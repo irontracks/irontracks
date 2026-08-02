@@ -3,8 +3,10 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { type SupabaseClient } from '@supabase/supabase-js';
 
 export interface ManualExercise {
@@ -81,12 +83,15 @@ export function HistoryListManualModal({
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
     useBackHandler(true, onClose);
+    // Congela o body (mesmo motivo do EditModal): evita o WebView arrastar o
+    // modal ao abrir o teclado no iOS.
+    useBodyScrollLock(true);
     return (
         <div
             role="button"
             tabIndex={-1}
             aria-label="Fechar modal"
-            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-start justify-center p-4"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
@@ -95,7 +100,9 @@ export function HistoryListManualModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="history-manual-title"
-                className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
+                // Ancorado no topo + altura via max-h-full (NÃO dvh — o dvh oscila com o
+                // teclado no iOS). Mesmo fix do HistoryListEditModal.
+                className="w-full max-w-2xl max-h-full flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',
@@ -136,7 +143,9 @@ export function HistoryListManualModal({
                     </div>
                 </div>
 
-                <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                {/* Scroll só vertical (overflow-x-hidden) + sem rubber-band (overscroll-none),
+                    mesmo fix do HistoryListEditModal. */}
+                <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none">
                     <div>
                         <div className="text-[10px] uppercase font-bold text-neutral-400">Data e Hora</div>
                         <input
@@ -152,7 +161,7 @@ export function HistoryListManualModal({
                         <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                         <input
                             aria-label="Duração (min)"
-                            type="number"
+                            inputMode="numeric"
                             value={manualDuration}
                             onChange={(e) => setManualDuration(e.target.value)}
                             className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
@@ -199,10 +208,10 @@ export function HistoryListManualModal({
                                     {manualExercises.map((ex, idx) => (
                                         <div key={idx} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                             <p className="text-sm font-bold text-white">{ex.name}</p>
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 [&>*]:min-w-0">
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Sets</div>
-                                                    <input aria-label="Sets" type="number" inputMode="numeric" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
+                                                    <input aria-label="Sets" inputMode="numeric" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Reps</div>
@@ -214,12 +223,12 @@ export function HistoryListManualModal({
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Descanso (s)</div>
-                                                    <input aria-label="Descanso (s)" type="number" inputMode="numeric" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
+                                                    <NumericInput aria-label="Descanso (s)" decimal={false} value={ex.restTime || 0} onValueChange={(n) => updateManualExercise(idx, 'restTime', n ?? 0)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 [&>*]:min-w-0">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}
@@ -235,7 +244,7 @@ export function HistoryListManualModal({
                                             </div>
                                             <div>
                                                 <div className="text-[10px] text-neutral-400">Reps por série</div>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 [&>*]:min-w-0">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}

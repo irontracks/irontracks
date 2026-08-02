@@ -207,6 +207,7 @@ final class WatchSessionManager: NSObject, ObservableObject {
                     self.hasEverSynced = true
                     UserDefaults.standard.set(true, forKey: self.hasEverSyncedKey)
                 }
+                self.persistComplicationSnapshot()
             } catch {
                 self.lastError = "Dashboard decode falhou: \(error.localizedDescription)"
             }
@@ -225,6 +226,7 @@ final class WatchSessionManager: NSObject, ObservableObject {
                     activeWorkoutId: self.dashboard.activeWorkoutId
                 )
                 self.lastSyncDate = Date()
+                self.persistComplicationSnapshot()
             } catch {
                 self.lastError = "Workout decode falhou: \(error.localizedDescription)"
             }
@@ -245,6 +247,24 @@ final class WatchSessionManager: NSObject, ObservableObject {
         case .requestRefresh, .logSet, .cardioFinish, .checkinRequest:
             break
         }
+    }
+
+    /// Espelha o dashboard no App Group pra que as Complications leiam da watch face.
+    /// O store ignora escritas sem mudança de conteúdo, preservando o orçamento de
+    /// reloads que o watchOS concede por complication.
+    private func persistComplicationSnapshot() {
+        let workout = dashboard.nextWorkout
+        WatchSharedStore.save(
+            WatchComplicationSnapshot(
+                streakDays: dashboard.streakDays,
+                weekWorkouts: dashboard.weekWorkouts,
+                weekGoal: dashboard.weekGoal,
+                workoutName: workout?.name,
+                dayLabel: workout?.dayLabel,
+                exerciseCount: workout?.exercises.count ?? 0,
+                isWorkoutActive: dashboard.isWorkoutActive
+            )
+        )
     }
 }
 

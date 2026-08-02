@@ -1,12 +1,24 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Calendar, ArrowLeft, Clock, User, Plus, Pencil, Trash2 } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  User,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle,
+} from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { InAppNotificationsProvider } from '@/contexts/InAppNotificationsContext'
+import { BackButton } from '@/components/ui/BackButton'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 type AppointmentRow = {
   id: string
@@ -34,6 +46,14 @@ type FormState = {
 
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 60
 
+const WEEKDAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'] as const
+
+const APPOINTMENT_TYPES = [
+  { value: 'personal', label: 'Personal' },
+  { value: 'assessment', label: 'Avaliação' },
+  { value: 'other', label: 'Outro' },
+] as const
+
 function toDateInputValue(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -51,15 +71,65 @@ function addMinutes(date: Date, minutes: number) {
   return new Date(date.getTime() + minutes * 60000)
 }
 
-function formatTimeRange(startIso: string, endIso: string) {
-  if (!startIso || !endIso) return ''
-  const start = new Date(startIso)
-  const end = new Date(endIso)
-  const startHours = String(start.getHours()).padStart(2, '0')
-  const startMinutes = String(start.getMinutes()).padStart(2, '0')
-  const endHours = String(end.getHours()).padStart(2, '0')
-  const endMinutes = String(end.getMinutes()).padStart(2, '0')
-  return `${startHours}:${startMinutes} - ${endHours}:${endMinutes}`
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+/** `new Date('2026-07-25')` seria interpretado como UTC — aqui precisa ser local. */
+function parseDateInput(value: string) {
+  const [year, month, day] = (value || '').split('-').map(Number)
+  if (!year || !month || !day) return new Date()
+  return new Date(year, month - 1, day)
+}
+
+function startOfWeek(date: Date) {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - start.getDay())
+  return start
+}
+
+function capitalize(value: string) {
+  if (!value) return value
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function formatMonthYear(date: Date) {
+  return capitalize(date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }))
+}
+
+function formatLongDate(date: Date) {
+  return capitalize(date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }))
+}
+
+function formatTime(iso: string) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** Duração exibida no sheet — espelha a regra do submit (fim inválido = 60 min). */
+function formatDuration(startTime: string, endTime: string) {
+  const [startHour, startMin] = (startTime || '').split(':').map(Number)
+  if (!Number.isFinite(startHour) || !Number.isFinite(startMin)) return ''
+  const [endHour, endMin] = (endTime || '').split(':').map(Number)
+
+  const start = startHour * 60 + startMin
+  const parsedEnd =
+    Number.isFinite(endHour) && Number.isFinite(endMin) ? endHour * 60 + endMin : Number.NaN
+  const end =
+    Number.isFinite(parsedEnd) && parsedEnd > start
+      ? parsedEnd
+      : start + DEFAULT_APPOINTMENT_DURATION_MINUTES
+
+  const total = end - start
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  if (hours && minutes) return `${hours}h${String(minutes).padStart(2, '0')}`
+  if (hours) return `${hours}h`
+  return `${minutes}min`
 }
 
 function getTypeLabel(type: 'personal' | 'assessment' | 'other') {
@@ -69,7 +139,6 @@ function getTypeLabel(type: 'personal' | 'assessment' | 'other') {
 }
 
 export default function SchedulePage() {
-  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
   const today = new Date()
@@ -86,6 +155,7 @@ export default function SchedulePage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState(initialDate)
   const [editingAppointment, setEditingAppointment] = useState<AppointmentRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<AppointmentRow | null>(null)
 
   const [form, setForm] = useState<FormState>({
     date: initialDate,
@@ -94,6 +164,19 @@ export default function SchedulePage() {
     studentId: '',
     type: 'personal',
   })
+
+  const selectedDateObj = useMemo(() => parseDateInput(selectedDate), [selectedDate])
+  const todayValue = useMemo(() => toDateInputValue(new Date()), [])
+
+  const durationLabel = useMemo(
+    () => formatDuration(form.startTime, form.endTime),
+    [form.startTime, form.endTime]
+  )
+
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(selectedDateObj)
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index))
+  }, [selectedDateObj])
 
   const loadAppointmentsForDate = useCallback(
     async (dateString: string) => {
@@ -187,6 +270,10 @@ export default function SchedulePage() {
       isCancelled = true
     }
   }, [userId, selectedDate, loadAppointmentsForDate])
+
+  const shiftWeek = (direction: -1 | 1) => {
+    setSelectedDate(toDateInputValue(addDays(selectedDateObj, direction * 7)))
+  }
 
   const handleOpenModal = () => {
     const base = new Date()
@@ -324,13 +411,14 @@ export default function SchedulePage() {
     setIsModalOpen(true)
   }
 
-  const handleDeleteAppointment = async (item: AppointmentRow) => {
+  const handleConfirmDelete = async () => {
+    const item = deleteTarget
+    if (!item) return
     if (!userId) {
       setError('Usuário não identificado.')
+      setDeleteTarget(null)
       return
     }
-    const confirmed = typeof window === 'undefined' ? false : window.confirm('Deseja realmente excluir este agendamento?')
-    if (!confirmed) return
     try {
       setSaving(true)
       setError('')
@@ -342,6 +430,7 @@ export default function SchedulePage() {
       if (deleteError) throw deleteError
       const targetDate = selectedDate || toDateInputValue(new Date())
       await loadAppointmentsForDate(targetDate)
+      setDeleteTarget(null)
     } catch (e: unknown) {
       setError(getErrorMessage(e) || 'Erro ao excluir agendamento.')
     } finally {
@@ -360,215 +449,372 @@ export default function SchedulePage() {
 
   return (
     <InAppNotificationsProvider>
-      <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
-        <header className="bg-neutral-950 border-b border-neutral-800 px-4 pt-[env(safe-area-inset-top)] pb-3 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-neutral-400 hover:text-white px-3 py-2 rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-xs font-bold uppercase tracking-wide">Voltar</span>
-          </button>
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-yellow-500" />
-            <div className="text-right">
-              <div className="text-[10px] uppercase text-neutral-400 font-bold">Coach</div>
-              <div className="text-sm font-black tracking-tight">Agenda do Dia</div>
+      <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
+        {/* ── Header ───────────────────────────────────────────────── */}
+        <header className="sticky top-0 z-30 bg-neutral-950/95 backdrop-blur-md border-b border-white/5 px-2 pt-[env(safe-area-inset-top)]">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center h-14">
+            <div className="justify-self-start">
+              <BackButton label="" className="px-2" />
             </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 py-4 pb-[max(env(safe-area-inset-bottom),96px)] space-y-4">
-          <section className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-bold uppercase text-neutral-400 mb-1">Data</div>
+            <h1 className="text-base font-bold tracking-tight">Agenda</h1>
+            <div className="justify-self-end relative">
+              <button
+                type="button"
+                aria-label="Escolher data"
+                className="w-11 h-11 flex items-center justify-center rounded-full text-neutral-400 active:scale-95 transition-transform"
+              >
+                <CalendarDays size={20} />
+              </button>
+              {/* Input nativo sobreposto: abre o date picker do sistema ao toque */}
               <input
                 type="date"
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
-                className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[48px] w-full"
+                aria-label="Escolher data"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
             </div>
+          </div>
+        </header>
+
+        {/* ── Seletor de semana ────────────────────────────────────── */}
+        <section className="px-4 pt-4 pb-3 border-b border-white/5">
+          <div className="flex items-center justify-between mb-3">
             <button
               type="button"
-              onClick={handleOpenModal}
-              className="flex items-center gap-2 bg-yellow-500 text-black font-black px-4 py-3 rounded-xl shadow-lg shadow-yellow-900/30 text-sm uppercase tracking-wide active:scale-95 transition-transform min-h-[44px]"
+              onClick={() => shiftWeek(-1)}
+              aria-label="Semana anterior"
+              className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full text-neutral-500 hover:text-white active:scale-95 transition"
             >
-              <Plus size={18} />
-              Novo Agendamento
+              <ChevronLeft size={18} />
             </button>
-          </section>
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-400">
+              {formatMonthYear(selectedDateObj)}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftWeek(1)}
+              aria-label="Próxima semana"
+              className="w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-neutral-500 hover:text-white active:scale-95 transition"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map(day => {
+              const value = toDateInputValue(day)
+              const isSelected = value === selectedDate
+              const isToday = value === todayValue
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSelectedDate(value)}
+                  aria-label={formatLongDate(day)}
+                  aria-current={isSelected ? 'date' : undefined}
+                  className={`flex flex-col items-center gap-1 py-2 rounded-xl transition-colors active:scale-95 ${
+                    isSelected ? 'bg-yellow-500 text-black' : 'text-neutral-400 hover:bg-white/5'
+                  }`}
+                >
+                  <span className={`text-[10px] font-bold tracking-wider ${isSelected ? 'text-black/60' : 'text-neutral-500'}`}>
+                    {WEEKDAY_LABELS[day.getDay()]}
+                  </span>
+                  <span className={`text-sm tabular-nums ${isSelected ? 'font-black' : 'font-semibold text-white'}`}>
+                    {day.getDate()}
+                  </span>
+                  <span
+                    className={`w-1 h-1 rounded-full ${
+                      isToday ? (isSelected ? 'bg-black/50' : 'bg-yellow-500') : 'bg-transparent'
+                    }`}
+                  />
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* ── Conteúdo ─────────────────────────────────────────────── */}
+        <main className="flex-1 flex flex-col px-4 pt-5 pb-[max(env(safe-area-inset-bottom),112px)]">
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="text-sm font-semibold text-neutral-300">{formatLongDate(selectedDateObj)}</h2>
+            {!loading && safeAppointments.length > 0 && (
+              <span className="text-xs text-neutral-500 tabular-nums">
+                {safeAppointments.length} {safeAppointments.length === 1 ? 'agendamento' : 'agendamentos'}
+              </span>
+            )}
+          </div>
 
           {error && (
-            <div className="bg-red-900/40 border border-red-500 text-red-100 text-sm px-3 py-2 rounded-xl">
+            <div className="mb-4 bg-red-500/10 border border-red-500/40 text-red-200 text-sm px-3 py-2.5 rounded-xl">
               {error}
             </div>
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-neutral-400 text-sm">
-              Carregando agenda...
+            <div className="space-y-3" aria-busy="true" aria-label="Carregando agenda">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="h-[76px] rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse" />
+              ))}
             </div>
           ) : safeAppointments.length === 0 ? (
-            <div className="mt-4 bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-6 flex flex-col items-center text-center">
-              <Calendar size={32} className="text-neutral-400 mb-3" />
-              <h2 className="text-base font-bold mb-1">Nenhum agendamento para este dia</h2>
-              <p className="text-xs text-neutral-400 mb-4">Aproveite o descanso! ☕</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-center pb-12">
+              <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center mb-5">
+                <CalendarDays size={30} className="text-neutral-600" strokeWidth={1.5} />
+              </div>
+              <h3 className="text-base font-bold text-neutral-200 mb-1.5">Dia livre</h3>
+              {/* Sem CTA aqui de propósito: a FAB "Agendar" fica visível neste
+                  estado e dois botões para a mesma ação viram redundância. */}
+              <p className="text-sm text-neutral-500 max-w-[16rem] leading-relaxed">
+                Nenhum agendamento marcado. Use este espaço para encaixar um aluno.
+              </p>
             </div>
           ) : (
-            <section className="space-y-3">
+            <ul className="space-y-2.5">
               {safeAppointments.map(item => {
                 const student = item.student_id ? studentsById.get(item.student_id) || null : null
                 const label = getTypeLabel(item.type)
-                const range = formatTimeRange(item.start_time, item.end_time)
                 const studentName = student?.name || student?.email || ''
+                // `title` é montado como "Tipo · Aluno"; sem aluno ele vira só o tipo
+                // e repetiria o badge — nesse caso não vale a pena exibir.
+                const secondary = studentName || (item.title && item.title !== label ? item.title : '')
                 return (
-                  <div
+                  <li
                     key={item.id}
-                    className="bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+                    className="bg-white/[0.035] border border-white/[0.07] rounded-2xl p-3.5 flex items-stretch gap-3.5"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-neutral-900 flex items-center justify-center">
-                        <Clock size={18} className="text-yellow-500" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold uppercase px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/40">
-                            {label}
-                          </span>
-                          {studentName ? (
-                            <span className="flex items-center gap-1 text-[11px] text-neutral-300">
-                              <User size={12} className="text-neutral-400" />
-                              {studentName}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-sm font-semibold text-white mb-0.5">
-                          {item.title}
-                        </div>
-                        <div className="text-xs text-neutral-400 flex items-center gap-1">
-                          <Clock size={12} />
-                          {range}
-                        </div>
-                      </div>
+                    <div className="flex flex-col items-center justify-center min-w-[3.25rem]">
+                      <span className="text-base font-black tabular-nums leading-none">{formatTime(item.start_time)}</span>
+                      <span className="text-[11px] text-neutral-500 tabular-nums mt-1 leading-none">
+                        {formatTime(item.end_time)}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    <div className="w-px bg-white/10 rounded-full" aria-hidden="true" />
+
+                    <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-yellow-500/10 text-yellow-400">
+                          {label}
+                        </span>
+                      </div>
+                      {secondary ? (
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                          <User size={13} className="text-neutral-500 shrink-0" />
+                          <span className="truncate">{secondary}</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-neutral-600">Sem aluno vinculado</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col justify-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleEditAppointment(item)}
-                        className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center text-neutral-300 active:scale-95 transition-transform"
+                        aria-label={`Editar ${item.title}`}
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
                       >
-                        <Pencil size={16} />
+                        <Pencil size={15} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteAppointment(item)}
-                        className="w-9 h-9 rounded-full bg-red-900/40 border border-red-700/60 flex items-center justify-center text-red-400 active:scale-95 transition-transform"
+                        onClick={() => setDeleteTarget(item)}
+                        aria-label={`Excluir ${item.title}`}
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
-                  </div>
+                  </li>
                 )
               })}
-            </section>
+            </ul>
           )}
         </main>
 
+        {/* ── FAB ──────────────────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={handleOpenModal}
+          aria-label="Novo agendamento"
+          className="fixed right-5 z-40 flex items-center gap-2 h-14 pl-4 pr-5 rounded-full bg-yellow-500 text-black font-black text-sm uppercase tracking-wide shadow-lg shadow-black/50 active:scale-95 transition-transform"
+          style={{ bottom: 'max(env(safe-area-inset-bottom), 1.25rem)' }}
+        >
+          <Plus size={20} strokeWidth={3} />
+          Agendar
+        </button>
+
+        {/* ── Modal criar/editar ───────────────────────────────────── */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-md p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-black flex items-center gap-2">
-                  <Calendar size={20} className="text-yellow-500" />
-                  Novo Agendamento
-                </h2>
+          <div className="overlay-enter fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:px-4">
+            <div
+              className="overlay-content-enter bg-neutral-900 border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1.25rem)' }}
+            >
+              {/* Handle: sinaliza folha arrastável, padrão de sheet nativo */}
+              <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
+                <div className="w-9 h-1 rounded-full bg-white/15" />
+              </div>
+
+              <div className="px-5 pt-2 pb-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black tracking-tight">
+                    {editingAppointment ? 'Editar agendamento' : 'Novo agendamento'}
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5 truncate">
+                    {formatLongDate(parseDateInput(form.date))}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="text-neutral-400 hover:text-white px-2 py-1 rounded-full active:scale-95 transition-transform"
+                  aria-label="Fechar"
+                  className="w-9 h-9 shrink-0 -mr-1 flex items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
                 >
-                  <ArrowLeft size={18} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitAppointment} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-neutral-400">Data</label>
-                    <input
-                      type="date"
-                      value={form.date}
-                      onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-neutral-400">Hora início</label>
+              <form onSubmit={handleSubmitAppointment} className="px-5 space-y-5">
+                {/* Quando ─ data + janela de horário, agrupadas porque decidem a mesma coisa */}
+                <fieldset className="space-y-2">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Quando
+                  </legend>
+                  <input
+                    type="date"
+                    value={form.date}
+                    aria-label="Data"
+                    onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
                     <input
                       type="time"
                       value={form.startTime}
+                      aria-label="Hora de início"
                       onChange={e => setForm(prev => ({ ...prev, startTime: e.target.value }))}
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                    />
+                    <input
+                      type="time"
+                      value={form.endTime}
+                      aria-label="Hora de término"
+                      onChange={e => setForm(prev => ({ ...prev, endTime: e.target.value }))}
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
                     />
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-400">Hora fim (opcional)</label>
-                  <input
-                    type="time"
-                    value={form.endTime}
-                    onChange={e => setForm(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-400">Aluno</label>
-                  <select
-                    value={form.studentId}
-                    onChange={e => setForm(prev => ({ ...prev, studentId: e.target.value }))}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  >
-                    <option value="">Sem aluno vinculado</option>
-                    {safeStudents.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name || s.email || 'Aluno sem nome'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-400">Tipo</label>
-                  <select
-                    value={form.type}
-                    onChange={e => setForm(prev => ({ ...prev, type: e.target.value as FormState['type'] }))}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  >
-                    <option value="personal">Personal</option>
-                    <option value="assessment">Avaliação</option>
-                    <option value="other">Outro</option>
-                  </select>
-                </div>
+                  {durationLabel && (
+                    <p className="text-xs text-neutral-500 pl-0.5">Duração de {durationLabel}</p>
+                  )}
+                </fieldset>
 
-                <div className="flex gap-2 mt-2">
+                {/* Tipo ─ 3 opções fixas viram chips: escolha visível sem abrir picker */}
+                <fieldset>
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Tipo
+                  </legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {APPOINTMENT_TYPES.map(option => {
+                      const isActive = form.type === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => setForm(prev => ({ ...prev, type: option.value }))}
+                          className={`h-11 rounded-xl text-sm font-bold transition active:scale-95 ${
+                            isActive
+                              ? 'bg-yellow-500 text-black'
+                              : 'bg-white/[0.04] border border-white/10 text-neutral-300 hover:bg-white/[0.07]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+
+                {/* Aluno ─ segue select (lista dinâmica), mas com chevron próprio */}
+                <fieldset>
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Aluno
+                  </legend>
+                  <div className="relative">
+                    <select
+                      value={form.studentId}
+                      aria-label="Aluno"
+                      onChange={e => setForm(prev => ({ ...prev, studentId: e.target.value }))}
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl pl-3.5 pr-10 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                    >
+                      <option value="">Sem aluno vinculado</option>
+                      {safeStudents.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name || s.email || 'Aluno sem nome'}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+                    />
+                  </div>
+                </fieldset>
+
+                {/* Salvar domina; cancelar é texto — não competem pelo mesmo peso */}
+                <div className="flex items-center gap-3 pt-1">
                   <button
                     type="button"
                     onClick={handleCloseModal}
                     disabled={saving}
-                    className="flex-1 min-h-[44px] px-4 py-3 rounded-xl border border-neutral-700 text-neutral-300 text-sm font-bold uppercase bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 active:scale-95 transition-transform"
+                    className="px-4 min-h-[52px] text-sm font-bold text-neutral-400 hover:text-white disabled:opacity-50 active:scale-95 transition"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black text-sm font-black uppercase tracking-wide hover:bg-yellow-400 disabled:opacity-50 active:scale-95 transition-transform"
+                    className="flex-1 min-h-[52px] rounded-2xl bg-yellow-500 text-black text-[15px] font-black disabled:opacity-50 active:scale-[0.98] transition"
                   >
-                    {saving ? 'Salvando...' : 'Salvar'}
+                    {saving ? 'Salvando…' : editingAppointment ? 'Salvar alterações' : 'Agendar'}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal de exclusão (substitui o window.confirm) ───────── */}
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
+            <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-sm p-5 text-center">
+              <div className="w-12 h-12 mx-auto rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <AlertTriangle size={22} className="text-red-400" />
+              </div>
+              <h2 className="text-base font-bold mb-1.5">Excluir agendamento?</h2>
+              <p className="text-sm text-neutral-400 mb-5 leading-relaxed">
+                {deleteTarget.title} · {formatTime(deleteTarget.start_time)}. Esta ação não pode ser desfeita.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={saving}
+                  className="flex-1 min-h-[48px] px-4 rounded-xl border border-white/10 text-neutral-300 text-sm font-bold hover:bg-white/5 disabled:opacity-50 active:scale-95 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={saving}
+                  className="flex-1 min-h-[48px] px-4 rounded-xl bg-red-500 text-white text-sm font-black disabled:opacity-50 active:scale-95 transition"
+                >
+                  {saving ? 'Excluindo…' : 'Excluir'}
+                </button>
+              </div>
             </div>
           </div>
         )}

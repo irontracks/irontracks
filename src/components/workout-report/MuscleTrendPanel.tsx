@@ -69,6 +69,9 @@ export const MuscleTrendPanel = ({ data, muscleById, series, buildSparklinePoint
           </tbody>
         </table>
       </div>
+      <div className="mt-2 text-[11px] text-neutral-500 leading-snug">
+        O Δ compara o acumulado <strong className="text-neutral-400">desta semana (em andamento)</strong> com o total da semana anterior — no começo da semana ele naturalmente fica negativo e sobe conforme você treina.
+      </div>
     </div>
   )
 }

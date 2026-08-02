@@ -5,7 +5,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { trackMeal } from '@/lib/nutrition/engine'
-import { saveLearnedFood } from '@/lib/nutrition/learned-foods'
+import { saveMealMemo } from '@/lib/nutrition/learned-foods'
 import { sanitizeFoodName } from '@/lib/nutrition/security'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
 
     // Auto-learn: save the AI-estimated food so the local parser
     // recognizes it next time without needing the AI again.
-    await saveLearnedFood(
+    await saveMealMemo(
       supabase,
       userId,
       text,                                              // original user input

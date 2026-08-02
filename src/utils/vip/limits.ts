@@ -10,8 +10,9 @@ export type VipTierLimits = {
   nutrition_macros: boolean
   analytics: boolean
   offline: boolean
-  chef_ai: boolean
-  lab_exams: boolean // análise de exames laboratoriais por IA (Gemini Pro) — pro+
+  // análise de exames laboratoriais por IA (Gemini Pro) — TODO plano VIP
+  // (start/pro/elite). O comentário antigo dizia "pro+" e divergia do código.
+  lab_exams: boolean
 }
 
 export type VipEntitlementSource =
@@ -38,7 +39,6 @@ export const FREE_LIMITS: VipTierLimits = {
   nutrition_macros: false,
   analytics: false,
   offline: false,
-  chef_ai: false,
   lab_exams: false
 }
 
@@ -51,7 +51,6 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   nutrition_macros: true,
   analytics: true,
   offline: true,
-  chef_ai: true,
   lab_exams: true
 }
 
@@ -74,7 +73,10 @@ export const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
   try {
     const normalized = normalizePlanId(tier)
     if (normalized === 'vip_elite') {
-      return { ...limits, nutrition_macros: true, analytics: true, offline: true, chef_ai: true, lab_exams: true }
+      // `chef_ai` foi REMOVIDO em 02/08/2026: era concedido ao Elite mas não
+      // era checado em rota nenhuma nem anunciado em plano nenhum — vaporware
+      // no schema. Se a feature um dia existir, nasce com gate + anúncio.
+      return { ...limits, nutrition_macros: true, analytics: true, offline: true, lab_exams: true }
     }
     if (normalized === 'vip_pro') {
       return { ...limits, offline: true, lab_exams: true }
@@ -113,13 +115,16 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         ...limits,
         chat_daily: capNumber(limits.chat_daily, 10),
         insights_weekly: capNumber(limits.insights_weekly, 3),
-        wizard_weekly: capNumber(limits.wizard_weekly, 1),
+        // 4/semana — o FREE tem 3. Até 02/08/2026 o cap era 1: quem PAGAVA o
+        // Start recebia MENOS gerações do Wizard (a feature VIP mais usada,
+        // 14 pessoas) que o plano gratuito. Invariante travado por teste:
+        // nenhum limite numérico de plano pago pode ficar abaixo do free.
+        wizard_weekly: capNumber(limits.wizard_weekly, 4),
         history_days: capHistory(limits.history_days, 60),
         nutrition_macros: false,
         analytics: false,
         offline: false,
-        chef_ai: false,
-        lab_exams: true, // disponível em todo VIP (start/pro/elite)
+              lab_exams: true, // disponível em todo VIP (start/pro/elite)
       }
     }
     if (normalized === 'vip_pro') {
@@ -127,13 +132,16 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         ...limits,
         chat_daily: capNumber(limits.chat_daily, 40),
         insights_weekly: capNumber(limits.insights_weekly, 7),
-        wizard_weekly: capNumber(limits.wizard_weekly, 3),
+        // 8/semana — precisa ficar ACIMA do Start (4). Ao corrigir a inversão
+        // pago×free em 02/08, o Start subiu para 4 e o Pro ficou em 3: o plano
+        // de R$59,90 com menos wizard que o de R$29,90. Guard de escada trava
+        // Start ≤ Pro ≤ Elite em toda cota numérica.
+        wizard_weekly: capNumber(limits.wizard_weekly, 8),
         history_days: null,
         nutrition_macros: true,
         analytics: false,
         offline: true,
-        chef_ai: false,
-        lab_exams: true,
+              lab_exams: true,
       }
     }
     if (normalized === 'vip_elite') {
@@ -146,8 +154,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         nutrition_macros: true,
         analytics: true,
         offline: true,
-        chef_ai: true,
-        lab_exams: true,
+              lab_exams: true,
       }
     }
     return limits

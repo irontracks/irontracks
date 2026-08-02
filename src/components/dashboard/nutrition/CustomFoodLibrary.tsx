@@ -9,6 +9,7 @@
 import { memo, useState, useCallback } from 'react'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
 import type { CustomFood, CustomFoodDraft } from './useCustomFoods'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 interface Props {
   foods: CustomFood[]
@@ -24,15 +25,12 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
   return (
     <div className="flex flex-col gap-0.5">
       <label htmlFor={id} className="text-[9px] uppercase tracking-widest text-neutral-500">{label}</label>
-      <input
+      <NumericInput
         id={id}
         aria-label={label}
-        type="number"
-        inputMode="decimal"
         min="0"
-        step="0.1"
         value={value}
-        onChange={e => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
+        onValueChange={n => onChange(Math.max(0, n ?? 0))}
         className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-[16px] text-white focus:outline-none focus:border-yellow-500/60"
       />
     </div>

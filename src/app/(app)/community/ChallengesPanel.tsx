@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Swords, Loader2, Check, X, Dumbbell, Flame } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 interface Challenge {
   id: string
@@ -192,25 +193,25 @@ export default function ChallengesPanel({
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <label className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">Meta</label>
-                  <input
+                  <NumericInput
                     aria-label="Meta do desafio"
-                    type="number"
+                    decimal={false}
                     min={1}
                     max={100}
                     value={targetValue}
-                    onChange={(e) => setTargetValue(Number(e.target.value) || 1)}
+                    onValueChange={(n) => setTargetValue(n || 1)}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-neutral-700 text-sm text-white font-bold"
                   />
                 </div>
                 <div className="flex-1">
                   <label className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">Prazo (dias)</label>
-                  <input
+                  <NumericInput
                     aria-label="Prazo em dias"
-                    type="number"
+                    decimal={false}
                     min={1}
                     max={30}
                     value={deadlineDays}
-                    onChange={(e) => setDeadlineDays(Number(e.target.value) || 7)}
+                    onValueChange={(n) => setDeadlineDays(n || 7)}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-neutral-700 text-sm text-white font-bold"
                   />
                 </div>

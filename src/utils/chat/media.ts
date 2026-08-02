@@ -1,4 +1,21 @@
+/**
+ * Lê o arquivo como data URL (base64). Usamos data URL — NÃO `URL.createObjectURL` —
+ * porque blob: URLs falham ao carregar no WebView do Capacitor (Android) quando o app
+ * é servido do `server.url` remoto: o `<img>` dispara onerror e a compressão quebra
+ * (era a causa do "Erro inesperado" no upload de foto de perfil). Data URL carrega em
+ * qualquer contexto. Mesmo caminho usado com sucesso no ProgressPhotos.
+ */
+function readAsDataURL(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo'))
+    reader.readAsDataURL(file)
+  })
+}
+
 export async function compressImage(file: File | Blob, { maxWidth = 1280, quality = 0.8 }: { maxWidth?: number, quality?: number } = {}): Promise<Blob> {
+  const dataUrl = await readAsDataURL(file)
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
@@ -22,8 +39,7 @@ export async function compressImage(file: File | Blob, { maxWidth = 1280, qualit
       )
     }
     img.onerror = () => reject(new Error('Falha ao carregar imagem'))
-    const url = URL.createObjectURL(file)
-    img.src = url
+    img.src = dataUrl
   })
 }
 

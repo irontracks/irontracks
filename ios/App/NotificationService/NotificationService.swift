@@ -103,6 +103,7 @@ class NotificationService: UNNotificationServiceExtension {
         "morning_briefing", "muscle_weekly_insights",
         "rest_timer",
         "story_comment", "story_like", "story_posted",
+        "student_workout_start",
         "team_chat", "team_invite",
         "trial_ending", "vip_welcome",
         "water_reminder",

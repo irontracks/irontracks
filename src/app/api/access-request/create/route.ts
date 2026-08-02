@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { normalizeBrPhone } from '@/lib/whatsapp/zapi'
+import { normalizeBrPhone } from '@/utils/phone/brPhone'
 import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { notifyAdminNewSignup } from '@/lib/admin/adminNotifications'
+import { verifyCref } from '@/lib/cref/verifyCref'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +88,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: 'Cadastro já realizado. Aguarde a aprovação do administrador.' })
     }
 
+    let storedCref = cref?.trim() || null
+    let crefVerification: 'verified' | 'manual_review' | undefined
+
+    if (role_requested === 'teacher' && storedCref) {
+      const verification = await verifyCref(storedCref, full_name)
+      if (!verification.canContinue) {
+        return NextResponse.json(
+          { ok: false, error: verification.message, cref_status: verification.status },
+          { status: 400 },
+        )
+      }
+
+      storedCref = verification.normalizedCref ?? storedCref
+      crefVerification = verification.status === 'verified' ? 'verified' : 'manual_review'
+    }
+
     // ── Upsert access request ─────────────────────────────────────────────────
 
     if (existingRequest?.id && existingRequest.status === 'rejected') {
@@ -96,7 +114,7 @@ export async function POST(req: Request) {
           phone,
           birth_date: birth_date ?? null,
           role_requested: role_requested ?? 'student',
-          cref: cref ?? null,
+          cref: storedCref,
           phone_verified: false,
           status: 'pending',
           updated_at: new Date().toISOString(),
@@ -108,7 +126,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'Erro ao atualizar solicitação.' }, { status: 500 })
       }
 
-      return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: existingRequest.id })
+      return NextResponse.json({
+        ok: true,
+        message: 'Solicitação enviada com sucesso!',
+        id: existingRequest.id,
+        cref_verification: crefVerification,
+      })
     }
 
     const { data: inserted, error: insertError } = await supabaseAdmin
@@ -119,7 +142,7 @@ export async function POST(req: Request) {
         full_name,
         birth_date: birth_date ?? null,
         role_requested: role_requested ?? 'student',
-        cref: cref ?? null,
+        cref: storedCref,
         phone_verified: false,
         status: 'pending',
       })
@@ -131,14 +154,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
 
-    // Notifica admins in-app (fire-and-forget — não bloqueia a resposta).
-    notifyAdminNewSignup({
-      name: full_name,
-      email,
-      role: role_requested === 'teacher' ? 'teacher' : 'student',
-    }).catch(() => { })
+    // Notifica admins (não bloqueia a resposta) — mas DENTRO de `waitUntil`.
+    //
+    // Era um `.catch(() => {})` solto. Numa função serverless isso é uma
+    // promessa órfã: a Vercel devolve a resposta e CONGELA a instância, então a
+    // notificação só avança quando outra requisição por acaso reaquece o mesmo
+    // Lambda. Medido em 01/08: solicitação às 16:52, push no aparelho às 17:05.
+    //
+    // Esta rota é a que mais sofre, e não por acaso: quem chama é um visitante
+    // anônimo se cadastrando, o tráfego é esporádico e a instância está fria.
+    // Os outros pushes do app saem de rotas movimentadas e por isso pareciam
+    // funcionar — o dono relatou exatamente isso, "só o de solicitação falha".
+    waitUntil(
+      notifyAdminNewSignup({
+        name: full_name,
+        email,
+        role: role_requested === 'teacher' ? 'teacher' : 'student',
+      }).catch(() => { }),
+    )
 
-    return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
+    return NextResponse.json({
+      ok: true,
+      message: 'Solicitação enviada com sucesso!',
+      id: inserted?.id ?? null,
+      cref_verification: crefVerification,
+    })
 
   } catch (error) {
     logError('access-request/create', error)

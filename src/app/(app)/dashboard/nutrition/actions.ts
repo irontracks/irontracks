@@ -11,7 +11,7 @@ import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey, type Meal
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
-import { saveLearnedFood } from '@/lib/nutrition/learned-foods'
+import { saveMealMemo } from '@/lib/nutrition/learned-foods'
 import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
@@ -228,7 +228,7 @@ export async function estimateFoodAction(text: string) {
 
     // Auto-learn: próxima vez o parser local reconhece sem IA.
     try {
-      await saveLearnedFood(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
+      await saveMealMemo(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
     } catch { /* não-fatal */ }
 
     const item = {
@@ -279,6 +279,77 @@ export async function applyGeneratedMealAction(
     return { ok: true, meal: mealLog, entry: row || null }
   } catch (e: unknown) {
     return { ok: false, error: String(getErrorMessage(e) || 'nutrition_apply_generated_meal_failed') }
+  }
+}
+
+/**
+ * Lança a refeição que o CHAT simulou — persistindo EXATAMENTE os items que o card
+ * mostrou.
+ *
+ * ── Por que não reusa o logMealAction (que seria o reuso óbvio) ────────────────
+ * Porque ele RE-RESOLVE o texto. O chat já resolveu: se a cascata falhou e caiu no
+ * Gemini, o logMealAction falharia de novo, devolveria `needsAi` e o cliente cairia
+ * em /api/ai/nutrition-estimate → NOVA amostra do modelo → OUTRO número. O card
+ * prometeria 390 kcal e o diário gravaria 412. O app se contradiria em dois toques,
+ * metrando a cota 2× e gastando 3 chamadas de IA no lugar de 1.
+ *
+ * ── Sobre confiar em número vindo do cliente ──────────────────────────────────
+ * É o mesmo modelo de confiança do applyGeneratedMealAction logo acima (dieta
+ * gerada), que também recebe macros do cliente e confia nos clamps do trackMeal
+ * (funil ÚNICO de escrita, tetos 6000/400/800/300). E o usuário já pode editar os
+ * próprios macros pelo editEntryCore. Não há dado de terceiro, não há vantagem em
+ * mentir pra si mesmo, e a alternativa (assinar a simulação) exigiria HMAC e cache
+ * que o repo não tem — infra nova pra proteger o usuário dele mesmo.
+ *
+ * Guard trava a ausência de resolveFood/estimateMacrosFromText aqui.
+ */
+export async function applyChatSimulationAction(
+  sim: {
+    foodText: string
+    foodName?: string
+    items: Array<{ label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }>
+  },
+  dateKey?: string,
+  clientId?: string,
+) {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolvedDateKey = resolveDateKey(dateKey)
+
+    const items = (Array.isArray(sim?.items) ? sim.items : []).slice(0, 20).map((it) => ({
+      label: sanitizeFoodName(String(it?.label ?? '')).slice(0, 120) || 'Item',
+      grams: Math.max(0, Number(it?.grams) || 0),
+      calories: Math.max(0, Number(it?.calories) || 0),
+      protein: Math.max(0, Number(it?.protein) || 0),
+      carbs: Math.max(0, Number(it?.carbs) || 0),
+      fat: Math.max(0, Number(it?.fat) || 0),
+    }))
+    if (!items.length) return { ok: false, error: 'Nada pra lançar.' }
+
+    // Os totais são a SOMA dos items — os mesmos que o card exibiu. Não arredonda
+    // aqui: o trackMeal grava a refeição crua e arredonda o total do dia (uma única
+    // passada), que é o que a projeção do card replicou. Ver chatProjection.ts.
+    const mealLog = {
+      // Nome LIMPO (sim.foodName vem da IA); jamais a pergunta crua do sim.foodText.
+      foodName: sanitizeFoodName(String(sim?.foodName || sim?.foodText || '')).slice(0, 120) || 'Refeição',
+      calories: items.reduce((s, i) => s + i.calories, 0),
+      protein: items.reduce((s, i) => s + i.protein, 0),
+      carbs: items.reduce((s, i) => s + i.carbs, 0),
+      fat: items.reduce((s, i) => s + i.fat, 0),
+    }
+    if (mealLog.calories <= 0 && mealLog.protein <= 0) return { ok: false, error: 'Refeição vazia.' }
+
+    const row = await trackMeal(userId, mealLog, resolvedDateKey, items, clientId ?? null)
+    revalidatePath('/dashboard/nutrition')
+    waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
+    return { ok: true, entry: row || null }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_apply_chat_simulation_failed') }
   }
 }
 

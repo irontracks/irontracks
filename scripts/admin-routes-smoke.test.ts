@@ -106,16 +106,5 @@ assert.ok(denyIdx > -1, 'teachers/accept must deny non-teachers with not_a_teach
 assert.ok(promoteIdx > -1 && denyIdx < promoteIdx, 'teachers/accept must check teacher membership BEFORE promoting profiles.role')
 assert.ok(/status:\s*403/.test(acceptText), 'teachers/accept must return 403 when no teacher record exists')
 
-// ── Write-IDOR guard: team/chat/notify (auditoria 2026-06-27) ──────────────
-// Qualquer autenticado inseria mensagem em sessão alheia + push spam. Deve
-// validar membership (isTeamSessionMember) ANTES de inserir em team_chat_messages.
-const notifyRoute = path.join(repoRoot, 'src', 'app', 'api', 'team', 'chat', 'notify', 'route.ts')
-const notifyText = fs.readFileSync(notifyRoute, 'utf8')
-const memberIdx = notifyText.indexOf('isTeamSessionMember')
-const insertIdx = notifyText.indexOf("from('team_chat_messages')")
-assert.ok(memberIdx > -1, 'team/chat/notify must validate membership via isTeamSessionMember')
-assert.ok(insertIdx > -1 && memberIdx < insertIdx, 'team/chat/notify must check membership BEFORE inserting the message')
-assert.ok(/status:\s*403/.test(notifyText), 'team/chat/notify must return 403 for non-members')
-
 process.stdout.write('ok\n')
 

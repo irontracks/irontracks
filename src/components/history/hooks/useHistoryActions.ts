@@ -4,6 +4,8 @@ import { useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ManualExercise, WorkoutLog, WorkoutSummary, isRecord, parseRawSession } from '@/components/historyListTypes';
 import { calculateTotalVolumeFromLogs } from './useHistoryData';
+import { buildReportMetrics } from '@/utils/report/reportMetrics';
+import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics';
 
 interface UseHistoryActionsProps {
     user: { id?: string; role?: string } | null;
@@ -77,6 +79,34 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         setHistory(prev => prev.map(h => h.id === id ? { ...h, ...changes } : h));
     };
 
+    // ── Hidratação sob demanda ───────────────────────────────────────────────
+    // A rota magra do histórico não manda `workouts.notes` (a sessão inteira).
+    // Quem precisa da sessão completa (detalhe/edição/retomar) busca AQUI, uma
+    // vez, e o resultado volta pro state — cliques seguintes não pagam de novo.
+    // RLS cobre: o usuário só lê os próprios treinos (admin vê alheios pela
+    // rota de admin, que continua mandando notes — aí este fetch nem roda).
+    const ensureRawSession = async (session: WorkoutSummary): Promise<WorkoutSummary> => {
+        if (session?.rawSession || session?.notes || session?.kind === 'cardio') return session;
+        try {
+            const { data, error } = await supabase
+                .from('workouts')
+                .select('id, user_id, student_id, notes')
+                .eq('id', session.id)
+                .maybeSingle();
+            if (error || !data) return session;
+            const raw = parseRawSession(data.notes);
+            const hydrated: WorkoutSummary = {
+                ...session,
+                rawSession: raw,
+                raw: { ...(isRecord(session.raw) ? session.raw : {}), user_id: data.user_id, student_id: data.student_id },
+            };
+            setHistory(prev => prev.map(h => (h.id === session.id ? hydrated : h)));
+            return hydrated;
+        } catch {
+            return session;
+        }
+    };
+
     // ── Edit session state ───────────────────────────────────────────────────
     const [showEdit, setShowEdit] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -85,9 +115,15 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     const [editDuration, setEditDuration] = useState('45');
     const [editNotes, setEditNotes] = useState('');
     const [editExercises, setEditExercises] = useState<ManualExercise[]>([]);
+    // Sessão original crua. O formulário de edição só conhece título/data/duração/
+    // séries — sem esta base, salvar reescrevia `workouts.notes` do ZERO e apagava
+    // tudo o que ele não sabe editar: reportMeta, ai, check-ins, cardio, RPE.
+    const [editBaseSession, setEditBaseSession] = useState<Record<string, unknown>>({});
 
-    const openEdit = (session: WorkoutSummary) => {
+    const openEdit = async (sessionInput: WorkoutSummary) => {
+        const session = await ensureRawSession(sessionInput);
         const raw = parseRawSession(session.rawSession ?? session.notes);
+        setEditBaseSession(isRecord(raw) ? (raw as Record<string, unknown>) : {});
         setEditId(session.id);
         setEditTitle(session.workoutTitle || raw?.workoutTitle || 'Treino');
         const d = raw?.date ? new Date(raw.date) : (session.date ? new Date(session.date) : new Date());
@@ -169,7 +205,26 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
                 }
             });
             const totalSeconds = parseInt(editDuration || '0', 10) * 60;
-            const session = { workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: totalSeconds, realTotalTime: totalSeconds, logs, exercises, notes: editNotes || '' };
+            // Parte da sessão ORIGINAL e sobrescreve só o que o formulário edita.
+            // Este UPDATE não passa por /api/workouts/finish, então é aqui que o
+            // `reportMeta` precisa ser recalculado — reconstruir a sessão do zero
+            // (o que se fazia até jul/2026) deixava o treino editado sem
+            // `reportMeta.totals`, e é a explicação mais provável das sessões que
+            // aparecem no banco com esse campo nulo.
+            const session: Record<string, unknown> = {
+                ...editBaseSession,
+                workoutTitle: editTitle, date: new Date(editDate).toISOString(),
+                totalTime: totalSeconds, realTotalTime: totalSeconds,
+                logs, exercises, notes: editNotes || '',
+            };
+            session.reportMeta = buildReportMetrics(session);
+            // As MÉTRICAS OFICIAIS que a IA já tinha gravado viraram passado ao
+            // mudar os pesos: re-sincroniza, senão as duas fontes de volume da
+            // mesma sessão voltam a divergir (guard volumeSingleSource).
+            if (isRecord(session.ai)) {
+                const metrics = computeAiSessionMetrics(session);
+                if (metrics) session.ai = { ...(session.ai as Record<string, unknown>), metrics };
+            }
             const { error } = await supabase.from('workouts').update({ name: editTitle, date: new Date(editDate).toISOString(), notes: JSON.stringify(session) }).eq('id', editId).eq('user_id', user.id);
             if (error) throw error;
             setShowEdit(false);
@@ -184,7 +239,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // ── Open session report ──────────────────────────────────────────────────
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
 
-    const openSession = (session: WorkoutSummary, onViewReport?: (s: unknown) => void) => {
+    const openSession = async (sessionInput: WorkoutSummary, onViewReport?: (s: unknown) => void) => {
+        const session = await ensureRawSession(sessionInput);
         const { RawSessionObjectSchema } = require('@/components/historyListTypes') as typeof import('@/components/historyListTypes');
         const rawSessionParsed = RawSessionObjectSchema.safeParse(session?.rawSession);
         const rawSession = rawSessionParsed.success ? rawSessionParsed.data : null;
@@ -202,10 +258,11 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // PRESERVANDO os logs (séries registradas). Pra quando o usuário finalizou
     // sem querer e quer voltar de onde parou. raw.logs usa o mesmo formato de
     // chave ("exIdx-setIdx") do treino ativo, então é reutilizado direto.
-    const openResume = (
-        session: WorkoutSummary,
+    const openResume = async (
+        sessionInput: WorkoutSummary,
         onResume?: (payload: { title: string; exercises: unknown[]; logs: Record<string, unknown> }) => void,
     ) => {
+        const session = await ensureRawSession(sessionInput);
         const raw = parseRawSession(session?.rawSession ?? session?.notes);
         const exercises = Array.isArray(raw?.exercises) ? raw.exercises : [];
         if (!exercises.length) return;
@@ -217,6 +274,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // ── Session metadata ─────────────────────────────────────────────────────
     const getSessionMeta = (s: WorkoutSummary) => {
         const raw = parseRawSession(s?.rawSession ?? s?.notes);
+        // Linha magra: servidor já computou (mesma fonte, sessionVolumeKg).
+        if (!raw) return { exCount: Number(s?.exCount) || 0, vol: Number(s?.volumeKg) || 0 };
         const exCount = Array.isArray(raw?.exercises) ? raw.exercises.length : 0;
         const vol = raw?.logs ? calculateTotalVolumeFromLogs(raw.logs) : 0;
         return { exCount, vol };

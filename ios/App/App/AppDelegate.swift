@@ -39,17 +39,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
 
-        // Allow background music (Spotify / Apple Music) to keep playing during workouts.
-        // .playback + .mixWithOthers: our alarm / timer sounds blend in without silencing
-        // or ducking other apps. .duckOthers was removed — activating the session on launch
-        // with duckOthers immediately lowers Spotify volume even before any sound plays.
-        // Speech recognition temporarily overrides to .record and restores on completion.
+        // Configura a sessão pra o alarme/timer MIXAR com a música de outros apps
+        // (.mixWithOthers). Speech recognition sobrepõe temporariamente com .record.
+        //
+        // Importante: NÃO ativamos a sessão aqui. Manter .playback ativo o tempo
+        // todo fazia o app "segurar" o foco de áudio — quando o alarme de descanso
+        // tocava (notificação, tela bloqueada) e interrompia o YouTube Music/Spotify,
+        // o foco voltava pro IronTracks (sessão ativa OCIOSA) em vez do app de
+        // música, que ficava pausado até o usuário apertar play. A sessão é ativada
+        // sob demanda (playAlarmSound / cardio) e liberada com
+        // .notifyOthersOnDeactivation ao parar (ver handleAudioInterruption abaixo).
         try? AVAudioSession.sharedInstance().setCategory(
             .playback,
             mode: .default,
             options: [.mixWithOthers, .allowAirPlay, .allowBluetoothA2DP]
         )
-        try? AVAudioSession.sharedInstance().setActive(true)
+
+        // Rede de segurança: se algo interromper a nossa sessão (ex.: o som da
+        // notificação do alarme), ao TERMINAR devolvemos o canal pros outros apps,
+        // pra a música retomar sozinha em vez de ficar pausada.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
 
         // ── BGTaskScheduler — register handlers BEFORE app finishes launching ──
         // iOS schedules these opportunistically (charging + Wi-Fi typically). Each
@@ -68,6 +82,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             self.handleSync(task: task as! BGProcessingTask)
         }
         return true
+    }
+
+    // MARK: – Audio interruption
+
+    /// Ao TERMINAR uma interrupção da nossa sessão (o som da notificação do alarme,
+    /// uma chamada, etc.), o IronTracks não tem áudio próprio pra retomar — então
+    /// liberamos o canal com .notifyOthersOnDeactivation. Isso devolve o foco pro
+    /// app de música (YouTube Music / Spotify), que volta a tocar sozinho em vez de
+    /// ficar pausado esperando o usuário apertar play.
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard
+            let info = notification.userInfo,
+            let typeRaw = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+            let type = AVAudioSession.InterruptionType(rawValue: typeRaw)
+        else { return }
+
+        if type == .ended {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     // MARK: – Background tasks

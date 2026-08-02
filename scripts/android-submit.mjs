@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * IronTracks — Submit latest AAB to Google Play Internal Testing (no UI).
+ * IronTracks — Submit latest AAB to Google Play Closed Testing Alpha (no UI).
  *
  * Espelho do scripts/ios-submit.mjs, mas pra Android via Google Play Developer API v3.
  *
@@ -8,13 +8,15 @@
  *   1. Autentica via service account JSON (JWT → access_token OAuth2)
  *   2. Cria um Edit em applications/{package}/edits
  *   3. Faz upload do AAB via uploadType=media
- *   4. Atribui a versão ao track (default: internal)
+ *   4. Atribui a versão ao track (default: alpha)
  *   5. Commit do edit
  *
  * Uso:
  *   node scripts/android-submit.mjs                                 # último AAB em build/outputs
  *   node scripts/android-submit.mjs --aab path/to/app-release.aab
- *   node scripts/android-submit.mjs --track production              # default: internal
+ *   node scripts/android-submit.mjs --track production              # default: alpha
+ *   node scripts/android-submit.mjs --name "IronTracks 1.14.1 (13)"
+ *   node scripts/android-submit.mjs --notes "Notas em português"
  *   node scripts/android-submit.mjs --dry-run
  *
  * Setup obrigatório (uma vez):
@@ -46,13 +48,35 @@ const SA_PATH = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT
 const args = process.argv.slice(2)
 let dryRun = false
 let aabPath = null
-let track = 'internal'
+let track = 'alpha'
+let releaseName = ''
+let releaseNotes = ''
 
 for (let i = 0; i < args.length; i++) {
     const a = args[i]
     if (a === '--dry-run') dryRun = true
     else if (a === '--aab') aabPath = args[++i]
     else if (a === '--track') track = args[++i]
+    else if (a === '--name') releaseName = args[++i]
+    else if (a === '--notes') releaseNotes = args[++i]
+    else {
+        console.error(`❌ Argumento inválido: ${a}`)
+        process.exit(1)
+    }
+}
+
+const allowedTracks = new Set(['internal', 'alpha', 'beta', 'production'])
+if (!allowedTracks.has(track)) {
+    console.error(`❌ Track inválido: ${track}`)
+    process.exit(1)
+}
+if (track === 'production' && process.env.ANDROID_CONFIRM_PRODUCTION !== 'YES') {
+    console.error('❌ Produção exige ANDROID_CONFIRM_PRODUCTION=YES.')
+    process.exit(1)
+}
+if (releaseNotes.length > 500) {
+    console.error('❌ As notas da versão excedem 500 caracteres.')
+    process.exit(1)
 }
 
 if (!aabPath) {
@@ -80,6 +104,7 @@ console.log('Config:')
 console.log('  Package:', PACKAGE_NAME)
 console.log('  AAB    :', aabPath)
 console.log('  Track  :', track)
+console.log('  Name   :', releaseName || '(automático)')
 console.log('  SA     :', saJson.client_email)
 console.log('  Mode   :', dryRun ? 'DRY RUN' : 'LIVE SUBMIT')
 console.log('')
@@ -173,12 +198,16 @@ console.log(`  versionCode=${bundle.versionCode}, sha1=${bundle.sha1?.slice(0, 1
 
 // ─── 3. Atribuir ao track ───────────────────────────────────────────────────
 console.log(`→ Atribuindo versionCode ${bundle.versionCode} ao track '${track}'...`)
+const release = {
+    status: 'completed',
+    versionCodes: [String(bundle.versionCode)],
+}
+if (releaseName) release.name = releaseName
+if (releaseNotes) release.releaseNotes = [{ language: 'pt-BR', text: releaseNotes }]
+
 await api('PUT', `/applications/${PACKAGE_NAME}/edits/${editId}/tracks/${track}`, {
     track,
-    releases: [{
-        status: 'completed',
-        versionCodes: [String(bundle.versionCode)],
-    }],
+    releases: [release],
 })
 console.log('  ✅ Track atualizado')
 
@@ -189,7 +218,6 @@ console.log('  ✅ Edit commitado')
 
 console.log('')
 console.log(`✅ AAB versionCode ${bundle.versionCode} enviado pro Play Console (track=${track}).`)
-if (track === 'internal') {
-    console.log('   Vai aparecer pra testers internos em ~10 min.')
-    console.log('   Pra promover pra Open Testing/Production, use o Play Console UI.')
+if (track === 'alpha') {
+    console.log('   Vai aparecer para os testadores do grupo da faixa Alpha em alguns minutos.')
 }

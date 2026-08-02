@@ -29,6 +29,11 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   workout_finish: 'notifyFriendWorkoutEvents',
   workout_finished: 'notifyFriendWorkoutEvents',
   workout_start: 'notifyFriendWorkoutStart',
+  // Professor: push "aluno iniciou o treino" (enviado via sendPushToAllPlatforms com
+  // preferenceKey explícito; mapeado aqui também pra manter o invariante toggle<->tipo).
+  student_workout_start: 'notifyStudentWorkoutStart',
+  // Aluno: push "seu professor te enviou um treino novo".
+  workout_assigned: 'notifyWorkoutAssigned',
   friend_comeback: 'notifyFriendComeback',
   friend_achievement: 'notifyAchievements',
   friend_weekly_goal: 'notifyFriendWeeklyGoal',
@@ -54,9 +59,7 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   challenge_created: 'notifyChallenges',
   challenge_accepted: 'notifyChallenges',
   challenge_declined: 'notifyChallenges',
-  team_invite: 'notifyTeamInvites',
   meal_reminder: 'notifyMealReminders',
-  workout_reminder: 'notifyWorkoutReminders',
 }
 
 /** Given a notification type, return the preference key that gates it, or null. */
@@ -122,7 +125,16 @@ export async function shouldThrottleBySenderType(senderId: unknown, type: unknow
   return Array.isArray(data) && data.length > 0
 }
 
-export async function insertNotifications(rows: unknown): Promise<{ ok: boolean; inserted: number; error?: string }> {
+/**
+ * `opts.skipPush`: NÃO dispara o push daqui. Use quando o chamador já enviou o push por conta
+ * própria — tipicamente via sendPushToAllPlatforms (iOS + Android), enquanto o push daqui é
+ * APNs/iOS-only. Sem isso, o usuário de iPhone recebe a MESMA notificação duas vezes (foi o
+ * que acontecia no cron muscle-weekly-insights: "Resumo da semana 💪" duplicado).
+ */
+export async function insertNotifications(
+  rows: unknown,
+  opts?: { skipPush?: boolean },
+): Promise<{ ok: boolean; inserted: number; error?: string }> {
   const admin = createAdminClient()
   const rawRows = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && typeof r === 'object')
@@ -222,6 +234,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
   // Fire-and-forget: send remote push to all recipient devices, grouped by notification type.
   // Grouping ensures each recipient hears the right message, not always the first row's title.
   // Fan-out is capped at PUSH_FAN_OUT_LIMIT to prevent Lambda timeouts on popular profiles.
+  if (opts?.skipPush) return { ok: true, inserted }
   try {
     const PUSH_FAN_OUT_LIMIT = 1000
 
@@ -231,7 +244,12 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
       const title = String(r.title || '').trim()
       const message = String(r.message || '').trim()
       const type = String(r.type || '').trim()
-      const link = String(r.link || r.action_url || '').trim()
+      // `metadata.link` também: a tabela `notifications` NÃO tem coluna `link`,
+      // então notificação de admin guarda o destino ali (ver lib/admin/
+      // adminNotifications.ts). Sem ler daqui, o push saía sem destino e o tap
+      // abria o app na tela inicial — reportado pelo dono em 01/08.
+      const meta = r.metadata && typeof r.metadata === 'object' ? r.metadata as Record<string, unknown> : null
+      const link = String(r.link || r.action_url || meta?.link || '').trim()
       if (!title || !message) continue
       const key = `${type}|${title}|${message}`
       if (!groups.has(key)) groups.set(key, { title, message, type, link: link || undefined, recipientIds: [] })

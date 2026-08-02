@@ -14,6 +14,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { dailyMuscleMapGenerationConfig } from '@/utils/ai/routeContracts'
 import {
   toStr,
   extractJsonFromModelText,
@@ -101,7 +102,7 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
     JSON.stringify(names),
   ].join('\n')
 
-  const model = getGeminiModel(apiKey, MODEL)
+  const model = getGeminiModel(apiKey, MODEL, dailyMuscleMapGenerationConfig())
   const geminiResult = await safeGemini('muscle-map-week:classify', () =>
     model.generateContent(prompt),
   )

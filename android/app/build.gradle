@@ -19,6 +19,7 @@ def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
+def hasReleaseSigning = keystorePropertiesFile.exists() && keystoreProperties['storeFile']
 
 android {
     namespace = "com.irontracks.app"
@@ -27,8 +28,8 @@ android {
         applicationId "com.irontracks.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.6.1"
+        versionCode 13
+        versionName "1.14.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // SENTRY_DSN is injected into AndroidManifest via manifestPlaceholders.
         // Pass via -PSENTRY_DSN=... on the CLI or set in ~/.gradle/gradle.properties.
@@ -43,18 +44,23 @@ android {
         }
     }
     signingConfigs {
-        release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+        if (hasReleaseSigning) {
+            release {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
         }
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
@@ -85,6 +91,10 @@ dependencies {
     // present and the google-services plugin is applied above.
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
+
+    // FusedLocationProvider — usado pelo CardioLocationService (GPS de cardio em
+    // background, paridade com o CLLocationManager do iOS).
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 }
 
 apply from: 'capacitor.build.gradle'

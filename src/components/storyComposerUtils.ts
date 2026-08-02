@@ -6,6 +6,7 @@
  */
 
 import { safeString } from '@/utils/guards'
+import { calculateTotalVolume as canonicalCalculateTotalVolume } from '@/utils/report/formatters'
 import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { type StoryTemplate, DEFAULT_STORY_TEMPLATE, storyFont } from '@/components/stories/storyTemplates'
 
@@ -139,34 +140,6 @@ export const pickFirstSupportedMime = (candidates: string[]): string => {
     }
 };
 
-export const parseExt = (rawName: string): string => {
-    const n = safeString(rawName).toLowerCase();
-    const i = n.lastIndexOf('.');
-    if (i < 0) return '';
-    const ext = n.slice(i);
-    return ['.jpeg', '.jpg', '.png', '.mp4', '.mov', '.webm'].includes(ext) ? ext : '';
-};
-
-export const extFromMime = (mime: string): string => {
-    const t = safeString(mime).toLowerCase();
-    if (t === 'image/png') return '.png';
-    if (t === 'image/jpeg') return '.jpg';
-    if (t === 'video/mp4') return '.mp4';
-    if (t === 'video/quicktime') return '.mov';
-    if (t === 'video/webm') return '.webm';
-    return '';
-};
-
-export const guessMediaKind = (mime: string, ext: string): 'video' | 'image' | 'unknown' => {
-    const t = safeString(mime).toLowerCase();
-    if (t.startsWith('video/')) return 'video';
-    if (t.startsWith('image/')) return 'image';
-    const e = safeString(ext).toLowerCase();
-    if (['.mp4', '.mov', '.webm'].includes(e)) return 'video';
-    if (['.jpg', '.jpeg', '.png'].includes(e)) return 'image';
-    return 'unknown';
-};
-
 export const formatDatePt = (v: unknown): string => {
     try {
         if (!v) return '';
@@ -192,44 +165,22 @@ export const formatDuration = (totalSeconds: unknown): string => {
     return `${m}min`;
 };
 
-export const calculateTotalVolume = (logs: Record<string, unknown>): number => {
-    try {
-        let total = 0;
-        Object.values(logs).forEach((log: unknown) => {
-            const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {};
-
-            // Cluster: each block may have different weight × reps
-            const cluster = l?.cluster;
-            if (cluster && typeof cluster === 'object') {
-                const c = cluster as Record<string, unknown>;
-                const source = Array.isArray(c.blocksDetailed) ? c.blocksDetailed
-                    : Array.isArray(c.blocks) ? c.blocks : null;
-                if (source && source.length > 0) {
-                    for (const block of source) {
-                        if (!block || typeof block !== 'object') continue;
-                        const b = block as Record<string, unknown>;
-                        const bw = Number(String(b?.weight ?? '').replace(',', '.'));
-                        const brRaw = String(b?.reps ?? '').replace(',', '.');
-                        const br = brRaw.includes('/') ? Number(brRaw.split('/')[0].trim()) : Number(brRaw);
-                        if (Number.isFinite(bw) && bw > 0 && Number.isFinite(br) && br > 0) total += bw * br;
-                    }
-                    return;
-                }
-            }
-
-            // Standard set — handle "8/10" done/planned format
-            const w = Number(String(l?.weight ?? '').replace(',', '.'));
-            const rRaw = String(l?.reps ?? '').replace(',', '.');
-            const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw);
-            if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
-                total += w * r;
-            }
-        });
-        return total;
-    } catch {
-        return 0;
-    }
-};
+/**
+ * Volume total do Story — DELEGA à fonte única (utils/report/formatters →
+ * setVolume + isWorkingSet).
+ *
+ * A implementação local era naive: tratava cluster, mas depois caía em
+ * `weight × reps` do TOPO do log. Isso (a) SUBCONTAVA drop-set/stripping — as
+ * etapas (ex.: 57kg→36kg) viravam "36 × total de reps" —, (b) zerava exercícios
+ * UNILATERAIS (que só gravam L_/R_) e (c) não filtrava aquecimento. Resultado: o
+ * Story mostrava um volume MENOR que o do relatório/histórico pro MESMO treino
+ * (caso real: 18.856 kg no Story vs 19.696 kg reais — 840 kg a menos só do drop).
+ *
+ * `parseRepsValue` da fonte única já trata o formato "feito/planejado" ("8/10" → 8),
+ * então nada se perde na delegação.
+ */
+export const calculateTotalVolume = (logs: Record<string, unknown>): number =>
+    canonicalCalculateTotalVolume(logs);
 
 
 export const computeKcal = ({
@@ -435,6 +386,8 @@ export const drawStory = ({
     transparentBg = false,
     skipClear = false,
     template = DEFAULT_STORY_TEMPLATE,
+    workoutTransform,
+    brandOffset,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -446,6 +399,10 @@ export const drawStory = ({
     transparentBg?: boolean;
     skipClear?: boolean;
     template?: StoryTemplate;
+    /** Zoom/reposicionamento do conteúdo (pinça + arrasto) — vale para todos os layouts. */
+    workoutTransform?: { scale: number; offsetX: number; offsetY: number };
+    /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
+    brandOffset?: { x: number; y: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
     // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
@@ -485,6 +442,25 @@ export const drawStory = ({
     baseOverlay.addColorStop(1, template.overlay.gradientEnd);
     ctx.fillStyle = baseOverlay;
     ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Zoom/reposição do conteúdo (pinça + arrasto) — vale para TODOS os layouts.
+    // Só o CONTEÚDO transforma: fundo (foto/gradiente) e overlay acima ficam fixos.
+    // Pivô no centro do canvas pra o zoom crescer/encolher "no lugar".
+    // ⚠️ Todo caminho de saída desta função precisa do `restore` correspondente
+    // (há um `return` antecipado no bloco live/group e outro no workout).
+    const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
+    const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
+    // Offset SÓ da marca (aplicado dentro do transform geral, nos blocos de brand).
+    const bOff = clampBrandOffset(brandOffset);
+    if (wtApplied) {
+        ctx.save();
+        ctx.translate(wt.offsetX, wt.offsetY);
+        const pivotX = canvasW / 2;
+        const pivotY = canvasH / 2;
+        ctx.translate(pivotX, pivotY);
+        ctx.scale(wt.scale, wt.scale);
+        ctx.translate(-pivotX, -pivotY);
+    }
 
     const left = SAFE_SIDE;
     const right = canvasW - SAFE_SIDE;
@@ -628,6 +604,7 @@ export const drawStory = ({
         ];
 
         cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
+        if (wtApplied) ctx.restore();
         return;
     }
 
@@ -640,6 +617,9 @@ export const drawStory = ({
         const bY = SAFE_TOP + 14;
         const bSize = 48;
         ctx.save();
+        // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o
+        // offset dela (independência total do resto do story).
+        enterBrandSpace(ctx, wt, bOff);
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 12;
         ctx.font = f(F.brandWeight, bSize, F.brandStyle);
@@ -762,6 +742,7 @@ export const drawStory = ({
 
         ctx.textAlign = 'left';
         ctx.letterSpacing = '0px';
+        if (wtApplied) ctx.restore();
         return;
     }
 
@@ -780,6 +761,9 @@ export const drawStory = ({
 
     // Shadow for legibility on any background
     ctx.save();
+    // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
+    // dela (independência total do resto do story).
+    enterBrandSpace(ctx, wt, bOff);
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
@@ -951,4 +935,120 @@ export const drawStory = ({
 
         ctx.restore();
     })();
+
+    if (wtApplied) ctx.restore();
 };
+
+// ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────
+export const WORKOUT_MIN_SCALE = 0.4
+export const WORKOUT_MAX_SCALE = 3
+
+export const clampWorkoutScale = (s: number): number =>
+    Math.min(WORKOUT_MAX_SCALE, Math.max(WORKOUT_MIN_SCALE, Number.isFinite(s) ? s : 1))
+
+export const clampWorkoutOffset = (o: number): number =>
+    Math.min(CANVAS_W, Math.max(-CANVAS_W, Number.isFinite(o) ? o : 0))
+
+export type WorkoutGestureStart = {
+    startOffsetX: number
+    startOffsetY: number
+    startScale: number
+    startDist: number
+    startMidX: number
+    startMidY: number
+    startX: number
+    startY: number
+}
+
+/** Pinça: escala pela razão de distância entre os dedos + pan pelo ponto médio. */
+export const pinchToWorkoutTransform = (
+    g: WorkoutGestureStart,
+    curDist: number,
+    midX: number,
+    midY: number,
+    factor: number,
+): { scale: number; offsetX: number; offsetY: number } => ({
+    scale: clampWorkoutScale(g.startScale * (curDist / (g.startDist || 1))),
+    offsetX: clampWorkoutOffset(g.startOffsetX + (midX - g.startMidX) * factor),
+    offsetY: clampWorkoutOffset(g.startOffsetY + (midY - g.startMidY) * factor),
+})
+
+/** Arrasto de 1 dedo: só move (offset), mantém a escala. */
+export const panToWorkoutOffset = (
+    g: WorkoutGestureStart,
+    x: number,
+    y: number,
+    factor: number,
+): { offsetX: number; offsetY: number } => ({
+    offsetX: clampWorkoutOffset(g.startOffsetX + (x - g.startX) * factor),
+    offsetY: clampWorkoutOffset(g.startOffsetY + (y - g.startY) * factor),
+})
+
+// ── Marca (IRON·TRACKS) 100% independente do bloco ───────────────────────────
+// O arrasto/zoom geral move e redimensiona o bloco (título, cards, tabela). A
+// marca NÃO entra nisso: vive em espaço próprio, com posição própria e tamanho
+// fixo. Antes o offset dela era aplicado DENTRO do transform geral, então
+// encolher os dados encolhia a marca junto — não era independência de verdade.
+export type Offset = { x: number; y: number }
+export const NO_OFFSET: Offset = { x: 0, y: 0 }
+
+/** Âncora da marca no canvas (mesma origem usada pelos renderers). */
+export const BRAND_BASE_X = SAFE_SIDE
+export const BRAND_BASE_Y = SAFE_TOP + 18
+
+export const clampBrandOffset = (o: Offset | null | undefined): Offset => ({
+    x: clampWorkoutOffset(Number(o?.x) || 0),
+    y: clampWorkoutOffset(Number(o?.y) || 0),
+})
+
+/**
+ * Onde a alça da marca cai no preview (fração 0..1 do lado). NÃO depende do
+ * zoom/pan geral — a marca não é afetada por eles.
+ */
+export const brandHandlePct = (brandOffset: Offset | null | undefined): Offset => {
+    const b = clampBrandOffset(brandOffset)
+    return {
+        x: (BRAND_BASE_X + b.x) / CANVAS_W,
+        y: (BRAND_BASE_Y + b.y) / CANVAS_H,
+    }
+}
+
+/** Arrasto da alça: px de tela → px de canvas (só o fator de exibição). */
+export const dragToBrandOffset = (
+    start: Offset,
+    dxScreen: number,
+    dyScreen: number,
+    factor: number,
+): Offset => clampBrandOffset({
+    x: (Number(start?.x) || 0) + (Number(dxScreen) || 0) * factor,
+    y: (Number(start?.y) || 0) + (Number(dyScreen) || 0) * factor,
+})
+
+/**
+ * Põe o ctx em ESPAÇO DA MARCA: desfaz o transform geral (zoom + pan do bloco)
+ * e aplica só o offset próprio da marca. Chamar logo após o `ctx.save()` do
+ * bloco da marca — o `ctx.restore()` correspondente devolve o transform geral.
+ *
+ * Desfazer é o ponto todo: os renderers desenham a marca já dentro do transform
+ * do bloco, então sem a inversa o zoom dos dados encolhe/estica a marca junto.
+ * A inversa de `T(off)·P·S·P⁻¹` é `P·S⁻¹·P⁻¹·T(-off)` — nesta ordem de chamadas.
+ */
+export const enterBrandSpace = (
+    ctx: CanvasRenderingContext2D,
+    workoutTransform: { scale: number; offsetX: number; offsetY: number } | null | undefined,
+    brandOffset: Offset | null | undefined,
+): void => {
+    const s = clampWorkoutScale(Number(workoutTransform?.scale) || 1)
+    const offX = Number(workoutTransform?.offsetX) || 0
+    const offY = Number(workoutTransform?.offsetY) || 0
+    const pivotX = CANVAS_W / 2
+    const pivotY = CANVAS_H / 2
+    if (s !== 1) {
+        ctx.translate(pivotX, pivotY)
+        ctx.scale(1 / s, 1 / s)
+        ctx.translate(-pivotX, -pivotY)
+    }
+    if (offX !== 0 || offY !== 0) ctx.translate(-offX, -offY)
+    const b = clampBrandOffset(brandOffset)
+    if (b.x !== 0 || b.y !== 0) ctx.translate(b.x, b.y)
+}

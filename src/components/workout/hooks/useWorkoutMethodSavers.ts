@@ -86,9 +86,35 @@ export function useWorkoutMethodSavers({
     setWaveModal,
     setGroupMethodModal,
     getLog,
-    updateLog,
+    updateLog: rawUpdateLog,
     startTimer,
 }: UseWorkoutMethodSaversProps) {
+
+    /**
+     * Todo save deste hook vem de um modal que o USUÁRIO preencheu e confirmou —
+     * logo o peso resultante é dele, não do motor.
+     *
+     * Sem marcar `weightSource: 'user'`, o peso salvo herdava a fonte anterior:
+     * se o autoload já tinha preenchido a caixa (fonte 'auto'), a guarda do
+     * useAutoloadWeight (`current !== '' && weightSource !== 'auto'`) não pegava,
+     * porque a fonte ERA 'auto' — e o efeito reescrevia o valor do usuário de
+     * volta pra sugestão. O NormalSet já marcava 'user' ao digitar; os 13 métodos
+     * avançados, que editam por modal, não.
+     *
+     * Marcado aqui na fronteira, e não nos 13 handlers, porque o 14º saver que
+     * alguém escrever também precisa disso.
+     */
+    const updateLog: UseWorkoutMethodSaversProps['updateLog'] = (key, patch) => {
+        if (isObject(patch)) {
+            const record = patch as UnknownRecord;
+            const weight = String(record.weight ?? '').trim();
+            if (weight) {
+                rawUpdateLog(key, { ...record, weightSource: 'user' });
+                return;
+            }
+        }
+        rawUpdateLog(key, patch);
+    };
 
     // ─── Cluster ──────────────────────────────────────────────────────────────
     const saveClusterModal = () => {
@@ -569,10 +595,13 @@ export function useWorkoutMethodSavers({
                 setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
                 return;
             }
-            const weight = String(m?.weight ?? '').trim();
+            const heavyWeight = String(m?.heavyWeight ?? m?.weight ?? '').trim();
+            const mediumWeight = String(m?.mediumWeight ?? '').trim();
+            const ultraWeight = String(m?.ultraWeight ?? '').trim();
+            const weight = heavyWeight; // top-line/base (médio/ultra vazios caem aqui)
             const wavesRaw = Array.isArray(m?.waves) ? m.waves : [];
-            if (!weight) {
-                setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+            if (!heavyWeight) {
+                setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha ao menos o peso "Pesado" (kg).' } : prev));
                 return;
             }
             if (wavesRaw.length < 1) {
@@ -599,7 +628,7 @@ export function useWorkoutMethodSavers({
                 weight,
                 reps: String(total),
                 rpe,
-                wave: { weight, waves, rpe },
+                wave: { weight, heavyWeight, mediumWeight, ultraWeight, waves, rpe },
             });
             setWaveModal(null);
         } catch (e) { logError('hook:useWorkoutMethodSavers.saveWave', e) }

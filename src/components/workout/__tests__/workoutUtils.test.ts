@@ -19,9 +19,73 @@ import {
   formatElapsed,
   normalizeExerciseKey,
   extractLogWeight,
+  extractLogReps,
+  extractLogRpe,
+  avgSideValues,
   estimate1Rm,
   computeRecoveryPauseMs,
 } from '../utils';
+
+describe('avgSideValues (unilateral L/R)', () => {
+  it('média dos dois lados positivos', () => {
+    expect(avgSideValues(40, 44)).toBe(42);
+    expect(avgSideValues('40', '44')).toBe(42);
+  });
+  it('aceita vírgula decimal (pt-BR)', () => {
+    expect(avgSideValues('30,3', '30,3')).toBeCloseTo(30.3, 1);
+  });
+  it('só um lado válido → esse lado', () => {
+    expect(avgSideValues(50, null)).toBe(50);
+    expect(avgSideValues('', 50)).toBe(50);
+  });
+  it('nenhum válido → null', () => {
+    expect(avgSideValues(null, undefined)).toBeNull();
+    expect(avgSideValues(0, 0)).toBeNull();
+  });
+});
+
+describe('extractLogWeight — unilateral (L_weight/R_weight)', () => {
+  it('lê o peso por-lado quando `weight` está vazio (bug do flexora em pé)', () => {
+    expect(extractLogWeight({ weight: '', L_weight: '40', R_weight: '44' })).toBe(42);
+    expect(extractLogWeight({ L_weight: '50', R_weight: '50' })).toBe(50);
+  });
+  it('o campo `weight` compartilhado ainda tem prioridade', () => {
+    expect(extractLogWeight({ weight: 80, L_weight: '40', R_weight: '44' })).toBe(80);
+  });
+});
+
+describe('extractLogReps / extractLogRpe — unilateral (L_reps/R_reps, L_rpe/R_rpe)', () => {
+  it('lê reps e rpe por-lado quando os campos compartilhados não existem', () => {
+    const log = { L_reps: '12', R_reps: '12', L_rpe: '8', R_rpe: '8' };
+    expect(extractLogReps(log)).toBe(12);
+    expect(extractLogRpe(log)).toBe(8);
+  });
+
+  it('campo compartilhado tem prioridade sobre os lados', () => {
+    expect(extractLogReps({ reps: 10, L_reps: '12', R_reps: '12' })).toBe(10);
+    expect(extractLogRpe({ rpe: 7, L_rpe: '9', R_rpe: '9' })).toBe(7);
+  });
+
+  it('médias entre lados diferentes', () => {
+    expect(extractLogReps({ L_reps: '10', R_reps: '12' })).toBe(11);
+    expect(extractLogRpe({ L_rpe: '7', R_rpe: '9' })).toBe(8);
+  });
+
+  it('sem nenhum dado → null (não 0)', () => {
+    // Guard do bug: `toNumber(undefined)` devolve 0, então `toNumber(x) ?? fallback`
+    // nunca cai no fallback. Série com reps=0 é descartada pelo motor de autoload.
+    expect(toNumber(undefined)).toBe(0);
+    expect(extractLogReps({ done: true })).toBeNull();
+    expect(extractLogRpe({ done: true })).toBeNull();
+  });
+
+  it('log da Flexora em pé (dados reais do beta) rende reps e rpe', () => {
+    const log = { done: true, L_weight: '10', R_weight: '10', L_reps: '12', R_reps: '12', L_rpe: '7', R_rpe: '7' };
+    expect(extractLogWeight(log)).toBe(10);
+    expect(extractLogReps(log)).toBe(12);
+    expect(extractLogRpe(log)).toBe(7);
+  });
+});
 
 // ─── computeRecoveryPauseMs (recuperação: gap longo = pausa) ──────────────────
 describe('computeRecoveryPauseMs', () => {

@@ -11,11 +11,26 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { uploadStoryFile } from '@/utils/storage/mediaUpload'
+import { createStoriesRefreshScheduler } from './storiesRefreshScheduler'
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
   if (!n) return '?'
   return n.slice(0, 1).toUpperCase()
+}
+
+/**
+ * Prévia (thumbnail) da mídia de um story, pra usar no círculo do PRÓPRIO story
+ * na fileira — em vez da foto de avatar, que duplicaria o avatar do header.
+ * Para vídeo, o Cloudinary devolve o primeiro frame só trocando a extensão por .jpg.
+ */
+export const storyPreviewUrl = (
+  story?: { mediaUrl: string | null; mediaKind?: 'image' | 'video' } | null,
+): string | null => {
+  const url = story?.mediaUrl
+  if (!url) return null
+  if (story?.mediaKind === 'video') return url.replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg')
+  return url
 }
 
 export default function StoriesBar({
@@ -146,45 +161,73 @@ export default function StoriesBar({
     }
   }
 
+  // `reload` é estável (useCallback com deps []), mas o efeito do Realtime abaixo
+  // roda uma única vez — a ref evita capturar uma versão velha se isso mudar.
+  const reloadRef = useRef(reload)
+  useEffect(() => { reloadRef.current = reload }, [reload])
+
+  // Caminho PRIMÁRIO: evento window disparado por quem acabou de postar (imediato).
   useEffect(() => {
     // Initial load — only if empty to avoid unnecessary fetches on tab switches
     if (groups.length === 0) {
       reload()
     }
-    // Fast-path: local window event dispatched by StoryComposer after post
     const onRefresh = () => reload()
     try {
       window.addEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
     } catch { }
-
-    // Reliable path: Supabase Realtime subscription on the stories table.
-    // This handles the iOS native case where window events don't cross component
-    // boundaries after tab switches or component remounts.
-    const supabase = createClient()
-    const channel = supabase
-      .channel('stories-auto-refresh')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
-        // Debounce slightly so CDN/Cloudinary has time to propagate before we fetch
-        setTimeout(() => reload(true), 1500)
-      })
-      .subscribe()
-
     return () => {
       try {
         window.removeEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
       } catch { }
-      try {
-        supabase.removeChannel(channel)
-      } catch { }
     }
   }, [reload, groups.length])
+
+  // Caminho de RESERVA: Supabase Realtime na tabela de stories — cobre o caso iOS
+  // nativo, em que o evento window não cruza fronteira de componente depois de
+  // troca de aba/remount.
+  //
+  // Deps VAZIAS de propósito: antes o efeito também dependia de `groups.length`,
+  // então a primeira carga (0 → N grupos) derrubava e recriava o canal WebSocket
+  // inteiro. O refresh é coalescido pelo scheduler (rajada de INSERTs → 1 fetch)
+  // e nunca dispara com o app em background — ver storiesRefreshScheduler.ts.
+  useEffect(() => {
+    const scheduler = createStoriesRefreshScheduler({
+      onRefresh: () => { reloadRef.current(true) },
+    })
+    const onVisibilityChange = () => {
+      try { if (document.visibilityState === 'visible') scheduler.flushOnVisible() } catch { }
+    }
+    try { document.addEventListener('visibilitychange', onVisibilityChange) } catch { }
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('stories-auto-refresh')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
+        scheduler.request()
+      })
+      .subscribe()
+
+    return () => {
+      scheduler.dispose()
+      try { document.removeEventListener('visibilitychange', onVisibilityChange) } catch { }
+      try { supabase.removeChannel(channel) } catch { }
+    }
+  }, [])
 
 
   const ordered = useMemo(() => {
     const arr = Array.isArray(groups) ? groups : []
     if (!myId) return arr
-    // Own avatar removed from visual row — it lives in the header Story Ring
-    return arr.filter((g) => g.authorId !== myId)
+    // O próprio story volta pra fileira, SEMPRE em primeiro, mas o círculo mostra
+    // a prévia da mídia postada (não a foto de avatar — que duplicaria o avatar do
+    // header, motivo pelo qual ele tinha sido removido daqui). Só entra se houver
+    // story ativo; senão a fileira segue só com os amigos.
+    const mine = arr.find(
+      (g) => g.authorId === myId && Array.isArray(g.stories) && g.stories.length > 0,
+    )
+    const others = arr.filter((g) => g.authorId !== myId)
+    return mine ? [mine, ...others] : others
   }, [groups, myId])
 
   // Keep own story group available for viewing from the header tap
@@ -212,6 +255,22 @@ export default function StoriesBar({
     return ordered.find((g) => g.authorId === openAuthorId) || null
   }, [ordered, openAuthorId, myId, myGroup])
   const closeViewer = useCallback(() => setOpen(false), [])
+
+  // Navegação entre USUÁRIOS (auto-advance estilo Instagram). Opera sobre `ordered` (a fila de
+  // amigos). Ver o próprio story (myGroup, aberto pelo header) não encadeia nos amigos: findIndex
+  // dá -1 → não avança → fecha. Retornam true se trocaram de usuário.
+  const goNextUser = useCallback((): boolean => {
+    const list = ordered
+    const i = list.findIndex((g) => g.authorId === openAuthorId)
+    if (i >= 0 && i + 1 < list.length) { setOpenAuthorId(list[i + 1].authorId); return true }
+    return false
+  }, [ordered, openAuthorId])
+  const goPrevUser = useCallback((): boolean => {
+    const list = ordered
+    const i = list.findIndex((g) => g.authorId === openAuthorId)
+    if (i > 0) { setOpenAuthorId(list[i - 1].authorId); return true }
+    return false
+  }, [ordered, openAuthorId])
   const handleStoryUpdated = useCallback(
     (storyId: string, patch: Partial<Story>) => {
       const authorId = openAuthorId
@@ -285,7 +344,10 @@ export default function StoriesBar({
         {ordered.map((g) => {
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
-          const name = String(g.displayName || '').trim() || 'Amigo'
+          const isMine = g.authorId === myId
+          const name = isMine ? 'Seu story' : (String(g.displayName || '').trim() || 'Amigo')
+          // No próprio story, o círculo mostra a prévia da mídia; nos amigos, o avatar.
+          const avatarSrc = (isMine ? storyPreviewUrl(g.stories?.[0]) : null) || g.photoUrl
 
           const ringType = !hasStories
             ? 'none'
@@ -301,7 +363,7 @@ export default function StoriesBar({
                   setOpen(true)
                 }}
                 className="w-[72px] focus:outline-none"
-                aria-label={hasStories ? `Abrir stories de ${name}` : `Sem stories de ${name}`}
+                aria-label={hasStories ? (isMine ? 'Ver seu story' : `Abrir stories de ${name}`) : `Sem stories de ${name}`}
               >
                 {/* Gradient ring wrapper */}
                 <div className="relative w-16 h-16 mx-auto">
@@ -326,8 +388,8 @@ export default function StoriesBar({
                     'absolute rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
                     ringType !== 'none' ? 'inset-[3px]' : 'inset-0 border border-neutral-800',
                   ].join(' ')}>
-                    {g.photoUrl ? (
-                      <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" loading="lazy" />
+                    {avatarSrc ? (
+                      <Image src={avatarSrc} alt={name} width={64} height={64} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <span className="text-yellow-500 font-black">{initials(name)}</span>
                     )}
@@ -348,11 +410,14 @@ export default function StoriesBar({
 
       {open && currentGroup ? (
         <StoryViewer
+          key={currentGroup.authorId}
           group={currentGroup}
           myId={myId}
           onClose={closeViewer}
           onStoryUpdated={handleStoryUpdated}
           onStoryDeleted={handleStoryDeleted}
+          onNextUser={goNextUser}
+          onPrevUser={goPrevUser}
         />
       ) : null}
     </div>

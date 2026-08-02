@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { computeDelta, daysBetween, type MetricDelta } from './assessmentDelta'
 import dynamic from 'next/dynamic'
 
 import type { AssessmentRow } from './assessmentUtils'
@@ -136,6 +137,8 @@ interface AssessmentListItemProps {
    * pareada (full ↔ bia em ±14 dias). null = não tem par.
    */
   pairedAssessment?: AssessmentRow | null
+  /** Avaliação anterior no TEMPO — base da variação mostrada no card. */
+  previousAssessment?: AssessmentRow | null
   idx: number
   isSelected: boolean
   aiPlanState: AiPlanEntry | undefined
@@ -154,6 +157,7 @@ interface AssessmentListItemProps {
 export function AssessmentListItem({
   assessment,
   pairedAssessment,
+  previousAssessment,
   idx,
   isSelected,
   aiPlanState,
@@ -193,6 +197,55 @@ export function AssessmentListItem({
     (typeof assessment?.bia_attachment_url === 'string' && assessment.bia_attachment_url)
     || (pairedAssessment && typeof pairedAssessment.bia_attachment_url === 'string' && pairedAssessment.bia_attachment_url)
   )
+
+  const pdfFormData = React.useMemo(() => ({
+    assessment_date: String(assessment.assessment_date ?? ''),
+    weight: String(assessment.weight || ''),
+    height: String(assessment.height || ''),
+    age: String(assessment.age || ''),
+    gender: safeGender(assessment.gender),
+    arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+    chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+    waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+    hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+    thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+    calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+    triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
+    biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
+    subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
+    suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
+    abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
+    thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
+    calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
+    arm_circ_left: '',
+    arm_circ_right: '',
+    thigh_circ_left: '',
+    thigh_circ_right: '',
+    calf_circ_left: '',
+    calf_circ_right: '',
+    triceps_skinfold_left: '',
+    triceps_skinfold_right: '',
+    biceps_skinfold_left: '',
+    biceps_skinfold_right: '',
+    thigh_skinfold_left: '',
+    thigh_skinfold_right: '',
+    calf_skinfold_left: '',
+    calf_skinfold_right: '',
+    bia_body_fat_percentage: String(assessment.bia_body_fat_percentage ?? ''),
+    bia_lean_mass: String(assessment.bia_lean_mass ?? ''),
+    bia_fat_mass: String(assessment.bia_fat_mass ?? ''),
+    bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
+    bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
+    bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
+    bia_attachment_url: String(assessment.bia_attachment_url ?? ''),
+    observations: '',
+              }), [assessment])
+  const pdfStudentName = String(assessment.student_name ?? '')
+  const pdfAssessmentDate = React.useMemo(() => new Date(
+    typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
+      ? assessment.assessment_date
+      : String(assessment.assessment_date ?? Date.now()),
+  ), [assessment.assessment_date])
 
   return (
     <div className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -242,183 +295,198 @@ export function AssessmentListItem({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
-            {[
-              { label: 'Peso', value: (() => { const w = getWeightKg(assessment); return w ? `${w.toFixed(1)} kg` : '-' })() },
-              { label: '% Gordura', value: (() => { const bf = getBodyFatPercent(assessment); return bf ? `${bf.toFixed(1)}%` : '-' })() },
-              { label: 'Massa Magra', value: (() => { const lm = getLeanMassKg(assessment); return lm ? `${lm.toFixed(1)} kg` : '-' })() },
-              { label: 'BMR', value: (() => { const v = getBmrKcal(assessment); return v ? `${v.toFixed(0)} kcal` : '-' })() },
-              { label: 'TDEE', value: workoutSessionsLoading ? '...' : tdee ? `${tdee.toFixed(0)} kcal` : '-' },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
-                <div className="text-white font-black mt-1">{value}</div>
+          {(() => {
+            /* Redesign ago/2026 — pedido do dono ("muito amador").
+             *
+             * O que estava errado não era só o acabamento: eram cinco números do
+             * MESMO tamanho, numa grade 2×2+1 que deixava o TDEE órfão, e
+             * NENHUMA evolução. Os dados da mudança estavam na tela (88,2 kg em
+             * março, 92,5 em setembro) e o usuário tinha de fazer a conta de
+             * cabeça, rolando entre cards.
+             *
+             * Agora: peso e gordura em destaque com a variação vs. a avaliação
+             * anterior; composição e metabolismo numa faixa secundária. Peso é
+             * o número que a pessoa procura primeiro — merece ser o maior.
+             */
+            const peso = getWeightKg(assessment)
+            const bf = getBodyFatPercent(assessment)
+            const lean = getLeanMassKg(assessment)
+            const bmr = getBmrKcal(assessment)
+
+            const dPeso = computeDelta(peso, previousAssessment ? getWeightKg(previousAssessment) : null, null)
+            const dBf = computeDelta(bf, previousAssessment ? getBodyFatPercent(previousAssessment) : null, 'down')
+            const dLean = computeDelta(lean, previousAssessment ? getLeanMassKg(previousAssessment) : null, 'up')
+            const dias = previousAssessment
+              ? daysBetween(assessment?.date ?? assessment?.assessment_date,
+                            previousAssessment?.date ?? previousAssessment?.assessment_date)
+              : null
+
+            const tomCor = (d: MetricDelta | null) =>
+              d?.tone === 'good' ? '#4ade80' : d?.tone === 'bad' ? '#f87171' : '#a3a3a3'
+
+            const Delta = ({ d, unidade }: { d: MetricDelta | null; unidade: string }) =>
+              d ? (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[12px] font-bold"
+                  style={{ color: tomCor(d) }}
+                >
+                  {d.diff > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {d.label}{unidade}
+                </span>
+              ) : null
+
+            const Destaque = ({ rotulo, valor, d, unidade }: {
+              rotulo: string; valor: string; d: MetricDelta | null; unidade: string
+            }) => (
+              <div className="flex-1 min-w-0 rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900/80 to-neutral-900/30 px-4 py-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{rotulo}</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-[26px] font-black leading-none text-white tabular-nums">{valor}</span>
+                  <Delta d={d} unidade={unidade} />
+                </div>
               </div>
-            ))}
-          </div>
+            )
+
+            const Secundario = ({ rotulo, valor }: { rotulo: string; valor: string }) => (
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-600">{rotulo}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold text-neutral-200 tabular-nums">{valor}</div>
+              </div>
+            )
+
+            return (
+              <div className="mt-4">
+                <div className="flex gap-2.5">
+                  <Destaque
+                    rotulo="Peso"
+                    valor={peso ? `${peso.toFixed(1)}` : '—'}
+                    d={dPeso}
+                    unidade=" kg"
+                  />
+                  <Destaque
+                    rotulo="Gordura"
+                    valor={bf ? `${bf.toFixed(1)}%` : '—'}
+                    d={dBf}
+                    unidade="%"
+                  />
+                </div>
+
+                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-neutral-800/70 bg-neutral-900/30 px-4 py-2.5">
+                  <Secundario rotulo="Massa magra" valor={lean ? `${lean.toFixed(1)} kg` : '—'} />
+                  <div className="h-7 w-px shrink-0 bg-neutral-800" />
+                  <Secundario rotulo="BMR" valor={bmr ? `${bmr.toFixed(0)} kcal` : '—'} />
+                  <div className="h-7 w-px shrink-0 bg-neutral-800" />
+                  <Secundario rotulo="TDEE" valor={workoutSessionsLoading ? '…' : tdee ? `${tdee.toFixed(0)} kcal` : '—'} />
+                </div>
+
+                {/* Dá ESCALA à variação: "+4.3 kg" em 30 dias e em 300 dias são
+                    coisas completamente diferentes. */}
+                {dias && (dPeso || dBf || dLean) ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-500">
+                    <span>Desde a anterior, há {dias} {dias === 1 ? 'dia' : 'dias'}:</span>
+                    {dLean ? (
+                      <span style={{ color: tomCor(dLean) }} className="font-bold">
+                        massa magra {dLean.label} kg
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })()}
         </div>
 
-        <div className="flex flex-col gap-2 mt-1">
-          {/* Row 1: Main actions
-              Para registros 'bia' standalone (sem dados antropométricos),
-              alguns botões não fazem sentido — Gerar PDF não tem o que
-              imprimir, Plano IA precisa de dobras/medidas. Mostramos só
-              Detalhes + Excluir destacado. Avaliações 'full' mantêm o
-              layout completo com todas as ações. */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onToggleDetails(assessmentId)}
-              className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-              style={{
-                background: isSelected ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.03)',
-                borderColor: isSelected ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
-                color: isSelected ? '#facc15' : '#a3a3a3',
-              }}
-              type="button"
-            >
-              {isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              {isSelected ? 'Ocultar' : 'Detalhes'}
-            </button>
-            {isBiaOnly && (
-              // Botão de excluir destacado com label, já na primeira linha
-              // (registros BIA não têm Row 2). Mantém o mesmo confirm flow
-              // Sim/Não usado pelas avaliações full.
-              confirmDeleteId === assessmentId ? (
-                <div className="flex items-center gap-1 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => onDelete(assessmentId)}
-                    disabled={deletingId === assessmentId}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                  >
-                    {deletingId === assessmentId ? '...' : 'Sim, excluir'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onConfirmDelete(null)}
-                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConfirmDelete(assessmentId)}
-                  className="min-h-[40px] ml-auto px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                  style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Excluir
-                </button>
-              )
-            )}
-            {!isBiaOnly && (
-              <AssessmentPDFGenerator
-              formData={{
-                assessment_date: String(assessment.assessment_date ?? ''),
-                weight: String(assessment.weight || ''),
-                height: String(assessment.height || ''),
-                age: String(assessment.age || ''),
-                gender: safeGender(assessment.gender),
-                arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
-                chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
-                waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
-                hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
-                thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
-                calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
-                triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
-                biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
-                subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
-                suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
-                abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
-                thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
-                calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
-                arm_circ_left: '',
-                arm_circ_right: '',
-                thigh_circ_left: '',
-                thigh_circ_right: '',
-                calf_circ_left: '',
-                calf_circ_right: '',
-                triceps_skinfold_left: '',
-                triceps_skinfold_right: '',
-                biceps_skinfold_left: '',
-                biceps_skinfold_right: '',
-                thigh_skinfold_left: '',
-                thigh_skinfold_right: '',
-                calf_skinfold_left: '',
-                calf_skinfold_right: '',
-                bia_body_fat_percentage: String(assessment.bia_body_fat_percentage ?? ''),
-                bia_lean_mass: String(assessment.bia_lean_mass ?? ''),
-                bia_fat_mass: String(assessment.bia_fat_mass ?? ''),
-                bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
-                bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
-                bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
-                bia_attachment_url: String(assessment.bia_attachment_url ?? ''),
-                observations: '',
-              }}
-              studentName={String(assessment.student_name ?? '')}
-              trainerName={String(assessment.trainer_name ?? '')}
-              assessmentDate={new Date(
-                typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
-                  ? assessment.assessment_date
-                  : String(assessment.assessment_date ?? Date.now()),
-              )}
-            />
-            )}
-          </div>
-          {/* Row 2: AI + Edit + Delete — só pra avaliações 'full'.
-              Registros 'bia' standalone já têm o botão Excluir destacado
-              na Row 1 acima. */}
+        {/* Props do PDF extraídas para constantes: ficavam inline num JSX de
+            ~45 linhas dentro da barra de ações, o que tornava impossível ler o
+            layout dos botões. Mesmo conteúdo, nada renomeado. */}
+        {/* Barra de ações — UMA linha (redesenho ago/2026, "não estou gostando
+            dos botões").
+            O que havia: cinco ações em duas linhas, com DOIS botões amarelos
+            competindo (Gerar PDF e Plano IA). Quando tudo é primário, nada é —
+            e a lixeira vermelha ficava permanentemente em destaque para uma
+            ação rara e destrutiva.
+            Agora: Detalhes (o que mais se usa) e Plano IA (a ação premium, e a
+            ÚNICA dourada) dividem a linha; PDF, Editar e Excluir viram ícones
+            discretos. A confirmação de exclusão continua inline. */}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => onToggleDetails(assessmentId)}
+            type="button"
+            className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition-colors active:scale-95"
+            style={{
+              background: isSelected ? 'rgba(234,179,8,0.12)' : 'rgba(255,255,255,0.03)',
+              borderColor: isSelected ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
+              color: isSelected ? '#facc15' : '#d4d4d4',
+            }}
+          >
+            {isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isSelected ? 'Ocultar' : 'Detalhes'}
+          </button>
+
           {!isBiaOnly && (
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenPlanModal(assessment)}
+              disabled={!!aiPlanState?.loading}
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-3 text-sm font-black text-black transition-transform active:scale-95 disabled:opacity-60"
+            >
+              <Sparkles className="w-4 h-4" />
+              {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
+            </button>
+          )}
+
+          {/* Secundárias: ícone só, com rótulo acessível. */}
+          {!isBiaOnly && (
+            <AssessmentPDFGenerator
+              variant="icon"
+              formData={pdfFormData}
+              studentName={pdfStudentName}
+              trainerName={String(assessment.trainer_name ?? '')}
+              assessmentDate={pdfAssessmentDate}
+              photos={photos}
+            />
+          )}
+
+          {!isBiaOnly && (
+            <button
+              type="button"
+              onClick={() => onEdit(assessmentId)}
+              title="Editar avaliação"
+              aria-label="Editar avaliação"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+
+          {confirmDeleteId === assessmentId ? (
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
-                onClick={() => onOpenPlanModal(assessment)}
-                disabled={!!aiPlanState?.loading}
-                className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                onClick={() => onDelete(assessmentId)}
+                disabled={deletingId === assessmentId}
+                className="min-h-[40px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition-colors hover:bg-red-500 active:scale-95 disabled:opacity-60"
               >
-                <Sparkles className="w-4 h-4" />
-                {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
+                {deletingId === assessmentId ? '…' : 'Excluir'}
               </button>
               <button
                 type="button"
-                onClick={() => onEdit(assessmentId)}
-                className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                onClick={() => onConfirmDelete(null)}
+                className="min-h-[40px] rounded-xl border border-neutral-700 px-3 text-sm font-bold text-neutral-400 transition-colors hover:text-white active:scale-95"
               >
-                <Edit3 className="w-4 h-4" />
-                Editar
+                Não
               </button>
-              {confirmDeleteId === assessmentId ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onDelete(assessmentId)}
-                    disabled={deletingId === assessmentId}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                  >
-                    {deletingId === assessmentId ? '...' : 'Sim'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onConfirmDelete(null)}
-                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                  >
-                    Não
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConfirmDelete(assessmentId)}
-                  className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onConfirmDelete(assessmentId)}
+              title="Excluir avaliação"
+              aria-label="Excluir avaliação"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-500 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>

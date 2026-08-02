@@ -1,9 +1,15 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import { useAdminPanel } from './AdminPanelContext';
 import type { UnknownRecord } from '@/types/app';
+
+const StudentLoadEvolution = dynamic(
+    () => import('./StudentLoadEvolution').then(m => ({ default: m.StudentLoadEvolution })),
+    { ssr: false },
+);
 
 export function StudentEvolutionTab() {
     const { selectedStudent, assessments } = useAdminPanel();
@@ -12,6 +18,7 @@ export function StudentEvolutionTab() {
 
     return (
         <div className="space-y-4">
+            <StudentLoadEvolution />
             <AssessmentButton
                 studentId={String(selectedStudent.user_id || selectedStudent.id || '')}
                 studentName={String(selectedStudent.name || '')}

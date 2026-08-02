@@ -1,0 +1,6 @@
+# Copy to android/key.properties and fill from the secure password manager.
+# Never commit the real file or the upload keystore.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=app/irontracks-upload.jks

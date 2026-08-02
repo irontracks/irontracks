@@ -6,6 +6,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { mealPlanGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
@@ -107,11 +108,7 @@ export async function POST(req: Request) {
       '- Sem markdown, sem texto extra.',
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID, {
-      maxOutputTokens: 8192,
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-    })
+    const model = getGeminiModel(apiKey, MODEL_ID, mealPlanGenerationConfig())
     const geminiResult = await safeGemini('meal-plan', () =>
       model.generateContent(prompt),
     )

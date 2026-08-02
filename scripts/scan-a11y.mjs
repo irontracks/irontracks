@@ -46,6 +46,54 @@ function getContext(lines, lineNum, size = 3) {
 
 // ─── Análise ──────────────────────────────────────────────────────────────────
 
+
+/**
+ * Substitui o CONTEÚDO dos comentários por espaços, preservando comprimento e quebras
+ * de linha — assim os offsets das regex e os números de linha continuam válidos.
+ *
+ * Por que existe: o scanner casava as regex no código cru e acusava JSX citado dentro
+ * de comentários. Dois "CRÍTICOS" de <img> sem alt em AvatarUploadModal.tsx eram
+ * exatamente isso — linhas `// ... <img> ...`; o <img> de verdade tem alt. Scanner que
+ * grita à toa é scanner que passa a ser ignorado.
+ *
+ * O percorrimento é caractere a caractere de propósito: um replace de /\/\/.*$/ comeria
+ * a barra dupla de "https://..." dentro de string e quebraria a detecção do resto da
+ * linha. Aqui as strings (', ", `) são estados próprios e passam intactas.
+ */
+function maskComments(src) {
+    const out = src.split('')
+    let i = 0
+    let state = 'code'
+    while (i < src.length) {
+        const c = src[i]
+        const c2 = src[i + 1]
+        if (state === 'code') {
+            if (c === '/' && c2 === '/') { out[i] = ' '; out[i + 1] = ' '; state = 'line'; i += 2; continue }
+            if (c === '/' && c2 === '*') { out[i] = ' '; out[i + 1] = ' '; state = 'block'; i += 2; continue }
+            if (c === "'") { state = 'sq'; i += 1; continue }
+            if (c === '"') { state = 'dq'; i += 1; continue }
+            if (c === '`') { state = 'tpl'; i += 1; continue }
+            i += 1; continue
+        }
+        if (state === 'line') {
+            if (c === '\n') { state = 'code'; i += 1; continue }
+            out[i] = ' '; i += 1; continue
+        }
+        if (state === 'block') {
+            if (c === '*' && c2 === '/') { out[i] = ' '; out[i + 1] = ' '; state = 'code'; i += 2; continue }
+            if (c !== '\n') out[i] = ' '
+            i += 1; continue
+        }
+        // dentro de string
+        if (c === '\\') { i += 2; continue }
+        if ((state === 'sq' && c === "'") || (state === 'dq' && c === '"') || (state === 'tpl' && c === '`')) {
+            state = 'code'; i += 1; continue
+        }
+        i += 1
+    }
+    return out.join('')
+}
+
 const allFiles = walk(ROOT)
 const findings = []
 
@@ -53,12 +101,14 @@ for (const filePath of allFiles) {
     const source  = readFileSync(filePath, 'utf8')
     const relPath = relative(process.cwd(), filePath)
     const lines   = source.split('\n')
+    // Regex rodam sobre o código SEM comentários (mesmo comprimento → linhas batem).
+    const scan    = maskComments(source)
 
     // ── 1. <img> sem alt ──────────────────────────────────────────────────────
     // Encontra tags <img que não contêm alt=
     const imgRe = /<img\b([^>]*?)(?:\/>|>)/gs
     let m
-    while ((m = imgRe.exec(source)) !== null) {
+    while ((m = imgRe.exec(scan)) !== null) {
         const attrs  = m[1]
         const lineNum = source.slice(0, m.index).split('\n').length
         // Next.js <Image> é tratado separadamente — só <img nativo
@@ -93,7 +143,7 @@ for (const filePath of allFiles) {
     // ── 2. <button> sem texto nem aria-label ──────────────────────────────────
     // Pega botões que contém APENAS ícones (Lucide, SVG) sem texto nem aria-label
     const btnRe = /<button\b([^>]*)>([\s\S]{0,300}?)<\/button>/g
-    while ((m = btnRe.exec(source)) !== null) {
+    while ((m = btnRe.exec(scan)) !== null) {
         if (ONLY_CRIT) continue
         const attrs    = m[1]
         const inner    = m[2]
@@ -143,7 +193,7 @@ for (const filePath of allFiles) {
     // ── 3. <input> sem label associado ───────────────────────────────────────
     if (!ONLY_CRIT) {
         const inputRe = /<input\b([^>]*?)(?:\/>|>)/gs
-        while ((m = inputRe.exec(source)) !== null) {
+        while ((m = inputRe.exec(scan)) !== null) {
             const attrs   = m[1]
             const lineNum = source.slice(0, m.index).split('\n').length
 
@@ -168,7 +218,7 @@ for (const filePath of allFiles) {
     // ── 4. <a> sem texto nem aria-label ──────────────────────────────────────
     if (!ONLY_CRIT) {
         const aRe = /<a\b([^>]*)>([\s\S]{0,200}?)<\/a>/g
-        while ((m = aRe.exec(source)) !== null) {
+        while ((m = aRe.exec(scan)) !== null) {
             const attrs   = m[1]
             const inner   = m[2]
             const lineNum = source.slice(0, m.index).split('\n').length
@@ -208,7 +258,7 @@ for (const filePath of allFiles) {
     // ── 5. <div onClick> / <span onClick> sem role ────────────────────────────
     if (!ONLY_CRIT) {
         const divClickRe = /<(?:div|span)\b([^>]*?)onClick=[^>]*?>/g
-        while ((m = divClickRe.exec(source)) !== null) {
+        while ((m = divClickRe.exec(scan)) !== null) {
             const attrs   = m[1]
             const lineNum = source.slice(0, m.index).split('\n').length
 

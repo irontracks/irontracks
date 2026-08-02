@@ -28,6 +28,30 @@ function sanitize(value: unknown, depth = 0): unknown {
   return out
 }
 
+
+/**
+ * Em função SERVERLESS, `captureException` só ENFILEIRA — a Vercel congela a
+ * instância assim que a resposta sai, e o evento morre no buffer sem nunca
+ * chegar ao Sentry. Era a causa do gap "o Sentry não recebe erros de rota
+ * server" (documentado no CLAUDE.md e sofrido a sessão inteira de 01/08):
+ * mesma classe da promessa órfã que atrasou o push de aprovação em 13 min.
+ *
+ * `flush` inicia o envio JÁ, e o `waitUntil` da Vercel segura a instância viva
+ * até completar. Import dinâmico: este logger também roda no BROWSER, onde
+ * `@vercel/functions` não existe — lá o SDK envia sozinho e nada disso é
+ * necessário. Fora da Vercel (dev, testes), o catch silencioso deixa o flush
+ * async normal seguir.
+ */
+function scheduleServerFlush() {
+  if (typeof window !== 'undefined') return
+  try {
+    const flushing = Sentry.flush(2000).catch(() => { })
+    void import('@vercel/functions')
+      .then((m) => { try { m.waitUntil?.(flushing) } catch { /* fora da Vercel */ } })
+      .catch(() => { /* fora da Vercel */ })
+  } catch { /* reporting nunca pode quebrar a aplicação */ }
+}
+
 export function logInfo(context: string, message: string, extra?: unknown) {
   if (IS_PROD) return
   const ts = new Date().toISOString()
@@ -55,6 +79,7 @@ export function logError(context: string, error: unknown, extra?: unknown) {
       tags: { logContext: context },
       ...(extra !== undefined ? { extra: { detail: sanitize(extra) } } : {}),
     })
+    scheduleServerFlush()
   } catch {
     // reporting nunca pode quebrar a aplicação
   }
@@ -64,4 +89,28 @@ export function logDebug(context: string, message: string, extra?: unknown) {
   if (IS_PROD) return
   const ts = new Date().toISOString()
   console.log(`[DEBUG ${ts}] ${context}: ${message}`, extra !== undefined ? sanitize(extra) : '')
+}
+
+/**
+ * logWarnRemote — como logWarn, mas TAMBÉM reporta ao Sentry (nível `warning`).
+ *
+ * Para sinais DIAGNÓSTICOS raros que precisam ser pesquisáveis/alertáveis em
+ * produção sem serem tratados como erro fatal — ex.: "flight-recorder" de um bug
+ * intermitente que não reproduz em dev. Diferente de `logWarn` (só console) e de
+ * `logError` (captura como exception). O try/catch garante que o reporting nunca
+ * quebre o fluxo da aplicação.
+ */
+export function logWarnRemote(context: string, message: string, extra?: unknown) {
+  const ts = new Date().toISOString()
+  if (!IS_PROD) console.warn(`[WARN* ${ts}] ${context}: ${message}`, extra !== undefined ? sanitize(extra) : '')
+  try {
+    Sentry.captureMessage(`${context}: ${message}`, {
+      level: 'warning',
+      tags: { logContext: context },
+      ...(extra !== undefined ? { extra: { detail: sanitize(extra) } } : {}),
+    })
+    scheduleServerFlush()
+  } catch {
+    // reporting nunca pode quebrar a aplicação
+  }
 }

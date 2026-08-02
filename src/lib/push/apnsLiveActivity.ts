@@ -21,7 +21,8 @@
 import * as http2 from 'http2'
 import { getApnsConfig, getJwt, type ApnsConfig } from '@/lib/push/apnsJwt'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { logInfo, logWarn, logError } from '@/lib/logger'
+import { logInfo, logError } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export type LiveActivityKind = 'rest' | 'workout'
 export type LiveActivityEvent = 'update' | 'end'
@@ -67,6 +68,37 @@ interface SendLiveActivityArgs<K extends LiveActivityKind> {
   alert?: { title: string; body: string }
 }
 
+/** Segundos entre 1970-01-01 (Unix) e 2001-01-01 (Apple reference date). */
+export const APPLE_REF_EPOCH_SECONDS = 978307200
+
+/**
+ * Converte uma data (ISO string | ms epoch | s epoch) para o formato que o iOS
+ * usa ao decodificar `Date` num content-state de push: `timeIntervalSinceReferenceDate`
+ * = SEGUNDOS desde 2001-01-01 (estratégia padrão do Swift `.deferredToDate`).
+ * Retorna null se não der pra parsear.
+ */
+export function dateToAppleRefSeconds(v: unknown): number | null {
+  if (v == null) return null
+  const ms = typeof v === 'number'
+    ? (v > 1e11 ? v : v * 1000) // > ~1e11 já é ms; senão trata como segundos
+    : new Date(String(v)).getTime()
+  return Number.isFinite(ms) ? ms / 1000 - APPLE_REF_EPOCH_SECONDS : null
+}
+
+/**
+ * Normaliza o content-state antes de enviar por push: campos de data (endDate)
+ * precisam virar segundos-desde-2001, senão o iOS falha a decodificação do
+ * content-state INTEIRO e descarta o update em silêncio (o bug do "card travado").
+ */
+export function normalizeContentStateDates(state: unknown): Record<string, unknown> {
+  const out = state && typeof state === 'object' ? { ...(state as Record<string, unknown>) } : {}
+  if (out.endDate != null) {
+    const ref = dateToAppleRefSeconds(out.endDate)
+    if (ref != null) out.endDate = ref
+  }
+  return out
+}
+
 async function sendOneLiveActivity<K extends LiveActivityKind>(
   args: SendLiveActivityArgs<K>,
   cfg: ApnsConfig,
@@ -75,10 +107,18 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
   return new Promise((resolve) => {
     try {
       const timestamp = Math.floor(Date.now() / 1000)
+      // ⚠️ Datas DENTRO do content-state (ex.: endDate do descanso) são decodificadas
+      // pelo iOS com a estratégia PADRÃO do Swift (`.deferredToDate`) →
+      // `Date(timeIntervalSinceReferenceDate:)` = segundos desde 2001-01-01, um NÚMERO.
+      // Enviar ISO 8601 (ou segundos-1970) faz o content-state INTEIRO falhar a
+      // decodificação e o iOS DESCARTA o update silenciosamente (APNs devolve 200):
+      // o alerta chega mas a Live Activity nunca vira ("card travado"). Convertendo aqui.
+      // (Os campos aps-level `timestamp`/`stale-date`/`dismissal-date` são segundos-1970,
+      // tratados pelo próprio ActivityKit — esses NÃO passam por aqui.)
       const aps: Record<string, unknown> = {
         timestamp,
         event: args.event,
-        'content-state': args.contentState,
+        'content-state': normalizeContentStateDates(args.contentState),
       }
       if (args.event === 'end' && args.dismissalDate) {
         aps['dismissal-date'] = Math.floor(new Date(args.dismissalDate).getTime() / 1000)
@@ -89,7 +129,9 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
 
       const payload = JSON.stringify({ aps })
 
-      const isProduction = !!(process.env.APNS_PRODUCTION === 'true')
+      // M2: usa env.apns.production (com .trim()) igual ao push normal (apns.ts) — leitura
+      // crua de process.env.APNS_PRODUCTION causava drift sandbox/prod se houvesse espaço.
+      const isProduction = env.apns.production
       const host = isProduction
         ? 'https://api.push.apple.com'
         : 'https://api.sandbox.push.apple.com'
@@ -132,7 +174,7 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
             if (reason === 'BadDeviceToken' || reason === 'Unregistered') {
               const admin = createAdminClient()
               Promise.resolve(admin.from('live_activity_push_tokens').delete().eq('token', args.token))
-                .catch(() => { /* best-effort */ })
+                .catch((delErr) => logError('apns-la', '[APNs LA] Failed to remove stale token', delErr))
             }
             safeResolve({ ok: false, error: String(reason) })
           }
@@ -165,7 +207,7 @@ export async function sendLiveActivityUpdate<K extends LiveActivityKind>(args: {
 }): Promise<Array<{ token: string; ok: boolean; error?: string }>> {
   const cfg = getApnsConfig()
   if (!cfg) {
-    logWarn('apns-la', '[APNs LA] Missing config — set APNS_KEY_ID/APNS_TEAM_ID/APNS_KEY_P8')
+    logError('apns-la', '[APNs LA] Missing config — set APNS_KEY_ID/APNS_TEAM_ID/APNS_KEY_P8')
     return []
   }
   if (!args.userId || !args.kind || !args.event) return []

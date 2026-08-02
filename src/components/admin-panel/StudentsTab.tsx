@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown, Gamepad2, Loader2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
 import { useTeacherStudentSessions } from '@/hooks/useTeacherStudentSessions';
+import { OPEN_TEACHER_CONTROL_EVENT } from '@/components/teacher/TeacherControlHost';
 import { logError } from '@/lib/logger';
 
-const TeacherControlModal = dynamic(
-    () => import('@/components/teacher/TeacherControlModal').then(m => ({ default: m.TeacherControlModal })),
-    { ssr: false, loading: () => null },
-);
+// Abre o controle de treino pelo host GLOBAL (montado no shell do dashboard) — o
+// modal e a auto-abertura no aceite não vivem mais aqui, pra funcionar em qualquer
+// tela, não só na aba de alunos.
+function openTeacherControl(userId: string, name: string) {
+    if (typeof window === 'undefined' || !userId) return;
+    window.dispatchEvent(new CustomEvent(OPEN_TEACHER_CONTROL_EVENT, { detail: { userId, name } }));
+}
 
 const STATUS_OPTIONS = [
     { value: 'pago', label: 'Pago', color: 'text-green-400' },
@@ -62,38 +65,9 @@ export const StudentsTab: React.FC = () => {
         user?.id ? String(user.id) : undefined,
     );
 
-    // Teacher control modal state
-    const [controlTarget, setControlTarget] = useState<{ userId: string; name: string } | null>(null);
-    const [requestingControl, setRequestingControl] = useState<string | null>(null); // studentUserId being requested
-
-    // Auto-open / auto-close the control modal in response to Realtime changes
-    const myUserId = user?.id ? String(user.id) : '';
-    const studentsRef = React.useRef(studentsWithTeacherFiltered);
-    studentsRef.current = studentsWithTeacherFiltered;
-    React.useEffect(() => {
-        if (!myUserId) return;
-        // Auto-open: student just accepted the request
-        Object.entries(activeSessionsMap).forEach(([uid, session]) => {
-            if (
-                session.controlStatus === 'active' &&
-                session.controlledBy === myUserId &&
-                !controlTarget
-            ) {
-                const all = studentsRef.current ?? [];
-                const student = all.find(s => String(s.user_id || s.id || '') === uid);
-                const name = String(student?.name || student?.email || 'Aluno');
-                setControlTarget({ userId: uid, name });
-            }
-        });
-        // Auto-close: student rejected, finished workout, or teacher was released
-        if (controlTarget) {
-            const session = activeSessionsMap[controlTarget.userId];
-            if (!session || !session.controlStatus) {
-                setControlTarget(null);
-            }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeSessionsMap, myUserId]);
+    // Pedido de controle em andamento (studentUserId). A auto-abertura no aceite e o
+    // modal vivem no TeacherControlHost (shell) — aqui só disparamos o pedido/abertura.
+    const [requestingControl, setRequestingControl] = useState<string | null>(null);
 
     // Live counts for filter pills
     const statusCounts = React.useMemo(() => {
@@ -122,9 +96,9 @@ export const StudentsTab: React.FC = () => {
         const activeSession = activeSessionsMap[studentUid];
         if (!activeSession) return;
 
-        // If already active, open the modal directly
+        // Já ativo comigo → reabre o modal (via host global) direto.
         if (activeSession.controlStatus === 'active' && activeSession.controlledBy === String(user?.id || '')) {
-            setControlTarget({ userId: studentUid, name: String(s.name || s.email || 'Aluno') });
+            openTeacherControl(studentUid, String(s.name || s.email || 'Aluno'));
             return;
         }
 
@@ -279,7 +253,7 @@ export const StudentsTab: React.FC = () => {
                                 onClick={(e) => {
                                     if (alreadyControlling) {
                                         e.stopPropagation();
-                                        setControlTarget({ userId: uid, name: String(s.name || s.email || 'Aluno') });
+                                        openTeacherControl(uid, String(s.name || s.email || 'Aluno'));
                                     } else {
                                         handleRequestControl(e, s);
                                     }
@@ -480,15 +454,6 @@ export const StudentsTab: React.FC = () => {
             </div>
 
             {/* Teacher Control Modal */}
-            {controlTarget && (
-                <TeacherControlModal
-                    supabase={supabase}
-                    studentUserId={controlTarget.userId}
-                    studentName={controlTarget.name}
-                    getAuthHeaders={getAdminAuthHeaders}
-                    onClose={() => setControlTarget(null)}
-                />
-            )}
         </div>
     );
 };

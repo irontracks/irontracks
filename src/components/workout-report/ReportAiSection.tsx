@@ -22,6 +22,8 @@ interface ReportAiSectionProps {
 }
 
 const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
+// Ilimitado (VIP) → não mostra "0/∞" (ruído). Só exibe o contador com teto real.
+const isUnlimitedInsights = (limit: number | null | undefined) => limit == null || limit > 1000
 const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
 export const ReportAiSection = ({
@@ -41,7 +43,7 @@ export const ReportAiSection = ({
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
                     <div className="flex items-center gap-2">
                         <div className="text-lg font-black text-white">Insights pós-treino</div>
-                        {credits?.insights && (
+                        {credits?.insights && !isUnlimitedInsights(credits.insights.limit) && (
                             <div className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${isInsightsExhausted(credits.insights) ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
                                 {credits.insights.used}/{formatLimit(credits.insights.limit)}
                             </div>
@@ -60,7 +62,7 @@ export const ReportAiSection = ({
                             {aiState?.loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                             {ai ? 'Regerar' : 'Gerar'}
                         </div>
-                        {credits?.insights && (
+                        {credits?.insights && !isUnlimitedInsights(credits.insights.limit) && (
                             <span className="text-[9px] font-mono opacity-80">
                                 ({credits.insights.used}/{formatLimit(credits.insights.limit)})
                             </span>

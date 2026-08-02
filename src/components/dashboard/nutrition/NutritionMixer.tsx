@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from
 import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction, resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
+import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
+import { Sparkles } from 'lucide-react'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -19,11 +21,19 @@ import {
 import { mealToContent, dayToContent, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
+/** Macros exibidos na projeção do preview. Calorias saem à parte (têm linha própria). */
+const PREVIEW_MACROS: ReadonlyArray<{ key: MacroKey; label: string }> = [
+  { key: 'protein', label: 'P' },
+  { key: 'carbs', label: 'C' },
+  { key: 'fat', label: 'G' },
+]
+
+const NutritionChat = dynamic(() => import('./NutritionChat'), { ssr: false })
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
-const SmartSuggestions = dynamic(() => import('./SmartSuggestions'), { ssr: false })
 const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
+const PrescribedDietPlan = dynamic(() => import('./PrescribedDietPlan'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
@@ -258,6 +268,12 @@ export default function NutritionMixer({
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [entriesTick, setEntriesTick] = useState(0)
+  const [chatOpen, setChatOpen] = useState(false)
+  /** Gerador de dieta aberto dentro do card de refeição (antes era um card à parte). */
+  const [dietOpen, setDietOpen] = useState(false)
+  // Offline REATIVO: isOffline() é lido no render e não re-renderiza sozinho quando
+  // a rede cai. O chat depende do servidor, então o campo precisa sumir de verdade.
+  const [chatOffline, setChatOffline] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
   const [entriesError, setEntriesError] = useState('')
   const [entryBusyId, setEntryBusyId] = useState('')
@@ -298,6 +314,12 @@ export default function NutritionMixer({
   // que ainda não aconteceu. DateNavigator já trava navegação pro futuro, isso
   // aqui é só a segunda camada de defesa.
   const isFutureDate = currentDateKey > todayDate
+
+  // ── Ações de IA do card de refeição ──────────────────────────────────────
+  // Mesmos gates de antes, só nomeados: eram condições inline em dois lugares
+  // diferentes da tela e agora as duas ações moram no mesmo card.
+  const canChat = !!canViewMacros && isToday && !chatOffline
+  const canGenerateDiet = !!canViewMacros && isToday && safeGoals.calories > 0
 
   // ── Panel toggles ────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'water'>('none')
@@ -413,16 +435,13 @@ export default function NutritionMixer({
     }
   }, [input, effectiveCustomFoods])
 
-  // Impacto da simulação na meta de calorias do dia (consumido + preview).
-  const previewImpact = useMemo(() => {
+  // Impacto da simulação nas metas do dia (consumido + preview), nos QUATRO macros.
+  // A conta vive em projectMeal (puro, testado) — a mesma função que o chat de nutrição
+  // usa pra responder "se eu comer X, pra quanto vai?". Um cálculo, dois lugares.
+  const previewProjection = useMemo(() => {
     if (!mealPreview || mealPreview.items.length === 0) return null
-    const consumed = safeNumber(totals?.calories)
-    const add = mealPreview.meal.calories
-    const goal = safeGoals.calories
-    const projected = consumed + add
-    const left = goal - projected
-    return { add, projected, goal, left, over: goal > 0 && projected > goal }
-  }, [mealPreview, totals?.calories, safeGoals.calories])
+    return projectMeal(totals, safeGoals, mealPreview.meal)
+  }, [mealPreview, totals, safeGoals])
 
   // ── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -545,9 +564,15 @@ export default function NutritionMixer({
   // forçamos refetch do dia visível pra trocar os pendentes pelas entries reais.
   const hasPending = (Array.isArray(entries) ? entries : []).some((e) => e.pending)
   useEffect(() => {
-    const onOnline = () => { window.setTimeout(() => setEntriesTick((v) => v + 1), 4000) }
+    const syncChatOffline = () => setChatOffline(isOffline())
+    syncChatOffline()
+    const onOnline = () => { syncChatOffline(); window.setTimeout(() => setEntriesTick((v) => v + 1), 4000) }
     window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
+    window.addEventListener('offline', syncChatOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', syncChatOffline)
+    }
   }, [])
   useEffect(() => {
     if (!hasPending) return
@@ -819,6 +844,18 @@ export default function NutritionMixer({
         )}
       </Card>
 
+      {/* O gatilho do chat MUDOU de lugar: agora vive dentro do card "Adicionar
+          refeição", junto do "Gerar dieta". As três ações de comida (lançar,
+          perguntar, gerar) ficam num lugar só em vez de espalhadas pela tela.
+          A folha em si continua montada aqui, no nível de cima. */}
+      <NutritionChat
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        dateKey={currentDateKey}
+        goals={{ ...safeGoals, source: goalsSource ?? 'default' }}
+        onLogged={() => setEntriesTick((v) => v + 1)}
+      />
+
       {/* ══ MACROS ═══════════════════════════════════════════════════════ */}
       {canViewMacros ? (
         <Card className="p-4 space-y-3">
@@ -930,20 +967,19 @@ export default function NutritionMixer({
         </Card>
       )}
 
-      {/* ══ AI SUGGESTIONS ═══════════════════════════════════════════════ */}
-      {safeGoals.calories > 0 && isToday && (
-        <SmartSuggestions goals={safeGoals} consumed={totals} onSelect={handleFavoriteSelect} />
-      )}
+      {/* ══ PLANO PRESCRITO PELO PROFESSOR ═══════════════════════════════ */}
+      {/* NÃO gatear por canViewMacros: o plano é uma ENTREGA do professor (não um recurso VIP
+          self-service), e o aluno pode ser FREE. O componente já se auto-protege — só
+          renderiza se existir plano ativo (senão retorna null). Gatear pelo VIP do aluno
+          escondia a dieta prescrita de alunos sem assinatura própria (achado da revisão). */}
+      <PrescribedDietPlan
+        dateKey={currentDateKey}
+        canApply={isToday}
+        onApplied={() => setEntriesTick(v => v + 1)}
+      />
 
-      {/* ══ DIET GENERATOR — memória nutricional ═════════════════════════ */}
-      {canViewMacros && safeGoals.calories > 0 && isToday && (
-        <DietGenerator
-          goals={safeGoals}
-          dateKey={currentDateKey}
-          hideVipCtas={hideVipCtas}
-          onApplied={() => setEntriesTick(v => v + 1)}
-        />
-      )}
+      {/* O gerador de dieta saiu daqui — virou uma ação dentro do card
+          "Adicionar refeição" (ver AÇÕES DE IA logo abaixo). */}
 
       {/* ══ MEAL INPUT ═══════════════════════════════════════════════════ */}
       {!isFutureDate && (
@@ -988,7 +1024,14 @@ export default function NutritionMixer({
                   <ul className="mt-2 space-y-1">
                     {mealPreview.items.map((it, i) => (
                       <li key={`${it.label}-${i}`} className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="min-w-0 truncate text-neutral-200">{it.label}</span>
+                        <span className="min-w-0 truncate text-neutral-200">
+                          {it.label}
+                          {/* Peso assumido, sempre à vista. Quando o alimento não vem da
+                              base local (TACO/Open Food Facts/customizado), não existe
+                              peso por unidade e o parser precisa chutar — aqui o chute
+                              deixa de ser silencioso e o usuário corrige com "200g de X". */}
+                          {it.grams > 0 && <span className="ml-1 text-neutral-500">· {it.grams}g</span>}
+                        </span>
                         <span className="shrink-0 whitespace-nowrap text-neutral-400">
                           <span className="font-semibold text-neutral-100">{it.calories}</span> kcal
                           <span className="ml-2 text-[10px] text-neutral-500">P{it.protein} C{it.carbs} G{it.fat}</span>
@@ -1001,11 +1044,31 @@ export default function NutritionMixer({
                     Total: P {mealPreview.meal.protein} · C {mealPreview.meal.carbs} · G {mealPreview.meal.fat} g
                   </div>
 
-                  {previewImpact && previewImpact.goal > 0 && (
-                    <div className={`mt-1 text-xs font-medium ${previewImpact.over ? 'text-red-300' : 'text-emerald-300'}`}>
-                      {previewImpact.over
-                        ? `Passa a meta em ${Math.abs(previewImpact.left)} kcal (${previewImpact.projected}/${previewImpact.goal})`
-                        : `Sobram ${previewImpact.left} kcal na meta (${previewImpact.projected}/${previewImpact.goal})`}
+                  {previewProjection && previewProjection.calories.remaining !== null && (
+                    <div className={`mt-1 text-xs font-medium ${previewProjection.calories.over ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {previewProjection.calories.over
+                        ? `Passa a meta em ${Math.abs(previewProjection.calories.remaining)} kcal (${previewProjection.calories.projected}/${previewProjection.calories.goal})`
+                        : `Sobram ${previewProjection.calories.remaining} kcal na meta (${previewProjection.calories.projected}/${previewProjection.calories.goal})`}
+                    </div>
+                  )}
+
+                  {/* Onde os macros FICAM se lançar. Antes só as kcal eram projetadas —
+                      dava pra caber na meta de calorias e estourar a gordura sem aviso. */}
+                  {previewProjection && (
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-neutral-400">
+                      {PREVIEW_MACROS.map(({ key, label }) => {
+                        const m = previewProjection[key]
+                        if (m.remaining === null) return null
+                        return (
+                          <span key={key}>
+                            {label}{' '}
+                            <span className={m.over ? 'font-semibold text-red-300' : 'font-semibold text-neutral-200'}>
+                              {m.projected}
+                            </span>
+                            /{m.goal}g
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </>
@@ -1054,6 +1117,59 @@ export default function NutritionMixer({
             )}
           </div>
 
+          {/* ══ AÇÕES DE IA ═══════════════════════════════════════════════
+              "Perguntar" e "Gerar dieta" viviam soltos na tela — um acima dos
+              macros, outro num card próprio. Como os três são a mesma intenção
+              ("resolver a comida de agora"), moram juntos aqui embaixo do Lançar.
+              Gates preservados um a um:
+              - canViewMacros: recurso Pro (mesma cota das rotas de nutrição).
+              - isToday: a aba navega por datas; simular/gerar "agora" sobre um
+                dia fechado gravaria no passado sem avisar.
+              - !chatOffline: o Mixer tem refeições otimistas que ainda não estão
+                no banco — offline, o chat contradiria o anel da própria tela.
+              - goals.calories > 0: sem meta não há dieta a gerar. */}
+          {(canChat || canGenerateDiet) && (
+            <div className="mt-2 flex items-center gap-2">
+              {canChat && (
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(true)}
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-[0.98]"
+                >
+                  <Sparkles size={13} className="text-yellow-500" />
+                  Perguntar
+                </button>
+              )}
+              {canGenerateDiet && (
+                <button
+                  type="button"
+                  onClick={() => setDietOpen(v => !v)}
+                  aria-expanded={dietOpen}
+                  className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.98] ${
+                    dietOpen
+                      ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
+                      : 'border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:border-yellow-500/30 hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">🍱</span>
+                  {dietOpen ? 'Fechar dieta' : 'Gerar dieta'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {canGenerateDiet && dietOpen && (
+            <div className="mt-3 border-t border-white/[0.06] pt-3">
+              <DietGenerator
+                embedded
+                goals={safeGoals}
+                dateKey={currentDateKey}
+                hideVipCtas={hideVipCtas}
+                onApplied={() => setEntriesTick(v => v + 1)}
+              />
+            </div>
+          )}
+
           {/* Schema missing */}
           {schemaMissing && (
             <div className="mt-3 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-yellow-200">
@@ -1070,7 +1186,7 @@ export default function NutritionMixer({
                   <button type="button" onClick={() => (window.location.href = '/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
                 )}
               </div>
-              {String(error).startsWith('Não reconheci:') && !aiUpgrade && (
+              {String(error).startsWith('Não reconheci') && !aiUpgrade && (
                 <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 h-11 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
                   {aiBusy ? 'Estimando...' : '🤖 Estimar com IA'}
                 </button>

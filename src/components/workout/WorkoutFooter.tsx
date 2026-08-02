@@ -4,8 +4,8 @@ import React from 'react';
 import { Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { logError, logWarn } from '@/lib/logger';
+import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
 
 export default function WorkoutFooter() {
   const {
@@ -26,19 +26,9 @@ export default function WorkoutFooter() {
 
   const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
 
-  // Team pause/resume — gracefully degrades if no team session
-  const teamCtx = useTeamWorkout() as unknown as {
-    teamSession: { id: string } | null
-    sessionPaused: boolean
-    pauseSession: () => void
-    resumeSession: () => void
-  }
-  const inTeamSession = !!teamCtx?.teamSession?.id
-  const teamPaused = inTeamSession && !!teamCtx?.sessionPaused
-
-  // Solo pause/resume — freezes display timer locally (team uses broadcast instead)
+  // Solo pause/resume — freezes display timer locally
   const { isPaused: timerPaused, togglePause } = useWorkoutTimer()
-  const isPaused = teamPaused || timerPaused
+  const isPaused = timerPaused
 
   const allSets = totalSets;
   const allDone = allSets > 0 && completedSets >= allSets;
@@ -73,8 +63,15 @@ export default function WorkoutFooter() {
     return { recoveryRingPct: pct, recoveryRingColor: color }
   }, [hasRecovery, plannedRestSec, recoverySeconds])
 
+  // Com o teclado aberto, esta barra (fixed bottom-0) fica ATRÁS dele e a barra de
+  // acessórios do iOS a corta ao meio — "vazando" meia barra na tela. Enquanto o
+  // usuário digita peso/reps ela não é necessária, então some (display:none, sem
+  // desmontar o componente). A barra do descanso (RestTimerOverlay) já se levanta
+  // acima do teclado por conta própria.
+  const keyboardOpen = useKeyboardOpen()
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe">
+    <div className={`fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe ${keyboardOpen ? 'hidden' : ''}`}>
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
         <button
@@ -152,16 +149,10 @@ export default function WorkoutFooter() {
             </span>
           </div>
 
-          {/* Pause/resume — team broadcasts to teammates; solo freezes local timer */}
+          {/* Pause/resume — freezes local timer */}
           <button
             type="button"
-            onClick={() => {
-              if (inTeamSession) {
-                teamPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()
-              } else {
-                togglePause()
-              }
-            }}
+            onClick={() => { togglePause() }}
             className={[
               'w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
               isPaused

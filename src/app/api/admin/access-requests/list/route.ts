@@ -4,6 +4,8 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
+import { logError } from '@/lib/logger'
+import { resolveDeliveryStatus, type AuditRow } from '@/utils/email/deliveryStatus'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,9 +48,16 @@ export async function GET(req: Request) {
       return respondDbError('admin:access-requests:list', error)
     }
 
+    // Só nas aprovadas: é a única visão onde a pergunta "o e-mail chegou?" faz
+    // sentido — e onde fica o botão de reenviar.
+    const rows = (data || []) as Array<Record<string, unknown>>
+    const withDelivery = q.status === 'approved'
+      ? await attachDeliveryStatus(admin, rows)
+      : rows
+
     return NextResponse.json({
       ok: true,
-      data,
+      data: withDelivery,
       meta: {
         page: q.page,
         limit: q.limit,
@@ -59,5 +68,68 @@ export async function GET(req: Request) {
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  }
+}
+
+/**
+ * Anexa `email_status` a cada solicitação aprovada.
+ *
+ * Duas consultas para a página inteira, não uma por linha: a lista chega a 200
+ * itens e N+1 aqui derrubaria o painel.
+ *
+ * Nunca lança — se a auditoria falhar, a lista ainda tem de aparecer. O painel
+ * mostra "Sem registro", que é a verdade.
+ */
+async function attachDeliveryStatus(
+  admin: ReturnType<typeof createAdminClient>,
+  rows: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const ids = rows.map((r) => String(r.id || '')).filter(Boolean)
+  if (!ids.length) return rows
+
+  try {
+    const { data: sendRows } = await admin
+      .from('audit_events')
+      .select('action, entity_id, created_at, metadata')
+      .eq('entity_type', 'access_request')
+      .in('entity_id', ids)
+      .in('action', ['approval_email_sent', 'approval_email_failed'])
+
+    const sends = (sendRows || []) as AuditRow[]
+    const byRequest = new Map<string, AuditRow[]>()
+    const providerIds: string[] = []
+    for (const ev of sends) {
+      const key = String(ev.entity_id || '')
+      if (!key) continue
+      const list = byRequest.get(key) ?? []
+      list.push(ev)
+      byRequest.set(key, list)
+      const pid = String(ev.metadata?.provider_id ?? '')
+      if (pid) providerIds.push(pid)
+    }
+
+    const byProvider = new Map<string, AuditRow[]>()
+    if (providerIds.length) {
+      const { data: deliveryRows } = await admin
+        .from('audit_events')
+        .select('action, entity_id, created_at, metadata')
+        .eq('entity_type', 'email')
+        .in('entity_id', [...new Set(providerIds)])
+      for (const ev of (deliveryRows || []) as AuditRow[]) {
+        const key = String(ev.entity_id || '')
+        if (!key) continue
+        const list = byProvider.get(key) ?? []
+        list.push(ev)
+        byProvider.set(key, list)
+      }
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      email_status: resolveDeliveryStatus(byRequest.get(String(r.id || '')) ?? [], byProvider),
+    }))
+  } catch (e) {
+    logError('admin:access-requests:list', e, { stage: 'delivery_status' })
+    return rows
   }
 }

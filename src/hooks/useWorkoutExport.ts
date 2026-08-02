@@ -10,6 +10,7 @@
  */
 import { logWarn } from '@/lib/logger'
 import { useState, useCallback } from 'react'
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 import { ActiveSession, UserRecord } from '@/types/app'
 import { workoutPlanHtml } from '@/utils/report/templates'
 import { importData } from '@/actions/workout-actions'
@@ -75,45 +76,16 @@ export function useWorkoutExport({
         try {
             const html = workoutPlanHtml(exportWorkout as Record<string, unknown>, user)
             const title = String((exportWorkout as Record<string, unknown>)?.title || 'treino').trim() || 'treino'
-            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
 
-            // iOS WKWebView blocks window.open() and print().
-            // Web Share API: opens native share sheet → user taps "Print" → save as PDF.
-            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-            if (canShare) {
-                try {
-                    const blob = new Blob([html], { type: 'text/html' })
-                    const file = new File([blob], fileName, { type: 'text/html' })
-                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
-                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
-                    if (canShareFiles) {
-                        await navigator.share({ files: [file], title: `${title} • IronTracks` })
-                    } else {
-                        const url = URL.createObjectURL(blob)
-                        await navigator.share({ title: `${title} • IronTracks`, url })
-                        URL.revokeObjectURL(url)
-                    }
-                    setShowExportModal(false)
-                    return
-                } catch (shareErr) {
-                    const msg = shareErr instanceof Error ? shareErr.message : ''
-                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
-                }
-            }
-
-            // Desktop fallback: open new tab + print dialog (save as PDF)
-            const blob = new Blob([html], { type: 'text/html' })
-            const url = URL.createObjectURL(blob)
-            const win = window.open(url, '_blank')
-            if (!win) {
-                URL.revokeObjectURL(url)
-                await alert('Não foi possível abrir a janela de impressão. Permita pop-ups e tente novamente.')
-                return
-            }
-            setTimeout(() => {
-                try { win.print() } catch (e) { logWarn('useWorkoutExport', 'silenced error', e) }
-                setTimeout(() => URL.revokeObjectURL(url), 60_000)
-            }, 400)
+            // Caminho único de export — ver utils/report/exportHtmlAsPdf. O fallback
+            // antigo compartilhava uma `blob:` URL, que no iOS acabava
+            // compartilhando a página atual do app em vez do plano.
+            await exportHtmlAsPdf({
+                html,
+                title,
+                baseFileName: `${title.replace(/\s+/g, '_')}_irontracks`,
+                alert: (msg: string) => { void alert(msg) },
+            })
             setShowExportModal(false)
         } catch (e) {
             await alert('Erro ao gerar PDF: ' + getErrorMessage(e))

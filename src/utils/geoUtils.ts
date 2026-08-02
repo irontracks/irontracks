@@ -81,6 +81,10 @@ export function speedKmh(distanceMeters: number, durationSeconds: number): numbe
  */
 export function formatPace(paceMinKm: number | null): string {
   if (paceMinKm === null || !Number.isFinite(paceMinKm) || paceMinKm <= 0) return '--:--'
+  // Pace acima de 60 min/km (< 1 km/h) não é ritmo real de corrida/caminhada — é o
+  // artefato de distância ~0 (parado esperando o GPS). Mostra "--:--" em vez de
+  // valores absurdos tipo "1885:36/km".
+  if (paceMinKm > 60) return '--:--'
   let mins = Math.floor(paceMinKm)
   let secs = Math.round((paceMinKm - mins) * 60)
   // Carry: 59,94 s arredonda pra 60 → mostrava "4:60" (formato impossível).

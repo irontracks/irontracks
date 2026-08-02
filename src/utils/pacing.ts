@@ -1,17 +1,12 @@
 import { isRecord } from '@/utils/guards'
+// "É cardio?" agora é fonte única (antes havia uma cópia aqui com regex própria).
+import { isCardioExercise } from '@/utils/exercise/isCardio'
+export { isCardioExercise }
 
 const DEFAULT_SECONDS_PER_REP = 4;
 const DEFAULT_CARDIO_MINUTES = 5;
 const DEFAULT_REST_SECONDS = 60;
 const SET_OVERHEAD_SECONDS = 5;
-
-export function isCardioExercise(ex: Record<string, unknown> | null): boolean {
-  const e = isRecord(ex) ? ex : {}
-  const method = String(e?.method ?? '').toLowerCase();
-  const type = String(e?.type ?? '').toLowerCase();
-  const name = String(e?.name ?? '').toLowerCase();
-  return method === 'cardio' || type === 'cardio' || /cardio|run|corrida|bike|cicl|esteira/.test(name);
-}
 
 function isBikeOutdoorCardio(ex: Record<string, unknown> | null): boolean {
   try {

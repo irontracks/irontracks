@@ -7,8 +7,10 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { studentWorkoutGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,12 +47,24 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+    const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
 
     const ip = getRequestIp(req)
     const rl = await checkRateLimitAsync(`ai:student-workout:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) {
       return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    }
+
+    // Cota da IA de treino conta na conta de QUEM gera (o professor). Mesma feature key
+    // do wizard antigo, pra usar o mesmo balde. Professor/admin resolvem 'elite' pelo
+    // role, então na prática passam; o metering registra o uso.
+    const access = await checkVipFeatureAccess(supabase, userId, 'wizard_weekly')
+    if (!access.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de gerações de treino atingido. Faça upgrade para continuar.' },
+        { status: 403 },
+      )
     }
 
     const apiKey = env.gemini.apiKey
@@ -129,6 +143,13 @@ export async function POST(req: Request) {
       '  "notes": string (orientações gerais)',
       '}',
       '',
+      'REGRA DO "method": ele vale pra TODAS as séries do exercício. Só use um método',
+      'avançado (Drop-set, Rest-Pause, Cluster, Bi-Set…) ali quando ele se aplica a',
+      'TODA série. Para uma técnica em séries ESPECÍFICAS (ex.: drop só na última,',
+      'rest-pause na 3ª), use "method": "Normal" e explique na nota (ex.: "DROP-SET na',
+      'última série: até a falha, reduz ~20%, continua") — o aluno aplica na série.',
+      'NUNCA marque o exercício inteiro como Drop-set quando a intenção é só uma série.',
+      '',
       'Dados do aluno:',
       JSON.stringify({
         profile: profile || {},
@@ -137,11 +158,7 @@ export async function POST(req: Request) {
       }),
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID, {
-      maxOutputTokens: 8192,
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-    })
+    const model = getGeminiModel(apiKey, MODEL_ID, studentWorkoutGenerationConfig())
     const geminiResult = await safeGemini('student-workout', () =>
       model.generateContent(prompt),
     )
@@ -151,6 +168,8 @@ export async function POST(req: Request) {
     const parsed2 = extractJson(text)
 
     if (!parsed2) return NextResponse.json({ ok: false, error: 'Resposta inválida' }, { status: 400 })
+
+    await incrementVipUsage(supabase, userId, 'wizard')
 
     return NextResponse.json({ ok: true, plan: parsed2 })
   } catch (e: unknown) {

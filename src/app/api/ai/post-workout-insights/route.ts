@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logWarnRemote } from '@/lib/logger'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -9,8 +9,11 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { postWorkoutInsightsGenerationConfig } from '@/utils/ai/routeContracts'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
+import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics'
+import { reconcileAiNarrative } from '@/utils/report/reconcileAiNarrative'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,70 +95,6 @@ const extractJsonFromModelText = (text: string) => {
   const end = cleaned.lastIndexOf('}')
   if (start === -1 || end === -1 || end <= start) return null
   return safeJsonParse(cleaned.slice(start, end + 1))
-}
-
-const computeMetrics = (session: Record<string, unknown>) => {
-  try {
-    const s = session && typeof session === 'object' ? session : {}
-    const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
-    const exercises = Array.isArray(s?.exercises) ? (s.exercises as unknown[]) : []
-    const exNameByIdx = new Map<number, string>()
-    exercises.forEach((ex: unknown, idx: number) => {
-      const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : {}
-      const name = String(exObj?.name || '').trim()
-      if (!name) return
-      exNameByIdx.set(idx, name)
-    })
-
-    const parseNum = (v: unknown) => {
-      const raw = String(v ?? '').replace(',', '.')
-      const n = Number(raw)
-      return Number.isFinite(n) ? n : 0
-    }
-
-    let totalVolume = 0
-    let setsDone = 0
-    const volumeByExIdx = new Map<number, number>()
-    const exercisesWithLogs = new Set<number>()
-
-    Object.entries(logs).forEach(([k, log]) => {
-      if (!log || typeof log !== 'object') return
-      const parts = String(k || '').split('-')
-      const exIdx = Number(parts[0])
-      if (!Number.isFinite(exIdx)) return
-      const w = parseNum((log as Record<string, unknown>)?.weight)
-      const r = parseNum((log as Record<string, unknown>)?.reps)
-      const hasNumbers = w > 0 && r > 0
-      const done = Boolean((log as Record<string, unknown>)?.done) || hasNumbers
-      if (!done) return
-      exercisesWithLogs.add(exIdx)
-      setsDone += 1
-      if (hasNumbers) {
-        const vol = w * r
-        if (Number.isFinite(vol) && vol > 0) {
-          totalVolume += vol
-          volumeByExIdx.set(exIdx, (volumeByExIdx.get(exIdx) || 0) + vol)
-        }
-      }
-    })
-
-    const topExercises = Array.from(volumeByExIdx.entries())
-      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
-      .slice(0, 3)
-      .map(([idx, vol]) => ({
-        name: exNameByIdx.get(idx) || `Exercício ${idx + 1}`,
-        volumeKg: Math.round(Number(vol) || 0),
-      }))
-
-    return {
-      totalVolumeKg: Math.round(totalVolume),
-      totalSetsDone: setsDone,
-      totalExercises: exercisesWithLogs.size,
-      topExercises,
-    }
-  } catch {
-    return null
-  }
 }
 
 export async function POST(req: Request) {
@@ -316,11 +255,26 @@ export async function POST(req: Request) {
     const painContext = extractPainContext(sessionObj)
     const hasPainData = painContext.trim().length > 0
 
-    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition', 'labs'])
+    // Privacidade: NÃO injeta 'labs' (exames: LDL/HDL/testosterona…). Este relatório
+    // é compartilhável (Storie/Card/PDF) — não deve ingerir nem ecoar o painel médico
+    // do usuário. Coaching baseado em exames fica nas superfícies de saúde dedicadas.
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition'])
+
+    // Métricas oficiais ANTES do prompt. Antes elas eram computadas só depois da
+    // geração, então o número correto nunca chegava ao modelo — ele somava os
+    // logs sozinho e errava: em 29/07/2026 o card dizia 26.300 kg e o texto
+    // "18.232 kg"; o MESMO 18.232 saiu numa sessão de volume 17.566 kg, e a
+    // string não existia no payload. LLM não faz aritmética: recebe pronto e narra.
+    const metrics = computeAiSessionMetrics(sessionObj)
+    const prevMetrics =
+      previousSession && typeof previousSession === 'object'
+        ? computeAiSessionMetrics(previousSession as Record<string, unknown>)
+        : null
 
     const prompt = [
       `${userCtx ? userCtx + '\n\n' : ''}Você é um coach de musculação e um analista de performance do app IronTracks.`,
-      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, treino, nutrição).',
+      'NÃO cite exames de sangue nem marcadores clínicos (colesterol, testosterona, etc.), mesmo que apareçam em algum lugar — este relatório pode ser compartilhado.',
       'Gere insights pós-treino com base na sessão atual (e na sessão anterior, se houver).',
       '',
       'Retorne APENAS um JSON válido (sem markdown, sem texto extra) com esta estrutura:',
@@ -340,12 +294,20 @@ export async function POST(req: Request) {
       '- Escreva em pt-BR.',
       '- Seja objetivo e prático.',
       '- Não invente números: use apenas os dados fornecidos.',
+      '- PROIBIDO somar, contar ou recalcular qualquer coisa a partir dos logs. Todo número agregado (volume total, número de séries, número de exercícios, comparação com a sessão anterior) DEVE ser copiado LITERALMENTE das MÉTRICAS OFICIAIS abaixo.',
+      '- Se um total que você quer citar não estiver nas MÉTRICAS OFICIAIS, não cite esse número.',
       '- Se não der para afirmar algo, omita.',
       hasPainData
         ? '- O atleta reportou OBSERVAÇÕES DE DOR/DESCONFORTO. Preencha pain_suggestions com (2-5 sugestões práticas) de técnicas de recuperação, mobilidade, ajuste de carga ou exercícios alternativos para cada área afetada. Seja específico e baseado em evidências.'
         : '- Não há relatos de dor nesta sessão. Retorne pain_suggestions como array vazio [].',
       '',
-      'Sessão atual:',
+      'MÉTRICAS OFICIAIS DA SESSÃO ATUAL (fonte de verdade — copie EXATAMENTE, NÃO recalcule):',
+      JSON.stringify(metrics),
+      '',
+      'MÉTRICAS OFICIAIS DA SESSÃO ANTERIOR (fonte de verdade para comparações, pode ser null):',
+      JSON.stringify(prevMetrics),
+      '',
+      'Sessão atual (detalhe por série — use para qualidade/técnica, NUNCA para somar totais):',
       JSON.stringify(session),
       '',
       'Sessão anterior (pode ser null):',
@@ -353,7 +315,7 @@ export async function POST(req: Request) {
       hasPainData ? '\nObservações de dor/desconforto reportadas:\n' + painContext : '',
     ].filter(s => s !== undefined).join('\n')
 
-    const model = getGeminiModel(apiKey, POST_WORKOUT_MODEL)
+    const model = getGeminiModel(apiKey, POST_WORKOUT_MODEL, postWorkoutInsightsGenerationConfig())
     // Retry transient 503/504/timeout with exponential backoff. Never leaks
     // Google's raw error string — errors become canonical 'ai_*' codes that
     // the client translates to pt-BR.
@@ -367,8 +329,18 @@ export async function POST(req: Request) {
     if (!parsed) return NextResponse.json({ ok: false, error: 'ai_invalid_input' }, { status: 400 })
 
     const baseAi = normalizeAi(parsed)
-    const metrics = computeMetrics(sessionObj)
-    const ai = metrics ? { ...baseAi, metrics } : baseAi
+    // Cinto de segurança: mesmo com as métricas oficiais no prompt, uma geração
+    // azarada ainda pode escrever um total divergente — e este relatório sai do
+    // app (Story/Card/PDF). Bullet com agregado que não bate é descartado, e a
+    // divergência vira warning pesquisável no Sentry pra medir a taxa residual.
+    const { ai: reconciled, divergences } = reconcileAiNarrative(baseAi, metrics)
+    if (divergences.length) {
+      logWarnRemote('ai:post-workout-insights', 'narrativa com agregado divergente descartada', {
+        workoutId: String(workout.id),
+        divergences: divergences.map((d) => ({ kind: d.kind, declared: d.declared, official: d.official })),
+      })
+    }
+    const ai = metrics ? { ...reconciled, metrics } : reconciled
 
     const mergedSession = (() => {
       const base = sessionFromNotes && typeof sessionFromNotes === 'object' ? sessionFromNotes : sessionFromBody && typeof sessionFromBody === 'object' ? sessionFromBody : session

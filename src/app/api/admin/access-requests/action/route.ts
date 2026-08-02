@@ -8,39 +8,52 @@ import { logError, logWarn } from '@/lib/logger'
 import { safeEmailLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
-import { env } from '@/utils/env'
+import { sendTransactionalEmail, describeEmailFailure, type EmailResult } from '@/utils/email/sendEmail'
+import { buildApprovalEmail, buildRejectionEmail, SUPPORT_EMAIL } from '@/utils/email/approvalEmail'
 
-// Normaliza número BR para E.164 sem o "+": 5511999999999
-function normalizeBrPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.length === 11) return `55${digits}`  // (11) 9xxxx-xxxx
-  if (digits.length === 13 && digits.startsWith('55')) return digits
-  if (digits.length === 12 && digits.startsWith('55')) return digits
-  return null
-}
-
-const sendWhatsAppMessage = async (rawPhone: string, fullName: string, accountExisted: boolean) => {
-  const instanceId = env.zapi.instanceId
-  const token = env.zapi.token
-  if (!instanceId || !token) return
-
-  const phone = normalizeBrPhone(rawPhone)
-  if (!phone) return
-
-  const name = (fullName || 'Atleta').split(' ')[0]
-  const message = accountExisted
-    ? `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Você já pode entrar com seu e-mail e senha. Bons treinos! 💪`
-    : `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Acesse https://irontracks.com.br para criar sua senha e começar a treinar!`
-
-  const clientToken = env.zapi.clientToken
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (clientToken) headers['Client-Token'] = clientToken
-
-  await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ phone, message }),
-  }).catch((): null => null)
+/**
+ * Registro PERSISTENTE de cada tentativa de envio.
+ *
+ * Sem isto, "fulano recebeu o e-mail?" não tem resposta: o log da Vercel expira
+ * e o Sentry não recebe erro de rota server neste projeto. Com o `provider_id`
+ * dá para achar a entrega no painel da Resend.
+ *
+ * Nunca lança: falhar a auditoria não pode derrubar a aprovação, que já está
+ * gravada pela RPC.
+ */
+async function recordEmailAttempt(
+  admin: ReturnType<typeof createAdminClient>,
+  input: {
+    requestId: string
+    email: string
+    accountExisted: boolean
+    result: EmailResult
+    resent?: boolean
+    actorId: string | null
+    actorEmail: string | null
+    actorRole: string
+  },
+): Promise<void> {
+  try {
+    await admin.from('audit_events').insert({
+      actor_id: input.actorId,
+      actor_email: input.actorEmail,
+      actor_role: input.actorRole,
+      action: input.result.ok ? 'approval_email_sent' : 'approval_email_failed',
+      entity_type: 'access_request',
+      entity_id: input.requestId,
+      metadata: {
+        email: input.email,
+        account_existed: input.accountExisted,
+        ...(input.resent ? { resent: true } : {}),
+        ...(input.result.ok
+          ? { provider_id: input.result.id }
+          : { reason: input.result.reason, detail: input.result.detail ?? null }),
+      },
+    })
+  } catch (e) {
+    logError('admin:access-requests:action', e, { stage: 'email_audit' })
+  }
 }
 
 export const dynamic = 'force-dynamic'
@@ -48,36 +61,34 @@ export const dynamic = 'force-dynamic'
 const ZodBodySchema = z
   .object({
     requestId: z.string().min(1),
-    action: z.enum(['accept', 'reject']),
+    // `resend_email` reenvia o aviso de aprovação de uma solicitação JÁ
+    // aprovada. Existe porque o envio podia falhar sem deixar rastro e o admin
+    // não tinha como tentar de novo — só avisar por fora.
+    action: z.enum(['accept', 'reject', 'resend_email']),
   })
   .strip()
 
-const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlreadyCreated: boolean) => {
-  const apiKey = env.resend.apiKey.trim()
-  const from = env.resend.from.trim()
-  const to = String(toEmail || '').trim()
-  if (!apiKey || !from || !to) return
-
-  const name = String(fullName || '').trim() || 'Atleta'
-  const subject = 'Seu acesso ao IronTracks foi aprovado'
-  const action = accountAlreadyCreated ? 'Você já pode entrar com seu e-mail e senha.' : 'Seu acesso foi aprovado. Agora você já pode criar sua conta e definir sua senha.'
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
-      <h2>Olá, ${name}!</h2>
-      <p>${action}</p>
-      <p><a href="https://irontracks.com.br" target="_blank" rel="noreferrer">Abrir IronTracks</a></p>
-      <p style="opacity:.7;font-size:12px">Se você não solicitou acesso, ignore este e-mail.</p>
-    </div>
-  `
-
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  }).catch((): null => null)
+/**
+ * Envia o e-mail de aprovação e devolve o que ACONTECEU.
+ *
+ * A versão anterior era um `fetch(...).catch(() => null)` que não olhava
+ * `res.ok`: chave ausente, domínio não verificado e erro de rede saíam todos
+ * como sucesso, e o `email_warning` da resposta era código morto. Ver
+ * `src/utils/email/sendEmail.ts` para o histórico completo.
+ */
+const sendApprovalEmail = async (
+  toEmail: string,
+  fullName: string,
+  accountAlreadyCreated: boolean,
+): Promise<EmailResult> => {
+  const built = buildApprovalEmail({ name: fullName, accountExisted: accountAlreadyCreated })
+  return sendTransactionalEmail({
+    to: String(toEmail || '').trim(),
+    subject: built.subject,
+    html: built.html,
+    text: built.text,
+    replyTo: SUPPORT_EMAIL,
+  })
 }
 
 export async function POST(req: Request) {
@@ -96,7 +107,7 @@ export async function POST(req: Request) {
     const requestId = String(body?.requestId || '').trim()
     const action = String(body?.action || '').trim()
 
-    if (!requestId || (action !== 'accept' && action !== 'reject')) {
+    if (!requestId || (action !== 'accept' && action !== 'reject' && action !== 'resend_email')) {
       return NextResponse.json({ ok: false, error: 'Dados inválidos.' }, { status: 400 })
     }
 
@@ -129,8 +140,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Essa solicitação já foi processada ou removida. Atualize a lista.' }, { status: 404 })
     }
 
+    const wasApproved = request.status === 'approved' || request.status === 'accepted'
+
+    // ── RESEND ────────────────────────────────────────────────────────────────
+    // Só faz sentido para solicitação já aprovada: é o segundo tiro depois de o
+    // primeiro e-mail ter falhado (antes, o admin não tinha nenhum).
+    if (action === 'resend_email') {
+      if (!wasApproved) {
+        return NextResponse.json({ ok: false, error: 'Só dá para reenviar o e-mail de uma solicitação já aprovada.' }, { status: 400 })
+      }
+
+      const email = String(request.email || '').trim()
+      const name = String(request.full_name || '')
+      // O texto muda se a conta existe ou não — precisa ser reconferido agora,
+      // porque a pessoa pode ter criado a conta depois da aprovação.
+      const { data: profile } = await admin
+        .from('profiles').select('id').ilike('email', safeEmailLike(email)).maybeSingle()
+      const accountExisted = Boolean((profile as { id?: string } | null)?.id)
+
+      const emailResult = await sendApprovalEmail(email, name, accountExisted)
+      await recordEmailAttempt(admin, {
+        requestId, email, accountExisted, result: emailResult, resent: true,
+        actorId: String(auth.user?.id || '').trim() || null,
+        actorEmail: auth.user?.email ? String(auth.user.email).trim() : null,
+        actorRole: String(auth.role || 'admin'),
+      })
+
+      return emailResult.ok
+        ? NextResponse.json({ ok: true, message: `E-mail reenviado para ${email}.` })
+        : NextResponse.json({
+            ok: false,
+            error: describeEmailFailure(emailResult.reason),
+          }, { status: 502 })
+    }
+
     if (request.status !== 'pending') {
-      const wasApproved = request.status === 'approved' || request.status === 'accepted'
       return NextResponse.json({
         ok: false,
         error: `Essa solicitação já foi ${wasApproved ? 'aprovada' : 'recusada'} anteriormente.`,
@@ -179,7 +223,34 @@ export async function POST(req: Request) {
       const { error: deleteError } = await admin.from('access_requests').delete().eq('id', requestId)
       if (deleteError) throw deleteError
 
-      return NextResponse.json({ ok: true, message: 'Solicitação recusada e removida.' })
+      // Até ago/2026 quem era recusado não recebia nada: a solicitação sumia, a
+      // conta era deletada, e a pessoa ficava na tela de espera para sempre sem
+      // saber. Enviado DEPOIS das escritas — o e-mail é cortesia, a recusa não
+      // depende dele.
+      const rejection = buildRejectionEmail({ name: String(request.full_name || '') })
+      const rejectionResult = await sendTransactionalEmail({
+        to: email,
+        subject: rejection.subject,
+        html: rejection.html,
+        text: rejection.text,
+        replyTo: SUPPORT_EMAIL,
+      })
+      if (!rejectionResult.ok) {
+        logError('admin:access-requests:action', new Error('rejection_email_failed'), {
+          reason: rejectionResult.reason,
+        })
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: rejectionResult.ok
+          ? 'Solicitação recusada e o usuário foi avisado por e-mail.'
+          : 'Solicitação recusada, mas o e-mail de aviso NÃO foi enviado.',
+        ...(rejectionResult.ok ? {} : {
+          email_warning: true,
+          email_error: describeEmailFailure(rejectionResult.reason),
+        }),
+      })
     }
 
     // ── ACCEPT ────────────────────────────────────────────────────────────────
@@ -222,32 +293,35 @@ export async function POST(req: Request) {
         account_existed: boolean
       }
 
-      // Send approval email + WhatsApp (external APIs — outside the DB transaction, best-effort)
-      let emailWarning = false
+      // O e-mail é API externa: fica FORA da transação do banco. A aprovação já
+      // está gravada — falhar aqui não desfaz nada, mas precisa aparecer,
+      // porque a tela de espera promete o e-mail ao usuário.
+      //
+      // Havia um aviso paralelo por WhatsApp (Z-API), removido em ago/2026
+      // junto com o resto do sistema: 2 conversas no total, a última em maio.
+      // O e-mail é o único canal agora — mais uma razão para ele não falhar mudo.
       const resolvedName = result.full_name || String(request.full_name || '')
       const resolvedEmail = result.email || String(request.email || '')
-      try {
-        await sendApprovalEmail(resolvedEmail, resolvedName, result.account_existed)
-      } catch (e) {
-        logWarn('admin:access-requests:action', 'Email send failed (non-fatal):', e)
-        emailWarning = true
-      }
-      const phone = String(request.phone || '').trim()
-      if (phone) {
-        sendWhatsAppMessage(phone, resolvedName, result.account_existed).catch(
-          (e) => logWarn('admin:access-requests:action', 'WhatsApp send failed (non-fatal):', e),
-        )
-      }
+      const emailResult = await sendApprovalEmail(resolvedEmail, resolvedName, result.account_existed)
+
+      await recordEmailAttempt(admin, {
+        requestId, email: resolvedEmail, accountExisted: result.account_existed,
+        result: emailResult, actorId, actorEmail, actorRole,
+      })
 
       // Bust students list cache so admin panel reflects the change immediately
       try { await cacheDeletePattern('admin:students:list:*') } catch { /* non-fatal */ }
 
+      // A mensagem não pode afirmar envio sem prova — era o que dizia antes.
       return NextResponse.json({
         ok: true,
-        message: result.account_existed
-          ? 'Acesso liberado e e-mail enviado.'
-          : 'Solicitação aprovada. Usuário já pode criar a conta.',
-        ...(emailWarning ? { email_warning: true } : {}),
+        message: emailResult.ok
+          ? 'Acesso liberado e e-mail de aprovação enviado.'
+          : 'Acesso liberado, mas o e-mail NÃO foi enviado.',
+        ...(emailResult.ok ? {} : {
+          email_warning: true,
+          email_error: describeEmailFailure(emailResult.reason),
+        }),
       })
     }
 

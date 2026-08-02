@@ -10,13 +10,16 @@ import LoadingScreen from '@/components/LoadingScreen';
 import CommunityLoading from '@/app/(app)/community/loading';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
-const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
-const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
+const TeacherControlHost = dynamic(() => import('@/components/teacher/TeacherControlHost'), { ssr: false });
 import { DashboardHeader } from './DashboardHeader';
+import { pathnameToView, viewToPath } from './viewPath';
 
 // Heavy components — loaded only when needed
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
+const TeacherArea = dynamic(() => import('@/components/teacher-area/TeacherArea'), { ssr: false });
+const ScheduleClient = dynamic(() => import('./schedule/ScheduleClient'), { ssr: false });
+const TeacherChatHost = dynamic(() => import('@/components/teacher-area/TeacherChatHost'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
@@ -42,9 +45,9 @@ const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr:
 const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
 const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/NutritionOverlay'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
-const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 const RestDayPromptCard = dynamic(() => import('@/components/dashboard/RestDayPromptCard'), { ssr: false, loading: () => null })
+const StudentWorkoutStartBanner = dynamic(() => import('@/components/teacher/StudentWorkoutStartBanner'), { ssr: false, loading: () => null })
 const StudentControlConsent = dynamic(
     () => import('@/components/teacher/StudentControlConsent').then(m => ({ default: m.StudentControlConsent })),
     { ssr: false, loading: () => null },
@@ -60,6 +63,7 @@ import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
+import { flushPendingWorkoutsRefresh } from '@/utils/workout/persistWorkoutPlan';
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
 import { useViewNavigation } from '@/hooks/useViewNavigation'
@@ -68,6 +72,7 @@ import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
 import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { useStudentControlNotice } from '@/hooks/useStudentControlNotice'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
@@ -113,42 +118,6 @@ const appId = 'irontracks-production';
 // pra view name pra preservar a renderização condicional existente. Quando o
 // pathname não corresponde a nenhuma sub-rota conhecida, retornamos 'dashboard'
 // (homepage default).
-function pathnameToView(pathname: string | null): string {
-    if (!pathname) return 'dashboard'
-    if (pathname === '/dashboard' || pathname === '/dashboard/') return 'dashboard'
-    if (pathname.startsWith('/dashboard/history')) return 'history'
-    if (pathname.startsWith('/dashboard/active')) return 'active'
-    if (pathname.startsWith('/dashboard/report/weekly')) return 'weeklySummary'
-    if (pathname.startsWith('/dashboard/report')) return 'report'
-    if (pathname.startsWith('/dashboard/chat/') && pathname.length > '/dashboard/chat/'.length) return 'directChat'
-    if (pathname === '/dashboard/chat' || pathname === '/dashboard/chat/') return 'chatList'
-    if (pathname.startsWith('/dashboard/profile')) return 'profile'
-    if (pathname.startsWith('/dashboard/admin')) return 'admin'
-    if (pathname.startsWith('/dashboard/community')) return 'community'
-    if (pathname.startsWith('/dashboard/assessments')) return 'assessments'
-    if (pathname.startsWith('/dashboard/vip')) return 'vip'
-    if (pathname.startsWith('/dashboard/edit')) return 'edit'
-    return 'dashboard'
-}
-
-function viewToPath(view: string): string {
-    switch (view) {
-        case 'dashboard': return '/dashboard'
-        case 'history': return '/dashboard/history'
-        case 'active': return '/dashboard/active'
-        case 'report': return '/dashboard/report/active'
-        case 'chatList': return '/dashboard/chat'
-        case 'directChat': return '/dashboard/chat/_'
-        case 'profile': return '/dashboard/profile'
-        case 'admin': return '/dashboard/admin'
-        case 'community': return '/dashboard/community'
-        case 'assessments': return '/dashboard/assessments'
-        case 'vip': return '/dashboard/vip'
-        case 'edit': return '/dashboard/edit'
-        default: return '/dashboard'
-    }
-}
-
 function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
     const { confirm, alert } = useDialog();
     const initialUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
@@ -185,9 +154,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const { streakStats, setStreakStats, streakLoading } = useWorkoutStreak(user?.id);
 
     // ── Apple Watch: user gyms for CheckinView ────────────────────────────────
+    // Só serve ao Watch (iOS nativo) — na web era 1 request desperdiçado em
+    // TODO boot, competindo por banda com o bootstrap em 4G. O gate espera o
+    // bridge do Capacitor (que pode não estar injetado no 1º render — mesma
+    // corrida documentada em useWorkoutLiveActivity), senão o Watch ficaria
+    // sem academias por uma checagem prematura.
     const [watchGyms, setWatchGyms] = useState<WatchGym[]>([])
+    const [gymsBridgeReady, setGymsBridgeReady] = useState<boolean>(() => isIosNative())
+    useEffect(() => {
+        if (gymsBridgeReady) return
+        let tries = 0
+        const id = setInterval(() => {
+            tries += 1
+            if (isIosNative()) { setGymsBridgeReady(true); clearInterval(id); return }
+            if (tries >= 25) clearInterval(id) // ~5s, como no guard da Live Activity
+        }, 200)
+        return () => clearInterval(id)
+    }, [gymsBridgeReady])
     useEffect(() => {
         if (!user?.id) return
+        if (!gymsBridgeReady) return
         fetch('/api/gps/gyms')
             .then((r) => r.json() as Promise<{ ok: boolean; gyms?: Array<{ id: string; name: string; latitude: number; longitude: number; radius_meters: number }> }>)
             .then((data) => {
@@ -201,7 +187,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 })))
             })
             .catch(() => {})
-    }, [user?.id])
+    }, [user?.id, gymsBridgeReady])
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     // Modal flags migrados pro Zustand store (PR#2). Cada seletor só re-renderiza
     // este componente quando ESSE slice muda — antes 11 useStates causavam
@@ -216,6 +202,34 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const setNutritionOpen = useModalStore((s) => s.setNutritionOpen)
     const quickViewWorkout = useModalStore((s) => s.quickViewWorkout) as ActiveSession | null
     const setQuickViewWorkout = useModalStore((s) => s.setQuickViewWorkout) as (v: ActiveSession | null) => void
+    // A overlay de Nutrição é local do dashboard (fixed/z-25, não é rota). Ao navegar
+    // pra qualquer outra view (ex.: Histórico pelo menu), ela precisa fechar — senão
+    // fica POR CIMA da nova view (bug: Histórico não abria, a nutrição ficava sobreposta).
+    useEffect(() => {
+        if (view !== 'dashboard' && nutritionOpen) {
+            setNutritionOpen(false)
+        }
+    }, [view, nutritionOpen, setNutritionOpen])
+    // Abrir a Nutrição precisa VOLTAR pro dashboard antes — ela só renderiza lá
+    // (gate acima). Antes os call-sites faziam só `setNutritionOpen(true)`: em
+    // qualquer outra aba (Avaliações, Comunidade, VIP) o efeito acima fechava a
+    // nutrição no mesmo tick e o clique não fazia absolutamente nada.
+    //
+    // Não dá pra só `setView('dashboard'); setNutritionOpen(true)`: `view` é
+    // DERIVADA do pathname e `setView` é um `router.push` — a view só vira
+    // 'dashboard' num render posterior, e até lá o efeito acima fecharia de novo.
+    // Então guardamos a intenção e abrimos quando a navegação aterrissar.
+    const pendingNutritionRef = useRef(false)
+    const openNutrition = useCallback(() => {
+        if (view === 'dashboard') { setNutritionOpen(true); return }
+        pendingNutritionRef.current = true
+        setView('dashboard')
+    }, [view, setView, setNutritionOpen])
+    useEffect(() => {
+        if (view !== 'dashboard' || !pendingNutritionRef.current) return
+        pendingNutritionRef.current = false
+        setNutritionOpen(true)
+    }, [view, setNutritionOpen])
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
@@ -327,21 +341,32 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!isIosNative()) return
         if (!userSettingsApi.loaded) return
         if (staleActivityCleanedRef.current) return
-        staleActivityCleanedRef.current = true
-        if (!activeSession) {
-            endWorkoutLiveActivity().catch(() => {})
+        // Há sessão ativa → não existe órfã pra limpar.
+        if (activeSession) {
+            staleActivityCleanedRef.current = true
+            return
         }
+        // ⚠️ NÃO REMOVER O ATRASO — guarda de regressão da Live Activity
+        // (ver src/hooks/__tests__/liveActivityRegressionGuards.test.ts).
+        //
+        // `activeSession` chega de forma ASSÍNCRONA. A versão anterior marcava o
+        // ref e chamava endWorkoutLiveActivity() assim que as settings carregavam;
+        // quando `loaded` virava true ANTES da sessão popular, isso encerrava a
+        // Live Activity que o ActiveWorkout tinha acabado de criar — sintoma
+        // clássico "a ilha dinâmica aparece e some". Esperar a sessão assentar
+        // resolve: se ela chegar, o efeito re-roda e o timer é cancelado.
+        const timer = setTimeout(() => {
+            if (staleActivityCleanedRef.current) return
+            staleActivityCleanedRef.current = true
+            endWorkoutLiveActivity().catch(() => { })
+        }, 6000)
+        return () => clearTimeout(timer)
     }, [userSettingsApi.loaded, activeSession])
 
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
         userId: user?.id,
-        settings: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
-            ? (userSettingsApi.settings as Record<string, unknown>)
-            : null,
     })
-    const offlineSyncOpen = useModalStore((s) => s.offlineSyncOpen)
-    const setOfflineSyncOpen = useModalStore((s) => s.setOfflineSyncOpen)
     const showProgressPhotos = useModalStore((s) => s.showProgressPhotos)
     const setShowProgressPhotos = useModalStore((s) => s.setShowProgressPhotos)
 
@@ -415,6 +440,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // View + activeSession local persistence — extracted to useLocalPersistence hook
     useLocalPersistence({ userId: user?.id, view, setView, activeSession })
+
+    // Edições de plano feitas DENTRO do treino ativo represam a invalidação da
+    // lista (ver persistWorkoutPlan): refetchar no meio da sessão remonta a tela
+    // e o modal do treino fechava sozinho. Ao SAIR do treino, soltamos o aviso —
+    // aí o dashboard recarrega já com a mudança.
+    const wasActiveRef = useRef(false)
+    useEffect(() => {
+        const isActive = view === 'active'
+        if (wasActiveRef.current && !isActive) flushPendingWorkoutsRefresh()
+        wasActiveRef.current = isActive
+    }, [view])
 
     // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
 
@@ -544,10 +580,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleJsonUpload,
     } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: appHandlers.alertVoid, confirm })
 
+    // JANELA PÓS-FINISH — marcado pelo handleFinishSession. O finish limpa o
+    // activeSession na hora, mas navega pro relatório com router.push (ASSÍNCRONO):
+    // até a rota commitar, view ainda é 'active' e activeSession já é null. Isso NÃO
+    // é "restaurando sessão" — é a navegação em voo. 30s é folgado de propósito (a
+    // rota costuma commitar em <1s); se travar além disso, o cap volta a valer.
+    const FINISH_NAV_GRACE_MS = 30_000
+    const justFinishedAtRef = useRef(0)
+    const isFinishNavPending = useCallback(() => Date.now() - justFinishedAtRef.current < FINISH_NAV_GRACE_MS, [])
+
     // CRUD de treinos — extraído para useWorkoutCrud
     const userSettingsForCrud = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
         ? (userSettingsApi.settings as Record<string, unknown>)
         : null
+    // Grava um subconjunto das settings de imediato (o peso informado no check-in
+    // vira o peso do perfil — ver utils/checkin/bodyWeightSync).
+    const settingsSaveFn = userSettingsApi?.save
+    const patchUserSettings = useCallback(async (patch: Record<string, unknown>) => {
+        if (!settingsSaveFn || !userSettingsForCrud) return
+        await settingsSaveFn({ ...userSettingsForCrud, ...patch } as never).catch(() => { })
+    }, [settingsSaveFn, userSettingsForCrud])
     const {
         handleStartSession,
         handleFinishSession,
@@ -574,10 +626,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setReportData: setReportData as (data: unknown) => void,
         setReportBackView,
         suppressForeignFinishToastUntilRef,
+        justFinishedAtRef,
         fetchWorkouts,
         alert,
         confirm,
         requestPreWorkoutCheckin,
+        patchSettings: patchUserSettings,
         resolveExerciseVideos,
         persistExerciseVideoUrls,
         normalizeWorkoutForEditor,
@@ -753,23 +807,49 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // a partir do userId, então não precisamos do channelId aqui.
     useEffect(() => {
         const onPushNavigate = (e: Event) => {
-            const detail = (e as CustomEvent<{ type?: string; senderId?: string; senderName?: string }>).detail;
-            if (detail?.type !== 'message') return;
-            const senderId = String(detail?.senderId || '').trim();
-            if (!senderId) return;
-            const senderName = String(detail?.senderName || '').trim();
-            setDirectChat({
-                channelId: '',
-                userId: senderId,
-                displayName: senderName || undefined,
-                other_user_id: senderId,
-                other_user_name: senderName || undefined,
-            });
-            setView('directChat');
+            const detail = (e as CustomEvent<{ type?: string; link?: string; senderId?: string; senderName?: string }>).detail;
+            // Aluno tocou no push "treino novo do professor" → leva pra lista de treinos
+            // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
+            // dashboard por default; com ele, funciona mesmo já aberto em outra view.
+            if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
+            // Avisos de admin abrem o painel na aba certa. Tem de ser pelo TYPE,
+            // não por link: o painel é uma `view` deste componente, não uma rota
+            // — `/admin` sequer existe em `app/`. O link antigo (`/admin?tab=
+            // requests`) levaria a 404; sem link nenhum, o tap só abria a tela
+            // inicial, que foi o que o dono reportou em 01/08.
+            const ADMIN_PUSH_TAB: Record<string, string> = {
+                admin_new_signup: 'requests',
+                admin_access_request: 'requests',
+                admin_vip_expiring: 'vip',
+            };
+            const adminTab = detail?.type ? ADMIN_PUSH_TAB[detail.type] : undefined;
+            if (adminTab) { openAdminPanel(adminTab); setView('admin'); return; }
+            if (detail?.type === 'message') {
+                const senderId = String(detail?.senderId || '').trim();
+                if (!senderId) return;
+                const senderName = String(detail?.senderName || '').trim();
+                setDirectChat({
+                    channelId: '',
+                    userId: senderId,
+                    displayName: senderName || undefined,
+                    other_user_id: senderId,
+                    other_user_name: senderName || undefined,
+                });
+                setView('directChat');
+                return;
+            }
+            // Fallback genérico: QUALQUER push que carregue um `link` interno navega pro
+            // destino — ex.: "Resumo da semana 💪" (link /dashboard/report/weekly?week=...,
+            // que o pathnameToView vira a view 'weeklySummary'). Antes, todo type diferente
+            // de 'message' caía num `return` e o link era ignorado: a push só abria o app.
+            // Só aceita caminho INTERNO ('/x', nunca '//host') — o payload vem de fora e não
+            // pode virar open-redirect.
+            const link = String(detail?.link || '').trim();
+            if (link.startsWith('/') && !link.startsWith('//')) router.push(link);
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView]);
+    }, [setView, router, openAdminPanel]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
@@ -784,6 +864,42 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // de user_settings — renderiza o dashboard na hora com os defaults e aplica as
     // preferências (som/unidades) quando chegarem. streakLoading segue excluído (secundário).
     const isDashboardReady = userSettingsApi.loaded || hasCachedWorkouts;
+
+    /**
+     * Primeiro uso: SEM NENHUM treino, aterrissa no Wizard — não no dashboard
+     * vazio (Fase 0.1 da tração, 02/08/2026, aprovada pelo dono).
+     *
+     * O porquê, medido em produção: dos 47 aprovados, 24 entraram e NUNCA
+     * criaram um treino; 9 clicaram em "Novo treino" (20 vezes) e desistiram no
+     * meio. O único usuário com acesso pleno real usa o app intensamente — o
+     * gargalo é a porta de entrada, não o produto depois dela.
+     *
+     * Guardas, na ordem em que protegem:
+     * - `isDashboardReady` + timer de 1.5s: dá tempo do bootstrap hidratar os
+     *   treinos de quem JÁ tem — se chegarem, a condição quebra e o timer morre
+     *   (sem flash de wizard pra usuário antigo);
+     * - `!isCoach`: professor sem treino PRÓPRIO é normal (monta pros alunos) —
+     *   seria nag em todo login;
+     * - `!activeSession` e `view === 'dashboard'`: nunca por cima de treino ativo;
+     * - sessionStorage: fechou sem criar, não reabre NESTA sessão. Na próxima
+     *   visita volta — os dados dizem que quem trava tenta de novo (Isabel: 8
+     *   cliques em dias diferentes), então reabrir é ajuda, não spam.
+     */
+    useEffect(() => {
+        if (!isDashboardReady || !user?.id || isCoach) return;
+        if (view !== 'dashboard' || activeSession) return;
+        if (!Array.isArray(workouts) || workouts.length > 0) return;
+        try { if (sessionStorage.getItem('irontracks_first_run_wizard') === '1') return; } catch { }
+        const t = setTimeout(() => {
+            try { sessionStorage.setItem('irontracks_first_run_wizard', '1'); } catch { }
+            // Evento próprio: separa a abertura AUTOMÁTICA da manual no funil —
+            // sem isso, não dá pra medir se a Fase 0.1 ativou alguém.
+            try { trackUserEvent('wizard_auto_open', { type: 'wizard', screen: 'first_run', metadata: { workouts: 0 } }) } catch { }
+            setCreateWizardOpen(true);
+        }, 1500);
+        return () => clearTimeout(t);
+    }, [isDashboardReady, user?.id, isCoach, view, activeSession, workouts, setCreateWizardOpen]);
+
     // Quando view='active' mas activeSession=null: o WKWebView foi morto pelo iOS
     // enquanto o app estava em background. A shell nativa preservou a URL
     // /dashboard/active, mas o JS recomeçou do zero — activeSession ainda não foi
@@ -803,14 +919,24 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setSessionRestoringExpired(false)
             return
         }
+        // Pós-finish: NÃO sequestrar a navegação pro relatório (ver isFinishNavPending).
+        if (isFinishNavPending()) return
         const t = setTimeout(() => {
             setSessionRestoringExpired(true)
             setView('dashboard') // navegar imediatamente, não esperar o safety net
         }, 5000)
         return () => clearTimeout(t)
-    }, [view, activeSession, setView])
+    }, [view, activeSession, setView, isFinishNavPending])
 
-    const isSessionRestoring = view === 'active' && !activeSession && !sessionRestoringExpired
+    // JANELA PÓS-FINISH — o finish limpa activeSession na hora, mas navega pro
+    // relatório com `setView` = router.push (ASSÍNCRONO). Até a rota commitar,
+    // `view` ainda é 'active' e activeSession já é null: isso NÃO é "restaurando
+    // sessão", é só a navegação em voo. Sem esta marca, o guard abaixo mostrava o
+    // LoadingScreen, o cap de 5s disparava setView('dashboard') (jogando o usuário
+    // de volta no dashboard) e, com o LoadingScreen seguindo montado, aos 8s vinha
+    // a tela "Não foi possível carregar o app". Intermitente: só quando a rota do
+    // relatório demorava a commitar.
+    const isSessionRestoring = view === 'active' && !activeSession && !sessionRestoringExpired && !isFinishNavPending()
     const isAppLoading = isSessionRestoring || (view !== 'active' && !activeSession && (
         (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
     ));
@@ -920,18 +1046,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 watchDashboard={watchDashboard}
                 watchGyms={watchGyms}
                 onWatchRefresh={() => { fetchWorkouts().catch(() => {}) }}
-                teamUser={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null}
-                onStartSession={handleStartSession as unknown as (w: Record<string, unknown>) => void | Promise<void>}
             >
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
                 <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
+                {/* Professor: host GLOBAL do controle de treino — abre o modal quando o aluno
+                    aceita, em QUALQUER tela (antes só abria na aba de alunos). */}
+                {isCoach && <TeacherControlHost teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
+                {/* Professor: host GLOBAL do chat 1:1 com aluno — abre o ChatDirectScreen
+                    sobre qualquer tela quando o detalhe do aluno dispara o evento. */}
+                {isCoach && <TeacherChatHost user={user as AdminUser} />}
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
-                        <IncomingInviteModal
-                            onStartSession={handleStartSession}
-                            savedWorkouts={workouts}
-                            onWorkoutSaved={() => { fetchWorkouts().catch(() => {}) }}
-                        />
-                        <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour
@@ -966,12 +1090,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             hideVipOnIos={hideVipOnIos}
                             vipAccess={vipAccess as { hasVip?: boolean } | null}
                             syncState={syncState as { pending?: number; failed?: number; online?: boolean; syncing?: boolean } | null}
-                            userSettings={userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null}
                             isHeaderVisible={isHeaderVisible}
                             coachPending={coachPending}
                             onGoHome={() => setView('dashboard')}
                             onOpenVip={openVipView}
                             onOpenAdmin={handleOpenAdmin}
+                            onOpenTeacherArea={() => setView('teacher')}
                             onOpenChatList={handleOpenChatList}
                             onOpenHistory={handleOpenHistory}
                             onOpenNotifications={handleOpenNotifications}
@@ -981,7 +1105,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenTour={handleOpenTour}
                             onOpenProfile={handleOpenProfile}
                             onLogout={handleLogout}
-                            onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
                             onAcceptCoach={handleAcceptCoach}
                         />
 
@@ -1004,6 +1127,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     renderizando ACIMA do DashboardTabs e empurram a barra pra baixo
                                     do offset fixo que o NutritionOverlay assume, fazendo a barra
                                     "flutuar" por cima do conteúdo de nutrição de forma incoerente. */}
+                                {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
+                                {view === 'dashboard' && !nutritionOpen && isCoach && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                                 {view === 'dashboard' && !nutritionOpen && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
                                 {view === 'dashboard' && !nutritionOpen && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
                                 {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
@@ -1016,6 +1141,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         // Close the nutrition overlay before switching views — it's a
                                         // full-screen overlay, so leaving it open would hide the tab the
                                         // user just clicked AND keep the Nutrição indicator stuck on.
+                                        // Também desarma a intenção pendente: clicar Nutrição e trocar de
+                                        // aba antes da navegação aterrissar não pode abrir a nutrição depois.
+                                        pendingNutritionRef.current = false
                                         setNutritionOpen(false)
                                         setView(next)
                                     }}
@@ -1046,7 +1174,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                     const sid = isRecord(s) ? String((s as Record<string, unknown>).id ?? 'active') : 'active'
                                                     router.push(`/dashboard/report/${encodeURIComponent(sid)}`)
                                                 }}
-                                                onOpenNutrition={() => setNutritionOpen(true)}
+                                                onOpenNutrition={openNutrition}
                                             />
                                     }
                                     vipLabel="VIP"
@@ -1054,7 +1182,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     vipEnabled={!hideVipOnIos}
                                     showNutritionTab={!!vipAccess?.hasVip}
                                     nutritionActive={nutritionOpen}
-                                    onOpenNutrition={() => setNutritionOpen(true)}
+                                    onOpenNutrition={openNutrition}
                                     settings={userSettingsApi?.settings ?? null}
                                     onCreateWorkout={handleCreateWorkout}
                                     onExpressWorkout={() => setExpressWorkoutOpen(true)}
@@ -1138,7 +1266,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 </div>
                             )}
 
-                            {nutritionOpen ? (
+                            {nutritionOpen && view === 'dashboard' ? (
                                 <NutritionOverlay
                                     onClose={() => setNutritionOpen(false)}
                                     canViewMacros={!!(vipStatus?.limits as Record<string, unknown> | undefined)?.nutrition_macros}
@@ -1201,14 +1329,52 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         nextWorkout={nextWorkout}
                                         onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                                         onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                                        onToggleAutoLoad={(v: boolean) => {
+                                            userSettingsApi?.updateSetting?.('autoLoad', v)
+                                            void userSettingsApi?.save?.({ autoLoad: v })
+                                        }}
+                                        onToggleExerciseDeload={(exKey: string, nextEnabled: boolean) => {
+                                            const cur = Array.isArray(userSettingsApi?.settings?.autoLoadDeloadOff)
+                                                ? (userSettingsApi.settings.autoLoadDeloadOff as string[])
+                                                : []
+                                            const off = new Set(cur.filter((k) => typeof k === 'string' && k.trim() !== ''))
+                                            // nextEnabled = deload LIGADO → tira da lista de "off"; desligado → entra.
+                                            if (nextEnabled) off.delete(exKey)
+                                            else off.add(exKey)
+                                            const next = Array.from(off)
+                                            userSettingsApi?.updateSetting?.('autoLoadDeloadOff', next)
+                                            void userSettingsApi?.save?.({ autoLoadDeloadOff: next })
+                                        }}
+                                        onToggleWorkoutDeload={(workoutKey: string, nextEnabled: boolean) => {
+                                            const cur = Array.isArray(userSettingsApi?.settings?.autoLoadDeloadOffWorkouts)
+                                                ? (userSettingsApi.settings.autoLoadDeloadOffWorkouts as string[])
+                                                : []
+                                            const off = new Set(cur.filter((k) => typeof k === 'string' && k.trim() !== ''))
+                                            // nextEnabled = descarga LIGADA → sai da lista de "off"; desligada → entra.
+                                            if (nextEnabled) off.delete(workoutKey)
+                                            else off.add(workoutKey)
+                                            const next = Array.from(off)
+                                            userSettingsApi?.updateSetting?.('autoLoadDeloadOffWorkouts', next)
+                                            void userSettingsApi?.save?.({ autoLoadDeloadOffWorkouts: next })
+                                        }}
+                                        onSavePlateSetup={(counts: Record<string, number>, barWeightKg: number) => {
+                                            userSettingsApi?.updateSetting?.('plateInventory', counts)
+                                            userSettingsApi?.updateSetting?.('barWeightKg', barWeightKg)
+                                            void userSettingsApi?.save?.({ plateInventory: counts, barWeightKg })
+                                        }}
                                         controlledByName={controlNotice.controlStatus === 'active' ? controlNotice.controlledByName : null}
+                                        onRevokeControl={controlNotice.reject}
                                     />
                                 </SectionErrorBoundary>
                             )}
 
                             {editActiveOpen && view === 'active' && editActiveDraft && (
+                                // z-[2200]: ACIMA da barra inferior do descanso (RestTimerOverlay,
+                                // z-2100) e do flash (z-2000). Senão, se um descanso está rolando, a
+                                // barra START/AUTO fica POR CIMA do editor e cobre o "+ Adicionar
+                                // Exercício" no rodapé.
                                 <div
-                                    className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
+                                    className="fixed inset-0 z-[2200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
                                     onClick={() => handleCloseActiveWorkoutEditor()}
                                 >
                                     <div
@@ -1350,6 +1516,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     </SectionErrorBoundary>
                                 </div>
                             )}
+
+                            {view === 'teacher' && (
+                                <div className="fixed inset-0 z-[60]">
+                                    <SectionErrorBoundary section="Área do Professor" fullScreen onReset={() => setView('dashboard')}>
+                                        <TeacherArea user={user as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {view === 'schedule' && (
+                                <div className="fixed inset-0 z-[60] overflow-y-auto bg-neutral-950">
+                                    <SectionErrorBoundary section="Agenda" fullScreen onReset={() => setView('dashboard')}>
+                                        <ScheduleClient />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
                         </div>
 
                         {/* Modals & Overlays — extracted to DashboardModals */}
@@ -1404,8 +1586,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             settingsOpen={settingsOpen}
                             setSettingsOpen={setSettingsOpen}
                             userSettingsApi={userSettingsApi as Record<string, unknown> | null}
-                            offlineSyncOpen={offlineSyncOpen}
-                            setOfflineSyncOpen={setOfflineSyncOpen}
                             openStudent={openStudent}
                             setOpenStudent={setOpenStudent as (v: unknown) => void}
                             showExportModal={showExportModal}

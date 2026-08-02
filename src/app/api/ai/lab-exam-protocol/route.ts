@@ -17,7 +17,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkLabExamsAccess } from '@/utils/vip/labExamsAccess'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
@@ -27,6 +27,7 @@ import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow, computeSessionStats } from '@/utils/bodyPhoto/trainingWindow'
 import { LabProtocolSchema } from '@/schemas/labExam'
+import { labProtocolGenerationConfig } from '@/utils/labExam/protocolContract'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // Gemini Pro cruzando 4 fontes pode levar >30s
@@ -383,7 +384,10 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:lab-protocol:${userId}:${ip}`, 5, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
+    // VIP — ou o exame-demonstração (`process` aceita até 1 exame: é a
+    // análise do que o create já deixou entrar; travar aqui deixaria o
+    // free com o arquivo subido e sem o valor).
+    const access = await checkLabExamsAccess(auth.supabase, userId, 'process')
     if (!access.allowed) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
     const parsed = await parseJsonBody(req, BodySchema)
@@ -505,7 +509,12 @@ export async function POST(req: Request) {
     const userCtx = await buildUserContextBlock(admin, assessedUserId, ['nutrition', 'profile'])
     const prompt = `${PROMPT_HEADER}\n\n${userCtx ? userCtx + '\n\n' : ''}DADOS:\n${JSON.stringify(promptData)}`
 
-    const model = getGeminiModel(apiKey, env.gemini.modelId)
+    // Structured output OBRIGATÓRIO aqui. Sem `responseSchema`, o 2.5 Pro gasta
+    // budget de saída pensando (não dá para desligar nesse modelo) e devolve o
+    // JSON truncado — foi o `protocol_failed` que o dono viu em 01/08. Cada
+    // tentativa custa uma chamada ao Pro cruzando 4 fontes: falhar e mandar
+    // "tente novamente" é queimar dinheiro dele.
+    const model = getGeminiModel(apiKey, env.gemini.modelId, labProtocolGenerationConfig())
     const geminiResult = await safeGemini('lab-exam-protocol', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)
@@ -515,7 +524,14 @@ export async function POST(req: Request) {
     const rawText = geminiResult.value?.response?.text?.() || ''
     const validated = LabProtocolSchema.safeParse(extractJson(rawText))
     if (!validated.success) {
-      logError('ai:lab-exam-protocol:invalid', new Error('schema mismatch'), { rawPreview: String(rawText).slice(0, 300) })
+      // Diagnóstico útil no log: o rawPreview sozinho não dizia ONDE quebrou.
+      // Com o erro do Zod e o tamanho da resposta dá para separar "veio
+      // truncado" de "campo inválido" sem gastar outra chamada.
+      logError('ai:lab-exam-protocol:invalid', new Error('schema mismatch'), {
+        issues: validated.error.issues.slice(0, 6).map((i) => `${i.path.join('.')}: ${i.message}`),
+        rawLength: rawText.length,
+        rawPreview: String(rawText).slice(0, 300),
+      })
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'protocol_failed' }).eq('id', examId)
       return NextResponse.json({ ok: false, error: 'protocol_failed', message: 'Não consegui gerar o protocolo. Tente novamente.' }, { status: 422 })
     }

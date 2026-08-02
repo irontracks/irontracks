@@ -5,10 +5,15 @@ import dynamic from 'next/dynamic'
 import { X, Check, Upload, ArrowLeft, Clock, Dumbbell, Zap, ChevronRight, PlayCircle } from 'lucide-react'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import { BackButton } from '@/components/ui/BackButton'
+import { CheckinScale } from '@/components/workout/CheckinScale'
 import type { AdminUser } from '@/types/admin'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import { getErrorMessage } from '@/utils/errorMessage'
+
+/** Peso em pt-BR (vírgula decimal): 96.85 → "96,85". */
+const formatKgPtBr = (kg: number): string =>
+    Number(kg).toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
 const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false })
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false })
@@ -16,11 +21,14 @@ const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ss
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false })
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 const MothersDayModal = dynamic(() => import('@/components/MothersDayModal'), { ssr: false })
-const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
-const PartnerExerciseOverlay = dynamic(() => import('@/components/workout/PartnerExerciseOverlay'), { ssr: false })
-
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
+// Lazy obrigatório: puxa `Reorder` do framer-motion — import estático aqui
+// arrasta a lib inteira pro bundle inicial do dashboard (guard em
+// dashboardModalsLazyBoundary.test.ts).
+const QuickViewExerciseList = dynamic(
+    () => import('@/components/dashboard/QuickViewExerciseList').then((m) => m.QuickViewExerciseList),
+    { ssr: false },
+)
 
 // Helper
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -105,10 +113,6 @@ export interface DashboardModalsProps {
     setSettingsOpen: (v: boolean) => void
     userSettingsApi: Record<string, unknown> | null
 
-    // Offline Sync
-    offlineSyncOpen: boolean
-    setOfflineSyncOpen: (v: boolean) => void
-
     // Open student
     openStudent: unknown
     setOpenStudent: (v: unknown) => void
@@ -144,7 +148,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
         setPendingUpdate, closeWhatsNew, mothersDayOpen, closeMothersDay,
         preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
         preCheckinDraft, setPreCheckinDraft, preCheckinResolveRef, settingsOpen, setSettingsOpen,
-        userSettingsApi, offlineSyncOpen, setOfflineSyncOpen,
+        userSettingsApi,
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
         handleExportPdf, handleExportJson, vipAccess, openVipView, alert,
         showProgressPhotos, setShowProgressPhotos,
@@ -167,13 +171,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
     }, [activeSession])
     // Use local ticker for display; fall back to prop for backward compat
     const effectiveTicker = localTicker || sessionTicker
-
-    // Partner exercise share — use hook directly since we're inside TeamWorkoutProvider
-    let teamWorkoutCtx: ReturnType<typeof useTeamWorkout> | null = null
-    try {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        teamWorkoutCtx = useTeamWorkout()
-    } catch { /* not inside TeamWorkoutProvider */ }
 
     const settings = userSettingsApi && typeof userSettingsApi === 'object'
         ? (userSettingsApi as Record<string, unknown>).settings ?? null
@@ -199,6 +196,24 @@ export default function DashboardModals(props: DashboardModalsProps) {
             return isFinite(val) && val > 0 ? val : null
         } catch { return null }
     })()
+
+    // Valor exibido no campo de peso do check-in: o que o usuário digitou ou, se ainda
+    // não mexeu, o peso do perfil PRÉ-PREENCHIDO (um toque em "Continuar" já confirma
+    // e registra o peso do dia — antes o campo nem aparecia pra quem tinha peso).
+    const preCheckinWeightValue = (() => {
+        const draftWeight = String((preCheckinDraft as Record<string, unknown>)?.weight ?? '').trim()
+        if (draftWeight) return draftWeight
+        return profileBodyWeightKg ? String(profileBodyWeightKg) : ''
+    })()
+
+    // Peso efetivo salvo ao continuar (o digitado ou o do perfil confirmado).
+    // Normaliza vírgula → ponto: o campo aceita "95,5" (pt-BR), mas quem consome o
+    // peso faz Number(), e Number("95,5") = NaN — o peso seria silenciosamente
+    // descartado no cálculo calórico. Guardamos sempre com ponto.
+    const preCheckinResolvedDraft = () => ({
+        ...(preCheckinDraft || {}),
+        weight: preCheckinWeightValue.replace(',', '.'),
+    })
 
     return (
         <>
@@ -319,74 +334,17 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 {/* Gold divider */}
                                 <div className="mx-5 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent mb-1" />
 
-                                {/* Exercise list */}
-                                <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto space-y-2">
-                                    {exCount === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
-                                            <div className="w-12 h-12 rounded-2xl bg-neutral-800/60 border border-neutral-700/40 flex items-center justify-center">
-                                                <Dumbbell size={20} className="text-neutral-600" />
-                                            </div>
-                                            <p className="text-neutral-500 text-sm">Este treino não tem exercícios.</p>
-                                        </div>
-                                    )}
-                                    {exercises.map((ex, idx) => {
-                                        const sets = parseInt(String(ex?.sets ?? ex?.numSets ?? '')) || 0
-                                        const reps = String(ex?.reps || '—')
-                                        const rest = ex?.restTime ? `${parseInt(String(ex.restTime))}s` : ex?.rest_time ? `${parseInt(String(ex.rest_time))}s` : null
-                                        const method = String(ex?.method || '')
-                                        const notes = String(ex?.notes || '').trim()
-                                        const isSpecialMethod = method && method.toLowerCase() !== 'normal' && method.toLowerCase() !== ''
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className="group relative bg-white/[0.03] border border-white/[0.07] hover:border-yellow-500/20 hover:bg-white/[0.05] rounded-2xl p-4 transition-all duration-200"
-                                            >
-                                                {/* Exercise number accent */}
-                                                <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
-
-                                                <div className="pl-3">
-                                                    {/* Top row: name + sets/reps */}
-                                                    <div className="flex items-start justify-between gap-3 mb-2">
-                                                        <div className="flex items-start gap-2.5 min-w-0">
-                                                            <span className="flex-shrink-0 w-5 h-5 rounded-md bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center text-[10px] font-black text-yellow-400 leading-none mt-0.5">
-                                                                {idx + 1}
-                                                            </span>
-                                                            <h4 className="font-bold text-white text-[13.5px] leading-snug">{String(ex?.name || '—')}</h4>
-                                                        </div>
-                                                        {sets > 0 && (
-                                                            <div className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                                                <span className="text-[12px] font-black text-yellow-400">{sets} × {reps}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Badges row */}
-                                                    <div className="flex flex-wrap items-center gap-1.5 ml-7">
-                                                        {rest && (
-                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800/80 border border-neutral-700/50">
-                                                                <Clock size={10} className="text-yellow-500" />
-                                                                <span className="text-[10.5px] font-bold text-neutral-400">Descanso: {rest}</span>
-                                                            </div>
-                                                        )}
-                                                        {isSpecialMethod && (
-                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                                                                <Zap size={10} className="text-amber-400" />
-                                                                <span className="text-[10.5px] font-bold text-amber-400">{method}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Notes */}
-                                                    {notes && (
-                                                        <div className="mt-2.5 ml-7 pl-3 border-l border-yellow-500/20">
-                                                            <p className="text-[11.5px] text-neutral-400 leading-relaxed italic">{notes}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
+                                {/* Exercise list — leitura + modo Organizar (arrastar) */}
+                                <QuickViewExerciseList
+                                    workoutId={qw?.id != null ? String(qw.id) : null}
+                                    exercises={exercises}
+                                    canReorder={!qw?.completed_at && !qw?.completedAt}
+                                    // Reescreve o treino DESTA tela na hora. "Iniciar treino"
+                                    // parte deste objeto — sem atualizá-lo, o exercício apagado
+                                    // (ou a ordem antiga) ia junto pra sessão, e só sumia depois
+                                    // que o refetch chegasse.
+                                    onExercisesChange={(next) => setQuickViewWorkout({ ...qw, exercises: next })}
+                                />
 
                                 {/* Bottom padding area */}
                                 <div className="h-2" />
@@ -523,20 +481,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 />
             )}
 
-            {/* Partner Exercise Control Overlay — key por share.id reinicializa o
-                estado a cada novo exercício compartilhado; error boundary evita que
-                uma falha do overlay derrube o app inteiro. */}
-            {teamWorkoutCtx?.incomingExerciseShare && (
-                <SectionErrorBoundary section="Modo Spotter" onReset={() => teamWorkoutCtx.endExerciseShare()}>
-                    <PartnerExerciseOverlay
-                        key={String(teamWorkoutCtx.incomingExerciseShare.id ?? '')}
-                        share={teamWorkoutCtx.incomingExerciseShare}
-                        onSendUpdate={teamWorkoutCtx.sendExerciseControlUpdate}
-                        onEnd={teamWorkoutCtx.endExerciseShare}
-                    />
-                </SectionErrorBoundary>
-            )}
-
             {/* Session Floating Bar */}
             {activeSession && view !== 'active' && (
                 <div className="fixed bottom-0 left-0 right-0 z-[1100]">
@@ -615,8 +559,8 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-bold uppercase tracking-widest text-yellow-500">Check-in</div>
-                                <div className="text-white font-bold text-lg truncate">Pré-treino</div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                                <div className="text-white font-black text-lg truncate">Pré-treino</div>
                                 <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
                             </div>
                             <button
@@ -627,40 +571,46 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     preCheckinResolveRef.current = null
                                     if (typeof r === 'function') r(null)
                                 }}
-                                className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                className="w-11 h-11 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 flex items-center justify-center text-neutral-200 transition-colors"
                                 aria-label="Fechar"
                             ><X size={18} /></button>
                         </div>
-                        <div className="p-5 space-y-6">
-                            {/* Weight field — only show when profile doesn't have a weight set */}
-                            {!profileBodyWeightKg ? (
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Peso (kg)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        placeholder="Ex: 85.0"
-                                        value={String((preCheckinDraft as Record<string, unknown>)?.weight ?? '')}
-                                        onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
-                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                    />
-                                    <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
-                                        ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-xl">
-                                    <div className="w-7 h-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-green-400 text-sm">✓</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-semibold text-green-300">Peso do perfil: {profileBodyWeightKg} kg</p>
-                                        <p className="text-[11px] text-green-400/60">Gasto calórico calculado automaticamente</p>
-                                    </div>
-                                </div>
-                            )}
+                        {/* Corpo rolável — garante que o "Continuar" nunca fique fora da tela. */}
+                        <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
+                            {/* Peso de hoje — SEMPRE editável.
+                                Antes: quem já tinha peso no perfil via só um card read-only e NUNCA
+                                conseguia atualizar aqui. Consequência: o gasto calórico seguia sendo
+                                calculado com um peso desatualizado, e a tendência de peso (o dado mais
+                                valioso de um check-in) se perdia. Agora vem pré-preenchido com o do
+                                perfil: um toque pra confirmar, ou ajuste se pesou hoje. */}
                             <div>
-                                <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Como se sente?</label>
+                                <label htmlFor="precheckin-weight" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                    Peso de hoje (kg)
+                                </label>
+                                {/* Sem type="number": num WebView (locale != pt-BR) ele REJEITA a vírgula
+                                    — o placeholder "Ex: 85,0" não entrava. inputMode="decimal" já mostra
+                                    o teclado com separador; o valor fica como texto e é parseado depois. */}
+                                <input
+                                    id="precheckin-weight"
+                                    inputMode="decimal"
+                                    placeholder={profileBodyWeightKg ? String(profileBodyWeightKg) : 'Ex: 85,0'}
+                                    value={preCheckinWeightValue}
+                                    onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
+                                    className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
+                                />
+                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">
+                                    {profileBodyWeightKg ? (
+                                        <>
+                                            Do seu perfil: <span className="font-bold text-neutral-300">{formatKgPtBr(profileBodyWeightKg)} kg</span>.
+                                            {' '}Ajuste se pesou hoje — melhora o gasto calórico e registra sua evolução.
+                                        </>
+                                    ) : (
+                                        <>⚡ Preencher melhora a precisão do gasto calórico no relatório final.</>
+                                    )}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Como se sente?</label>
                                 <div className="flex gap-2">
                                     {[
                                         { value: 'great', label: '💪 Ótimo', color: 'bg-green-500/20 border-green-500/40 text-green-300' },
@@ -671,13 +621,38 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                             key={opt.value}
                                             type="button"
                                             onClick={() => setPreCheckinDraft({ ...(preCheckinDraft || {}), mood: opt.value })}
-                                            className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-colors ${(preCheckinDraft as Record<string, unknown>)?.mood === opt.value ? opt.color : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}
+                                            aria-pressed={(preCheckinDraft as Record<string, unknown>)?.mood === opt.value}
+                                            className={`flex-1 min-h-[44px] py-3 rounded-xl border text-sm font-bold transition-colors ${(preCheckinDraft as Record<string, unknown>)?.mood === opt.value ? opt.color : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}
                                         >{opt.label}</button>
                                     ))}
                                 </div>
                             </div>
+                            {/* #3 auto-carga: prontidão do dia. Sono e dor muscular modulam a
+                                carga sugerida (dia ruim → o motor pega mais leve). Opcionais. */}
+                            <CheckinScale
+                                label="Dor muscular hoje (0–10)"
+                                hint="Dor/desconforto agora, antes de treinar. 0 = nenhuma."
+                                values={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                                gridCols="grid-cols-6"
+                                value={String((preCheckinDraft as Record<string, unknown>)?.soreness ?? '')}
+                                onChange={(v) => setPreCheckinDraft({ ...(preCheckinDraft || {}), soreness: v })}
+                            />
                             <div>
-                                <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Notas (opcional)</label>
+                                <label htmlFor="precheckin-sleep" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                    Sono na última noite (h)
+                                </label>
+                                <input
+                                    id="precheckin-sleep"
+                                    inputMode="decimal"
+                                    placeholder="Ex: 7,5"
+                                    value={String((preCheckinDraft as Record<string, unknown>)?.sleepHours ?? '')}
+                                    onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), sleepHours: e.target.value })}
+                                    className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
+                                />
+                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">Dormir pouco reduz a carga sugerida no treino de hoje.</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Notas (opcional)</label>
                                 <textarea
                                     placeholder="Ex: Dor leve no ombro direito"
                                     value={String((preCheckinDraft as Record<string, unknown>)?.notes ?? '')}
@@ -695,7 +670,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     preCheckinResolveRef.current = null
                                     if (typeof r === 'function') r(null)
                                 }}
-                                className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300"
+                                className="flex-1 min-h-[44px] p-3 bg-neutral-800 border border-neutral-700 rounded-xl font-bold text-neutral-200 hover:bg-neutral-700"
                             >Pular</button>
                             <button
                                 type="button"
@@ -703,9 +678,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     setPreCheckinOpen(false)
                                     const r = preCheckinResolveRef.current
                                     preCheckinResolveRef.current = null
-                                    if (typeof r === 'function') r(preCheckinDraft)
+                                    // Salva o peso CONFIRMADO (digitado ou o do perfil pré-preenchido) —
+                                    // sem isto, quem só confirma não registraria o peso do dia.
+                                    if (typeof r === 'function') r(preCheckinResolvedDraft())
                                 }}
-                                className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black"
+                                className="flex-1 min-h-[44px] p-3 bg-yellow-500 rounded-xl font-black text-black"
                             >Continuar</button>
                         </div>
                     </div>
@@ -765,13 +742,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
             {showProgressPhotos && (
                 <ProgressPhotos onClose={() => setShowProgressPhotos(false)} />
             )}
-
-            {/* Offline Sync */}
-            <OfflineSyncModal
-                open={offlineSyncOpen}
-                onClose={() => setOfflineSyncOpen(false)}
-                userId={user?.id as string | undefined}
-            />
 
             {/* Welcome */}
             <WelcomeFloatingWindow user={user as AdminUser} onClose={() => { }} />

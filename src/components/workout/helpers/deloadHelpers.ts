@@ -10,13 +10,19 @@ import {
     ReportHistoryItem,
     AiRecommendation,
     DeloadAnalysis,
+    UnknownRecord,
 } from '../types';
 import {
+    isObject,
     safeJsonParse,
     normalizeReportHistory,
     averageNumbers,
     toNumber,
     estimate1Rm,
+    clampNumber,
+    roundToStep,
+    extractLogWeight,
+    WEIGHT_ROUND_STEP,
     DELOAD_HISTORY_KEY,
     DELOAD_AUDIT_KEY,
     DELOAD_HISTORY_SIZE,
@@ -24,14 +30,30 @@ import {
     DELOAD_RECENT_WINDOW,
     DELOAD_STAGNATION_PCT,
     DELOAD_REGRESSION_PCT,
+    DELOAD_REDUCTION_MIN,
+    DELOAD_REDUCTION_MAX,
 } from '../utils';
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 
-export const loadDeloadHistory = (): ReportHistory => {
+/**
+ * Chave por USUÁRIO. As chaves eram constantes globais, então num aparelho
+ * compartilhado (mesma família, mesmo navegador) o histórico de deload e a trilha
+ * de auditoria de uma conta ficavam visíveis para a próxima que logasse. O cache de
+ * histórico de treino ao lado já é escopado exatamente por isso — ver o comentário
+ * em utils.ts sobre o vazamento entre contas corrigido em 2026-07-23.
+ *
+ * Sem `userId` cai na chave legada (não perde o dado de quem já tinha).
+ */
+const scopedKey = (base: string, userId?: string | null): string => {
+    const uid = String(userId ?? '').trim();
+    return uid ? `${base}.${uid}` : base;
+};
+
+export const loadDeloadHistory = (userId?: string | null): ReportHistory => {
     try {
         if (typeof window === 'undefined') return { version: 1, exercises: {} };
-        const raw = window.localStorage.getItem(DELOAD_HISTORY_KEY);
+        const raw = window.localStorage.getItem(scopedKey(DELOAD_HISTORY_KEY, userId));
         if (!raw) return { version: 1, exercises: {} };
         const parsed = safeJsonParse(raw);
         return normalizeReportHistory(parsed);
@@ -40,28 +62,191 @@ export const loadDeloadHistory = (): ReportHistory => {
     }
 };
 
-export const saveDeloadHistory = (next: ReportHistory) => {
+export const saveDeloadHistory = (next: ReportHistory, userId?: string | null) => {
     try {
         if (typeof window === 'undefined') return;
-        window.localStorage.setItem(DELOAD_HISTORY_KEY, JSON.stringify(next));
+        window.localStorage.setItem(scopedKey(DELOAD_HISTORY_KEY, userId), JSON.stringify(next));
     } catch { }
 };
 
-export const appendDeloadAudit = (entry: unknown) => {
+export const appendDeloadAudit = (entry: unknown, userId?: string | null) => {
     try {
         if (typeof window === 'undefined') return;
-        const raw = window.localStorage.getItem(DELOAD_AUDIT_KEY);
+        const key = scopedKey(DELOAD_AUDIT_KEY, userId);
+        const raw = window.localStorage.getItem(key);
         const parsed: unknown = raw ? safeJsonParse(raw) : null;
         const list: unknown[] = Array.isArray(parsed) ? parsed : [];
         const next = [entry, ...list].slice(0, 100);
-        window.localStorage.setItem(DELOAD_AUDIT_KEY, JSON.stringify(next));
+        window.localStorage.setItem(key, JSON.stringify(next));
     } catch { }
 };
 
+// ─── Aplicação do deload (núcleo puro) ────────────────────────────────────────
+
+export type DeloadSetInput = {
+    /** "exIdx-setIdx" */
+    key: string;
+    /** log atual da série (peso/reps/rpe/done/weightSource/advanced_config). */
+    log: UnknownRecord;
+    /** Peso planejado desta série (do plano ou do template), quando houver. */
+    plannedWeight: number | null;
+    /** Sugestão de reps/RPE já calculada para esta série, quando houver. */
+    suggestion: UnknownRecord | null;
+    /** advanced_config resolvido para esta série. */
+    cfg: unknown;
+};
+
+export type DeloadPatch = { key: string; patch: UnknownRecord };
+
+export type DeloadPlan = {
+    patches: DeloadPatch[];
+    /** Séries preservadas por já estarem concluídas. */
+    skippedDone: number;
+    appliedWeights: number[];
+};
+
+/**
+ * Decide, para cada série, o peso pós-deload e o patch a gravar. Núcleo PURO —
+ * extraído de `applyDeloadToExercise` para poder ser testado de verdade, em vez de
+ * por source-guard: era o único ponto do deload que escreve algo e não tinha
+ * nenhum teste de comportamento (auditoria 2026-07-29).
+ *
+ * Três regras não óbvias moram aqui:
+ *
+ *  1. Série já CONCLUÍDA não é tocada — o peso dela é o que a pessoa levantou.
+ *     Reescrever falsificava retroativamente volume, relatório e PDF.
+ *  2. `weightSource: 'user'` é obrigatório no patch. O deload nasce de um modal
+ *     que a pessoa confirmou, então o peso é dela. Sem essa marca a série seguia
+ *     'auto' e o re-sync do autoload reescrevia a sugestão antiga por cima,
+ *     desfazendo o deload em silêncio.
+ *  3. A REFERÊNCIA da redução respeita a origem do peso, para os cortes não se
+ *     comporem: peso assumido pelo usuário manda; peso posto pelo motor (que já
+ *     pode vir descontado por prontidão e reconhecimento) cede lugar ao maior
+ *     entre ele e o planejado, para a redução incidir sobre a carga cheia.
+ */
+export function buildDeloadPatches(input: {
+    sets: DeloadSetInput[];
+    ratio: number;
+    minWeight: number;
+    baseWeight: number;
+    appliedAt: string;
+    meta: { reductionPct: unknown; reason: unknown; historyCount: unknown };
+}): DeloadPlan {
+    const { sets, ratio, minWeight, baseWeight, appliedAt, meta } = input;
+    const patches: DeloadPatch[] = [];
+    const appliedWeights: number[] = [];
+    let skippedDone = 0;
+
+    for (const item of Array.isArray(sets) ? sets : []) {
+        const log: UnknownRecord = isObject(item?.log) ? item.log : {};
+
+        const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
+        const alreadyDone = doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true';
+        if (alreadyDone) { skippedDone += 1; continue; }
+
+        const logWeight = extractLogWeight(log);
+        const suggestion = isObject(item?.suggestion) ? item.suggestion : null;
+        // Peso desta série na ÚLTIMA sessão — é a referência de "carga cheia".
+        //
+        // Usar o planejado do template aqui foi um erro meu: o template envelhece.
+        // No Crucifixo do dono, o template dizia 70 kg mas a carga real havia caído
+        // para 50; com o template como referência, "reduzir 22%" resultava em
+        // 54,5 kg — o botão de DELOAD AUMENTAVA a carga. O histórico recente não
+        // envelhece, então é ele que distingue os dois casos:
+        //   • motor cortou HOJE (prontidão/reconhecimento): caixa < última sessão
+        //     → reduz sobre a última sessão, sem compor cortes;
+        //   • carga caiu de verdade: caixa ≈ última sessão → reduz sobre ela mesma.
+        const lastSessionWeight = toNumber(suggestion?.weight ?? null);
+        const plannedWeight = toNumber(item?.plannedWeight ?? null);
+        const userOwnsWeight = String(log.weightSource ?? '') === 'user';
+        const reference = userOwnsWeight && logWeight != null
+            ? logWeight
+            : Math.max(logWeight ?? 0, lastSessionWeight ?? 0) || plannedWeight || toNumber(baseWeight) || 0;
+        if (!reference || reference <= 0) continue;
+
+        // Invariante de sanidade: deload REDUZ. Nunca devolve peso acima da
+        // referência, qualquer que seja a combinação de piso e arredondamento.
+        const target = Math.min(Math.max(reference * ratio, minWeight || 0), reference);
+        const nextWeight = roundToStep(target, WEIGHT_ROUND_STEP);
+        const baseSetWeight = reference;
+        const currentReps = log.reps;
+        const currentRpe = log.rpe;
+        const hasReps = String(currentReps ?? '').trim().length > 0;
+        const hasRpe = String(currentRpe ?? '').trim().length > 0;
+
+        patches.push({
+            key: item.key,
+            patch: {
+                weight: String(nextWeight),
+                weightSource: 'user',
+                reps: !hasReps && suggestion?.reps != null ? String(suggestion.reps) : currentReps,
+                rpe: !hasRpe && suggestion?.rpe != null ? String(suggestion.rpe) : currentRpe,
+                deload: {
+                    appliedAt,
+                    originalWeight: baseSetWeight,
+                    suggestedWeight: nextWeight,
+                    reductionPct: meta?.reductionPct,
+                    reason: meta?.reason,
+                    historyCount: meta?.historyCount,
+                },
+                advanced_config: item?.cfg ?? log.advanced_config ?? null,
+            },
+        });
+        appliedWeights.push(nextWeight);
+    }
+
+    return { patches, skippedDone, appliedWeights };
+}
+
+/**
+ * Clampa o peso digitado no campo livre do modal e devolve a redução resultante.
+ *
+ * O campo não tinha teto superior: digitar acima do peso base fazia a razão passar
+ * de 1 e o "deload" AUMENTAR a carga em todas as séries, gravado com metadado de
+ * deload. Agora respeita os mesmos limites do slider (5%–40%) e o piso de 1RM.
+ */
+export function clampDeloadWeight(
+    nextWeightRaw: number,
+    baseWeight: number,
+    minWeight: number,
+): { weight: number; reductionPct: number } | null {
+    if (!Number.isFinite(baseWeight) || baseWeight <= 0) return null;
+    if (!Number.isFinite(nextWeightRaw)) return null;
+    const maxAllowed = baseWeight * (1 - DELOAD_REDUCTION_MIN);
+    const minAllowed = Math.max(minWeight || 0, baseWeight * (1 - DELOAD_REDUCTION_MAX));
+    const bounded = clampNumber(nextWeightRaw, Math.min(minAllowed, maxAllowed), maxAllowed);
+    const weight = roundToStep(bounded, WEIGHT_ROUND_STEP);
+    return { weight, reductionPct: clampNumber(1 - weight / baseWeight, 0, 1) };
+}
+
 // ─── Pure Analysis Functions ──────────────────────────────────────────────────
 
-export const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis => {
-    const ordered = Array.isArray(items) ? items.slice(-DELOAD_HISTORY_SIZE) : [];
+export const analyzeDeloadHistory = (
+    items: ReportHistoryItem[],
+    /**
+     * Treino atual (nome normalizado). Informado, a análise usa SÓ sessões deste
+     * treino — e se não houver o mínimo, devolve `hasEnoughHistory: false` em vez de
+     * cair no agregado.
+     *
+     * Sem esse recorte a análise comparava contextos diferentes: "Remada na máquina"
+     * aparece em cinco treinos do dono, de 40 a 110 kg, e a alternância entre eles
+     * era lida como "carga caiu" — falso positivo confirmado no aviso de 29/07.
+     */
+    preferWorkoutKey?: string | null,
+): DeloadAnalysis => {
+    const wanted = String(preferWorkoutKey ?? '').trim();
+    const base = Array.isArray(items) ? items : [];
+    const source = wanted ? base.filter((i) => String(i?.workoutKey ?? '') === wanted) : base;
+    // Sessões em que o próprio app já mandou reduzir NÃO são evidência de
+    // regressão — a carga caiu porque foi mandada cair. Sem este filtro o deload
+    // se auto-alimenta: aplicar -22% derruba o volume muito além do limiar de 3%,
+    // a análise seguinte lê "regressão" e sugere outro corte, e assim por diante.
+    // O motor de carga já ignora essas sessões (useWorkoutAutoload: `if
+    // (item?.deloadApplied) continue`); a análise ficava de fora da mesma regra.
+    // Ficou latente enquanto ninguém aplicava deload (0 de 547 sessões até
+    // jul/2026) — vira ativo no primeiro uso de verdade.
+    const semDeload = source.filter((i) => i?.deloadApplied !== true);
+    const ordered = semDeload.slice(-DELOAD_HISTORY_SIZE);
     const recent = ordered.slice(-DELOAD_RECENT_WINDOW);
     const older = ordered.slice(0, Math.max(0, ordered.length - recent.length));
     const avgRecentVolume = averageNumbers(recent.map((i) => i.totalVolume).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
@@ -80,7 +265,60 @@ export const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis
         (!hasRegression && weightDelta != null && Math.abs(weightDelta) <= DELOAD_STAGNATION_PCT);
 
     const status: DeloadAnalysis['status'] = hasRegression ? 'overtraining' : hasStagnation ? 'stagnation' : 'stable';
-    return { status, volumeDelta, weightDelta };
+    // Sem sessões suficientes, os deltas são null e o status cai em 'stable' por
+    // FALTA de dado, não por leitura da progressão. Quem afirma algo ao usuário
+    // (ou dispara aviso proativo) tem de olhar `hasEnoughHistory`, não só o status.
+    const itemsCount = ordered.length;
+    const hasEnoughHistory = itemsCount >= DELOAD_HISTORY_MIN && (volumeDelta != null || weightDelta != null);
+    return { status, volumeDelta, weightDelta, itemsCount, hasEnoughHistory };
+};
+
+export type ExerciseDeloadAlert = {
+    status: 'stagnation' | 'overtraining';
+    suggestedPct: number;
+    itemsCount: number;
+};
+
+export type SessionDeloadAlert = {
+    exIdxs: number[];
+    status: 'stagnation' | 'overtraining';
+    suggestedPct: number;
+    itemsCount: number;
+};
+
+/**
+ * Promove os avisos POR EXERCÍCIO a uma decisão de SESSÃO.
+ *
+ * O diagnóstico segue por exercício (é onde o histórico vive, e estagnação
+ * costuma ser local), mas a ação é do treino: a fadiga que justifica descarga é
+ * sistêmica — aliviar um exercício só não descansa nada — e decidir oito vezes
+ * seguidas é a explicação mais provável de a ferramenta nunca ter sido usada
+ * (0 de 547 sessões concluídas até jul/2026).
+ *
+ * Abaixo do mínimo, devolve null e o aviso continua no card do exercício: com um
+ * exercício travado o caso é local, não uma sessão inteira pedindo descanso.
+ *
+ * Regressão em QUALQUER exercício manda o cenário — e com ele a redução maior.
+ * `itemsCount` é o MENOR entre os exercícios: é o tamanho da evidência mais
+ * fraca do conjunto, e é ele que o texto mostra ao usuário.
+ */
+export const buildSessionDeloadAlert = (
+    alerts: Record<number, ExerciseDeloadAlert>,
+    minExercises: number,
+    reductionOvertrain: number,
+    reductionStagnation: number,
+): SessionDeloadAlert | null => {
+    const entries = Object.entries(alerts ?? {})
+        .map(([k, v]) => [Number(k), v] as const)
+        .filter(([k, v]) => Number.isFinite(k) && k >= 0 && isObject(v));
+    if (entries.length < Math.max(1, minExercises)) return null;
+    const temRegressao = entries.some(([, v]) => v.status === 'overtraining');
+    return {
+        exIdxs: entries.map(([k]) => k).sort((a, b) => a - b),
+        status: temRegressao ? 'overtraining' : 'stagnation',
+        suggestedPct: temRegressao ? reductionOvertrain : reductionStagnation,
+        itemsCount: Math.min(...entries.map(([, v]) => Number(v.itemsCount) || 0)),
+    };
 };
 
 export const parseAiRecommendation = (text: unknown): AiRecommendation => {
@@ -122,12 +360,21 @@ export const estimate1RmFromSets = (
 
 export const getDeloadReason = (analysis: DeloadAnalysis, reductionPct: number, historyCount: number) => {
     const pct = Math.round((Number(reductionPct) || 0) * 1000) / 10;
+    // Sem base suficiente, NÃO afirma cenário. Antes dizia "devido à progressão
+    // estável nos últimos histórico curto (1 treinos)" — uma frase com cara de
+    // análise, calculada sobre um único ponto de dado.
+    const enough = analysis?.hasEnoughHistory !== false && historyCount >= DELOAD_HISTORY_MIN;
+    if (!enough) {
+        const n = Number(historyCount) || 0;
+        return n > 0
+            ? `Redução de ${pct}%. Só ${n} ${n === 1 ? 'treino' : 'treinos'} no histórico — ainda não dá pra afirmar estagnação; ajuste no slider se precisar.`
+            : `Redução de ${pct}%. Sem histórico deste exercício — valor de partida, ajuste no slider se precisar.`;
+    }
     const label =
         analysis?.status === 'overtraining'
             ? 'regressão'
             : analysis?.status === 'stagnation'
                 ? 'estagnação'
                 : 'progressão estável';
-    const historyLabel = historyCount >= DELOAD_HISTORY_MIN ? `${historyCount} treinos` : `histórico curto (${historyCount || 0} treinos)`;
-    return `Redução de ${pct}% devido à ${label} nos últimos ${historyLabel}.`;
+    return `Redução de ${pct}% devido à ${label} nos últimos ${historyCount} treinos.`;
 };

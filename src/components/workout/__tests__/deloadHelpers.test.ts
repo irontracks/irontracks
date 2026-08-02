@@ -242,9 +242,30 @@ describe('getDeloadReason', () => {
     expect(result).toContain('progressão estável');
   });
 
-  it('mentions histórico curto when count < 4', () => {
-    const result = getDeloadReason({ status: 'stable', volumeDelta: null, weightDelta: null }, 0.12, 2);
-    expect(result).toContain('histórico curto');
+  it('com histórico curto NÃO afirma cenário — só diz que falta base (auditoria 2026-07-29)', () => {
+    // Antes o texto era "devido à progressão estável nos últimos histórico curto
+    // (2 treinos)": uma frase com aparência de análise, calculada sobre 2 pontos.
+    const result = getDeloadReason(
+      { status: 'stable', volumeDelta: null, weightDelta: null, itemsCount: 2, hasEnoughHistory: false },
+      0.12,
+      2,
+    );
+    expect(result).toContain('2 treinos');
+    // o invariante é não AFIRMAR o cenário — "devido à <cenário>" é a construção
+    // afirmativa. Citar o cenário numa negação ("não dá pra afirmar estagnação")
+    // é justamente o comportamento desejado, então não se testa por substring solta.
+    expect(result).not.toContain('devido à');
+    expect(result).not.toContain('progressão estável');
+  });
+
+  it('sem histórico nenhum, deixa claro que é valor de partida', () => {
+    const result = getDeloadReason(
+      { status: 'stable', volumeDelta: null, weightDelta: null, itemsCount: 0, hasEnoughHistory: false },
+      0.12,
+      0,
+    );
+    expect(result).toContain('Sem histórico');
+    expect(result).not.toContain('progressão estável');
   });
 
   it('shows numeric count when count >= 4', () => {

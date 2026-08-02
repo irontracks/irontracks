@@ -5,18 +5,18 @@ import { logError } from '@/lib/logger';
 // The controller no longer re-renders every second, only on user interaction.
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
+import { useWorkoutAutoload } from './hooks/useWorkoutAutoload';
 import { useWorkoutExerciseCrud } from './hooks/useWorkoutExerciseCrud';
 import { useWorkoutFinish } from './hooks/useWorkoutFinish';
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers';
 import { useDialog } from '@/contexts/DialogContext';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import {
   ActiveWorkoutProps,
   UnknownRecord,
   WorkoutDraft,
   WorkoutExercise,
 } from './types';
-import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary } from './utils';
+import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
@@ -30,18 +30,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
   // Bridge DialogContext alert (Promise<boolean>) to Promise<void> for child hooks
   const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title); }, [alert]);
-  const teamWorkout = useTeamWorkout() as unknown as {
-    sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown>
-    broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
-    broadcastWorkoutEdit: (workout: UnknownRecord) => void
-    teamSession: { id: string; isHost: boolean; participants: unknown[] } | null
-    sharedLogs: Record<string, Record<string, { exIdx: number; sIdx: number; weight: string; reps: string; ts: number }>>
-    exerciseControlUpdates: Array<{ fromUserId: string; exerciseIdx: number; setIdx: number; patch: Record<string, unknown>; ts: number }>
-  };
-  const sendInvite = teamWorkout.sendInvite;
-  const broadcastMyLog = teamWorkout.broadcastMyLog
-  const broadcastWorkoutEdit = teamWorkout.broadcastWorkoutEdit
-  const teamSession = teamWorkout.teamSession
   const session = props.session;
   const workout = session?.workout ?? null;
   const workoutExercises = workout?.exercises;
@@ -116,7 +104,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const {
     collapsed, setCollapsed,
     openNotesKeys, setOpenNotesKeys,
-    inviteOpen, setInviteOpen,
     linkedWeightExercises, setLinkedWeightExercises,
     currentExerciseIdx, setCurrentExerciseIdx,
     finishing, setFinishing,
@@ -190,29 +177,47 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         }
       }
 
-      // If weight changes and this exercise has linked weights enabled, update all sets
-      if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
+      // If a WEIGHT changes and this exercise has linked weights enabled, replicate
+      // it to all sets. Cobre flat (`weight`) E unilateral (`L_weight`/`R_weight`).
+      // Antes só olhava `weight`, então unilateral — que grava L_weight/R_weight —
+      // NUNCA sincronizava (o LADO R ficava vazio ao digitar o LADO L).
+      //
+      // Unilateral: o lado digitado replica pra ESSE lado em todas as séries, e o
+      // OUTRO lado é auto-preenchido com o mesmo valor SÓ onde está vazio. Assim o
+      // 1º peso preenche os dois lados (caso comum: mesma carga), mas editar um lado
+      // depois não apaga o outro (permite cargas diferentes em L e R).
+      const typedSide: 'L_weight' | 'R_weight' | null =
+        'L_weight' in patchObj ? 'L_weight' : 'R_weight' in patchObj ? 'R_weight' : null;
+      const typedWeight = 'weight' in patchObj ? patchObj.weight
+        : typedSide ? (patchObj as Record<string, unknown>)[typedSide]
+          : undefined;
+      if (linkedWeightExercises.has(exIdx) && typedWeight !== undefined) {
         const ex = exercises[exIdx];
         if (ex) {
           const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
           const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
           const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+          const otherSide = typedSide === 'L_weight' ? 'R_weight' : 'L_weight';
 
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc); as demais
-            // recebem só o peso. Antes o early-return propagava o peso e DESCARTAVA o
-            // resto do que foi digitado na série atual (a série nem marcava como feita).
-            const linkedMerged = setIdx === sIdx ? { ...prev, ...patchObj } : { ...prev, weight: patchObj.weight };
+            // Peso a propagar nesta série: o lado digitado sempre; o outro lado só se
+            // estiver vazio (não clobbera uma carga diferente já registrada).
+            const weightPatch: Record<string, unknown> = typedSide
+              ? { [typedSide]: typedWeight }
+              : { weight: typedWeight };
+            if (typedSide) {
+              const otherVal = (prev as Record<string, unknown> | null)?.[otherSide];
+              if (otherVal == null || String(otherVal).trim() === '') weightPatch[otherSide] = typedWeight;
+            }
+            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc) por cima
+            // do peso; as demais recebem só o peso. Antes o early-return propagava o
+            // peso e DESCARTAVA o resto do que foi digitado na série atual.
+            const linkedMerged = setIdx === sIdx ? { ...prev, ...weightPatch, ...patchObj } : { ...prev, ...weightPatch };
             propsRef.current.onUpdateLog(linkedKey, linkedMerged);
             logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
           }
-          // Broadcast linked weight update for first set only
-          try {
-            const w = String(patchObj.weight ?? '')
-            if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
-          } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
           return;
         }
       }
@@ -227,18 +232,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       // second call to read a stale `prev` that's missing the first
       // call's fields (e.g., weight typed just before pressing OK).
       logsRef.current = { ...logsRef.current, [key]: merged };
-
-      // Broadcast log update to team partners
-      try {
-        if (broadcastMyLog && Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
-          const merged = { ...prev, ...patchObj }
-          const w = String(merged.weight ?? '')
-          const r = String(merged.reps ?? '')
-          if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
-        }
-      } catch (e) { logError('hook:useActiveWorkoutController.broadcastLog', e) }
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
-  }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
+  }, [exercises, linkedWeightExercises, getLog]);
 
   // ── Set type (working / warmup / feeler) ─────────────────────────────────
   // Writes to the active log so the change is part of the session payload on
@@ -249,31 +244,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     updateLog(key, { set_type: type, is_warmup: type === 'warmup' });
   }, [updateLog]);
 
-  // ── Apply partner exercise control updates ───────────────────────────────
-  const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
-  // Dedup POR SÉRIE (exIdx-setIdx), não por um ts global: o spotter emite vários
-  // patches num mesmo tick (ex.: um por série num drop-set) com o mesmo Date.now()
-  // em ms — com um ts único, só o 1º era aplicado e os demais sumiam.
-  const lastAppliedTsByKey = useRef<Record<string, number>>({})
-  useEffect(() => {
-    if (!exerciseControlUpdates?.length) return
-    for (const update of exerciseControlUpdates) {
-      const key = `${update.exerciseIdx}-${update.setIdx}`
-      if (update.ts <= (lastAppliedTsByKey.current[key] ?? 0)) continue
-      lastAppliedTsByKey.current[key] = update.ts
-      try {
-        const prev = getLog(key)
-        const merged = { ...prev, ...update.patch }
-        if (typeof propsRef.current?.onUpdateLog === 'function') {
-          propsRef.current.onUpdateLog(key, merged)
-        }
-        // Atualiza a "memória rápida" (logsRef) na hora: sem isso, uma ação local logo
-        // em seguida lia o logsRef velho e sobrescrevia a mudança do parceiro/professor.
-        logsRef.current = { ...logsRef.current, [key]: merged }
-      } catch (e) { logError('hook:useActiveWorkoutController.applyPartnerUpdate', e) }
-    }
-  }, [exerciseControlUpdates, getLog])
-
 
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────
   const deload = useWorkoutDeload({
@@ -281,16 +251,83 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getPlanConfig: (ex, setIdx) => getPlanConfig(ex, setIdx),
     getPlannedSet: (ex, setIdx) => getPlannedSet(ex, setIdx),
     alert: alertVoid, confirm,
+    // Escopa o cache de histórico por usuário (trocar de conta servia o do anterior).
+    userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? ''),
   });
   const {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
-    deloadSuggestions, deloadModal, setDeloadModal,
+    deloadSuggestions, deloadAlerts, deloadModal, setDeloadModal,
+    sessionDeloadAlert, sessionDeloadModal, setSessionDeloadModal, applyDeloadToSession,
     deloadAiCacheRef, reportHistoryLoadingRef,
     reportHistoryLoadingSinceRef, reportHistoryStatusRef, reportHistoryUpdatedAtRef,
     persistDeloadHistoryFromSession,
     openDeloadModal, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
     applyDeloadToExercise,
   } = deload;
+
+  // ── Carga automática (autoload) — reusa reportHistory + motor suggestWeight ──
+  const { autoLoadEnabled, autoLoadSuggestions } = useWorkoutAutoload({
+    exercises,
+    reportHistory,
+    settings: settings as Record<string, unknown> | null,
+    userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? '') || null,
+    // `logs` alimenta SÓ a leitura das séries de Reconhecimento concluídas (sinal do
+    // dia). O hook usa uma chave canônica desses sinais como dependência, então o
+    // motor não recalcula a cada tecla — ver comentário em useWorkoutAutoload.
+    logs,
+    // Escopa o histórico pelo treino em curso: o mesmo exercício vive em treinos
+    // diferentes com cargas incomparáveis, e sem isto o motor ancorava na sessão
+    // de outro treino.
+    workoutName: String((workout as Record<string, unknown>)?.name ?? (session as Record<string, unknown>)?.name ?? ''),
+  });
+
+  // ── Deload por-exercício (o botão do card) ──────────────────────────────────
+  // Lê a lista persistida de exercícios com deload DESLIGADO e expõe um toggle que
+  // persiste via o mesmo caminho de settings do autoLoad (props.onToggleExerciseDeload).
+  const deloadOffKeys = useMemo(() => {
+    const list = Array.isArray((settings as Record<string, unknown> | null)?.autoLoadDeloadOff)
+      ? ((settings as Record<string, unknown>).autoLoadDeloadOff as unknown[])
+      : [];
+    return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''));
+  }, [settings]);
+
+  /**
+   * Descarga do TREINO — a decisão que substituiu os 8 botões dos cards.
+   *
+   * Chave = nome do treino normalizado, a mesma que o histórico já usa
+   * (`currentWorkoutKey` em useWorkoutAutoload). Assim "Lower B" liga/desliga
+   * sozinho, sem arrastar o Supino de outros treinos junto — que era o efeito
+   * colateral de chavear por exercício.
+   */
+  const workoutDeloadKey = useMemo(
+    () => normalizeExerciseKey(String((workout as Record<string, unknown>)?.name
+      ?? (session as Record<string, unknown>)?.name ?? '')),
+    [workout, session],
+  )
+
+  const workoutDeloadOff = useMemo(() => {
+    const list = Array.isArray((settings as Record<string, unknown> | null)?.autoLoadDeloadOffWorkouts)
+      ? ((settings as Record<string, unknown>).autoLoadDeloadOffWorkouts as unknown[])
+      : []
+    return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''))
+  }, [settings]);
+
+  const workoutDeloadEnabled = !!workoutDeloadKey && !workoutDeloadOff.has(workoutDeloadKey)
+
+  const toggleWorkoutDeload = useCallback(() => {
+    if (!workoutDeloadKey) return
+    propsRef.current?.onToggleWorkoutDeload?.(workoutDeloadKey, workoutDeloadOff.has(workoutDeloadKey))
+  }, [workoutDeloadKey, workoutDeloadOff]);
+
+  const toggleExerciseDeload = useCallback((exIdx: number) => {
+    const ex = exercises?.[exIdx];
+    const name = String((ex as Record<string, unknown>)?.name || '').trim();
+    if (!name) return;
+    const key = normalizeExerciseKey(name);
+    // Está off agora? Então o toque LIGA (nextEnabled = true). E vice-versa.
+    const nextEnabled = deloadOffKeys.has(key);
+    propsRef.current?.onToggleExerciseDeload?.(key, nextEnabled);
+  }, [exercises, deloadOffKeys]);
 
 
   const startTimer = useCallback((seconds: unknown, context: unknown) => {
@@ -403,20 +440,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession: (updatedWorkout: UnknownRecord) => {
       props.onUpdateSession?.(updatedWorkout);
-      if (teamSession?.id && typeof broadcastWorkoutEdit === 'function') {
-        // Small delay to allow state to settle before serialising
-        setTimeout(() => {
-          try {
-            // updatedWorkout is a session patch: { workout: { exercises: [...] } }
-            // broadcastWorkoutEdit must receive the raw workout object so that
-            // handleAcceptWorkoutEdit on the receiver can read .exercises directly
-            const rawWorkout = (typeof updatedWorkout.workout === 'object' && updatedWorkout.workout !== null)
-              ? updatedWorkout.workout as UnknownRecord
-              : updatedWorkout;
-            broadcastWorkoutEdit(rawWorkout);
-          } catch { }
-        }, 300);
-      }
     },
     alert: alertVoid, confirm,
   });
@@ -566,7 +589,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // o botão Salvar do "Editar exercício".
   const anyModalOpen = !!(
     editExerciseOpen || addExerciseOpen || organizeOpen || fullEditorOpen ||
-    postCheckinOpen || inviteOpen ||
+    postCheckinOpen ||
     deloadModal || clusterModal || restPauseModal || dropSetModal || strippingModal ||
     fst7Modal || heavyDutyModal || pontoZeroModal || forcedRepsModal ||
     negativeRepsModal || partialRepsModal || sistema21Modal || waveModal || groupMethodModal
@@ -579,13 +602,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     exercises,
     ui,
     settings,
+    onSavePlateSetup: props.onSavePlateSetup,
     collapsed,
     setCollapsed,
     finishing,
     openNotesKeys,
     setOpenNotesKeys,
-    inviteOpen,
-    setInviteOpen,
     addExerciseOpen,
     setAddExerciseOpen,
     addExerciseDraft,
@@ -634,6 +656,17 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
+    deloadAlerts,
+    sessionDeloadAlert,
+    sessionDeloadModal,
+    setSessionDeloadModal,
+    applyDeloadToSession,
+    autoLoadEnabled,
+    autoLoadSuggestions,
+    deloadOffKeys,
+    workoutDeloadEnabled,
+    toggleWorkoutDeload,
+    toggleExerciseDeload,
     currentExerciseIdx,
     setCurrentExerciseIdx,
     deleteConfirmIdx,
@@ -713,7 +746,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     HELP_TERMS,
     currentExercise,
     onFinish: props.onFinish,
-    sendInvite,
     completedSets,
     totalSets,
     progressPct,
@@ -722,9 +754,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     currentExDoneSets,
   }), [
     sessionForContext, anyModalOpen, workout, exercises, ui, settings,
+    props.onSavePlateSetup,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
-    inviteOpen, setInviteOpen,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,
     fullEditorOpen, fullEditorWorkout,
     organizeOpen, setOrganizeOpen, organizeDraft, setOrganizeDraft,
@@ -745,7 +777,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     groupMethodModal, setGroupMethodModal,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
-    deloadSuggestions,
+    deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
+    deloadOffKeys, toggleExerciseDeload,
+    workoutDeloadEnabled, toggleWorkoutDeload,
+    sessionDeloadAlert, sessionDeloadModal, setSessionDeloadModal, applyDeloadToSession,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
@@ -771,7 +806,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     saveSistema21Modal, saveWaveModal, saveGroupMethodModal,
     applyDeloadToExercise, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
     toggleNotes, alert, confirm,
-    currentExercise, props.onFinish, sendInvite,
+    currentExercise, props.onFinish,
     completedSets, totalSets, progressPct, remainingSets,
     currentExSetsCount, currentExDoneSets,
   ]);

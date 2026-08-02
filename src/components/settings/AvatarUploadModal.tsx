@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { compressImage } from '@/utils/chat/media'
+import { cloudinaryDeliveryUrl } from '@/utils/storage/cloudinaryUpload'
+import { logError, logWarn } from '@/lib/logger'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { Camera, Loader2, Check, X } from 'lucide-react'
-import Image from 'next/image'
 
 interface AvatarUploadModalProps {
   isOpen: boolean
@@ -24,21 +25,15 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
   const [success, setSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Cleanup preview URL on unmount or close
-  useEffect(() => {
-    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
-  }, [previewUrl])
-
   // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap — Escape fecha quando não está fazendo upload
   const handleEscape = useCallback(() => {
     if (uploading) return
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
     setSelectedFile(null)
     setPreviewUrl(null)
     setError('')
     setSuccess(false)
     onClose()
-  }, [uploading, previewUrl, onClose])
+  }, [uploading, onClose])
   const focusTrapRef = useFocusTrap(isOpen, handleEscape)
   useBackHandler(isOpen, handleEscape)
 
@@ -59,10 +54,13 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
       return
     }
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    const preview = URL.createObjectURL(file)
-    setPreviewUrl(preview)
     setSelectedFile(file)
+    // Preview via data URL — blob: URLs de URL.createObjectURL não carregam no WebView
+    // do Capacitor (app servido do server.url remoto), o que quebrava o preview.
+    const reader = new FileReader()
+    reader.onload = () => setPreviewUrl(String(reader.result || ''))
+    reader.onerror = () => setPreviewUrl(null)
+    reader.readAsDataURL(file)
   }
 
   const handleUpload = async () => {
@@ -71,8 +69,17 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
     setUploading(true)
 
     try {
-      // 1. Compress image
-      const compressed = await compressImage(selectedFile, { maxWidth: 512, quality: 0.85 })
+      // 1. Comprime a imagem (best-effort). Se o canvas/WebView não decodificar a imagem
+      //    (HEIC mislabelado como jpg, imagem gigante etc.), NÃO falha o upload: envia o
+      //    original e deixa o Cloudinary normalizar formato/tamanho na entrega (passo 3b).
+      let uploadBlob: Blob = selectedFile
+      let compressed = false
+      try {
+        uploadBlob = await compressImage(selectedFile, { maxWidth: 512, quality: 0.85 })
+        compressed = true
+      } catch (err) {
+        logWarn('avatarUpload', 'compressão falhou, enviando original', err)
+      }
 
       // 2. Sign upload via Cloudinary
       const signRes = await fetch('/api/storage/sign-cloudinary', {
@@ -89,7 +96,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
 
       // 3. Upload to Cloudinary
       const form = new FormData()
-      form.append('file', compressed, 'avatar.jpg')
+      form.append('file', uploadBlob, compressed ? 'avatar.jpg' : (selectedFile.name || 'avatar'))
       form.append('api_key', sign.apiKey)
       form.append('timestamp', String(sign.timestamp))
       form.append('signature', sign.signature)
@@ -99,12 +106,19 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
 
       const uploadRes = await fetch(sign.uploadUrl, { method: 'POST', body: form })
       const uploadData = await uploadRes.json()
-      const secureUrl = String(uploadData?.secure_url || '')
-      if (!secureUrl) {
+      const rawUrl = String(uploadData?.secure_url || '')
+      if (!rawUrl) {
         setError('Erro no upload da imagem.')
         setUploading(false)
         return
       }
+
+      // 3b. Se enviamos o original (compressão pulou), força entrega web-friendly:
+      //     f_auto (webp/jpg conforme o device) + resize p/ 512 — um .heic cru não
+      //     renderiza no <img> do WebView, então normalizar aqui garante que exiba.
+      const secureUrl = compressed
+        ? rawUrl
+        : cloudinaryDeliveryUrl(rawUrl, 'f_auto,q_auto,w_512,c_limit')
 
       // 4. Update profile in Supabase
       const supabase = createClient()
@@ -114,6 +128,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
         .eq('id', userId)
 
       if (dbError) {
+        logError('avatarUpload', dbError, { step: 'profiles.update' })
         setError('Erro ao salvar foto no perfil.')
         setUploading(false)
         return
@@ -126,7 +141,10 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
       setTimeout(() => {
         onPhotoUpdated(secureUrl)
       }, 1000)
-    } catch {
+    } catch (e) {
+      // Antes o erro era engolido (catch vazio) — zero visibilidade no Sentry. Agora
+      // reporta via logError (client + server) mantendo a mensagem amigável ao usuário.
+      logError('avatarUpload', e)
       setError('Erro inesperado. Tente novamente.')
     } finally {
       setUploading(false)
@@ -135,7 +153,6 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
 
   const handleClose = () => {
     if (uploading) return
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
     setSelectedFile(null)
     setPreviewUrl(null)
     setError('')
@@ -161,7 +178,10 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
         <div className="flex flex-col items-center gap-4">
           <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-yellow-500/40">
             {displayUrl ? (
-              <Image src={displayUrl} width={96} height={96} className="w-full h-full object-cover" alt="Avatar" unoptimized />
+              // Plain <img>: o preview é data URL e o WebView do Capacitor renderiza data/
+              // remote URLs de forma confiável (next/image com data: URL tem quirks).
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={displayUrl} width={96} height={96} className="w-full h-full object-cover" alt="Avatar" />
             ) : (
               <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
                 <Camera size={28} className="text-neutral-600" />

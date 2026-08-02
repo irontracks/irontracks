@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import { logError, logWarn } from '@/lib/logger'
+import { isSessionFresh } from '@/utils/social/activeSession'
 
 export interface StudentActiveSession {
   startedAt: string
@@ -34,6 +35,13 @@ export function useTeacherStudentSessions(
    * aluno gera UPDATE; sem filtro, todos os alunos triplicam o tráfego.
    */
   studentUserIds?: readonly string[],
+  /**
+   * Sufixo do nome do canal Realtime. Necessário quando DOIS consumidores montam
+   * o hook pro mesmo teacher ao mesmo tempo (ex.: o TeacherControlHost global + o
+   * StudentsTab) — dois canais Supabase com o MESMO tópico podem conflitar. Cada
+   * consumidor passa um sufixo único.
+   */
+  channelSuffix?: string,
 ): ActiveMap {
   const [activeMap, setActiveMap] = useState<ActiveMap>({})
   const channelRef = useRef<RealtimeChannel | null>(null)
@@ -64,6 +72,10 @@ export function useTeacherStudentSessions(
 
         const map: ActiveMap = {}
         for (const row of data) {
+          // A linha só é deletada no finish/discard — quem fechou o app no meio do
+          // treino fica pra sempre. Sem este corte, o badge "Treinando agora" do
+          // professor acendia pra aluno que parou de treinar meses atrás.
+          if (!isSessionFresh(row.updated_at)) continue
           map[String(row.user_id)] = {
             startedAt: String(row.started_at ?? ''),
             updatedAt: String(row.updated_at ?? ''),
@@ -78,7 +90,7 @@ export function useTeacherStudentSessions(
 
     try {
       const ch = supabase
-        .channel(`teacher-student-sessions:${teacherUserId}`)
+        .channel(`teacher-student-sessions:${teacherUserId}${channelSuffix ? `:${channelSuffix}` : ''}`)
         .on(
           'postgres_changes',
           {
@@ -134,7 +146,7 @@ export function useTeacherStudentSessions(
         }
       } catch (e) { logWarn('useTeacherStudentSessions', 'cleanup failed', { error: String(e) }) }
     }
-  }, [supabase, teacherUserId, filterKey])
+  }, [supabase, teacherUserId, filterKey, channelSuffix])
 
   return activeMap
 }

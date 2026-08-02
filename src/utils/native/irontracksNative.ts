@@ -1,6 +1,55 @@
 import { registerPlugin } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
+import * as Sentry from '@sentry/nextjs'
 import { isIosNative, isNativePlatform } from '@/utils/platform'
+
+/**
+ * Reporta falha ao INICIAR uma Live Activity.
+ *
+ * Por que existe: o lado Swift engolia a falha num `print` e resolvia a promise
+ * com `activityId: ""` — sucesso falso. Aqui o JS descartava a string vazia. Com
+ * isso, a Ilha Dinâmica e o aviso da tela bloqueada podiam sumir para todo mundo
+ * sem UM registro em lugar nenhum (foi exatamente o que aconteceu: o dono
+ * reportou o sumiço e o Sentry estava limpo).
+ *
+ * Isto é telemetria, não correção: a causa raiz continua no Swift, mas agora ela
+ * aparece. E como o app carrega o front do servidor, este aviso vale para todos
+ * os builds já instalados, sem precisar de TestFlight.
+ */
+const reportLiveActivityFailure = (
+  kind: 'workout' | 'rest',
+  reason: 'empty_activity_id' | 'threw',
+  error?: unknown,
+  /** Diagnóstico que o Swift devolve junto do id vazio (builds novos). */
+  native?: { error?: unknown; activitiesEnabled?: unknown },
+) => {
+  try {
+    const nativeError = String(native?.error ?? '').slice(0, 300)
+    const tags: Record<string, string> = { area: 'live-activity', kind, reason }
+    // `activitiesEnabled` distingue "usuário desligou nos Ajustes" de "o
+    // ActivityKit recusou" — os dois davam exatamente o mesmo sintoma.
+    if (native?.activitiesEnabled !== undefined) tags.activitiesEnabled = String(native.activitiesEnabled)
+    if (nativeError) tags.nativeError = nativeError.slice(0, 60)
+    const extra = { nativeError: nativeError || undefined }
+    if (error !== undefined) Sentry.captureException(error, { tags, extra })
+    else Sentry.captureMessage(`live_activity_start_failed:${kind}:${reason}`, { level: 'warning', tags, extra })
+  } catch {
+    // Telemetria nunca pode derrubar o treino.
+  }
+}
+
+/**
+ * Retorno do início de uma Live Activity.
+ *
+ * `activityId` vazio = não nasceu. `error`/`activitiesEnabled` só existem em
+ * builds a partir da correção de diagnóstico — antes disso o Swift devolvia
+ * apenas o id vazio e o motivo morria num print.
+ */
+type LiveActivityStartResult = {
+  activityId?: string
+  error?: string
+  activitiesEnabled?: boolean
+}
 
 // ─── Plugin type ────────────────────────────────────────────────────────────
 
@@ -15,7 +64,9 @@ type IronTracksNativePlugin = {
   scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string; repeatCount?: number; repeatEverySeconds?: number }) => Promise<void>
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
-  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<void>
+  // Resolve com activityId ('' quando o Activity.request() falha no Swift).
+  // O tipo declarava Promise<void> e o retorno era jogado fora — a falha ficava invisível.
+  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<LiveActivityStartResult | void>
   updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   endAllRestLiveActivities: () => Promise<void>
@@ -48,6 +99,10 @@ type IronTracksNativePlugin = {
   // Photos
   saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
   saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
+  // PDF export — renderiza o HTML como application/pdf e abre o share sheet.
+  // SÓ existe em builds a partir de jul/2026: chamar direto num build antigo vira
+  // "plugin is not implemented on ios". Use `sharePdfFromHtml()` abaixo, que checa.
+  sharePdfFromHtml: (opts: { html: string; fileName?: string }) => Promise<{ shared: boolean; error: string }>
   // Voice
   requestVoicePermissions: () => Promise<{ microphone: string; speechRecognition: string }>
   startSpeechRecognition: (opts: { lang?: string }, callback: (result: { transcript?: string; isFinal?: boolean; error?: string; message?: string; code?: number }) => void) => Promise<string>
@@ -85,7 +140,7 @@ type IronTracksNativePlugin = {
     totalSetsForExercise?: number
     totalSetsCompleted?: number
     totalVolumeKg?: number
-  }) => Promise<{ activityId: string }>
+  }) => Promise<LiveActivityStartResult>
   updateWorkoutLiveActivity: (opts: {
     currentExerciseName?: string
     currentSetIndex?: number
@@ -93,6 +148,7 @@ type IronTracksNativePlugin = {
     totalSetsCompleted?: number
     totalVolumeKg?: number
   }) => Promise<void>
+  updateWorkoutRestCountdown: (opts: { restEndMs: number }) => Promise<void>
   endWorkoutLiveActivity: () => Promise<void>
   // App Intents (Siri shortcuts) — pending action triggered by Siri/Shortcuts
   checkPendingIntentAction: () => Promise<{ action: string }>
@@ -103,6 +159,10 @@ type IronTracksNativePlugin = {
   checkGeofenceStatus: () => Promise<{ active: boolean; authorization: string; gymName: string }>
   requestAlwaysLocationPermission: () => Promise<{ status: string }>
   addListener(eventName: 'gymGeofenceEntered', listenerFunc: (data: { gymName: string }) => void): Promise<PluginListenerHandle>
+  // Cardio GPS — continuous background location (run/bike tracking)
+  startCardioLocation: () => Promise<{ ok: boolean; authorization?: string }>
+  stopCardioLocation: () => Promise<{ points: NativeCardioFix[] }>
+  drainCardioLocations: () => Promise<{ points: NativeCardioFix[] }>
   // BGTaskScheduler — schedule next refresh / sync windows
   scheduleBackgroundTasks: () => Promise<{ ok: boolean }>
   addListener(eventName: 'backgroundRefresh', listenerFunc: (data: { kind: 'refresh' | 'sync' }) => void): Promise<PluginListenerHandle>
@@ -141,6 +201,22 @@ export type HapticStyle =
   | 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
   | 'success' | 'warning' | 'error' | 'selection'
 
+/** A single GPS fix as delivered by the native cardio location manager. */
+export interface NativeCardioFix {
+  lat: number
+  lng: number
+  /** Horizontal accuracy in meters (lower is better). */
+  accuracy: number
+  /** Altitude in meters. */
+  altitude: number
+  /** Speed in m/s (-1 when unavailable). */
+  speed: number
+  /** Course/heading in degrees (-1 when unavailable). */
+  heading: number
+  /** Unix ms the fix was produced. */
+  timestamp: number
+}
+
 // ─── Web / fallback implementation ───────────────────────────────────────────
 
 const webFallback: IronTracksNativePlugin = {
@@ -176,6 +252,7 @@ const webFallback: IronTracksNativePlugin = {
   getActiveCalories: async () => ({ calories: 0 }),
   saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+  sharePdfFromHtml: async () => ({ shared: false, error: 'Not available on web' }),
   requestVoicePermissions: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
   startSpeechRecognition: async () => '',
   stopSpeechRecognition: async () => ({ ok: false }),
@@ -187,12 +264,16 @@ const webFallback: IronTracksNativePlugin = {
   getSleepData: async () => ({ totalMinutes: 0, asleepMinutes: 0, inBedMinutes: 0, startMs: 0, endMs: 0 }),
   startWorkoutLiveActivity: async () => ({ activityId: '' }),
   updateWorkoutLiveActivity: async () => { },
+  updateWorkoutRestCountdown: async () => { },
   endWorkoutLiveActivity: async () => { },
   checkPendingIntentAction: async () => ({ action: '' }),
   startGymGeofence: async () => ({ ok: false }),
   stopGymGeofence: async () => ({ ok: false }),
   checkGeofenceStatus: async () => ({ active: false, authorization: 'denied', gymName: '' }),
   requestAlwaysLocationPermission: async () => ({ status: 'denied' }),
+  startCardioLocation: async () => ({ ok: false }),
+  stopCardioLocation: async () => ({ points: [] }),
+  drainCardioLocations: async () => ({ points: [] }),
   scheduleBackgroundTasks: async () => ({ ok: false }),
   getLiveActivityPushTokens: async () => ({ tokens: [] }),
   kvGet: async () => ({ value: null, exists: false }),
@@ -243,6 +324,47 @@ export const openAppSettings = async () => {
   }
 }
 
+// ─── Cardio GPS (continuous background location — iOS + Android native) ───────
+//
+// iOS: CLLocationManager em background (IronTracksNativePlugin.swift).
+// Android: CardioLocationService (foreground service + FusedLocationProvider).
+// No web, estas funções são no-op e o cardio cai no fallback @capacitor/geolocation.
+
+/** True quando o tracker nativo de cardio está disponível (iOS ou Android nativo). */
+export const isNativeCardioLocationAvailable = (): boolean => isNativePlatform()
+
+/** Inicia o tracking nativo (background). Resolve ok:false se indisponível/negado. */
+export const startNativeCardioLocation = async (): Promise<{ ok: boolean; authorization?: string }> => {
+  try {
+    if (!isNativePlatform()) return { ok: false }
+    return await Native.startCardioLocation()
+  } catch {
+    return { ok: false }
+  }
+}
+
+/** Para o tracking nativo e devolve os pontos ainda em buffer. */
+export const stopNativeCardioLocation = async (): Promise<NativeCardioFix[]> => {
+  try {
+    if (!isNativePlatform()) return []
+    const res = await Native.stopCardioLocation()
+    return Array.isArray(res?.points) ? res.points : []
+  } catch {
+    return []
+  }
+}
+
+/** Drena (retorna + limpa) os fixes bufferizados nativamente desde a última chamada. */
+export const drainNativeCardioLocations = async (): Promise<NativeCardioFix[]> => {
+  try {
+    if (!isNativePlatform()) return []
+    const res = await Native.drainCardioLocations()
+    return Array.isArray(res?.points) ? res.points : []
+  } catch {
+    return []
+  }
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export const requestNativeNotifications = async () => {
@@ -289,6 +411,12 @@ export const onNativeNotificationAction = (handler: (actionId: string) => void) 
       if (actionId) handler(actionId)
     } catch { }
   })
+  // Neutraliza rejeição solta no REGISTRO (ex.: binário nativo antigo sem o plugin).
+  // Sem isto, em builds sem o IronTracksNative esta promise rejeitava na hora e virava
+  // unhandledrejection — foi a origem de ~6.8k eventos "plugin is not implemented on
+  // ios" no Sentry, todos com culprit /dashboard (onde este listener é registrado).
+  // O .catch do unsubscribe (abaixo) só roda se alguém desinscrever — tarde demais.
+  if (isPromise(listener)) listener.catch(() => { })
   return () => {
     try {
       if (!listener) return
@@ -343,8 +471,12 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
-    await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
-  } catch { }
+    const result = await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
+    // Mesma pista do treino: id vazio = a Live Activity não nasceu.
+    if (result && !String(result.activityId || '')) reportLiveActivityFailure('rest', 'empty_activity_id', undefined, result)
+  } catch (e) {
+    reportLiveActivityFailure('rest', 'threw', e)
+  }
 }
 
 export const updateRestLiveActivity = async (
@@ -403,8 +535,13 @@ export const startWorkoutLiveActivity = async (state: WorkoutLiveActivityState):
       totalSetsCompleted: Math.max(0, Math.round(Number(state.totalSetsCompleted) || 0)),
       totalVolumeKg: Math.max(0, Number(state.totalVolumeKg) || 0),
     })
-    return String(result?.activityId || '')
-  } catch {
+    const activityId = String(result?.activityId || '')
+    // Swift resolve com id vazio quando o Activity.request() falha — é a única
+    // pista que temos de que a Ilha Dinâmica não vai aparecer.
+    if (!activityId) reportLiveActivityFailure('workout', 'empty_activity_id', undefined, result)
+    return activityId
+  } catch (e) {
+    reportLiveActivityFailure('workout', 'threw', e)
     return ''
   }
 }
@@ -422,6 +559,15 @@ export const updateWorkoutLiveActivity = async (
       totalSetsCompleted: Math.max(0, Math.round(Number(patch.totalSetsCompleted) || 0)),
       totalVolumeKg: Math.max(0, Number(patch.totalVolumeKg) || 0),
     })
+  } catch { /* swallow */ }
+}
+
+/** Liga/desliga o countdown de descanso na ilha do TREINO (compact leading).
+ *  restEndMs = timestamp epoch (ms) do fim do descanso; 0 limpa. No-op na web. */
+export const updateWorkoutRestCountdown = async (restEndMs: number): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.updateWorkoutRestCountdown({ restEndMs: Math.max(0, Number(restEndMs) || 0) })
   } catch { /* swallow */ }
 }
 
@@ -723,6 +869,38 @@ export const stopNativeSpeechRecognition = async () => {
     if (!isIosNative()) return
     await Native.stopSpeechRecognition()
   } catch { /* silent */ }
+}
+
+// ─── PDF export ───────────────────────────────────────────────────────────────
+
+/** Resultado do export nativo. `unsupported` = build instalado ainda não tem o
+ *  método Swift; o chamador deve cair no fallback web em vez de mostrar erro. */
+export type SharePdfResult = { shared: boolean; unsupported: boolean; error: string }
+
+/**
+ * Renderiza um HTML como PDF de verdade no lado nativo e abre o share sheet.
+ *
+ * Por que não dá pra fazer isso no JS: no WKWebView `window.print()` não existe,
+ * e o share sheet do iOS recusa arquivos `text/html` — o fallback antigo
+ * compartilhava uma `blob:` URL, que o iOS não resolve, e acabava
+ * compartilhando a PÁGINA ATUAL (o "salvar PDF" gerava a tela do app).
+ *
+ * Detecção de build: o proxy do Capacitor expõe QUALQUER nome de método como
+ * função, então checar `typeof` não prova nada — a única prova é chamar e ler o
+ * erro. Builds sem o método rejeitam com "not implemented"; devolvemos
+ * `unsupported: true` para o chamador usar o caminho antigo, sem estourar erro
+ * no Sentry (foram 6.8k eventos desse tipo).
+ */
+export const sharePdfFromHtml = async (html: string, fileName: string): Promise<SharePdfResult> => {
+  if (!isIosNative()) return { shared: false, unsupported: true, error: 'not_ios_native' }
+  try {
+    const result = await Native.sharePdfFromHtml({ html, fileName })
+    return { shared: !!result?.shared, unsupported: false, error: String(result?.error || '') }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e ?? '')
+    const unsupported = /not implemented|unimplemented|not available/i.test(msg)
+    return { shared: false, unsupported, error: msg }
+  }
 }
 
 // ─── Photos ───────────────────────────────────────────────────────────────────

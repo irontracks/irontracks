@@ -51,11 +51,63 @@ export const clusterVolume = (cluster: unknown): number => {
   return vol
 }
 
-/** Volume de UMA série: cluster → unilateral (L+R) → normal (peso×reps). */
+/**
+ * Estágios de um DROP-SET ou STRIPPING. São mecanicamente idênticos (reduzir a
+ * carga em etapas, `stages: [{weight,reps}]`), só mudam a chave onde o saver
+ * grava. Ambos precisam somar etapa a etapa — senão o topo (drop-set grava a
+ * etapa mais leve × total → subestima; stripping grava a mais pesada × total →
+ * superestima) distorce volume e 1RM. Ver auditoria de métodos avançados.
+ */
+export const getStageArray = (log: Record<string, unknown>): unknown[] | null => {
+  const drop = isRec(log.drop_set) ? log.drop_set : null
+  if (drop && Array.isArray(drop.stages) && drop.stages.length > 0) return drop.stages
+  const strip = isRec(log.stripping) ? log.stripping : null
+  if (strip && Array.isArray(strip.stages) && strip.stages.length > 0) return strip.stages
+  return null
+}
+
+/** Volume de estágios (drop-set/stripping): soma peso×reps de cada etapa. */
+export const stagesVolume = (stages: unknown[]): number => {
+  let vol = 0
+  for (const s of stages) {
+    if (!isRec(s)) continue
+    const w = parseWeightValue(s.weight)
+    const r = parseRepsValue(s.reps)
+    if (w > 0 && r > 0) vol += w * r
+  }
+  return vol
+}
+
+/**
+ * Volume de um WAVE LOADING (onda). Cada onda tem 3 tiers (pesado/médio/ultra),
+ * cada um com peso e reps próprios. Retrocompat: tier sem peso usa o `weight`
+ * base do log (modelo antigo, peso único). Volume = Σ ondas Σ tiers (peso×reps).
+ */
+export const waveVolume = (wave: unknown): number => {
+  if (!isRec(wave)) return 0
+  const waves = Array.isArray(wave.waves) ? wave.waves : null
+  if (!waves || waves.length === 0) return 0
+  const base = parseWeightValue(wave.weight)
+  const hw = parseWeightValue(wave.heavyWeight) || base
+  const mw = parseWeightValue(wave.mediumWeight) || base
+  const uw = parseWeightValue(wave.ultraWeight) || base
+  let vol = 0
+  for (const w of waves) {
+    if (!isRec(w)) continue
+    vol += hw * parseRepsValue(w.heavy) + mw * parseRepsValue(w.medium) + uw * parseRepsValue(w.ultra)
+  }
+  return vol
+}
+
+/** Volume de UMA série: cluster → estágios (drop/stripping) → wave → unilateral → normal. */
 export const setVolume = (log: unknown): number => {
   if (!isRec(log)) return 0
   const cv = clusterVolume(log.cluster)
   if (cv > 0) return cv
+  const stages = getStageArray(log)
+  if (stages) { const sv = stagesVolume(stages); if (sv > 0) return sv }
+  const wv = waveVolume(log.wave)
+  if (wv > 0) return wv
   const lv = parseWeightValue(log.L_weight) * parseRepsValue(log.L_reps)
   const rv = parseWeightValue(log.R_weight) * parseRepsValue(log.R_reps)
   if (lv > 0 || rv > 0) return lv + rv
@@ -74,6 +126,23 @@ export const setTopWeightReps = (log: unknown): { weight: number; reps: number }
 }
 
 /**
+ * Repetições TOTAIS de uma série — unilateral soma os dois lados.
+ *
+ * `setTopWeightReps` devolve o lado (12), que é o certo para EXIBIR a série ao
+ * lado do peso daquele lado e para o 1RM. Para CONTAGEM (reps do exercício, da
+ * sessão, Δ reps) o certo é o total feito: 12 por lado = 24. Sem isto a mesma
+ * linha do relatório mostrava volume dos DOIS lados e reps de UM (flagrado pelo
+ * dono em jul/2026: unilateral com 3×12+12 aparecia como 36 reps, não 72).
+ */
+export const setTotalReps = (log: unknown): number => {
+  if (!isRec(log)) return 0
+  const lr = parseRepsValue(log.L_reps)
+  const rr = parseRepsValue(log.R_reps)
+  if (lr > 0 || rr > 0) return lr + rr
+  return parseRepsValue(log.reps)
+}
+
+/**
  * True se a série CONTA para estatísticas: foi feita (done) E não é aquecimento
  * nem feeler. Mesma regra do relatório de finalização (reportMetrics), pra o card
  * "Resumo" do histórico não superestimar o volume contando aquecimento.
@@ -87,6 +156,31 @@ export const isWorkingSet = (log: unknown): boolean => {
   if (rawType === 'warmup' || rawType === 'feeler') return false
   if (!rawType && (log.is_warmup || log.isWarmup)) return false
   return true
+}
+
+/**
+ * Volume TOTAL da sessão (kg) a partir do mapa de logs — FONTE ÚNICA de verdade.
+ *
+ * Todo lugar que exibe, grava ou compara "volume total" precisa passar por aqui:
+ * card do relatório, PDF, Story, histórico, calorias, métricas oficiais da IA e o
+ * `reportMeta.totals.volumeKg` gravado no finish. Até jul/2026 cada um tinha sua
+ * própria soma e duas delas divergiam na MESMA sessão — `buildLogVolume`
+ * (reportMetrics) reimplementava o cálculo por série e, na isometria, multiplicava
+ * peso × SEGUNDOS: uma prancha de 60 s com o peso corporal (73 kg) virava 4.380 kg
+ * de "volume" que só o reportMeta enxergava (caso real de 09/07: 24.247 vs 17.650).
+ *
+ * Regra: soma `setVolume` de cada série de TRABALHO (`isWorkingSet`), varrendo o
+ * mapa inteiro de logs — não filtra por exercício, igual ao card e ao PDF.
+ */
+export const sessionVolumeKg = (logs: unknown): number => {
+  if (!isRec(logs)) return 0
+  let volume = 0
+  for (const log of Object.values(logs)) {
+    if (!isWorkingSet(log)) continue
+    const v = setVolume(log)
+    if (Number.isFinite(v) && v > 0) volume += v
+  }
+  return volume
 }
 
 /** Epley 1RM: peso × (1 + reps/30). 1 rep = o próprio peso. 0 se inválido. */
@@ -110,11 +204,24 @@ export const setBestE1rm = (log: unknown): number => {
   if (!isRec(log)) return 0
   let best = 0
   const bump = (w: number, r: number) => { const e = epley1rm(w, r); if (e > best) best = e }
-  // dropset: melhor etapa (o topo grava a etapa mais leve × total de reps → enganoso)
-  const drop = isRec(log.drop_set) ? log.drop_set : null
-  const stages = drop && Array.isArray(drop.stages) ? drop.stages : null
+  // dropset/stripping: melhor etapa (o topo grava a etapa mais leve/pesada × total
+  // de reps → enganoso nos dois). Mesma estrutura `stages: [{weight,reps}]`.
+  const stages = getStageArray(log)
   if (stages && stages.length > 0) {
     for (const s of stages) if (isRec(s)) bump(parseWeightValue(s.weight), parseRepsValue(s.reps))
+    if (best > 0) return best
+  }
+  // wave: melhor tier (peso próprio × reps), retrocompat com peso base único
+  const wave = isRec(log.wave) ? log.wave : null
+  const waveList = wave && Array.isArray(wave.waves) ? wave.waves : null
+  if (waveList && waveList.length > 0) {
+    const base = parseWeightValue(wave!.weight)
+    const hw = parseWeightValue(wave!.heavyWeight) || base
+    const mw = parseWeightValue(wave!.mediumWeight) || base
+    const uw = parseWeightValue(wave!.ultraWeight) || base
+    for (const w of waveList) if (isRec(w)) {
+      bump(hw, parseRepsValue(w.heavy)); bump(mw, parseRepsValue(w.medium)); bump(uw, parseRepsValue(w.ultra))
+    }
     if (best > 0) return best
   }
   // cluster: melhor bloco (blocksDetailed tem o peso próprio de cada bloco)

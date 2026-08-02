@@ -9,13 +9,20 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setForcedRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
   const fr = isObject(log.forced_reps) ? (log.forced_reps as UnknownRecord) : null;
   const savedWeight = String(fr?.weight ?? log.weight ?? '').trim();
+  // CONTAGEM de reps até falhar — não confundir com a flag `log.failure`, que é o
+  // toggle manual e trava a progressão do autoload. Repetições Forçadas vão à falha
+  // em toda série; gravar a flag aqui congelaria a carga pra sempre. Ver o comentário
+  // em utils/autoload/suggestWeight.ts (decisão de produto, travada por teste).
   const repsFailure = parseTrainingNumber(fr?.reps_failure ?? log.reps) ?? null;
   const forcedCount = parseTrainingNumber(fr?.forced_count) ?? null;
   const done = !!log.done;
@@ -96,6 +103,7 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso, reps à falha e reps forçadas no modal.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

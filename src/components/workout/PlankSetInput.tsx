@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { flushSync } from 'react-dom'
-import { Check, Play, Square } from 'lucide-react'
+import { Check, Play } from 'lucide-react'
+import { RunningTimerCard } from './RunningTimerCard'
 import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
@@ -47,6 +48,8 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
   const [weight, setWeight] = useState(initialWeight)
   const [targetSeconds, setTargetSeconds] = useState(initialDuration)
   const [isRunning, setIsRunning] = useState(false)
+  const [startedAtMs, setStartedAtMs] = useState(0)
+  const [runningTargetSec, setRunningTargetSec] = useState(0)
   const startedAtRef = useRef<number>(0)
   // Trava anti-duplo-toque (mesma proteção de ~400ms dos sets normais): dedo
   // suado / duplo toque não inicia nem para o timer/log duas vezes.
@@ -90,18 +93,25 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
     const sec = Math.min(3600, Math.max(1, Math.round(raw)))
     lastToggleRef.current = Date.now()
     startedAtRef.current = Date.now()
+    setStartedAtMs(startedAtRef.current)
+    setRunningTargetSec(sec)
     setIsRunning(true)
 
     startTimer(sec, {
       kind: 'plank',
       key,
       exerciseName: String(ex?.name ?? '').trim(),
-      onComplete: () => {
+      // `finalDurationSeconds` chega quando o usuário encerra pela barra do
+      // cronômetro antes da meta — grava o tempo REAL aguentado.
+      onComplete: (finalDurationSeconds?: number) => {
         const nowMs = Date.now()
+        const aguentou = Number.isFinite(finalDurationSeconds) && Number(finalDurationSeconds) > 0
+          ? Math.round(Number(finalDurationSeconds))
+          : sec
         updateLog(key, {
           weight: parseTrainingNumber(weight) ?? null,
           reps: null,
-          durationSeconds: sec,
+          durationSeconds: aguentou,
           done: true,
           restStartMs: restTime > 0 ? nowMs : null,
         })
@@ -147,19 +157,13 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
 
   if (isRunning) {
     return (
-      <div className="rounded-xl border px-3 py-2.5 bg-neutral-900/50 border-neutral-800/80">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-neutral-300">Série {setIdx + 1} • Prancha em andamento</span>
-          <button
-            type="button"
-            onClick={handleStop}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/90 text-white text-xs font-black"
-          >
-            <Square size={14} />
-            Parar
-          </button>
-        </div>
-      </div>
+      <RunningTimerCard
+        setIdx={setIdx}
+        label="Prancha"
+        startedAtMs={startedAtMs}
+        targetSeconds={runningTargetSec}
+        onStop={handleStop}
+      />
     )
   }
 

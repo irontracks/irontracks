@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
 import { respondDbError } from '@/utils/api/dbError'
+import { canNotifyStudentAppointment } from '@/utils/auth/appointmentNotifyAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +52,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'student_not_found' }, { status: 404 })
     }
 
-    if (student.teacher_id && student.teacher_id !== user.id && auth.role !== 'admin') {
+    // Fail-closed: só admin OU o professor DESTE aluno (teacher_id não-nulo batendo com o
+    // caller). A checagem antiga (`student.teacher_id && ...`) fazia curto-circuito com
+    // teacher_id nulo e liberava qualquer professor a notificar alunos órfãos (phishing).
+    if (!canNotifyStudentAppointment({ role: auth.role, studentTeacherId: student.teacher_id, callerId: user.id })) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
@@ -13,6 +14,8 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const {
@@ -33,6 +36,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
@@ -160,6 +164,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               Cluster
             </span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -189,7 +194,8 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
                 }}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <button
                 type="button"
@@ -222,6 +228,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                 <Pencil size={14} />
                 <span className="text-xs font-black hidden sm:inline">Abrir</span>
               </button>
+              <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
               <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
                 <MessageSquare size={12} />
               </button>
@@ -280,6 +287,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
       </div>
 
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {!done && plannedBlocks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plannedBlocks.map((planned, idx) => {

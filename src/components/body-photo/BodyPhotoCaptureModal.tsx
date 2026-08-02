@@ -2,9 +2,10 @@
 
 import React, { useCallback, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell } from 'lucide-react'
+import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell, AlertTriangle } from 'lucide-react'
 import { createBodyPhotoAssessment } from '@/actions/bodyPhotoAssessment-actions'
 import { analyzeBodyPhoto, fetchBodyPhotoCorrelation } from '@/lib/api/bodyPhoto'
+import { translateAiError } from '@/utils/ai/clientErrors'
 import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/utils/storage/bodyPhotoUpload'
 import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
@@ -12,6 +13,15 @@ import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
 
 type Stage = 'capture' | 'processing' | 'result' | 'error'
+
+/**
+ * Texto de erro das rotas de IA. As rotas devolvem `message` (texto nosso, já em
+ * pt-BR) OU só um código canônico (`ai_error`, `ai_rate_limited`…). Sem esta
+ * tradução o código cru vazava pra tela — o usuário via literalmente "ai_error"
+ * quando a cota diária do Gemini estourou (31/07/2026).
+ */
+const aiErrorText = (res: { message?: string; error?: string }): string =>
+    res.message?.trim() || translateAiError(res.error)
 
 const POSE_HINT: Record<BodyPhotoPose, string> = {
     front: 'Em pé, de frente, braços levemente afastados do corpo.',
@@ -67,7 +77,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
         setCorrelationLoading(true); setCorrelationError('')
         try {
             const res = await fetchBodyPhotoCorrelation(assessmentId)
-            if (!res.ok || !res.correlation || !res.window) throw new Error(res.message || res.error || 'Falha na correlação.')
+            if (!res.ok || !res.correlation || !res.window) throw new Error(aiErrorText(res))
             setCorrelation({ data: res.correlation, window: res.window })
         } catch (e) {
             setCorrelationError(e instanceof Error ? e.message : 'Erro inesperado.')
@@ -119,7 +129,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
 
             setProgress('Analisando com IA… isso pode levar alguns segundos.')
             const res = await analyzeBodyPhoto(id)
-            if (!res.ok || !res.analysis) throw new Error(res.message || res.error || 'Falha na análise.')
+            if (!res.ok || !res.analysis) throw new Error(aiErrorText(res))
 
             setLaudo(res.analysis)
             setStage('result')
@@ -229,7 +239,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                             {/* Correlação treino × corpo (on-demand) */}
                             <div className="pt-2 border-t border-neutral-800">
                                 {correlation ? (
-                                    <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                    <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} assessmentId={assessmentId} />
                                 ) : (
                                     <div className="text-center py-2">
                                         <p className="text-sm text-neutral-400 mb-3">
@@ -241,10 +251,21 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                             className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl border font-bold transition active:scale-95 disabled:opacity-50"
                                             style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
                                         >
-                                            {correlationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Dumbbell className="w-4 h-4" />}
-                                            {correlationLoading ? 'Cruzando com seus treinos…' : 'Correlação com treino'}
+                                            {correlationLoading
+                                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                : correlationError ? <RotateCcw className="w-4 h-4" /> : <Dumbbell className="w-4 h-4" />}
+                                            {correlationLoading
+                                                ? 'Cruzando com seus treinos…'
+                                                : correlationError ? 'Tentar novamente' : 'Correlação com treino'}
                                         </button>
-                                        {correlationError ? <p className="mt-2 text-sm text-red-400">{correlationError}</p> : null}
+                                        {/* Erro fica DEPOIS do botão e o botão vira a ação de retry — antes a
+                                            mensagem aparecia solta e o usuário não sabia que era só clicar de novo. */}
+                                        {correlationError && !correlationLoading ? (
+                                            <div className="mt-3 mx-auto max-w-sm flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-left">
+                                                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                                <p className="text-[13px] leading-snug text-red-300">{correlationError}</p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
                             </div>

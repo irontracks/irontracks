@@ -7,7 +7,7 @@
 # Required scopes: project:read, project:releases, org:read.
 
 defaults.org=your-org-slug
-defaults.project=irontracks-android
+defaults.project=javascript-nextjs
 auth.token=YOUR_SENTRY_AUTH_TOKEN
 
 # Optional: upload native debug symbols (NDK) and ProGuard mappings

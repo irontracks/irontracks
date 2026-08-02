@@ -1,1 +1,1 @@
-export { calculateTotalVolume, computeFallbackKcal, getKcalEstimate } from './kcalClientImpl'
+export { computeFallbackKcal, getKcalEstimate } from './kcalClientImpl'

@@ -21,6 +21,7 @@ import {
 } from '@/utils/calories/metEstimate'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
+import { sessionVolumeKg } from '@/utils/report/setVolume'
 import { logError } from '@/lib/logger'
 
 const ZodBodySchema = z
@@ -69,21 +70,15 @@ const calculateClusterVolume = (cluster: unknown): number => {
   return vol
 }
 
+/**
+ * Volume total p/ a estimativa de calorias — delega à FONTE ÚNICA
+ * (`sessionVolumeKg`). Este endpoint já teve a própria conta, que subcontava
+ * drop-set/stripping e zerava unilaterais; o volume alimenta o MET, então
+ * qualquer divergência aqui vira kcal errada. Não reimplementar.
+ */
 const calculateTotalVolume = (logs: Record<string, unknown>) => {
   try {
-    let volume = 0
-    Object.values(logs).forEach((log: unknown) => {
-      if (!log || typeof log !== 'object') return
-      const row = log as Record<string, unknown>
-      // Cluster: each block may have different weight
-      const clusterVol = calculateClusterVolume(row.cluster)
-      if (clusterVol > 0) { volume += clusterVol; return }
-      // Standard set
-      const w = parseWeightValue(row.weight)
-      const r = parseRepsValue(row.reps)
-      if (w > 0 && r > 0) volume += w * r
-    })
-    return volume
+    return sessionVolumeKg(logs)
   } catch { return 0 }
 }
 

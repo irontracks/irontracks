@@ -30,19 +30,33 @@ function toggleLinkWeights(prev: Set<number>, exIdx: number): Set<number> {
     return next
 }
 
-/** applyLinkedWeightUpdate: retorna as chaves que devem ser atualizadas */
+/**
+ * applyLinkedWeightUpdate: espelha a lógica real de sincronização de pesos.
+ * Cobre flat (`weight`) E unilateral (`L_weight`/`R_weight` → replica pros DOIS
+ * lados). A série atual (sIdx) recebe o patch completo por cima do peso.
+ */
 function applyLinkedWeightUpdate(
     ex: Record<string, unknown>,
     exIdx: number,
     patchObj: Record<string, unknown>,
-    getLogs: (key: string) => Record<string, unknown>
+    getLogs: (key: string) => Record<string, unknown>,
+    sIdx = 0
 ): Array<{ key: string; value: Record<string, unknown> }> {
     const setsCount = getSetsCount(ex)
+    const typedSide = 'L_weight' in patchObj ? 'L_weight' : 'R_weight' in patchObj ? 'R_weight' : null
+    const typed = 'weight' in patchObj ? patchObj.weight : typedSide ? patchObj[typedSide] : undefined
+    const otherSide = typedSide === 'L_weight' ? 'R_weight' : 'L_weight'
     const updates: Array<{ key: string; value: Record<string, unknown> }> = []
     for (let setIdx = 0; setIdx < setsCount; setIdx++) {
         const linkedKey = `${exIdx}-${setIdx}`
         const prev = getLogs(linkedKey)
-        updates.push({ key: linkedKey, value: { ...prev, ...patchObj } })
+        const weightPatch: Record<string, unknown> = typedSide ? { [typedSide]: typed } : { weight: typed }
+        if (typedSide) {
+            const otherVal = prev?.[otherSide]
+            if (otherVal == null || String(otherVal).trim() === '') weightPatch[otherSide] = typed
+        }
+        const value = setIdx === sIdx ? { ...prev, ...weightPatch, ...patchObj } : { ...prev, ...weightPatch }
+        updates.push({ key: linkedKey, value })
     }
     return updates
 }
@@ -134,6 +148,46 @@ describe('useActiveWorkoutController — applyLinkedWeightUpdate', () => {
         const exFewer = { sets: 4, setDetails: [{}] } // 4 sets declarados, 1 no detalhe
         const updates = applyLinkedWeightUpdate(exFewer, 1, { weight: '60' }, emptyLogs)
         expect(updates).toHaveLength(4)
+    })
+
+    // ── Unilateral (o bug do print): o input grava L_weight/R_weight, não weight ──
+    it('unilateral: digitar o LADO L replica pros DOIS lados de todas as séries', () => {
+        // Antes, o gate `'weight' in patchObj` era falso pra { L_weight } → NADA
+        // sincronizava e o LADO R ficava vazio.
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '18' }, emptyLogs)
+        expect(updates).toHaveLength(3)
+        for (const u of updates) {
+            expect(u.value.L_weight).toBe('18')
+            expect(u.value.R_weight).toBe('18') // preenche o lado R também
+        }
+    })
+
+    it('unilateral: a série atual mantém os campos digitados (L_reps/L_done)', () => {
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '20', L_reps: '12', L_done: true }, emptyLogs)
+        expect(updates[0].value.L_reps).toBe('12')
+        expect(updates[0].value.L_done).toBe(true)
+        expect(updates[0].value.R_weight).toBe('20')
+        // as OUTRAS séries recebem só o peso (não o L_done da série atual)
+        expect(updates[1].value.L_done).toBeUndefined()
+        expect(updates[1].value.L_weight).toBe('20')
+    })
+
+    it('unilateral: editar o LADO R depois replica o R (permite cargas diferentes)', () => {
+        const withL = (key: string) => (key.startsWith('0-') ? { L_weight: '18', R_weight: '18' } : {})
+        const updates = applyLinkedWeightUpdate(ex, 0, { R_weight: '20' }, withL)
+        for (const u of updates) {
+            expect(u.value.L_weight).toBe('18') // L preservado
+            expect(u.value.R_weight).toBe('20') // R atualizado em todas
+        }
+    })
+
+    it('não sincroniza quando o patch não tem peso (ex.: só marcar done)', () => {
+        // Sanidade: um patch sem weight/L_weight/R_weight não deve disparar a réplica
+        // no código real (typedWeight === undefined). Aqui o mirror recebe só peso;
+        // o guard real está no controller.
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '', }, emptyLogs)
+        expect(updates[0].value.L_weight).toBe('') // limpar propaga vazio, consistente
+        expect(updates[0].value.R_weight).toBe('')
     })
 })
 
@@ -334,5 +388,77 @@ describe('buildWorkoutSummary', () => {
         expect(r.volume).toBe(960) // 2 × (20×12 + 20×12)
         expect(r.text).toContain('Rosca unilateral — 2 séries · 960 kg') // soma os dois lados
         expect(r.text).not.toContain('sem carga')
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildWorkoutSummary × aquecimento
+//
+// O modal de "Treino concluído" e o RELATÓRIO contavam séries por regras
+// diferentes: reportMetrics.ts:53-56 pula warmup/feeler ("they don't count toward
+// exercise stats") e o resumo usava isSetCompleted, que só olha "foi feita".
+// Resultado: num treino com aquecimento marcado, o modal mostrava um volume e o
+// relatório — segundos depois — mostrava outro, menor. Em produção: 10 usuários
+// com 48 séries de aquecimento + 41 com a flag is_warmup.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildWorkoutSummary — aquecimento não conta (mesma regra do relatório)', () => {
+    const exs = [{ name: 'Supino reto' }]
+
+    it('série de aquecimento não entra no volume nem na contagem', () => {
+        const logs = {
+            '0-0': { done: true, set_type: 'warmup', weight: '40', reps: '10' }, // 400
+            '0-1': { done: true, weight: '100', reps: '10' }, // 1000
+            '0-2': { done: true, weight: '100', reps: '10' }, // 1000
+        }
+        const r = buildWorkoutSummary(exs, logs)
+        expect(r.sets).toBe(2) // era 3
+        expect(r.volume).toBe(2000) // era 2400
+        expect(r.text).toContain('2 séries')
+    })
+
+    it('feeler também não conta', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'feeler', weight: '60', reps: '5' },
+            '0-1': { done: true, weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('a flag legada is_warmup (sem set_type) também', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, is_warmup: true, weight: '40', reps: '10' },
+            '0-1': { done: true, weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('exercício SÓ de aquecimento some do resumo (não fica "0 séries")', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'warmup', weight: '40', reps: '10' },
+        })
+        expect(r.exercises).toBe(0)
+        expect(r.text).toBe('')
+    })
+
+    it('set_type normal continua contando', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'normal', weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('drop-set segue somando os estágios (o caso do peck deck, 3.616 kg)', () => {
+        // Verificado no banco: o topo do log ("43kg × 24") é RESUMO; a verdade são
+        // os estágios. 70×12 + 43×12 = 1356, ×2, + 70×8 + 43×8 = 904 → 3616.
+        const r = buildWorkoutSummary([{ name: 'Peck deck' }], {
+            '0-0': { done: true, weight: '43', reps: '24', drop_set: { stages: [{ weight: '70', reps: 12 }, { weight: '43', reps: 12 }] } },
+            '0-1': { done: true, weight: '43', reps: '24', drop_set: { stages: [{ weight: '70', reps: 12 }, { weight: '43', reps: 12 }] } },
+            '0-2': { done: true, weight: '43', reps: '16', drop_set: { stages: [{ weight: '70', reps: 8 }, { weight: '43', reps: 8 }] } },
+        })
+        expect(r.sets).toBe(3)
+        expect(r.volume).toBe(3616)
     })
 })

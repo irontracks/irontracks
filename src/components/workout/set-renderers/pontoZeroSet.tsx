@@ -4,16 +4,20 @@ import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import {
   isObject,
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setPontoZeroModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
   const pz = isObject(log.ponto_zero) ? (log.ponto_zero as UnknownRecord) : null;
   const savedWeight = String(pz?.weight ?? log.weight ?? '').trim();
   const reps = parseTrainingNumber(pz?.reps ?? log.reps) ?? null;
@@ -49,6 +53,7 @@ const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">Ponto Zero</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -80,6 +85,7 @@ const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Ponto Zero</span>
               <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${reps} reps • ${holdSec}s hold` : 'Abra o modal para preencher'}</span>
             </div>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
               <MessageSquare size={14} />
             </button>
@@ -96,6 +102,7 @@ const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps no modal para concluir.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

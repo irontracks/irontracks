@@ -81,13 +81,39 @@ const defaultConfig = {
   emoji: '📝',
 }
 
-export default function FeedCard({
-  item,
-  onProfileClick,
-}: {
+export type FeedCardProps = {
   item: FeedItem
   onProfileClick?: (userId: string) => void
-}) {
+  /** Presença do autor: 'training' (treinando agora) > 'online' (app aberto) > null. */
+  presence?: 'training' | 'online' | null
+}
+
+/**
+ * Comparador do React.memo: shallow sobre a UNIÃO das chaves das duas props.
+ *
+ * Por que memoizar: o poll de presença do `useCommunityData` roda a cada 30s e
+ * atualiza estado no CommunityClient — sem memo, TODOS os cards do feed
+ * re-renderizavam a cada tick (feed de 20+ itens, com <Image/> e badges).
+ *
+ * Por que shallow-de-união e não uma lista fixa de props: `presence` é primitivo
+ * ('training' | 'online' | null), então o card de quem MUDOU de presença sempre
+ * re-renderiza — e uma prop nova adicionada no futuro entra na comparação
+ * sozinha, em vez de ser silenciosamente ignorada (a armadilha clássica de
+ * comparador custom). `item` vem do array `feedItems`, cuja identidade só muda
+ * em load/append do feed.
+ */
+export function feedCardPropsAreEqual(prev: FeedCardProps, next: FeedCardProps): boolean {
+  const a = prev as unknown as Record<string, unknown>
+  const b = next as unknown as Record<string, unknown>
+  const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]))
+  return keys.every((k) => Object.is(a[k], b[k]))
+}
+
+function FeedCard({
+  item,
+  onProfileClick,
+  presence,
+}: FeedCardProps) {
   const cfg = typeConfig[item.type] || defaultConfig
   const name = item.senderName || 'Usuário'
   const initials = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -124,6 +150,19 @@ export default function FeedCard({
         >
           {cfg.emoji}
         </div>
+        {/* Presença: treinando (verde pulsante) > online (verde) */}
+        {presence && (
+          <span
+            className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full"
+            title={presence === 'training' ? 'Treinando agora' : 'Online'}
+            style={{
+              background: '#22c55e',
+              border: '1.5px solid #0a0a0a',
+              boxShadow: presence === 'training' ? '0 0 6px #22c55e' : 'none',
+              animation: presence === 'training' ? 'pulse 2s infinite' : 'none',
+            }}
+          />
+        )}
       </button>
 
       {/* Content */}
@@ -191,3 +230,5 @@ export default function FeedCard({
     </div>
   )
 }
+
+export default React.memo(FeedCard, feedCardPropsAreEqual)

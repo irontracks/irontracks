@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
 import { WorkoutRowSchema, ExerciseRowSchema, SetRowSchema } from '@/schemas/database'
 import { AdvancedConfig } from '@/types/app'
+import { applyNotesMethodToSetDetails } from '@/utils/training/notesMethodParser'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/types/dashboard'
 
@@ -116,6 +117,10 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
   const [periodizedLoaded, setPeriodizedLoaded] = useState(false)
   const [periodizedWorkouts, setPeriodizedWorkouts] = useState<DashboardWorkout[]>([])
   const [periodizedError, setPeriodizedError] = useState('')
+  // Reentrância via ref, NÃO via state: `periodizedLoading` como dep do efeito
+  // fazia o próprio `setPeriodizedLoading(true)` re-rodar o efeito, cujo cleanup
+  // cancelava o fetch em voo — a aba travava em "Carregando..." para sempre.
+  const loadingRef = useRef(false)
 
   // Reset when dashboard view or tab changes
   useEffect(() => {
@@ -130,8 +135,9 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
   useEffect(() => {
     if (workoutsTab !== 'periodized') return
     if (periodizedLoaded) return
-    if (periodizedLoading) return
+    if (loadingRef.current) return
     let cancelled = false
+    loadingRef.current = true
     setPeriodizedLoading(true)
     setPeriodizedError('')
     ;(async () => {
@@ -216,13 +222,14 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
           setPeriodizedError('Falha ao carregar treinos periodizados.')
         }
       } finally {
+        loadingRef.current = false
         if (!cancelled) setPeriodizedLoading(false)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [periodizedLoaded, periodizedLoading, supabase, workoutsTab])
+  }, [periodizedLoaded, supabase, workoutsTab])
 
   // Load full workout by ID (for lazy-load on click)
   const loadWorkoutFullById = async (workoutId: string): Promise<DashboardWorkout | null> => {
@@ -273,6 +280,28 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         const rpeValues = setDetails.map((s) => s.rpe).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
         const defaultRpe = isCardio ? 5 : 8
         const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
+
+        // Liga método por série a partir das notas (paridade com mapWorkoutRow).
+        // Shape da periodização usa `advancedConfig` (camelCase) + `isWarmup`.
+        const setDetailsWithMethods = (isCardio
+          ? setDetails
+          : applyNotesMethodToSetDetails(
+              setDetails as unknown as Record<string, unknown>[],
+              e.notes,
+              setsCount,
+              {
+                configKey: 'advancedConfig',
+                makeDefault: (index, config) => ({
+                  set_number: index + 1,
+                  reps: null,
+                  rpe: null,
+                  weight: null,
+                  isWarmup: false,
+                  advancedConfig: (config as AdvancedConfig | AdvancedConfig[] | null) ?? null,
+                }),
+              },
+            )) as unknown as DashboardSetDetail[]
+
         return {
           id: e.id,
           name: e.name,
@@ -284,7 +313,7 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
           sets: setsCount,
           reps: repsHeader,
           rpe: rpeHeader,
-          setDetails,
+          setDetails: setDetailsWithMethods,
         } satisfies DashboardExercise
       })
 

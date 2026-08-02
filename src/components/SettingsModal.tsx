@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
@@ -11,6 +11,7 @@ import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { hardRefreshApp } from '@/utils/app/hardRefresh';
 import { isIosNative } from '@/utils/platform'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -74,13 +75,16 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [userEmail, setUserEmail] = useState('')
   const [userId, setUserId] = useState('')
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
+  // Admin de verdade (lido de profiles.role, igual ao laAdmin da seção de push) —
+  // gateia o painel "Diagnóstico iOS" e seus botões de debug, que antes vazavam
+  // pra todo usuário iOS.
+  const [isAdmin, setIsAdmin] = useState(false)
   const [iosNotifStatus, setIosNotifStatus] = useState<string>('unknown')
   const [iosTimeSensitiveStatus, setIosTimeSensitiveStatus] = useState<string | undefined>(undefined)
   const [iosNotifBusy, setIosNotifBusy] = useState(false)
   const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
   const [iosDiagBusy, setIosDiagBusy] = useState(false)
   const [iosLiveTestId, setIosLiveTestId] = useState<string>('')
-  const [healthKitGranted, setHealthKitGranted] = useState(false)
   const [healthKitBusy, setHealthKitBusy] = useState(false)
   const [exportingData, setExportingData] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
@@ -91,8 +95,22 @@ export default function SettingsModal(props: SettingsModalProps) {
     setDraft((prev) => ({ ...(isObject(prev) ? prev : {}), [key]: value }))
   }
 
-  const userRole = String(props?.userRole || '')
-  const canSeeExperimental = userRole === 'admin' || userRole === 'teacher'
+  // O "Conectado" do Apple Health é DERIVADO do consentimento persistido, não um
+  // state efêmero: antes era `useState(false)`, então ao fechar e reabrir o modal
+  // o badge voltava pra "Não conectado" mesmo com o sync salvo e funcionando.
+  // (O HealthKit não expõe status de autorização de LEITURA por privacidade — o
+  // consentimento salvo é a única fonte de verdade que temos no cliente.)
+  const healthKitGranted = Boolean(draft?.appleHealthSync)
+
+  // Ressincroniza o rascunho com as settings salvas a cada abertura. O modal não
+  // desmonta ao fechar (retorna null), então o `useState(() => base)` congelava o
+  // primeiro valor visto — inclusive o `{}` de antes das settings carregarem.
+  const wasOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) setDraft(base)
+    wasOpenRef.current = isOpen
+  }, [isOpen, base])
+
   const canSave = isOpen && !saving
   const focusTrapRef = useFocusTrap(isOpen, props?.onClose)
   useBackHandler(isOpen, () => props?.onClose?.())
@@ -163,9 +181,10 @@ export default function SettingsModal(props: SettingsModalProps) {
       setUserEmail(String(data?.user?.email || ''))
       setUserId(uid)
       if (uid) {
-        supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
+        supabase.from('profiles').select('photo_url, role').eq('id', uid).maybeSingle()
           .then(({ data: profile }) => {
             setUserPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+            setIsAdmin(String((profile as { role?: string } | null)?.role || '').toLowerCase() === 'admin')
           })
       }
     })
@@ -193,17 +212,14 @@ export default function SettingsModal(props: SettingsModalProps) {
     try {
       setHealthKitBusy(true)
       const res = await requestHealthKitPermission()
-      const granted = !!res?.granted
-      setHealthKitGranted(granted)
-      if (granted) {
-        // Persist the user's consent so useHealthKit knows to fetch data
+      if (res?.granted) {
+        // Persiste o consentimento (é o que o useHealthKit lê pra buscar dados) e
+        // espelha no draft — senão um "Salvar" posterior gravaria o draft antigo
+        // (appleHealthSync=false) por cima, desligando o sync recém-concedido.
         await props?.patchSettings?.({ appleHealthSync: true }).catch(() => { })
-        // Também espelha no draft local — senão um "Salvar" posterior gravaria
-        // o draft antigo (appleHealthSync=false) por cima, desligando o sync
-        // que acabou de ser concedido.
         setValue('appleHealthSync', true)
       }
-    } catch (e) { logError('component:SettingsModal.requestHealthKit', e); setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
+    } catch (e) { logError('component:SettingsModal.requestHealthKit', e) } finally { setHealthKitBusy(false) }
   }
 
   const handleOpenAppSettings = async () => {
@@ -270,7 +286,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           <SettingsAppModeSection draft={draft} setValue={setValue} setModulesModalOpen={setModulesModalOpen} />
           <SettingsToolsSection draft={draft} setValue={setValue} onOpenWhatsNew={props?.onOpenWhatsNew} onOpenProgressPhotos={props?.onOpenProgressPhotos} />
           <SettingsWorkoutSection draft={draft} setValue={setValue} />
-          <SettingsSoundSection draft={draft} setValue={setValue} canSeeExperimental={canSeeExperimental} />
+          <SettingsSoundSection draft={draft} setValue={setValue} />
           <SettingsNotificationsSection
             draft={draft} setValue={setValue}
             iosNotifStatus={iosNotifStatus} iosNotifBusy={iosNotifBusy}
@@ -299,8 +315,8 @@ export default function SettingsModal(props: SettingsModalProps) {
           )}
           {iosNative && <SettingsSecuritySection draft={draft} setValue={setValue} />}
 
-          {/* iOS Diagnostics */}
-          {iosNative && (
+          {/* iOS Diagnostics — só admin (painel de debug: versão/plugins/permissões + testes) */}
+          {iosNative && isAdmin && (
             <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
@@ -332,7 +348,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={async () => { try { await triggerHaptic('success'); alert('Ok', 'Haptic') } catch { alert('Falhou', 'Haptic') } }} className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black">Testar Haptic</button>
                 <button type="button" onClick={async () => { try { const res = await authenticateWithBiometrics('Confirmar Face ID / Touch ID'); alert(res?.success ? 'Ok' : String(res?.error || 'Falhou'), 'Biometria') } catch { alert('Falhou', 'Biometria') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Biometria</button>
-                <button type="button" onClick={async () => { try { const res = await requestHealthKitPermission(); setHealthKitGranted(!!res?.granted); alert(res?.granted ? 'Permissão ok' : String(res?.error || 'Negado'), 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">HK (debug)</button>
+                <button type="button" onClick={async () => { try { await handleRequestHealthKitPermission(); alert('Permissão solicitada — veja o status no card do Apple Health', 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">HK (debug)</button>
                 <button type="button" onClick={async () => { try { const id = iosLiveTestId || `diagnostic-${Date.now()}`; await startRestLiveActivity(id, 60, 'Diagnóstico'); setIosLiveTestId(id); alert('Iniciada (60s)', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Live Activity</button>
                 <button type="button" disabled={!iosLiveTestId} onClick={async () => { try { await endRestLiveActivity(iosLiveTestId); setIosLiveTestId(''); alert('Encerrada', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Encerrar Live Activity</button>
               </div>
@@ -421,12 +437,12 @@ export default function SettingsModal(props: SettingsModalProps) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button type="button" onClick={async () => { try { const payload = JSON.stringify(draft && typeof draft === 'object' ? draft : {}, null, 2); const blob = new Blob([payload], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `irontracks-settings-${new Date().toISOString()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url) } catch (e: unknown) { await alert('Falha ao exportar: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
-                <Download size={16} className="text-yellow-500" /> Exportar
+                <Download size={16} className="text-yellow-500" /> Exportar configurações
               </button>
               <button type="button" onClick={async () => { try { setDraft(DEFAULT_SETTINGS); await alert('Preferências resetadas. Clique em Salvar para aplicar.') } catch (e: unknown) { await alert('Falha ao resetar: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <RotateCcw size={16} className="text-yellow-500" /> Resetar
               </button>
-              <button type="button" onClick={async () => { try { if (typeof window === 'undefined') return; const keys: string[] = []; for (let i = 0; i < window.localStorage.length; i += 1) { const k = window.localStorage.key(i); if (k) keys.push(k) } keys.forEach((k) => { if (k.startsWith('irontracks.')) { try { window.localStorage.removeItem(k) } catch { } } }); try { window.location.reload() } catch { } } catch (e: unknown) { await alert('Falha ao limpar cache: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+              <button type="button" onClick={async () => { try { await hardRefreshApp() } catch (e: unknown) { await alert('Falha ao limpar cache: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }} title="Limpa dados locais, o cache de versao e recarrega o app do servidor">
                 <Trash2 size={16} className="text-yellow-500" /> Limpar cache
               </button>
             </div>

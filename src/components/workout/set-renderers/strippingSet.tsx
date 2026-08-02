@@ -4,16 +4,20 @@ import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import {
   isObject,
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, getPlannedSet, setStrippingModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
   const stagesPlannedRaw: unknown[] = Array.isArray(cfgRaw) ? cfgRaw : [];
@@ -64,6 +68,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">Stripping</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -94,6 +99,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Stripping</span>
               <span className="text-xs text-neutral-400 truncate">Etapas {defaultCount} • Total: {total || 0} reps</span>
             </div>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -114,6 +120,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps em todas as etapas no modal para concluir.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

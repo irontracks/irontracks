@@ -27,11 +27,18 @@ export default function DietGenerator({
   dateKey,
   hideVipCtas,
   onApplied,
+  embedded = false,
 }: {
   goals: Totals
   dateKey: string
   hideVipCtas?: boolean
   onApplied?: () => void
+  /**
+   * Modo embutido: renderiza só o conteúdo, sem card nem cabeçalho próprios —
+   * quem controla a abertura é o card de refeição, que agora concentra as ações
+   * de IA. Sem isso, um card dentro de outro card ficava com moldura dupla.
+   */
+  embedded?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -89,23 +96,8 @@ export default function DietGenerator({
     }
   }, [applyingIdx, dateKey, onApplied])
 
-  return (
-    <div className="relative rounded-2xl bg-neutral-900/80 border border-white/[0.06] backdrop-blur-sm overflow-hidden">
-      <div className="p-4">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between"
-        >
-          <span className="flex items-center gap-2">
-            <span className="text-lg">🍱</span>
-            <span className="text-sm font-bold text-white">Gerar dieta com IA</span>
-          </span>
-          <span className="text-[10px] uppercase tracking-wider text-yellow-500">{open ? 'Fechar' : 'Abrir'}</span>
-        </button>
-
-        {open && (
-          <div className="mt-3 space-y-3">
+  const content = (
+          <div className={embedded ? 'space-y-3' : 'mt-3 space-y-3'}>
             <p className="text-xs text-neutral-400">
               Monta um cardápio batendo suas metas ({Math.round(num(goals.calories))} kcal · {Math.round(num(goals.protein))}g P)
               usando os alimentos que você já come.
@@ -210,7 +202,27 @@ export default function DietGenerator({
               </div>
             )}
           </div>
-        )}
+  )
+
+  // Embutido no card de refeição: sem moldura nem cabeçalho — quem abre/fecha é o pai.
+  if (embedded) return content
+
+  return (
+    <div className="relative rounded-2xl bg-neutral-900/80 border border-white/[0.06] backdrop-blur-sm overflow-hidden">
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-lg">🍱</span>
+            <span className="text-sm font-bold text-white">Gerar dieta com IA</span>
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-yellow-500">{open ? 'Fechar' : 'Abrir'}</span>
+        </button>
+
+        {open && content}
       </div>
     </div>
   )

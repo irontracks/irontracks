@@ -1,10 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
+import { shouldAutoAdvanceRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
 import { isNativePlatform } from '@/utils/platform';
-import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { useKeyboardInset } from '@/hooks/useKeyboardInset';
+import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 
 interface RestTimerContext {
@@ -18,6 +20,13 @@ interface RestTimerContext {
      *  - undefined when there is no next set (last set of last exercise)
      */
     nextSetLabel?: string;
+    /** Descanso que venceu com o app FECHADO e foi restaurado (ver
+     *  `sanitizeRestoredSession`). Liga o modo silencioso: barra + START
+     *  visíveis, sem flash "BORA!", sem alarme, sem auto-advance e sem
+     *  reagendar notificação/Live Activity de um descanso que já acabou. */
+    restoredExpired?: boolean;
+    /** Momento em que aquele descanso deveria ter terminado (ms). */
+    restoredExpiredAtMs?: number;
     onComplete?: (finalDurationSeconds?: number) => void;
 }
 
@@ -49,9 +58,14 @@ interface RestTimerOverlayProps {
     workoutStartMs?: number;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart, workoutStartMs }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart, workoutStartMs }) => {
+    // Descanso restaurado já vencido: só a barra com START, em silêncio.
+    const isRestoredExpired = context?.restoredExpired === true
     const isPlankMode = context?.kind === 'plank'
-    const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
+    const isCardioMode = context?.kind === 'cardio'
+    // Timer de exercício (prancha/cardio) conta o tempo DO exercício, não o descanso.
+    const isExerciseTimer = isPlankMode || isCardioMode
+    const finishedLabel = isExerciseTimer ? 'Tempo concluído!' : 'Descanso finalizado'
 
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
@@ -66,28 +80,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // levantamos a barra exatamente essa altura — funciona tanto se o WebView
     // redimensiona quanto se não (inset 0 vs >0, auto-corrige). Padroniza:
     // a barra fica SEMPRE acima do teclado.
-    const [kbInset, setKbInset] = useState(0);
-    useEffect(() => {
-        const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-        if (!vv) return;
-        const update = () => {
-            // Altura do teclado = layout viewport − viewport visível. NÃO subtrair
-            // vv.offsetTop: quando o iOS rola pra revelar o input, offsetTop fica
-            // > 0 e zerava o inset (barra colava atrás do teclado). offsetTop é o
-            // scroll do visual viewport, não a altura do teclado.
-            const inset = Math.max(0, window.innerHeight - vv.height);
-            setKbInset(inset > 1 ? inset : 0);
-        };
-        update();
-        vv.addEventListener('resize', update);
-        vv.addEventListener('scroll', update);
-        window.addEventListener('resize', update);
-        return () => {
-            vv.removeEventListener('resize', update);
-            vv.removeEventListener('scroll', update);
-            window.removeEventListener('resize', update);
-        };
-    }, []);
+    // Fonte única: useKeyboardInset (mesma medição, agora compartilhada com o
+    // WorkoutFooter, que sofria do mesmo problema).
+    const kbInset = useKeyboardInset();
     // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
     // keeping the bottom bar (timer + START + AUTO) visible. Lets the user
     // peek at the upcoming sets in the workout list below WITHOUT pressing
@@ -98,25 +93,26 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // flash automatically shows again — no setState-in-effect needed.
     const [flashDismissedForTarget, setFlashDismissedForTarget] = useState<number | null>(null);
     const flashDismissed = targetTime != null && flashDismissedForTarget === targetTime;
-    // AUTO: persisted in localStorage so the user's preference survives across
-    // sets, sessions and app restarts. When ON, the overlay auto-advances 500 ms
-    // after the countdown reaches zero.
-    const [autoLocal, setAutoLocal] = useState<boolean>(() => {
-        if (typeof window === 'undefined') return false;
-        try {
-            return window.localStorage.getItem('irontracks.restTimerAuto.v1') === '1';
-        } catch {
-            return false;
-        }
-    });
+    // AUTO — fonte única de verdade: a preferência `restTimerAutoStart` das
+    // Configurações (chega via prop `autoStartEnabled`). Antes o overlay guardava um
+    // SEGUNDO estado próprio em localStorage ('irontracks.restTimerAuto.v1') e ignorava
+    // a prop — então o toggle "START automático" das Configurações não fazia NADA e o
+    // botão AUTO da barra vivia num universo paralelo. Resultado: o auto-start não
+    // obedecia o liga/desliga que o usuário via. Agora os dois controlam o MESMO valor.
+    //
+    // `autoOn` é só um espelho OTIMISTA da prop, pra o botão responder na hora (o save
+    // das settings tem round-trip). Ressincroniza sempre que a prop persistida muda —
+    // se o save falhar, a prop não muda e o espelho volta pro valor real no próximo
+    // render. O gate de auto-advance usa ESTE mesmo `autoOn`, então botão e gate nunca
+    // divergem (era exatamente a divergência que fazia o START disparar "sozinho").
+    const [autoOn, setAutoOn] = useState<boolean>(!!autoStartEnabled);
     useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            window.localStorage.setItem('irontracks.restTimerAuto.v1', autoLocal ? '1' : '0');
-        } catch {
-            /* storage unavailable — preference simply won't persist */
-        }
-    }, [autoLocal]);
+        setAutoOn(!!autoStartEnabled);
+    }, [autoStartEnabled]);
+    const toggleAuto = useCallback(() => {
+        setAutoOn((v) => !v);      // feedback imediato
+        onToggleAutoStart?.();     // persiste no setting (fonte única)
+    }, [onToggleAutoStart]);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -249,7 +245,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [allowTickCountdown, context?.kind, isFinished, soundVolume, soundsEnabled, timeLeft]);
 
     useEffect(() => {
-        if (isFinished) {
+        // Descanso vencido com o app fechado não toca alarme na volta: o usuário
+        // já perdeu esse descanso, tocar agora é só susto.
+        if (isFinished && !isRestoredExpired) {
             alarmActiveRef.current = true;
             // Limite do alarme: se "alarme contínuo" está DESLIGADO, o alarme para
             // sozinho ao atingir o MENOR entre repeatMaxSeconds e (repeatMaxCount ×
@@ -300,7 +298,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (!isFinished) return;
             stopAlarm(false);
         };
-    }, [allowVibrate, isFinished, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
+    }, [allowVibrate, isFinished, isRestoredExpired, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
 
     useEffect(() => {
         if (!isFinished) return;
@@ -351,6 +349,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     continuousAlarmRef.current = continuousAlarm;
     const soundsEnabledRef = useRef(soundsEnabled);
     soundsEnabledRef.current = soundsEnabled;
+    const isRestoredExpiredRef = useRef(isRestoredExpired);
+    isRestoredExpiredRef.current = isRestoredExpired;
 
     useEffect(() => {
         if (!targetTime) {
@@ -367,6 +367,19 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         }
         hasNotifiedRef.current = false;
         const id = `${context?.kind || 'rest'}-${context?.exerciseId || ''}-${context?.setId || ''}-${targetTime}`;
+
+        // Restaurado já vencido: NADA de agendar notificação/alarme/Live Activity —
+        // o descanso acabou enquanto o app estava fechado. Só renderiza a barra
+        // (o tick abaixo marca isFinished) pra o usuário apertar START.
+        if (isRestoredExpiredRef.current) {
+            notifyIdRef.current = '';
+            totalSecondsRef.current = 1;
+            // 0:00 em vez do atraso real: "+2:41:00 além do planejado" (o tempo em
+            // que o app ficou fechado) não é informação útil, é ruído.
+            setTimeLeft(0);
+            setIsFinished(true);
+            return;
+        }
 
         // ★ CANCEL any previous notification before scheduling new one
         if (notifyIdRef.current && notifyIdRef.current !== id) {
@@ -395,6 +408,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, liveTitle, workoutStartMs);
+            // Espelha o countdown na ilha do TREINO (do outro lado do elapsed).
+            updateWorkoutRestCountdown(targetTime);
             // Guarda os dados deste descanso p/ um eventual agendamento no
             // background. Cancela qualquer agendamento de um descanso anterior.
             if (restPushScheduleIdRef.current) {
@@ -442,6 +457,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 cancelRestNotification(notifyIdRef.current);
                 endRestLiveActivity(notifyIdRef.current);
             }
+            updateWorkoutRestCountdown(0); // limpa o countdown na ilha do treino
             stopAlarm(false);
         };
     // ★ ONLY depend on targetTime + context identity — not on settings
@@ -525,9 +541,12 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     //   1. ONLY triggers when the countdown actually reaches 0 (isFinished).
     //      No more "500ms after overlay mounts" — at that moment the countdown
     //      is still running, so an auto-fire would be a skip-rest.
-    //   2. Gated by `autoStartEnabled` (the `restTimerAutoStart` user setting).
-    //      Default OFF — nobody gets it unless they opt-in via Settings.
-    //   3. Locked per-rest with `autoStartFiredRef`. Even if autoStartEnabled
+    //   2. Gated by `autoOn` — espelho da preferência `restTimerAutoStart`
+    //      (Configurações E botão AUTO da barra apontam pra ela). Default OFF:
+    //      ninguém pega auto-start sem ligar explicitamente. Até 2026-07-24 o gate
+    //      usava um estado local em localStorage desconectado deste setting — o
+    //      liga/desliga não era obedecido e o START disparava "sozinho".
+    //   3. Locked per-rest with `autoStartFiredRef`. Even if autoOn
     //      flips true AFTER the countdown already finished (e.g. user opens
     //      Settings during rest), nothing fires — the decision for this rest
     //      was locked the moment isFinished went true.
@@ -549,11 +568,18 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             return;
         }
         if (autoStartFiredRef.current) return;
+        // Restaurado vencido: o START tem que ser do usuário. Auto-avançar aqui
+        // devolveria exatamente o bug que isto conserta (voltar já "iniciado").
+        if (isRestoredExpired) return;
         // Lock the decision for this rest at the moment it finishes. Any later
         // toggle of the Settings switch is ignored — only the NEXT rest uses it.
         autoStartFiredRef.current = true;
-        if (!autoLocal) return;
+        if (!shouldAutoAdvanceRest({ isFinished, autoOn })) return;
 
+        // Espera o alarme cumprir a função ANTES de avançar. Com 500 ms o
+        // `stopAlarm(true)` abaixo cortava som e vibração no meio — o aviso de fim
+        // de descanso simplesmente não acontecia com o app na frente (relatado em
+        // treino, 2026-07-31). Ver REST_ALARM_FULL_CYCLE_MS.
         const timeout = setTimeout(() => {
             // Bail if the user already tapped START manually during the delay
             if (startBusyRef.current) return;
@@ -561,6 +587,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             setDismissed(true);
             try {
                 if (notifyIdRef.current) endRestLiveActivity(notifyIdRef.current);
+                updateWorkoutRestCountdown(0);
                 stopAlarm(true);
                 const fn = onStartRef.current ?? onFinishRef.current;
                 if (typeof fn === 'function') fn(contextRef.current);
@@ -569,9 +596,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
                 } catch { /* swallow — nothing useful to do */ }
             }
-        }, 500);
+        }, REST_ALARM_FULL_CYCLE_MS);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoLocal]);
+    }, [isFinished, autoOn, isRestoredExpired]);
 
     // ── Widget lock-screen button bridge ───────────────────────────────────
     // When the user taps "PULAR DESCANSO" or "INICIAR SÉRIE" on the iOS lock
@@ -604,7 +631,18 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);
             }
+            updateWorkoutRestCountdown(0);
             stopAlarm(true);
+            // Cardio/prancha: o botão CONCLUI o exercício com o tempo REAL feito.
+            // Antes caía no caminho do descanso (onStart), que só fechava o
+            // cronômetro — a série não era gravada e o card ficava preso em
+            // "em andamento" até o usuário achar o Parar (dono, jul/2026).
+            if (isExerciseTimer) {
+                const doneSeconds = Math.max(1, Math.round(totalSecondsRef.current - timeLeft));
+                if (typeof onFinish === 'function') onFinish(context);
+                if (typeof context?.onComplete === 'function') context.onComplete(doneSeconds);
+                return;
+            }
             if (typeof onStart === 'function') onStart(context);
             else if (typeof onFinish === 'function') onFinish(context);
         } catch {
@@ -640,7 +678,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         : 0;
     const redOffset = circ * extraProgress;
 
-    const isOvertime = isFinished || extraSeconds > 0;
+    const isOvertime = (isFinished && !isRestoredExpired) || extraSeconds > 0;
     const kind = String(context?.kind ?? '');
     const isSideRest = kind === 'side_rest';
     const isTransition = kind === 'transition';
@@ -656,7 +694,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 so the user can scan the upcoming sets before pressing START).
                 stopPropagation still guards against the tap leaking to the
                 workout modal below. */}
-            {isFinished && !isTransition && !flashDismissed && (
+            {isFinished && !isTransition && !flashDismissed && !isRestoredExpired && (
                 <div
                     role="presentation"
                     className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-amber-500/90' : 'bg-green-600/90'}`}
@@ -731,7 +769,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                     letterSpacing: '0.02em',
                                 }}
                             >
-                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : (isPlankMode ? 'prancha' : 'desc')}
+                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : isCardioMode ? 'cardio' : (isPlankMode ? 'prancha' : 'desc')}
                             </span>
                         </div>
                     </div>
@@ -757,13 +795,21 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                             : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-yellow-900/30 hover:shadow-yellow-500/40'
                                 }`}
                             >
-                                {isSideRest ? 'TROCAR LADO ▶' : isTransition ? 'CHEGUEI ✓' : 'START ▶'}
+                                {isSideRest
+                                    ? 'TROCAR LADO ▶'
+                                    : isTransition
+                                        ? 'CHEGUEI ✓'
+                                        : isExerciseTimer
+                                            ? 'CONCLUIR ✓'
+                                            : 'START ▶'}
                             </button>
-                            {!isSideRest && !isTransition && (
+                            {/* AUTO é o auto-start do DESCANSO — não faz sentido em
+                                cardio/prancha, onde o botão conclui o exercício. */}
+                            {!isSideRest && !isTransition && !isExerciseTimer && (
                                 <button
-                                    onClick={() => setAutoLocal(v => !v)}
+                                    onClick={toggleAuto}
                                     className={`px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 border ${
-                                        autoLocal
+                                        autoOn
                                             ? 'bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-900/40'
                                             : 'bg-neutral-800/80 text-neutral-400 border-neutral-700'
                                     }`}

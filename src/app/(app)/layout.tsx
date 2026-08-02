@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { resolveRoleByUser } from '@/utils/auth/route'
+import { getRequestUser, getRequestRole } from '@/utils/auth/serverAuthCache'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { safeEmailLike } from '@/utils/safePgFilter'
 import OfflineBanner from '@/components/OfflineBanner'
@@ -9,11 +9,14 @@ import { QueryProvider } from './_providers/QueryProvider'
 import React from 'react'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Dedup por request: o layout do dashboard reaproveita esta MESMA resolução
+  // de user/role (React.cache em serverAuthCache) — antes eram 2× getUser +
+  // 2× resolveRole em série por navegação.
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getRequestUser()
 
   if (user?.id) {
-    const { role } = await resolveRoleByUser(user)
+    const { role } = await getRequestRole(user.id, user.email ?? null)
 
     // Admins e Professores sempre têm acesso liberado
     if (role === 'admin' || role === 'teacher') {
@@ -51,6 +54,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             approved_at: new Date().toISOString(),
           }
           if (roleRequested === 'teacher') approvalPayload.role = 'teacher'
+          // Aluno convidado que entra por OTP não traz nome no metadata → handle_new_user
+          // deixa display_name = prefixo do email. Como este branch só roda enquanto ainda não
+          // aprovado (1º login), grava o nome do convite aqui — assim o nome fica certo mesmo
+          // que o aluno pule a tela de onboarding.
+          if (fullName) approvalPayload.display_name = fullName
 
           await admin.from('profiles').update(approvalPayload).eq('id', user.id)
 
@@ -87,7 +95,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <QueryProvider>
       <OfflineBanner />
-      {/* UpdateAvailableBanner self-gates to iOS native only via isIosNative() */}
+      {/* UpdateAvailableBanner self-gates to iOS/Android native via the hook */}
       <UpdateAvailableBanner />
       {children}
     </QueryProvider>

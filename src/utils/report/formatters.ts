@@ -4,7 +4,7 @@
  */
 import { stripDiacritics } from '@/utils/normalizeExerciseName'
 import { isRecord } from '@/utils/guards'
-import { setVolume } from './setVolume'
+import { sessionVolumeKg } from './setVolume'
 
 // ─── Type guard (re-export da fonte única em utils/guards) ────────────────────
 export { isRecord }
@@ -75,29 +75,13 @@ export const normalizeExerciseKey = (v: unknown): string => {
 
 // ── Volume calculation ──────────────────────────────────────────────────────
 
-/**
- * Whether a logged set should contribute to volume / PR / progression stats.
- * Returns false for warmup or feeler ("reconhecimento") sets.
- */
-const isWorkingSet = (log: Record<string, unknown>): boolean => {
-    const raw = (log.set_type ?? log.setType) as string | null | undefined
-    if (raw === 'warmup' || raw === 'feeler') return false
-    if (raw === 'working') return true
-    return !(log.is_warmup ?? log.isWarmup)
-}
-
+// Fina camada sobre `sessionVolumeKg` (setVolume.ts), a fonte ÚNICA do volume
+// total. Já houve duas cópias locais aqui — uma sem checar `done`, outra
+// reimplementando a soma por série — e ambas divergiram em silêncio do histórico,
+// do PDF e do reportMeta. Não reintroduzir a conta: delegar.
 export const calculateTotalVolume = (logs: unknown): number => {
     try {
-        let volume = 0
-        const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {}
-        Object.values(safeLogs).forEach((log: unknown) => {
-            if (!isRecord(log)) return
-            // Skip warmup / feeler sets — they should not influence volume.
-            if (!isWorkingSet(log)) return
-            // setVolume trata cluster, unilateral (L+R) e série normal.
-            volume += setVolume(log)
-        })
-        return volume
+        return sessionVolumeKg(logs)
     } catch {
         return 0
     }

@@ -136,7 +136,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     <div className="flex items-center gap-1">
                                         <input
                                             aria-label="Sets"
-                                            type="number"
+                                            inputMode="numeric"
                                             value={ex.sets}
                                             onChange={e => updateExercise(idx, 'sets', e.target.value)}
                                             className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center outline-none text-sm text-white"
@@ -163,7 +163,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     <div className="text-[10px] text-yellow-500 font-bold block">RPE</div>
                                     <input
                                         aria-label="RPE"
-                                        type="number"
+                                        inputMode="decimal"
                                         value={ex.rpe}
                                         onChange={e => updateExercise(idx, 'rpe', e.target.value)}
                                         className="w-full bg-neutral-900 border border-yellow-500/30 rounded py-2 px-1.5 text-center text-sm text-yellow-500 font-bold outline-none"
@@ -174,7 +174,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     <div className="text-[10px] text-neutral-500 block">Rest(s)</div>
                                     <input
                                         aria-label="Rest(s)"
-                                        type="number"
+                                        inputMode="numeric"
                                         value={ex.restTime}
                                         onChange={e => updateExercise(idx, 'restTime', e.target.value)}
                                         className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center text-sm text-white outline-none"

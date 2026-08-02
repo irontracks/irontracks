@@ -15,6 +15,17 @@ const ZodBodySchema = z
     })
     .strip()
 
+type StudentStorageObject = {
+    bucket_id: string
+    name: string
+}
+
+type StudentDeletionPlan = {
+    student_id?: string
+    student_user_id?: string | null
+    storage_objects?: unknown
+}
+
 export async function POST(req: Request) {
     try {
         // Parse body first — we need the token field for fallback auth
@@ -89,7 +100,100 @@ export async function POST(req: Request) {
             }
         }
 
-        // Atomically delete all student data via RPC (single transaction)
+        // Storage precisa ser removido antes de auth.users: o Supabase bloqueia a
+        // exclusão de um usuário que ainda seja dono de objetos.
+        const { data: planResult, error: planError } = await admin.rpc('get_student_deletion_plan', {
+            p_student_id: studentRow.id,
+        })
+
+        if (planError) {
+            const msg = String(planError.message || '').trim()
+            const lower = msg.toLowerCase()
+            if (lower.includes('student_not_found')) {
+                return NextResponse.json({ ok: false, error: 'Aluno não encontrado.' }, { status: 404 })
+            }
+            if (lower.includes('schema cache') || lower.includes('get_student_deletion_plan')) {
+                return NextResponse.json({
+                    ok: false,
+                    error: 'Função de exclusão desatualizada. Aplique a migration de exclusão completa de alunos.',
+                }, { status: 500 })
+            }
+            return NextResponse.json({ ok: false, error: msg || 'Falha ao preparar exclusão do aluno.' }, { status: 500 })
+        }
+
+        const plan = (planResult || {}) as StudentDeletionPlan
+        const plannedUserId = plan.student_user_id ? String(plan.student_user_id) : null
+        if (plannedUserId !== studentRow.user_id) {
+            logWarn('student-delete', 'Deletion plan returned a different user id', {
+                studentId: studentRow.id,
+                expectedUserId: studentRow.user_id,
+                plannedUserId,
+            })
+            return NextResponse.json({ ok: false, error: 'Falha de consistência ao preparar exclusão.' }, { status: 500 })
+        }
+
+        const storageObjects: StudentStorageObject[] = Array.isArray(plan.storage_objects)
+            ? plan.storage_objects.flatMap((item) => {
+                if (!item || typeof item !== 'object') return []
+                const row = item as Record<string, unknown>
+                const bucketId = String(row.bucket_id || '').trim()
+                const name = String(row.name || '').trim()
+                return bucketId && name ? [{ bucket_id: bucketId, name }] : []
+            })
+            : []
+
+        // error_reports usa ON DELETE RESTRICT e precisa sair antes de auth.users.
+        if (plannedUserId) {
+            const { error: blockingRowsError } = await admin
+                .from('error_reports')
+                .delete()
+                .eq('user_id', plannedUserId)
+            if (blockingRowsError) {
+                logWarn('student-delete', 'Failed to remove auth deletion blockers', {
+                    studentId: studentRow.id,
+                    error: blockingRowsError.message,
+                })
+                return NextResponse.json({ ok: false, error: 'Falha ao preparar dados vinculados ao aluno.' }, { status: 500 })
+            }
+        }
+
+        const pathsByBucket = new Map<string, string[]>()
+        for (const item of storageObjects) {
+            const paths = pathsByBucket.get(item.bucket_id) || []
+            paths.push(item.name)
+            pathsByBucket.set(item.bucket_id, paths)
+        }
+
+        for (const [bucketId, paths] of pathsByBucket) {
+            const uniquePaths = Array.from(new Set(paths))
+            for (let index = 0; index < uniquePaths.length; index += 100) {
+                const chunk = uniquePaths.slice(index, index + 100)
+                const { error: storageError } = await admin.storage.from(bucketId).remove(chunk)
+                if (storageError) {
+                    logWarn('student-delete', 'Failed to remove student storage objects', {
+                        studentId: studentRow.id,
+                        bucketId,
+                        error: storageError.message,
+                    })
+                    return NextResponse.json({ ok: false, error: 'Falha ao excluir arquivos do aluno.' }, { status: 502 })
+                }
+            }
+        }
+
+        // A conta Auth vem antes da limpeza final. Se a RPC final falhar, a linha
+        // students permanece e a operação pode ser repetida com segurança.
+        if (plannedUserId) {
+            const { error: authDeleteError } = await admin.auth.admin.deleteUser(plannedUserId)
+            if (authDeleteError && authDeleteError.status !== 404) {
+                logWarn('student-delete', 'auth.users delete failed', {
+                    studentId: studentRow.id,
+                    studentUserId: plannedUserId,
+                    error: authDeleteError.message,
+                })
+                return NextResponse.json({ ok: false, error: 'Falha ao excluir a conta de login do aluno.' }, { status: 502 })
+            }
+        }
+
         const { data: rpcResult, error: rpcError } = await admin.rpc('delete_student_cascade', {
             p_student_id:  studentRow.id,
             p_actor_id:    actorId || null,
@@ -103,36 +207,34 @@ export async function POST(req: Request) {
             if (lower.includes('student_not_found')) {
                 return NextResponse.json({ ok: false, error: 'Aluno não encontrado.' }, { status: 404 })
             }
+            if (lower.includes('auth_user_still_exists')) {
+                return NextResponse.json({ ok: false, error: 'A conta de login do aluno ainda existe.' }, { status: 502 })
+            }
             if (lower.includes('schema cache') || lower.includes('delete_student_cascade')) {
                 return NextResponse.json({
                     ok: false,
-                    error: 'Função de exclusão não encontrada. Rode a migration 20260401_delete_student_cascade.sql no Supabase.',
-                }, { status: 400 })
+                    error: 'Função de exclusão desatualizada. Aplique a migration de exclusão completa de alunos.',
+                }, { status: 500 })
             }
-            return NextResponse.json({ ok: false, error: msg || 'Falha ao excluir aluno.' }, { status: 400 })
+            logWarn('student-delete', 'Final database cleanup failed after auth deletion', {
+                studentId: studentRow.id,
+                studentUserId: plannedUserId,
+                error: msg,
+            })
+            return NextResponse.json({
+                ok: false,
+                error: 'Conta removida, mas a limpeza final falhou. Tente excluir o aluno novamente.',
+            }, { status: 500 })
         }
 
         const report = (rpcResult || {}) as { student_id: string; student_user_id: string | null }
-        const studentUserId = report.student_user_id || studentRow.user_id
-
-        // Delete auth user — must happen outside Postgres (external auth service)
-        let authDeleteWarning = false
-        if (studentUserId) {
-            try {
-                await admin.auth.admin.deleteUser(studentUserId)
-            } catch (e) {
-                // Student data was already deleted atomically by the RPC.
-                // Auth user remains orphaned — admin should be notified.
-                logWarn('student-delete', 'auth.users delete failed after cascade', { studentUserId, error: getErrorMessage(e) })
-                authDeleteWarning = true
-            }
-        }
+        const studentUserId = report.student_user_id || plannedUserId
 
         return NextResponse.json({
             ok: true,
             student_id: studentRow.id,
             student_user_id: studentUserId,
-            ...(authDeleteWarning ? { auth_delete_warning: 'Aluno removido do sistema, mas a conta de login pode precisar de exclusão manual.' } : {}),
+            storage_objects_deleted: storageObjects.length,
         })
     } catch (e: unknown) {
         return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

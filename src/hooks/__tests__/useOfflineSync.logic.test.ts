@@ -23,26 +23,6 @@ const DEFAULT_SYNC_STATE: SyncState = {
 }
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────
-function isOfflineSyncV2Enabled(settings: Record<string, unknown> | null | undefined): boolean {
-  if (!settings) return false
-  if (settings.featuresKillSwitch === true) return false
-  return settings.featureOfflineSyncV2 === true
-}
-
-function applyQueueSummary(
-  prev: SyncState,
-  summary: { ok?: boolean; online?: boolean; pending?: number; failed?: number; due?: number },
-): SyncState {
-  if (!summary?.ok) return prev
-  return {
-    ...prev,
-    online: summary.online !== false,
-    pending: Number(summary.pending || 0),
-    failed: Number(summary.failed || 0),
-    due: Number(summary.due || 0),
-  }
-}
-
 function applyLegacyPending(prev: SyncState, online: boolean, pending: number): SyncState {
   return { ...prev, online, pending, failed: 0, due: 0 }
 }
@@ -89,56 +69,6 @@ describe('DEFAULT_SYNC_STATE', () => {
 
   it('inicia sem sincronizar', () => {
     expect(DEFAULT_SYNC_STATE.syncing).toBe(false)
-  })
-})
-
-describe('isOfflineSyncV2Enabled', () => {
-  it('retorna false quando settings é null', () => {
-    expect(isOfflineSyncV2Enabled(null)).toBe(false)
-  })
-
-  it('retorna false quando killSwitch ativado', () => {
-    expect(isOfflineSyncV2Enabled({ featuresKillSwitch: true, featureOfflineSyncV2: true })).toBe(false)
-  })
-
-  it('retorna false quando featureOfflineSyncV2 não definida', () => {
-    expect(isOfflineSyncV2Enabled({ featuresKillSwitch: false })).toBe(false)
-  })
-
-  it('retorna true quando habilitada e sem killSwitch', () => {
-    expect(isOfflineSyncV2Enabled({ featuresKillSwitch: false, featureOfflineSyncV2: true })).toBe(true)
-  })
-
-  it('retorna true quando killSwitch ausente', () => {
-    expect(isOfflineSyncV2Enabled({ featureOfflineSyncV2: true })).toBe(true)
-  })
-})
-
-describe('applyQueueSummary', () => {
-  it('não altera estado quando summary.ok é false', () => {
-    const prev = { ...DEFAULT_SYNC_STATE, pending: 5 }
-    const result = applyQueueSummary(prev, { ok: false, pending: 100 })
-    expect(result.pending).toBe(5) // não alterado
-  })
-
-  it('aplica valores do summary quando ok', () => {
-    const prev = { ...DEFAULT_SYNC_STATE }
-    const result = applyQueueSummary(prev, { ok: true, pending: 3, failed: 1, due: 2, online: true })
-    expect(result.pending).toBe(3)
-    expect(result.failed).toBe(1)
-    expect(result.due).toBe(2)
-  })
-
-  it('online: false no summary é respeitado', () => {
-    const prev = { ...DEFAULT_SYNC_STATE, online: true }
-    const result = applyQueueSummary(prev, { ok: true, online: false })
-    expect(result.online).toBe(false)
-  })
-
-  it('online undefined no summary → true (default)', () => {
-    const prev = { ...DEFAULT_SYNC_STATE, online: true }
-    const result = applyQueueSummary(prev, { ok: true })
-    expect(result.online).toBe(true) // online !== false
   })
 })
 

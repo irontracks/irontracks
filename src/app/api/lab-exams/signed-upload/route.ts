@@ -4,8 +4,8 @@
  * Minta um signed upload URL pro bucket PRIVADO lab-exams e registra a linha
  * em lab_exam_files. O cliente faz o PUT com uploadToSignedUrl(path, token, file).
  *
- * Acesso: dono (user_id) OU personal (trainer_id) do exame. Checagem explícita
- * porque usamos admin client (service role bypassa RLS).
+ * Acesso: dono (user_id) OU personal com vínculo VIVO em `students`. Checagem
+ * explícita porque usamos admin client (service role bypassa RLS).
  *
  * Path: {assessed_user_id}/exams/{examId}/{timestamp}_{safeName} — sempre sob o
  * prefixo do AVALIADO, pra casar com o RLS de prefixo do storage.
@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
@@ -75,8 +76,10 @@ export async function POST(request: Request) {
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const assessedUserId = String((exam as { user_id?: string }).user_id || '')
-    const trainerId = (exam as { trainer_id?: string | null }).trainer_id || null
-    if (userId !== assessedUserId && userId !== trainerId) {
+    // Gate por VÍNCULO REAL (canCoachStudent), não por row.trainer_id: o trainer_id
+    // é gravado na criação e nunca revalidado, então um ex-personal continuava
+    // anexando arquivos ao exame do ex-aluno depois do vínculo desfeito (auditoria 2026-07-28).
+    if (userId !== assessedUserId && !(await canCoachStudent({ id: userId, email: auth.user.email }, assessedUserId))) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 

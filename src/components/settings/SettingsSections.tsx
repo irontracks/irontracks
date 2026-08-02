@@ -214,7 +214,7 @@ export function SettingsWorkoutNamesSection({ draft, setValue }: SettingsSection
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <div className="text-sm font-bold text-white">Dia inicial do programa</div>
-                        <div className="text-xs text-neutral-400">Define como &quot;A - ... (SEGUNDA)&quot; começa no Wizard.</div>
+                        <div className="text-xs text-neutral-400">Dia da semana associado ao primeiro treino do programa (A).</div>
 
                     </div>
                     <select value={programTitleStartDay} onChange={(e) => setValue('programTitleStartDay', e.target.value)} className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white">
@@ -252,8 +252,8 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                     <select value={uiMode} onChange={(e) => {
                         const next = String(e.target.value || 'beginner')
                         setValue('uiMode', next)
-                        if (next === 'beginner') { setValue('moduleSocial', true); setValue('moduleCommunity', true); setValue('moduleMarketplace', true) }
-                        else if (next === 'intermediate') { setValue('moduleSocial', true); setValue('moduleCommunity', false); setValue('moduleMarketplace', false) }
+                        if (next === 'beginner') { setValue('moduleSocial', true); setValue('moduleCommunity', true) }
+                        else if (next === 'intermediate') { setValue('moduleSocial', true); setValue('moduleCommunity', false) }
                     }} className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white">
                         <option value="beginner">Iniciante</option>
                         <option value="intermediate">Intermediário</option>
@@ -263,7 +263,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <div className="text-sm font-bold text-white">Módulos opcionais</div>
-                        <div className="text-xs text-neutral-400">Ative/desative Social, Comunidade e Marketplace.</div>
+                        <div className="text-xs text-neutral-400">Ative/desative Social e Comunidade.</div>
                     </div>
                     <button type="button" onClick={() => setModulesModalOpen(true)} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800">Gerenciar</button>
                 </div>
@@ -278,7 +278,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <div className="text-sm font-bold text-white">Check-in pós-treino</div>
-                            <div className="text-xs text-neutral-400">Pergunta RPE/satisfação ao finalizar.</div>
+                            <div className="text-xs text-neutral-400">Pergunta o esforço percebido (RPE) e a satisfação ao finalizar.</div>
                         </div>
                         <ToggleSwitch checked={promptPostWorkoutCheckin} onChange={() => setValue('promptPostWorkoutCheckin', !promptPostWorkoutCheckin)} />
                     </div>
@@ -381,21 +381,13 @@ export function SettingsWorkoutSection({ draft, setValue }: SettingsSectionProps
     )
 }
 
-// ── Som e Convites ───────────────────────────────────────────────────────────
-interface SettingsSoundSectionProps extends SettingsSectionProps {
-    canSeeExperimental: boolean
-}
-export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: SettingsSoundSectionProps) {
+// ── Som ──────────────────────────────────────────────────────────────────────
+export function SettingsSoundSection({ draft, setValue }: SettingsSectionProps) {
     const enableSounds = Boolean(draft?.enableSounds ?? true)
     const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
-    const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
-    const featuresKillSwitch = Boolean(draft?.featuresKillSwitch ?? false)
-    const featureTeamworkV2 = Boolean(draft?.featureTeamworkV2 ?? false)
-    const featureStoriesV2 = Boolean(draft?.featureStoriesV2 ?? false)
-    const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Volume2} label="Som e Convites" color="#eab308" />
+            <SectionHeader icon={Volume2} label="Som" color="#eab308" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Sons do App</div><div className="text-xs text-neutral-400">Notificações e feedback sonoro.</div></div>
@@ -408,31 +400,6 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
                         <div className="font-mono text-xs font-bold text-neutral-200 w-10 text-right">{soundVolume}%</div>
                     </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Convites de Treino em Equipe</div><div className="text-xs text-neutral-400">Permite receber convites no modal &quot;BORA!&quot;.</div></div>
-                    <ToggleSwitch checked={allowTeamInvites} onChange={() => setValue('allowTeamInvites', !allowTeamInvites)} />
-                </div>
-                {canSeeExperimental && (
-                    <div className="mt-4 rounded-xl border border-neutral-700 bg-neutral-900/40 p-4">
-                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Experimentais</div>
-                        <div className="flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Kill Switch</div><div className="text-xs text-neutral-400">Desativa recursos em teste neste usuário.</div></div>
-                            <ToggleSwitch checked={featuresKillSwitch} onChange={() => setValue('featuresKillSwitch', !featuresKillSwitch)} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Treino em Equipe V2</div><div className="text-xs text-neutral-400">Link/QR, presença e saída segura da sessão.</div></div>
-                            <ToggleSwitch checked={featureTeamworkV2} onChange={() => setValue('featureTeamworkV2', !featureTeamworkV2)} disabled={featuresKillSwitch} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Stories/Relatórios V2</div><div className="text-xs text-neutral-400">CTA pós-treino e melhorias de compartilhamento.</div></div>
-                            <ToggleSwitch checked={featureStoriesV2} onChange={() => setValue('featureStoriesV2', !featureStoriesV2)} disabled={featuresKillSwitch} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Offline Sync V2</div><div className="text-xs text-neutral-400">Fila com backoff, limites e central de pendências.</div></div>
-                            <ToggleSwitch checked={featureOfflineSyncV2} onChange={() => setValue('featureOfflineSyncV2', !featureOfflineSyncV2)} disabled={featuresKillSwitch} />
-                        </div>
-                    </div>
-                )}
             </div>
         </SectionCard>
     )
@@ -492,7 +459,7 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
                     </select>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Tick nos últimos 5s</div><div className="text-xs text-neutral-400">Ajuda no ritmo em cluster.</div></div>
+                    <div><div className="text-sm font-bold text-white">Tick nos últimos 5s</div><div className="text-xs text-neutral-400">Emite um tique nos 5s finais do descanso, pra ajudar no ritmo.</div></div>
                     <ToggleSwitch checked={restTimerTickCountdown} onChange={() => setValue('restTimerTickCountdown', !restTimerTickCountdown)} />
                 </div>
             </div>
@@ -508,7 +475,7 @@ export function SettingsPrivacySection({ draft, setValue }: SettingsSectionProps
             <SectionHeader icon={Lock} label="Privacidade" color="#ef4444" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Mensagens diretas</div><div className="text-xs text-neutral-400">Permite iniciar e receber conversas diretas.</div></div>
+                    <div><div className="text-sm font-bold text-white">Receber mensagens diretas</div><div className="text-xs text-neutral-400">Permite que outros iniciem conversas diretas com você.</div></div>
                     <ToggleSwitch checked={allowDirectMessages} onChange={() => setValue('allowDirectMessages', !allowDirectMessages)} />
                 </div>
             </div>
@@ -567,13 +534,17 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     // Master switch: disables ALL push (lock-screen) notifications.
     // In-app bell list still populates so the user can review events later.
     const pushNotificationsEnabled = Boolean(draft?.pushNotificationsEnabled ?? true)
+    const quietHoursEnabled = Boolean(draft?.quietHoursEnabled ?? false)
+    const quietHoursStart = Number.isFinite(Number(draft?.quietHoursStart)) ? Number(draft?.quietHoursStart) : 22
+    const quietHoursEnd = Number.isFinite(Number(draft?.quietHoursEnd)) ? Number(draft?.quietHoursEnd) : 7
     // Per-type toggles (in-app row + push)
     const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
     const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
+    const notifyStudentWorkoutStart = Boolean(draft?.notifyStudentWorkoutStart ?? true)
+    const notifyWorkoutAssigned = Boolean(draft?.notifyWorkoutAssigned ?? true)
     const notifyBroadcasts = Boolean(draft?.notifyBroadcasts ?? true)
     const notifySocialFollows = Boolean(draft?.notifySocialFollows ?? true)
     const notifyFollowAccepted = Boolean(draft?.notifyFollowAccepted ?? true)
-    const notifyFriendOnline = Boolean(draft?.notifyFriendOnline ?? true)
     const notifyFriendWorkoutEvents = Boolean(draft?.notifyFriendWorkoutEvents ?? true)
     const notifyFriendWorkoutStart = Boolean(draft?.notifyFriendWorkoutStart ?? true)
     const notifyFriendPRs = Boolean(draft?.notifyFriendPRs ?? true)
@@ -598,11 +569,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyTrialEnding = Boolean(draft?.notifyTrialEnding ?? true)
     const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
     const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
-    const notifyMissedMeal = Boolean(draft?.notifyMissedMeal ?? false)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
-    const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
-    const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
-    const notifyWorkoutReminders = Boolean(draft?.notifyWorkoutReminders ?? true)
 
     return (
         <SectionCard>
@@ -630,31 +597,42 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                     </div>
                 </div>
 
+                {/* Não perturbar — janela de silêncio (horário de Brasília) */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0"><div className="text-sm font-bold text-white">Não perturbar</div><div className="text-xs text-neutral-400">Silencia os pushes numa faixa de horário. O sino do app continua listando tudo.</div></div>
+                    <ToggleSwitch checked={quietHoursEnabled} onChange={() => setValue('quietHoursEnabled', !quietHoursEnabled)} />
+                </div>
+                {quietHoursEnabled && (
+                    <div className="flex items-center gap-3 pl-1">
+                        <div className="text-xs text-neutral-400">Das</div>
+                        <select value={quietHoursStart} onChange={(e) => setValue('quietHoursStart', Number(e.target.value))} className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm text-white min-h-[36px]" aria-label="Início do não perturbar">
+                            {Array.from({ length: 24 }).map((_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+                        </select>
+                        <div className="text-xs text-neutral-400">às</div>
+                        <select value={quietHoursEnd} onChange={(e) => setValue('quietHoursEnd', Number(e.target.value))} className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm text-white min-h-[36px]" aria-label="Fim do não perturbar">
+                            {Array.from({ length: 24 }).map((_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+                        </select>
+                    </div>
+                )}
+
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Toasts no app</div><div className="text-xs text-neutral-400">Mensagens rápidas no topo da tela.</div></div>
                     <ToggleSwitch checked={inAppToasts} onChange={() => setValue('inAppToasts', !inAppToasts)} />
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Pedir permissão automaticamente</div><div className="text-xs text-neutral-400">Evita prompt do navegador ao iniciar treino.</div></div>
+                    <div><div className="text-sm font-bold text-white">Pedir permissão automaticamente</div><div className="text-xs text-neutral-400">Solicita a permissão de notificações ao entrar, em vez de no meio do treino.</div></div>
                     <ToggleSwitch checked={notificationPermissionPrompt} onChange={() => setValue('notificationPermissionPrompt', !notificationPermissionPrompt)} />
                 </div>
 
                 {/* ── Conversas e eventos diretos ──────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e convites</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e avisos</div>
                     <NotifRow
-                        title="Mensagem direta"
-                        description="DMs recebidas de outros usuários."
+                        title="Notificar mensagem recebida"
+                        description="Aviso quando chega uma mensagem direta."
                         checked={notifyDirectMessages}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
-                    />
-                    <NotifRow
-                        title="Convite de treino em grupo"
-                        description="Alguém te chamou para treinar junto."
-                        checked={notifyTeamInvites}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyTeamInvites', !notifyTeamInvites)}
                     />
                     <NotifRow
                         title="Agenda / professor"
@@ -662,6 +640,20 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyAppointments}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyAppointments', !notifyAppointments)}
+                    />
+                    <NotifRow
+                        title="Aluno iniciou treino (professor)"
+                        description="Avisa você quando um aluno seu começa um treino, pra assumir o controle."
+                        checked={notifyStudentWorkoutStart}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStudentWorkoutStart', !notifyStudentWorkoutStart)}
+                    />
+                    <NotifRow
+                        title="Treino novo do professor"
+                        description="Avisa você quando seu professor monta ou envia um treino novo."
+                        checked={notifyWorkoutAssigned}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyWorkoutAssigned', !notifyWorkoutAssigned)}
                     />
                     <NotifRow
                         title="Avisos do IronTracks"
@@ -693,13 +685,9 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyFollowAccepted', !notifyFollowAccepted)}
                     />
-                    <NotifRow
-                        title="Amigo online"
-                        description="Quando um seguido abre o app."
-                        checked={notifyFriendOnline}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyFriendOnline', !notifyFriendOnline)}
-                    />
+                    {/* "Amigo online" saiu da lista de push: notifyFriendOnline agora
+                        controla o indicador VISUAL de presença no feed da Comunidade
+                        (não gera notificação). O toggle vive no painel da Comunidade. */}
                     <NotifRow
                         title="Amigo começou treino"
                         description="Quando um seguido inicia um treino agora."
@@ -871,7 +859,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                     />
                     <NotifRow
                         title="Menções (@)"
-                        description="Avisa quando alguém te menciona em comentários ou no chat de team."
+                        description="Avisa quando alguém te menciona em um comentário."
                         checked={notifyMentions}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyMentions', !notifyMentions)}
@@ -893,33 +881,15 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                 {/* ── Lembretes ─────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Lembretes</div>
-                    <NotifRow
-                        title="Refeições"
-                        description="Horários de refeição configurados na nutrição."
-                        checked={notifyMealReminders}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
-                    />
-                    <NotifRow
-                        title="Refeição esquecida"
-                        description="Avisa 30min depois se você não registrou. Desligado por padrão."
-                        checked={notifyMissedMeal}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyMissedMeal', !notifyMissedMeal)}
-                    />
+                    {/* "Refeições" e "Refeição esquecida" removidos até religar o driver
+                        (a rota nutrition/reminders/trigger precisa de cron a cada minuto —
+                        Supabase pg_cron; a infra atual é diária). A rota fica dormente. */}
                     <NotifRow
                         title="Meta diária atingida"
                         description="Quando você bate a meta de calorias ou proteína do dia."
                         checked={notifyDailyGoal}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyDailyGoal', !notifyDailyGoal)}
-                    />
-                    <NotifRow
-                        title="Treino"
-                        description="Lembretes para não perder um dia de treino."
-                        checked={notifyWorkoutReminders}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyWorkoutReminders', !notifyWorkoutReminders)}
                     />
                 </div>
 
@@ -1284,7 +1254,6 @@ interface SettingsModulesModalProps extends SettingsSectionProps {
 export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: SettingsModulesModalProps) {
     const moduleSocial = Boolean(draft?.moduleSocial ?? true)
     const moduleCommunity = Boolean(draft?.moduleCommunity ?? true)
-    const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
     if (!isOpen) return null
     return (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -1304,13 +1273,9 @@ export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: Setti
                         <div><div className="text-sm font-bold text-white">Comunidade</div><div className="text-xs text-neutral-400">Lista e interações de comunidade.</div></div>
                         <ToggleSwitch checked={moduleCommunity} onChange={() => setValue('moduleCommunity', !moduleCommunity)} />
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Marketplace</div><div className="text-xs text-neutral-400">Planos e assinaturas de professores.</div></div>
-                        <ToggleSwitch checked={moduleMarketplace} onChange={() => setValue('moduleMarketplace', !moduleMarketplace)} />
-                    </div>
                 </div>
                 <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => { setValue('moduleSocial', true); setValue('moduleCommunity', true); setValue('moduleMarketplace', true) }} className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 inline-flex items-center gap-2">
+                    <button type="button" onClick={() => { setValue('moduleSocial', true); setValue('moduleCommunity', true) }} className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 inline-flex items-center gap-2">
                         <RotateCcw size={16} className="text-yellow-500" /> Restaurar
                     </button>
                     <button type="button" onClick={onClose} className="px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center gap-2">Ok</button>

@@ -115,13 +115,18 @@ class RestTimerReceiver : BroadcastReceiver() {
             context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
 
-        vibrator?.vibrate(
-            VibrationEffect.createWaveform(
-                longArrayOf(0, 400, 200, 400, 200, 400),
-                intArrayOf(0, 255, 0, 255, 0, 255),
-                -1
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0, 400, 200, 400, 200, 400),
+                    intArrayOf(0, 255, 0, 255, 0, 255),
+                    -1
+                )
             )
-        )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 400, 200, 400, 200, 400), -1)
+        }
     }
 
     private fun scheduleRepeat(
@@ -151,12 +156,37 @@ class RestTimerReceiver : BroadcastReceiver() {
         )
 
         val triggerMs = SystemClock.elapsedRealtime() + (repeatEverySeconds * 1000L)
+        scheduleAlarm(alarmManager, triggerMs, pendingIntent)
+    }
+
+    private fun scheduleAlarm(
+        alarmManager: AlarmManager,
+        triggerMs: Long,
+        pendingIntent: PendingIntent
+    ) {
+        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            alarmManager.canScheduleExactAlarms()
+
         try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerMs, pendingIntent
-            )
+            if (exactAllowed) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerMs,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerMs,
+                    pendingIntent
+                )
+            }
         } catch (_: SecurityException) {
-            alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerMs, pendingIntent)
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                triggerMs,
+                pendingIntent
+            )
         }
     }
 }

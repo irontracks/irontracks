@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
+import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import {
   NormalSet,
   RestPauseSet,
@@ -22,27 +23,27 @@ import {
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { setTopWeightReps } from '@/utils/report/setVolume';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
 import { PlankSetInput } from './PlankSetInput';
+import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
-
-function useSafeTeamWorkout() {
-  try {
-    return useTeamWorkout()
-  } catch {
-    return null
-  }
-}
+import PlateCalculatorSheet from './PlateCalculatorSheet'
+import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
+import { resolveIncrement } from '@/utils/autoload/plateMath';
+import { DEFAULT_GYM_INVENTORY, type PlateInventory } from '@/utils/plates/plateInventory';
 
 type GroupPos = 'first' | 'middle' | 'last';
 
-function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
-  const logs = useWorkoutLogs();
+function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> }) {
+  // Só as entradas de log DESTE exercício (passadas pelo wrapper connected, com referência
+  // estável). Assim o card só re-renderiza quando as próprias séries mudam — não a cada
+  // tecla em qualquer outro exercício. Ver helpers/exerciseLogSlice.ts.
+  const logs = logsSlice;
   const {
     workout,
     collapsed,
@@ -51,7 +52,10 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
     reportHistoryStatus,
     reportHistoryLoadingRef,
     reportHistory,
+    deloadAlerts,
+    sessionDeloadAlert,
     openDeloadModal,
+    autoLoadEnabled,
     openEditExercise,
     addExtraSetToExercise,
     getPlannedSet,
@@ -65,11 +69,20 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
     openDeleteConfirm,
     closeDeleteConfirm,
     removeExerciseFromWorkout,
+    settings,
+    updateLog,
+    onSavePlateSetup,
   } = useWorkoutContext();
 
-  const teamCtx = useSafeTeamWorkout();
-
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
+  // Aviso proativo de deload deste exercício (estagnação/regressão com histórico
+  // suficiente). Sem isto o app calculava a análise e não contava pra ninguém.
+  //
+  // Cala quando a descarga vira decisão de SESSÃO (banner no topo do treino):
+  // repetir o mesmo recado em cada card e mais uma vez no topo é ruído, e ruído
+  // foi o que manteve esta feature sem uso.
+  const deloadAlertRaw = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
+  const deloadAlert = sessionDeloadAlert ? undefined : deloadAlertRaw;
   const observation = String(ex?.notes || '').trim();
   const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
   const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
@@ -95,6 +108,41 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
 
   // Compute whether all sets in this exercise are marked done
   const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
+
+  // ── Calculadora de anilhas ────────────────────────────────────────────────
+  // Só aparece em exercício de BARRA: em máquina/cabo/halter não existe anilha por
+  // lado, e o ícone seria ruído num header que já tem 6 botões.
+  const [plateCalcOpen, setPlateCalcOpen] = useState(false);
+  const isBarbell = useMemo(
+    () => resolveIncrement(inferEquipmentFromName(name)).equipmentClass === 'barbell',
+    [name],
+  );
+  const plateInventory: PlateInventory = useMemo(() => {
+    const raw = (settings as Record<string, unknown> | null | undefined)?.plateInventory;
+    const counts = isObject(raw) ? (raw as Record<string, number>) : null;
+    const bar = Number((settings as Record<string, unknown> | null | undefined)?.barWeightKg);
+    return {
+      // Inventário vazio = academia completa. Ninguém é obrigado a cadastrar nada
+      // para a calculadora funcionar; só quem treina em casa ajusta.
+      counts: counts && Object.keys(counts).length > 0 ? counts : DEFAULT_GYM_INVENTORY.counts,
+      barWeightKg: Number.isFinite(bar) && bar >= 0 ? bar : DEFAULT_GYM_INVENTORY.barWeightKg,
+    };
+  }, [settings]);
+  /**
+   * Série que receberá o peso: a primeira NÃO concluída (a que o usuário está fazendo).
+   * Quando todas estão concluídas, cai na última — aplicar numa série já fechada é
+   * correção legítima. O sheet SEMPRE mostra o rótulo antes de aplicar: em drop-set,
+   * cluster e stripping a "série corrente" tem sub-etapas, e escrever no lugar errado
+   * é a classe de bug que já mordeu a família de renderers.
+   */
+  const targetSetIdx = useMemo(() => {
+    for (let i = 0; i < setsCount; i++) {
+      // Deriva de `logs` (o slice deste exercício), não de getLog: getLog é estável e lê
+      // uma ref, então o memo não reavaliaria ao concluir uma série.
+      if (!logs[`${exIdx}-${i}`]?.done) return i;
+    }
+    return Math.max(0, setsCount - 1);
+  }, [setsCount, exIdx, logs]);
 
   // Completion animation — brief scale+glow when exercise finishes
   const [justCompleted, setJustCompleted] = useState(false);
@@ -139,7 +187,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
         const log = logsObj[`${exIdx}-${i}`];
         // Ignora séries de AQUECIMENTO: um aquecimento pesado não é recorde.
         if (log?.set_type === 'warmup' || log?.is_warmup === true) continue;
-        const w = Number(log?.weight ?? log?.total_weight ?? 0);
+        // setTopWeightReps trata unilateral (L_/R_) — sem isto, exercícios
+        // unilaterais (que salvam só em L_weight/R_weight) nunca acendiam o badge PR.
+        const w = setTopWeightReps(log as Record<string, unknown>).weight || Number(log?.weight ?? log?.total_weight ?? 0);
         if (w > sessionMax) sessionMax = w;
       }
       return sessionMax > 0 && sessionMax > histTopWeight;
@@ -180,6 +230,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
       return <PlankSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
     }
 
+    // Cardio (method === 'Cardio'): tempo + intensidade (+ inclinação na esteira)
+    // com botão START da contagem regressiva, em vez de PESO/REPS/RPE.
+    if (method.toLowerCase() === 'cardio') {
+      return <CardioSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
+    }
+
     // Per-set method override — takes precedence over all automatic detection
     const perSetMethod = String(log.per_set_method || '').trim();
     if (perSetMethod === 'Normal') {
@@ -217,10 +273,13 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
       );
     }
 
-    // Drop-Set: array config or saved drop stages
+    // Drop-Set: array config, estágios salvos, OU o método do exercício = "Drop-set"
+    // (o dropdown grava method='Drop-set' SEM criar advanced_config; sem esta terceira
+    // condição, escolher "Drop-set" no editor caía silenciosamente em NormalSet).
     const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
     const dropStages: unknown[] = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : [];
-    if (Array.isArray(rawCfg) || dropStages.length > 0) {
+    const isDropByMethod = /^drop-?set$/i.test(method);
+    if (Array.isArray(rawCfg) || dropStages.length > 0 || isDropByMethod) {
       return <DropSetSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
     }
 
@@ -394,6 +453,49 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
               <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
             </div>
           ) : null}
+          {/* Aviso proativo de deload: a análise de estagnação/regressão já existia
+              e só alimentava um placeholder cinza escondido atrás do valor do
+              autoload — daí a feature nunca ter sido usada (0 de 543 sessões).
+              Agora ela fala. Só aparece com histórico suficiente e quando há algo
+              a dizer; progressão normal não gera ruído. */}
+          {deloadAlert ? (
+            <div className="mt-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[13px] text-amber-200 leading-snug">
+                  {deloadAlert.status === 'overtraining'
+                    ? `Sua carga caiu nas últimas ${deloadAlert.itemsCount} vezes que você fez este treino.`
+                    : `Você está há ${deloadAlert.itemsCount} treinos sem evoluir neste exercício.`}
+                </div>
+                {/* O termo "deload" é jargão: quem nunca ouviu não sabe que reduzir
+                    carga de propósito é o que destrava a evolução. O texto de ajuda
+                    já existia pronto em HELP_TERMS e não era usado em lugar nenhum. */}
+                <HelpHint
+                  forceVisible
+                  title={HELP_TERMS.deload.title}
+                  text={HELP_TERMS.deload.text}
+                  tooltip={HELP_TERMS.deload.tooltip}
+                  className="h-5 w-5 shrink-0 text-[11px] border-amber-500/40 text-amber-300"
+                />
+              </div>
+              {/* Explica o BENEFÍCIO antes de pedir a ação — sem isso o aviso manda
+                  o usuário fazer algo que soa contraintuitivo (treinar mais leve). */}
+              <div className="mt-1 text-[11px] text-amber-200/70 leading-snug">
+                Aliviar a carga por um treino ajuda o corpo a recuperar e costuma
+                destravar a evolução na semana seguinte.
+              </div>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  try { e.preventDefault(); e.stopPropagation(); } catch { }
+                  setCurrentExerciseIdx(exIdx);
+                  await openDeloadModal(ex, exIdx);
+                }}
+                className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-400 active:scale-95 transition-transform"
+              >
+                Aliviar {Math.round(deloadAlert.suggestedPct * 100)}% hoje →
+              </button>
+            </div>
+          ) : null}
           {/* Per-card sets progress bar */}
           {setsCount > 0 && (
             <div className="mt-2 h-[3px] w-full bg-neutral-800/60 rounded-full overflow-hidden">
@@ -444,22 +546,40 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
             exerciseId={String(ex?.id || ex?.exercise_id || '')}
             exerciseLibraryId={String(ex?.exercise_library_id || '')}
           />
-          <button
-            type="button"
-            onClick={async (e) => {
-              try {
-                e.preventDefault();
-                e.stopPropagation();
-              } catch { }
-              setCurrentExerciseIdx(exIdx);
-              await openDeloadModal(ex, exIdx);
-            }}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
-            title="Sugestão de Deload"
-            aria-label="Sugestão de Deload"
-          >
-            {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
-          </button>
+          {/* O liga/desliga de descarga POR EXERCÍCIO saiu daqui em ago/2026.
+              Descarga é decisão do TREINO — a fadiga que a justifica é sistêmica,
+              e aliviar um movimento só não descansa nada. Oito botões pediam oito
+              decisões para o que é uma só, e a chave por NOME de exercício fazia
+              desligar o Supino num treino desligar em todos. O controle único
+              está no topo da lista (SessionDeloadBanner). O modal manual abaixo
+              segue para quem NÃO usa a carga automática. */}
+          {autoLoadEnabled ? null : (
+            <button
+              type="button"
+              onClick={async (e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch { }
+                setCurrentExerciseIdx(exIdx);
+                await openDeloadModal(ex, exIdx);
+              }}
+              className={[
+                'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+                // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
+                // seta sem texto no meio de outros ícones, e no celular não há hover
+                // pra revelar o `title` — ninguém descobria que ali morava o deload.
+                deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800',
+              ].join(' ')}
+              title="Sugestão de Deload"
+              aria-label="Sugestão de Deload"
+            >
+              {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
+              {deloadAlert ? (
+                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Deload</span>
+              ) : null}
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -478,6 +598,21 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
           >
             <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
           </button>
+          {isBarbell ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                try { e.preventDefault(); e.stopPropagation(); } catch { }
+                setCurrentExerciseIdx(exIdx);
+                setPlateCalcOpen(true);
+              }}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+              title="Calculadora de anilhas"
+              aria-label="Calculadora de anilhas"
+            >
+              <Weight size={15} />
+            </button>
+          ) : null}
           <AIExerciseSwap exerciseName={name} exerciseIndex={exIdx} />
           <button
             type="button"
@@ -516,36 +651,25 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
           >
             <Trash2 size={14} />
           </button>
-          {/* Share with partner — only when team session is active */}
-          {teamCtx?.teamSession && (
-            <button
-              type="button"
-              onClick={(e) => {
-                try {
-                  e.preventDefault();
-                  e.stopPropagation();
-                } catch { }
-                try {
-                  // Collect current logs for this exercise
-                  const exerciseLogs: Record<string, unknown> = {}
-                  for (let i = 0; i < setsCount; i++) {
-                    const key = `${exIdx}-${i}`
-                    exerciseLogs[key] = getLog(key)
-                  }
-                  teamCtx.shareExerciseWithPartner(exIdx, ex as Record<string, unknown>, exerciseLogs, null)
-                } catch (err) {
-                  logError('ExerciseCard', 'Failed to share exercise', { exIdx, err })
-                }
-              }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors active:scale-95 flex-shrink-0"
-              title="Compartilhar com parceiro"
-              aria-label="Compartilhar exercício com parceiro"
-            >
-              <Share2 size={14} />
-            </button>
-          )}
         </div>
       </div>
+
+      {plateCalcOpen ? (
+        <PlateCalculatorSheet
+          isOpen={plateCalcOpen}
+          onClose={() => setPlateCalcOpen(false)}
+          exerciseName={name}
+          setLabel={`Série ${targetSetIdx + 1}`}
+          initialWeight={parseTrainingNumber(getLog(`${exIdx}-${targetSetIdx}`).weight) ?? null}
+          inventory={plateInventory}
+          onApply={(w) => {
+            // weightSource 'user': o usuário assumiu esta carga — o motor de autoload
+            // nunca mais a reescreve (mesma regra do campo digitado à mão).
+            updateLog(`${exIdx}-${targetSetIdx}`, { weight: String(w), weightSource: 'user' });
+          }}
+          onSaveInventory={(counts, bar) => onSavePlateSetup?.(counts, bar)}
+        />
+      ) : null}
 
       {deleteConfirmIdx === exIdx && (
         <div className="mt-3 rounded-xl border border-red-500/25 p-4" style={{ background: 'rgba(239,68,68,0.07)' }}>
@@ -615,5 +739,32 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
   );
 }
 
-const ExerciseCard = React.memo(ExerciseCardInner);
+// Comparador do memo: re-renderiza o card pesado só quando ex/exIdx/groupPos mudam OU o slice
+// de logs DESTE exercício muda (shallow por referência). Assim uma tecla em outro exercício
+// (que gera um slice novo mas shallow-igual aqui) NÃO re-renderiza este card.
+function arePropsEqual(
+  prev: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
+  next: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
+): boolean {
+  return (
+    prev.ex === next.ex &&
+    prev.exIdx === next.exIdx &&
+    prev.groupPos === next.groupPos &&
+    shallowEqualByRef(prev.logsSlice, next.logsSlice)
+  );
+}
+
+const ExerciseCardMemo = React.memo(ExerciseCardInner, arePropsEqual);
+
+// Wrapper "connected": ISOLA a assinatura do context de logs. Ele re-renderiza a cada tecla
+// (é barato — só extrai o slice), mas o card pesado (ExerciseCardMemo) só re-renderiza quando
+// o slice DESTE exercício muda (via arePropsEqual). Antes, o ExerciseCardInner chamava
+// useWorkoutLogs() direto e o React.memo era inútil (context não respeita memo) -> todos os
+// cards re-renderizavam a cada tecla. Os 4 call sites (lista, partner overlay, 2× teacher)
+// seguem renderizando <ExerciseCard> sem mudança — o wrapper cuida dos logs internamente.
+function ExerciseCard({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
+  const logs = useWorkoutLogs() as Record<string, Record<string, unknown>>;
+  const logsSlice = pickExerciseLogSlice(logs, exIdx) as Record<string, Record<string, unknown>>;
+  return <ExerciseCardMemo ex={ex} exIdx={exIdx} groupPos={groupPos} logsSlice={logsSlice} />;
+}
 export default ExerciseCard;

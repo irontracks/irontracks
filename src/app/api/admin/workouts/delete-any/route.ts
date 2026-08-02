@@ -54,6 +54,28 @@ export async function POST(req: Request) {
     const { error: delErr } = await admin.from('workouts').delete().eq('id', id)
     if (delErr) return respondDbError('admin:workouts:delete-any', delErr)
 
+    // Trilha de auditoria — a rota já exigia `reason` e o descartava. Apagar
+    // treino de outro usuário (com exercícios e séries em cascata) sem registro
+    // de quem e por quê só aparece quando o dono do treino reclama. Mesmo
+    // padrão de `admin/vip/revoke`. Best-effort: falha aqui não desfaz a
+    // exclusão, que já aconteceu.
+    try {
+      await admin.from('audit_events').insert({
+        actor_id: auth.user?.id || null,
+        actor_email: auth.user?.email || null,
+        actor_role: 'admin',
+        action: 'admin_workout_delete_any',
+        entity_type: 'workout',
+        entity_id: id,
+        metadata: {
+          reason,
+          owner_user_id: w?.user_id ?? null,
+          was_template: w?.is_template === true,
+          deleted_exercises: exIds.length,
+        },
+      })
+    } catch (e) { logWarn('admin:workouts:delete-any', 'Failed to write audit_events', e) }
+
     try {
       const isSourceTemplate = w?.is_template === true && String(w?.user_id || '') === String(w?.created_by || '')
       if (isSourceTemplate) {

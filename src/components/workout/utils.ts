@@ -2,8 +2,7 @@
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
-import { isSetCompleted } from '@/utils/report/setCompletion'
+import { setVolume, setTopWeightReps, isWorkingSet } from '@/utils/report/setVolume'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -16,11 +15,19 @@ export const DELOAD_REDUCTION_STABLE = 0.12;
 export const DELOAD_REDUCTION_STAGNATION = 0.15;
 export const DELOAD_REDUCTION_OVERTRAIN = 0.22;
 export const DELOAD_MIN_1RM_FACTOR = 0.5;
+/**
+ * A partir de quantos exercícios sinalizados a descarga vira decisão de SESSÃO.
+ * Com 1 só, o caso é local (aquele exercício travou) e o aviso segue no card.
+ */
+export const DELOAD_SESSION_MIN_EXERCISES = 2;
 export const DELOAD_REDUCTION_MIN = 0.05;
 export const DELOAD_REDUCTION_MAX = 0.4;
 export const WEIGHT_ROUND_STEP = 0.5;
 export const REPORT_HISTORY_LIMIT = 80;
-export const REPORT_CACHE_KEY = 'irontracks.report.history.v2';
+// v4: o builder v3 lia o PESO por lado mas ainda gravava reps/rpe=0 no unilateral
+// (toNumber devolve 0, não null → o fallback L/R nunca rodava). Sem reps o motor
+// descarta a série e o autoload não sugere. Bump força reconstrução com o builder novo.
+export const REPORT_CACHE_KEY = 'irontracks.report.history.v4';
 export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
 export const REPORT_FETCH_TIMEOUT_MS = 9000;
 export const DELOAD_SUGGEST_MODE = 'watermark';
@@ -101,6 +108,12 @@ export const averageNumbers = (list: unknown): number | null => {
   return total / arr.length;
 };
 
+/** Média dos valores L/R positivos (exercício unilateral). null se nenhum lado válido. */
+export const avgSideValues = (l: unknown, r: unknown): number | null => {
+  const vals = [toNumber(l), toNumber(r)].filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  return vals.length ? averageNumbers(vals) : null;
+};
+
 export const extractLogWeight = (log: unknown): number | null => {
   const base: UnknownRecord = isObject(log) ? log : {};
   const direct = toNumber(base.weight ?? null);
@@ -124,7 +137,33 @@ export const extractLogWeight = (log: unknown): number | null => {
   const restPause = isObject(base.rest_pause) ? (base.rest_pause as UnknownRecord) : null;
   const restPauseWeight = toNumber(restPause ? restPause.weight : null);
   if (restPauseWeight != null && restPauseWeight > 0) return restPauseWeight;
+  // Unilateral: peso gravado por lado (L_weight/R_weight), não no campo `weight`.
+  // Sem este fallback, o histórico (e o watermark/autoload) ficava vazio p/ unilaterais.
+  const uni = avgSideValues(base.L_weight, base.R_weight);
+  if (uni != null && uni > 0) return uni;
   return null;
+};
+
+/**
+ * Reps da série, com fallback para os campos por lado do unilateral (L_reps/R_reps).
+ *
+ * NÃO dá pra escrever `toNumber(log.reps) ?? avgSideValues(...)`: `toNumber` devolve 0
+ * (não null) quando o campo não existe — o `??` nunca cairia no fallback e o unilateral
+ * ficava com reps=0. Série sem reps é descartada pelo motor → autoload sem sugestão.
+ */
+export const extractLogReps = (log: unknown): number | null => {
+  const base: UnknownRecord = isObject(log) ? log : {};
+  const direct = toNumber(base.reps ?? null);
+  if (direct != null && direct > 0) return direct;
+  return avgSideValues(base.L_reps, base.R_reps);
+};
+
+/** RPE da série, com o mesmo fallback por lado (L_rpe/R_rpe) do unilateral. */
+export const extractLogRpe = (log: unknown): number | null => {
+  const base: UnknownRecord = isObject(log) ? log : {};
+  const direct = toNumber(base.rpe ?? null);
+  if (direct != null && direct > 0) return direct;
+  return avgSideValues(base.L_rpe, base.R_rpe);
 };
 
 export const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number): Promise<T> => {
@@ -213,11 +252,27 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
   return { version, exercises };
 };
 
-export const readReportCache = (): { data: ReportHistory; cachedAt: number; stale: boolean } | null => {
+/**
+ * Chave do cache ESCOPADA POR USUÁRIO.
+ *
+ * Sem escopo, trocar de conta no mesmo aparelho servia o histórico do usuário
+ * anterior: logar numa conta sem histórico gravava um cache VAZIO que era então
+ * entregue à conta cheia — e, por estar "fresco", o fetch de rede era pulado
+ * (`if (cached?.data && !cached.stale) return`). Sintoma: zero sugestões e zero
+ * watermark, sem nenhum erro. Reproduzido no simulador em 2026-07-23.
+ *
+ * `userId` é OBRIGATÓRIO de propósito: sem usuário conhecido não se serve cache
+ * (melhor buscar da rede do que arriscar servir dado de outra conta).
+ */
+const reportCacheKeyFor = (userId: string): string => `${REPORT_CACHE_KEY}.${userId}`;
+
+export const readReportCache = (userId: string): { data: ReportHistory; cachedAt: number; stale: boolean } | null => {
   try {
+    const uid = String(userId ?? '').trim();
+    if (!uid) return null;
     const win = typeof window !== 'undefined' ? window : null;
     if (!win || !win.localStorage) return null;
-    const raw = win.localStorage.getItem(REPORT_CACHE_KEY);
+    const raw = win.localStorage.getItem(reportCacheKeyFor(uid));
     if (!raw) return null;
     const parsed = safeJsonParse(raw);
     if (!isObject(parsed)) return null;
@@ -231,12 +286,14 @@ export const readReportCache = (): { data: ReportHistory; cachedAt: number; stal
   }
 };
 
-export const writeReportCache = (data: unknown) => {
+export const writeReportCache = (data: unknown, userId: string) => {
   try {
+    const uid = String(userId ?? '').trim();
+    if (!uid) return;
     const win = typeof window !== 'undefined' ? window : null;
     if (!win || !win.localStorage) return;
     const payload = { cachedAt: Date.now(), data: normalizeReportHistory(data) };
-    win.localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(payload));
+    win.localStorage.setItem(reportCacheKeyFor(uid), JSON.stringify(payload));
   } catch {}
 };
 
@@ -307,9 +364,14 @@ export const shouldOpenFinishPrompt = (params: {
 
 /**
  * Resumo textual do treino pro prompt de finalização — por exercício: séries
- * concluídas + volume (peso×reps), com flag "sem carga" quando uma série foi
- * marcada feita sem peso/reps registrados. Puro/testável. Exercícios sem
- * nenhuma série feita não entram.
+ * VÁLIDAS + volume (peso×reps), com flag "sem carga" quando uma série foi marcada
+ * feita sem peso/reps registrados. Puro/testável. Exercícios sem nenhuma série
+ * válida não entram.
+ *
+ * "Válida" = isWorkingSet: feita E não é aquecimento/feeler — a MESMA regra do
+ * relatório (reportMetrics.ts:53-56). Antes usava isSetCompleted, que só olha "foi
+ * feita", então um treino com aquecimento marcado mostrava um volume aqui e outro,
+ * menor, no relatório logo em seguida.
  */
 export const buildWorkoutSummary = (
   exercises: unknown,
@@ -332,7 +394,10 @@ export const buildWorkoutSummary = (
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
       const log = isObject(val) ? val : {};
-      if (!isSetCompleted(log)) continue;
+      // isWorkingSet, não isSetCompleted: aquecimento/feeler NÃO contam. O
+      // relatório já os pula (reportMetrics.ts:53-56), e com regras diferentes o
+      // modal mostrava um volume e o relatório, segundos depois, mostrava outro.
+      if (!isWorkingSet(log)) continue;
       done += 1;
       const v = setVolume(log); // trata cluster + unilateral (L+R) + normal
       const { weight: w, reps: r } = setTopWeightReps(log);

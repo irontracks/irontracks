@@ -147,14 +147,32 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
 function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   const router = useRouter()
   const { notify } = useInAppNotifications()
+  // Erros de follow/cancel/unfollow do hook viram toast não-bloqueante (antes eram
+  // window.alert cru, que trava a main thread). Estável p/ não recriar os callbacks do hook.
+  const notifyError = useCallback((text: string) => {
+    const msg = String(text || '').trim()
+    if (!msg) return
+    notify({ text: msg, senderName: 'Comunidade', displayName: 'Comunidade', photoURL: undefined, type: 'info' })
+  }, [notify])
   const {
     supabase, userId, loading, profiles, follows, followRequests, loadError,
     busyId, busyRequestId,
     feedItems, feedLoading, feedError, feedHasMore, feedLoadedRef, loadFeed,
-    onlineFriends, onlineFriendProfiles,
+    trainingNowIds, trainingNowProfiles, onlineIds,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
-  } = useCommunityData()
+  } = useCommunityData(notifyError)
   const userSettingsApi = useUserSettings(userId)
+  // Presença dos amigos no feed (bolinha verde) — gated pela preferência do usuário
+  // (notifyFriendOnline). Treinando tem prioridade sobre online.
+  const showPresence = Boolean((userSettingsApi?.settings as Record<string, unknown>)?.notifyFriendOnline ?? true)
+  const trainingSet = useMemo(() => new Set(trainingNowIds), [trainingNowIds])
+  const onlineSet = useMemo(() => new Set(onlineIds), [onlineIds])
+  const presenceOf = useCallback((uid: string): 'training' | 'online' | null => {
+    if (!showPresence || !uid) return null
+    if (trainingSet.has(uid)) return 'training'
+    if (onlineSet.has(uid)) return 'online'
+    return null
+  }, [showPresence, trainingSet, onlineSet])
   const [communitySettingsOpen, setCommunitySettingsOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -163,6 +181,10 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
   // ── Profile modal state ──
   const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null)
+  // Estável de propósito: o FeedCard é memoizado (feedCardPropsAreEqual) e uma
+  // arrow inline aqui recriaria a prop a cada render, anulando a memo e fazendo
+  // o feed inteiro re-renderizar a cada tick do poll de presença (30s).
+  const handleProfileClick = useCallback((id: string) => setProfileModalUserId(id), [])
 
   const showMessage = useCallback(
     (text: string) => {
@@ -357,7 +379,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
               <div className="px-5 py-3 max-h-[60vh] overflow-y-auto">
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="allowSocialFollows" label="Permitir convites para seguir" description="Se desligar, ninguém consegue solicitar para te seguir." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifySocialFollows" label="Notificações sociais" description="Solicitações de seguir e confirmações." />
-                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendOnline" label="Amigo entrou no app" description="Avisos de presença." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendOnline" label="Mostrar amigos online" description="Bolinha verde no feed em quem está online ou treinando agora. Não gera notificação." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendWorkoutEvents" label="Atividades de treino do amigo" description="Início/fim/criação/edição de treino." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendPRs" label="PRs do amigo" description="Avisos quando bater recorde pessoal." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendStreaks" label="Streak do amigo" description="Avisos de sequência de dias treinando." />
@@ -381,9 +403,9 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   onClick={async () => {
                     try {
                       const res = await userSettingsApi.save()
-                      if (!res?.ok) { if (typeof window !== 'undefined') window.alert(String(res?.error || 'Falha ao salvar')); return }
+                      if (!res?.ok) { notifyError(String(res?.error || 'Falha ao salvar')); return }
                       setCommunitySettingsOpen(false)
-                    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+                    } catch (e) { notifyError(e instanceof Error ? e.message : String(e)) }
                   }}
                   className="flex-1 py-3 rounded-xl font-black text-sm text-black transition-all disabled:opacity-50 active:scale-[0.98]"
                   style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)', boxShadow: '0 4px 16px rgba(234,179,8,0.3)' }}
@@ -415,8 +437,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             {/* ── FEED TAB ── */}
             {activeTab === 'feed' && (
               <>
-                {/* Treinando Agora */}
-                {onlineFriends.length > 0 && (
+                {/* Treinando Agora — quem tem sessão de treino ABERTA (não "app aberto") */}
+                {trainingNowIds.length > 0 && (
                   <GoldGradientBorder>
                     <div className="px-4 py-3 flex items-center gap-3">
                       <div className="relative flex-shrink-0">
@@ -429,12 +451,12 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-black uppercase tracking-widest text-green-400">Treinando Agora</div>
                         <div className="text-[11px] text-neutral-400 truncate">
-                          {onlineFriendProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
-                          {onlineFriends.length > 3 && ` +${onlineFriends.length - 3}`}
+                          {trainingNowProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
+                          {trainingNowIds.length > 3 && ` +${trainingNowIds.length - 3}`}
                         </div>
                       </div>
                       <div className="flex -space-x-2">
-                        {onlineFriendProfiles.slice(0, 4).map((p) => (
+                        {trainingNowProfiles.slice(0, 4).map((p) => (
                           <Avatar key={p.id} photo={p.photo_url} name={safeString(p.display_name)} size={28} />
                         ))}
                       </div>
@@ -476,7 +498,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   <GoldGradientBorder>
                     <div>
                       {(feedItems as unknown as FeedItem[]).map((item) => (
-                        <FeedCard key={item.id} item={item} onProfileClick={(id) => setProfileModalUserId(id)} />
+                        <FeedCard key={item.id} item={item} presence={presenceOf(String((item as { senderId?: string }).senderId || ''))} onProfileClick={handleProfileClick} />
                       ))}
                       {feedHasMore && (
                         <button

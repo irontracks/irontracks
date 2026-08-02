@@ -8,9 +8,28 @@
  */
 import { estimateCaloriesMet } from './metEstimate'
 import { estimateCardioKcal } from './cardioKcal'
+import { isCardioExercise } from '@/utils/exercise/isCardio'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
+
+/**
+ * Houve musculação de verdade na sessão? (log com peso ou reps num exercício que
+ * NÃO é cardio). É o que distingue "sessão que é só a aula" de "sessão de
+ * musculação com uma aula lançada junto".
+ */
+function hasNonCardioWork(session: Record<string, unknown>, logs: Record<string, unknown>): boolean {
+  const exercises = Array.isArray(session.exercises) ? (session.exercises as unknown[]) : []
+  return Object.entries(logs).some(([key, log]) => {
+    const exIdx = Number(String(key).split('-')[0])
+    if (!Number.isFinite(exIdx)) return false
+    if (isCardioExercise(exercises[exIdx])) return false
+    if (!isRecord(log)) return false
+    const w = Number(String(log.weight ?? '').replace(',', '.'))
+    const r = Number(String(log.reps ?? '').replace(',', '.'))
+    return (Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)
+  })
+}
 
 export interface SessionKcalOpts {
   bodyWeightKg?: number | null
@@ -82,9 +101,25 @@ export function estimateSessionKcalBreakdown(session: unknown, opts: SessionKcal
 
   // Modelo de força cobre só o tempo NÃO-cardio (senão o tempo de cardio contaria
   // duas vezes: como leve aqui e como modalidade no cardio).
+  //
+  // ⚠️ O desconto pressupõe que o cardio aconteceu DENTRO da sessão cronometrada.
+  // Quando não acontece — aula externa (FitDance, spinning) lançada no treino —,
+  // o tempo declarado do cardio pode passar da duração registrada e a subtração
+  // zerava TODA a musculação: caso real de 27/07/2026, sessão de 51 min com uma
+  // aula de 60 min, 9 de 10 exercícios com 0 kcal. Se o cardio não cabe na
+  // duração registrada, ele não aconteceu dentro dela — o cronômetro mediu só a
+  // musculação. Então a força fica com a sessão inteira e o cardio soma por fora.
   const totalMin = totalTimeSeconds / 60
-  const strengthMin = Math.max(0, totalMin - cardio.cardioMinutes)
-  const strengthExecMin = execSec > 0 ? Math.max(0, execSec / 60 - cardio.cardioMinutes) : null
+  const cardioFitsInSession = cardio.cardioMinutes > 0 && cardio.cardioMinutes < totalMin
+  // Sem musculação registrada, a sessão É o cardio → desconta normal (força zera).
+  const discountCardioTime = cardioFitsInSession || !hasNonCardioWork(sessionObj, sessionLogs)
+
+  const strengthMin = discountCardioTime
+    ? Math.max(0, totalMin - cardio.cardioMinutes)
+    : totalMin
+  const strengthExecMin = execSec > 0
+    ? (discountCardioTime ? Math.max(0, execSec / 60 - cardio.cardioMinutes) : execSec / 60)
+    : null
 
   const strengthKcal = strengthMin > 0
     ? estimateCaloriesMet(

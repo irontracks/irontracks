@@ -2,8 +2,16 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+
+/**
+ * Mini-sets assumidos quando o exercício está marcado como Rest-Pause mas chegou
+ * sem configuração. Mesmo valor que o editor grava por padrão — os dois precisam
+ * concordar, senão o card mostra uma quantidade e o plano diz outra.
+ */
+const DEFAULT_MINI_SETS = 2;
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
@@ -12,6 +20,8 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const RestPauseSetInner = ({
   ex, exIdx, setIdx, sstOverride,
@@ -40,6 +50,7 @@ const RestPauseSetInner = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
 
   // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
   function useLocalField(external: string, onSave: (v: string) => void) {
@@ -101,7 +112,13 @@ const RestPauseSetInner = ({
       const fromLog = Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0)
       if (fromLog > 0) return fromLog
       // If mini_reps are already saved in the log, use their count
-      return minisArrRaw.length
+      if (minisArrRaw.length) return minisArrRaw.length
+      // Último recurso: o método é Rest-Pause mas o exercício veio SEM configuração
+      // (treino antigo, ou montado antes de o dropdown de método criar as etapas).
+      // Cair em 0 deixava o card sem nenhum mini-set: a pessoa via o método marcado
+      // e nada para preencher, tendo de configurar do zero em todo treino. Dois é o
+      // mesmo default que o editor usa. (queixa do dono, 30/07)
+      return DEFAULT_MINI_SETS
     })()
 
   const minis: Array<number | null> = Array.from({ length: miniSets }).map((_, idx) => {
@@ -141,6 +158,7 @@ const RestPauseSetInner = ({
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -169,7 +187,8 @@ const RestPauseSetInner = ({
                 onFocus={weightField.onFocus}
                 onBlur={weightField.onBlur}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <button
                 type="button"
@@ -204,6 +223,7 @@ const RestPauseSetInner = ({
                 <Pencil size={14} />
                 <span className="text-xs font-black hidden sm:inline">Abrir</span>
               </button>
+              <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
               <button
                 type="button"
                 onClick={() => toggleNotes(key)}
@@ -215,7 +235,10 @@ const RestPauseSetInner = ({
                 <MessageSquare size={12} />
               </button>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {/* Botão AO LADO, nunca embaixo. Era `flex-col sm:flex-row`: no celular
+                empilhava e o Concluir descia pra uma linha própria, destoando dos
+                demais métodos (reportado pelo dono). */}
+            <div className="flex flex-row items-center gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
                   {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
@@ -253,8 +276,8 @@ const RestPauseSetInner = ({
                 }}
                 className={
                   canDone
-                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
-                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed sm:w-auto'
+                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 shrink-0'
+                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed shrink-0'
                 }
               >
                 <Check size={16} />
@@ -265,6 +288,7 @@ const RestPauseSetInner = ({
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps de todos os mini-sets no modal para concluir.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

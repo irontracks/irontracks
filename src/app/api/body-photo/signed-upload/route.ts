@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
@@ -65,8 +66,10 @@ export async function POST(request: Request) {
         if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
         const assessedUserId = String((assessment as { user_id?: string }).user_id || '')
-        const trainerId = (assessment as { trainer_id?: string | null }).trainer_id || null
-        if (userId !== assessedUserId && userId !== trainerId) {
+        // Gate por VÍNCULO REAL (canCoachStudent), não por trainer_id da linha —
+        // auto-declarável por quem cria a avaliação. Aqui importa duas vezes: além
+        // de ler, esta rota ESCREVE foto sob o prefixo do avaliado no bucket.
+        if (userId !== assessedUserId && !(await canCoachStudent({ id: userId, email: auth.user.email }, assessedUserId))) {
             return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
         }
 

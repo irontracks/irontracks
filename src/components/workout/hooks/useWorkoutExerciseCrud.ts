@@ -4,7 +4,10 @@ import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types'
 import { isObject } from '../utils';
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { editedSetDetails, stripMethodBlobs } from '../helpers/editedSetDetails';
+import { canonicalEditorMethod } from '../helpers/editorMethod';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
+import { persistWorkoutPlan } from '@/utils/workout/persistWorkoutPlan';
 import {
   tagExercisesForEdit,
   reconcileEditedExercises,
@@ -102,6 +105,32 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     });
   };
 
+  /**
+   * Pergunta se a mudança de séries vale só para HOJE ou também para o plano.
+   *
+   * Antes, adicionar/remover série mexia só na sessão e o plano nunca mudava —
+   * quem ajustava o treino de verdade tinha que repetir o ajuste toda semana, sem
+   * nenhuma pista de que aquilo era temporário.
+   *
+   * "Só neste treino" é o botão em DESTAQUE (padrão seguro escolhido pelo dono):
+   * alterar o plano é irreversível pela tela do treino ativo, então exige uma
+   * escolha consciente. Sem o persistidor disponível, não pergunta nada — não faz
+   * sentido oferecer uma opção que não dá pra cumprir.
+   */
+  const askPersistSetChange = async (kind: 'add' | 'remove', nextWorkout: UnknownRecord) => {
+    if (typeof onPersistWorkoutTemplate !== 'function') return;
+    try {
+      const onlyToday = await confirm(
+        kind === 'add'
+          ? 'Salvar esta série a mais só neste treino, ou também no plano (vale para os próximos)?'
+          : 'Remover esta série só neste treino, ou também do plano (vale para os próximos)?',
+        kind === 'add' ? 'Série adicionada' : 'Série removida',
+        { confirmText: 'Só neste treino', cancelText: 'Salvar no plano' },
+      );
+      if (!onlyToday) onPersistWorkoutTemplate(nextWorkout);
+    } catch { /* diálogo indisponível → mantém só na sessão (o padrão seguro) */ }
+  };
+
   const addExtraSetToExercise = async (exIdx: unknown) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
@@ -140,6 +169,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         if (next.has(idx)) next.delete(idx);
         return next;
       });
+      await askPersistSetChange('add', { ...workout, exercises: nextExercises });
     } catch (e: unknown) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
@@ -178,6 +208,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       } catch { }
 
       onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      await askPersistSetChange('remove', { ...workout, exercises: nextExercises });
     } catch (e: unknown) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
@@ -199,7 +230,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const setsCount = Math.max(setsHeader, Array.isArray(sdArrRaw) ? sdArrRaw.length : 0) || 1;
       const restTimeNum = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
       const restTime = typeof restTimeNum === 'number' && Number.isFinite(restTimeNum) && restTimeNum > 0 ? restTimeNum : DEFAULT_EXTRA_EXERCISE_REST_TIME_S;
-      const method = String(ex?.method || 'Normal').trim() || 'Normal';
+      // Normaliza a grafia pro valor do dropdown (ex.: "Drop-Set" → "Drop-set"),
+      // senão o <select> não casa e mostra "Normal" (e salvar perderia o método).
+      const method = canonicalEditorMethod(ex?.method);
       const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
       const sideRestTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time);
       const sideRestTime = typeof sideRestTimeNum === 'number' && sideRestTimeNum > 0 ? String(sideRestTimeNum) : '';
@@ -249,18 +282,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
       const previousSetsCount = Math.max(setsHeader, sdArr.length);
 
-      const nextSetDetails: WorkoutSetDetail[] = [];
-      for (let i = 0; i < desiredSets; i += 1) {
-        const current = sdArr[i];
-        const currentObj = current && typeof current === 'object' ? (current as UnknownRecord) : null;
-        const setNumber = i + 1;
-        if (currentObj) {
-          const nextSetNumber = Number(currentObj.set_number ?? currentObj.setNumber ?? setNumber) || setNumber;
-          nextSetDetails.push({ ...currentObj, set_number: nextSetNumber });
-        } else {
-          nextSetDetails.push({ set_number: setNumber, weight: null, reps: '', rpe: null, notes: null, is_warmup: false, advanced_config: null });
-        }
-      }
+      // Troca de método limpa a config antiga (mata o método fantasma); série nova
+      // com método inalterado herda o advanced_config. Ver helpers/editedSetDetails.
+      const prevMethod = String(exRaw?.method || 'Normal').trim() || 'Normal';
+      const nextSetDetails = editedSetDetails(sdArr, desiredSets, method !== prevMethod) as WorkoutSetDetail[];
 
       nextExercises[idx] = {
         ...exRaw,
@@ -280,6 +305,14 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
           try {
             delete nextLogs[`${idx}-${i}`];
           } catch { }
+        }
+      }
+      // Troca de método: tira os blobs de método já EXECUTADOS dos logs sobreviventes
+      // (senão o método antigo persiste no render mesmo após uma série feita).
+      if (method !== prevMethod) {
+        for (let i = 0; i < desiredSets; i += 1) {
+          const lk = `${idx}-${i}`;
+          if (lk in nextLogs) nextLogs[lk] = stripMethodBlobs(nextLogs[lk]);
         }
       }
 
@@ -381,14 +414,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         nextLogs[`${remap.get(exI)}${k.slice(dash)}`] = v;
       }
       const payload = { ...workout, exercises: orderedExercises };
-      const response = await fetch('/api/workouts/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: workoutId, workout: payload }),
-      }).catch((): null => null);
-      const result = response ? await response.json().catch((): null => null) : null;
-      if (!response || !response.ok || !result?.ok) {
-        setOrganizeError(String(result?.error || 'Falha ao salvar a ordem.'));
+      const saved = await persistWorkoutPlan(workoutId, payload, { deferNotify: true });
+      if (!saved.ok) {
+        setOrganizeError(saved.error || 'Falha ao salvar a ordem.');
         setOrganizeSaving(false);
         return;
       }
@@ -460,19 +488,12 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         try { await alert('Não foi possível salvar: treino sem ID.'); } catch { }
         return;
       }
-      try {
-        const response = await fetch('/api/workouts/update', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
-        }).catch((): null => null);
-        const result = response ? await response.json().catch((): null => null) : null;
-        if (!response?.ok || !(result as Record<string, unknown>)?.ok) {
-          try { await alert(String((result as Record<string, unknown>)?.error || 'Falha ao salvar no plano.')); } catch { }
-        }
-      } catch (e: unknown) {
-        const msg = isObject(e) && typeof e.message === 'string' ? e.message : 'Falha ao salvar no plano.';
-        try { await alert(msg); } catch { }
+      // persistWorkoutPlan invalida a lista de treinos ao confirmar. Sem isso, o
+      // exercício removido continuava aparecendo até reiniciar o app (bug real,
+      // reportado em ago/2026 justamente com um exercício apagado no treino ativo).
+      const saved = await persistWorkoutPlan(workoutId, { ...workout, exercises: nextExercises }, { deferNotify: true });
+      if (!saved.ok) {
+        try { await alert(saved.error || 'Falha ao salvar no plano.'); } catch { }
       }
     }
   };
@@ -548,17 +569,8 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     if (persist) {
       const workoutId = String(workout?.id ?? (workout as UnknownRecord)?.workout_id ?? '').trim();
       if (workoutId) {
-        try {
-          const response = await fetch('/api/workouts/update', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
-          }).catch((): null => null);
-          const result = response ? await response.json().catch((): null => null) : null;
-          if (!response?.ok || !(result as UnknownRecord)?.ok) {
-            try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
-          }
-        } catch {
+        const saved = await persistWorkoutPlan(workoutId, { ...workout, exercises: nextExercises }, { deferNotify: true });
+        if (!saved.ok) {
           try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
         }
       }

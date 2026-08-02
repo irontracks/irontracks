@@ -69,6 +69,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // Photos
         CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
+        // PDF export (relatório de treino / plano)
+        CAPPluginMethod(name: "sharePdfFromHtml", returnType: CAPPluginReturnPromise),
         // Voice
         CAPPluginMethod(name: "requestVoicePermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startSpeechRecognition", returnType: CAPPluginReturnCallback),
@@ -85,6 +87,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // Workout Live Activity (session-level — exercise / set / volume / elapsed)
         CAPPluginMethod(name: "startWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateWorkoutRestCountdown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         // App Intents (Siri shortcuts) — read pending action triggered by intent
         CAPPluginMethod(name: "checkPendingIntentAction", returnType: CAPPluginReturnPromise),
@@ -93,6 +96,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         CAPPluginMethod(name: "stopGymGeofence", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkGeofenceStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestAlwaysLocationPermission", returnType: CAPPluginReturnPromise),
+        // Cardio GPS — continuous background location for run/bike tracking.
+        // CLLocationManager nativo (background updates + buffer) resolve o congelamento
+        // do @capacitor/geolocation quando o WebView é suspenso (tela bloqueada/bolso).
+        CAPPluginMethod(name: "startCardioLocation", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCardioLocation", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "drainCardioLocations", returnType: CAPPluginReturnPromise),
         // BGTaskScheduler — schedule next opportunistic refresh / sync
         CAPPluginMethod(name: "scheduleBackgroundTasks", returnType: CAPPluginReturnPromise),
         // App Shortcuts — push the user's recent workouts so AppEntity.suggestedEntities()
@@ -137,6 +146,26 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
     private var pendingAlwaysAuthCall: CAPPluginCall?
     /// Throttle: don't fire more than one geofence notification per N seconds.
     private var lastGeofenceFireMs: Double = 0
+
+    // ── Cardio GPS state (continuous background tracking) ────────────────────
+    /// DEDICATED manager (separate from the geofence one) so cardio's aggressive
+    /// settings (best accuracy, background updates, no distance filter) never
+    /// touch the geofence region monitoring. Distinguished in didUpdateLocations
+    /// by `manager === cardioLocationManager`.
+    private lazy var cardioLocationManager: CLLocationManager = {
+        let m = CLLocationManager()
+        m.delegate = self
+        return m
+    }()
+    /// True between startCardioLocation and stopCardioLocation.
+    private var cardioActive = false
+    /// Fixes captured natively, waiting for JS to drain. The native layer keeps
+    /// receiving them even while the WebView JS is suspended (background mode),
+    /// so nothing is lost — JS drains the backlog on resume.
+    private var cardioBuffer: [[String: Any]] = []
+    /// Serialises buffer access between the CLLocationManager delegate (main) and
+    /// the Capacitor call threads (drain/stop).
+    private let cardioQueue = DispatchQueue(label: "com.irontracks.cardioLocation")
 
     // ── Live Activity push tokens (captured at start, updated on rotation) ───
     /// Keyed by activity-kind so JS can correlate when sending to the backend.
@@ -403,7 +432,22 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             options: []
         )
 
-        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory])
+        // Categoria "aluno iniciou o treino" (só professor): botão "Assumir treino".
+        // .foreground abre o app; o JS (usePushNotifications) dispara o request de controle
+        // usando o studentId do payload. O push carrega category=TEACHER_ASSUME_CONTROL.
+        let assumeControlAction = UNNotificationAction(
+            identifier: "ASSUME_CONTROL",
+            title: "Assumir treino",
+            options: [.foreground]
+        )
+        let assumeControlCategory = UNNotificationCategory(
+            identifier: "TEACHER_ASSUME_CONTROL",
+            actions: [assumeControlAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory, assumeControlCategory])
         call.resolve()
     }
 
@@ -527,8 +571,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     isFinished: false
                 )
                 do {
-                    // staleDate = 5 minutes after timer ends — generous window so the
-                    // finished state remains visible even if the app is slow to update.
+                    // staleDate = 5 min após o fim do descanso — janela generosa pra a
+                    // Live Activity não sumir/congelar assim que o timer zera. A transição
+                    // pra "Hora de Treinar" no fim vem do push do servidor (api/rest/fire,
+                    // formato de data corrigido) + a auto-cura do widget (endDate <= Date()).
                     let staleDate = endDate.addingTimeInterval(300)
                     let content = ActivityContent(state: state, staleDate: staleDate)
                     // pushType: .token = ask APNs to issue a push token so the backend
@@ -541,8 +587,15 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     self.observePushToken(activity: activity, kind: "rest")
                     call.resolve(["activityId": activity.id])
                 } catch {
+                    // O motivo TEM que subir pro JS. Antes ele morria neste print e o
+                    // JS recebia sucesso com id vazio — a Live Activity podia estar
+                    // quebrada pra todo mundo sem um registro em lugar nenhum.
                     print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
-                    call.resolve(["activityId": ""])
+                    call.resolve([
+                        "activityId": "",
+                        "error": error.localizedDescription,
+                        "activitiesEnabled": ActivityAuthorizationInfo().areActivitiesEnabled,
+                    ])
                     return
                 }
 
@@ -563,14 +616,29 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                         targetSeconds: capturedSeconds,
                         isFinished: true
                     )
-                    // Keep the finished state visible for 5 minutes
+                    // Mostra o estado "Hora de Treinar!" por uma janela curta (staleDate) —
+                    // depois a Live Activity é DISPENSADA (abaixo), não fica pendurada.
                     let finishedContent = ActivityContent(
                         state: finishedState,
-                        staleDate: Date().addingTimeInterval(300)
+                        staleDate: Date().addingTimeInterval(120)
                     )
                     for activity in Activity<RestTimerAttributes>.activities
                         where activity.attributes.timerID == capturedId {
                         await activity.update(finishedContent)
+                    }
+
+                    // Auto-dispensa: depois de uma folga curta, encerra a Live Activity do
+                    // descanso pra ela NÃO ficar congelada/travada na Dynamic Island e no
+                    // Lock Screen (o bug: aos ~5 min ela virava "stale" e congelava lá pra
+                    // sempre). Se o usuário iniciar a próxima série, endRestLiveActivity já
+                    // cancela esta task antes. Como é Task.sleep (wall-clock), isso também
+                    // dispara ao voltar do background: o app suspenso resume a task e limpa
+                    // a atividade em vez de deixá-la pendurada.
+                    try? await Task.sleep(nanoseconds: 90 * 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    for activity in Activity<RestTimerAttributes>.activities
+                        where activity.attributes.timerID == capturedId {
+                        await activity.end(dismissalPolicy: .immediate)
                     }
                 }
             }
@@ -601,9 +669,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                 targetSeconds: targetSeconds,
                 isFinished: isFinished
             )
-            // When finished: keep visible for 5 min. When running: end of timer + 5 min.
+            // Rodando: staleDate = 5 min após o fim (janela generosa pra não sumir cedo);
+            // a transição pra "Hora de Treinar" vem do push do servidor + auto-cura do
+            // widget (endDate <= Date()). Finalizado: janela curta antes do auto-dismiss.
             let staleDate = isFinished
-                ? Date().addingTimeInterval(300)
+                ? Date().addingTimeInterval(120)
                 : endDate.addingTimeInterval(300)
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
@@ -688,7 +758,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     currentSetIndex: setIndex,
                     totalSetsForExercise: setsForEx,
                     totalSetsCompleted: setsCompleted,
-                    totalVolumeKg: totalVolumeKg
+                    totalVolumeKg: totalVolumeKg,
+                    restEndDate: nil
                 )
                 // staleDate = 12 h after start (safety cap; far longer than any workout)
                 let staleDate = startDate.addingTimeInterval(12 * 3600)
@@ -703,8 +774,13 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     self.observeWorkoutPushToken(activity: activity, kind: "workout")
                     call.resolve(["activityId": activity.id])
                 } catch {
+                    // Mesmo motivo do rest: sem isto, a falha é invisível em produção.
                     print("[IronTracks] Workout LA start failed: \(error.localizedDescription)")
-                    call.resolve(["activityId": ""])
+                    call.resolve([
+                        "activityId": "",
+                        "error": error.localizedDescription,
+                        "activitiesEnabled": ActivityAuthorizationInfo().areActivitiesEnabled,
+                    ])
                 }
             }
         } else {
@@ -720,18 +796,50 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             let setsCompleted = call.getInt("totalSetsCompleted") ?? 0
             let totalVolumeKg = call.getDouble("totalVolumeKg") ?? 0.0
 
+            // PRESERVA o restEndDate atual: o snapshot do treino (exercício/série/volume)
+            // não pode apagar o countdown de descanso em andamento. Quem mexe no descanso
+            // é o updateWorkoutRestCountdown.
+            let currentRestEnd = Activity<WorkoutLiveActivityAttributes>.activities.first?.content.state.restEndDate
             let state = WorkoutLiveActivityAttributes.ContentState(
                 currentExerciseName: exerciseName,
                 currentSetIndex: setIndex,
                 totalSetsForExercise: setsForEx,
                 totalSetsCompleted: setsCompleted,
-                totalVolumeKg: totalVolumeKg
+                totalVolumeKg: totalVolumeKg,
+                restEndDate: currentRestEnd
             )
             let staleDate = Date().addingTimeInterval(12 * 3600)
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
                 for activity in Activity<WorkoutLiveActivityAttributes>.activities {
                     await activity.update(content)
+                }
+            }
+            call.resolve()
+        } else {
+            call.resolve()
+        }
+    }
+
+    // Liga/desliga o countdown de descanso na ilha do TREINO. Só mexe no restEndDate,
+    // PRESERVANDO os campos de progresso (exercício/série/volume) do estado atual —
+    // senão zeraria o treino. restEndMs=0 → limpa (volta o ícone).
+    @objc func updateWorkoutRestCountdown(_ call: CAPPluginCall) {
+        if #available(iOS 16.2, *) {
+            let restEndMs = call.getDouble("restEndMs") ?? 0
+            let restEnd: Date? = restEndMs > 0 ? Date(timeIntervalSince1970: restEndMs / 1000.0) : nil
+            Task {
+                for activity in Activity<WorkoutLiveActivityAttributes>.activities {
+                    let cur = activity.content.state
+                    let next = WorkoutLiveActivityAttributes.ContentState(
+                        currentExerciseName: cur.currentExerciseName,
+                        currentSetIndex: cur.currentSetIndex,
+                        totalSetsForExercise: cur.totalSetsForExercise,
+                        totalSetsCompleted: cur.totalSetsCompleted,
+                        totalVolumeKg: cur.totalVolumeKg,
+                        restEndDate: restEnd
+                    )
+                    await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
                 }
             }
             call.resolve()
@@ -1240,6 +1348,106 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         ])
     }
 
+    // ─── Cardio GPS — continuous background location ─────────────────────────
+    //
+    // O @capacitor/geolocation entrega posição via callback JS: quando o iOS
+    // suspende o WebView (tela bloqueada, celular no bolso), o callback para e a
+    // distância congela. Aqui o CLLocationManager nativo mantém `startUpdatingLocation`
+    // rodando em background (UIBackgroundModes: location + allowsBackgroundLocationUpdates),
+    // BUFFERIZA os fixes nativamente e o JS drena o backlog no resume — nada se perde.
+
+    private func cardioAuthString(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways:    return "authorizedAlways"
+        case .authorizedWhenInUse: return "authorizedWhenInUse"
+        case .denied:              return "denied"
+        case .restricted:          return "restricted"
+        case .notDetermined:       return "notDetermined"
+        @unknown default:          return "unknown"
+        }
+    }
+
+    @objc func startCardioLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let mgr = self.cardioLocationManager
+            let status = mgr.authorizationStatus
+            if status == .denied || status == .restricted {
+                call.resolve(["ok": false, "authorization": self.cardioAuthString(status)])
+                return
+            }
+            if status == .notDetermined {
+                // WhenInUse basta pra background updates quando o modo 'location' está
+                // declarado no Info.plist e as updates começam em foreground (é o caso).
+                mgr.requestWhenInUseAuthorization()
+            }
+            mgr.desiredAccuracy = kCLLocationAccuracyBest
+            mgr.distanceFilter = kCLDistanceFilterNone
+            mgr.activityType = .fitness
+            mgr.pausesLocationUpdatesAutomatically = false
+            // Só ativa background updates se o modo estiver declarado — senão o iOS
+            // lança exceção. O Info.plist do IronTracks tem UIBackgroundModes: location.
+            mgr.allowsBackgroundLocationUpdates = true
+            if #available(iOS 11.0, *) {
+                mgr.showsBackgroundLocationIndicator = true
+            }
+            self.cardioQueue.sync { self.cardioBuffer.removeAll() }
+            self.cardioActive = true
+            mgr.startUpdatingLocation()
+            call.resolve(["ok": true, "authorization": self.cardioAuthString(mgr.authorizationStatus)])
+        }
+    }
+
+    @objc func stopCardioLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.cardioActive = false
+            self.cardioLocationManager.stopUpdatingLocation()
+            self.cardioLocationManager.allowsBackgroundLocationUpdates = false
+            let remaining: [[String: Any]] = self.cardioQueue.sync {
+                let b = self.cardioBuffer
+                self.cardioBuffer.removeAll()
+                return b
+            }
+            call.resolve(["points": remaining])
+        }
+    }
+
+    @objc func drainCardioLocations(_ call: CAPPluginCall) {
+        let drained: [[String: Any]] = cardioQueue.sync {
+            let b = self.cardioBuffer
+            self.cardioBuffer.removeAll()
+            return b
+        }
+        call.resolve(["points": drained])
+    }
+
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // Só o manager do cardio — o geofence não chama startUpdatingLocation.
+        guard manager == cardioLocationManager, cardioActive else { return }
+        var toAppend: [[String: Any]] = []
+        for loc in locations {
+            // Precisão negativa = fix inválido; descarta.
+            if loc.horizontalAccuracy < 0 { continue }
+            toAppend.append([
+                "lat": loc.coordinate.latitude,
+                "lng": loc.coordinate.longitude,
+                "accuracy": loc.horizontalAccuracy,
+                "altitude": loc.altitude,
+                "speed": loc.speed,       // m/s (-1 se indisponível)
+                "heading": loc.course,    // graus (-1 se indisponível)
+                "timestamp": loc.timestamp.timeIntervalSince1970 * 1000,
+            ])
+        }
+        if toAppend.isEmpty { return }
+        cardioQueue.sync {
+            cardioBuffer.append(contentsOf: toAppend)
+            // Teto de segurança: uma corrida de 2h a 1Hz ~ 7200 pontos. 12000 dá folga
+            // e evita crescimento ilimitado se o JS parar de drenar.
+            if cardioBuffer.count > 12000 {
+                cardioBuffer.removeFirst(cardioBuffer.count - 12000)
+            }
+        }
+    }
+
     // ─── BGTaskScheduler — schedule next refresh / sync (Feature 15) ─────────
 
     @objc func scheduleBackgroundTasks(_ call: CAPPluginCall) {
@@ -1317,6 +1525,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         DispatchQueue.main.async {
             self.alarmPlayer?.stop()
             self.alarmPlayer = nil
+            // Libera o canal de áudio pros outros apps (YouTube Music / Spotify)
+            // retomarem sozinhos — sem isto o app segurava o foco depois do alarme
+            // e a música só voltava no play manual.
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             call.resolve()
         }
     }
@@ -1680,6 +1892,76 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             }) { success, error in
                 call.resolve(["saved": success, "error": error?.localizedDescription ?? ""])
             }
+        }
+    }
+
+    // ─── PDF export ───────────────────────────────────────────────────────────
+    //
+    // Sintoma que originou isto (jul/2026): no iPhone, "salvar PDF" do relatório
+    // salvava a TELA DO APP em vez do relatório. Causa: no WKWebView não existe
+    // `window.print()`, e o share sheet do iOS recusa arquivos `text/html`
+    // (`navigator.canShare({files})` devolve false). O JS caía então no fallback
+    // de compartilhar uma `blob:` URL — que o iOS não resolve, então o share
+    // pegava a página atual da WebView.
+    //
+    // Aqui o HTML vira um PDF de verdade e vai pro share sheet como
+    // `application/pdf`, tipo que o iOS aceita. O JS SEMPRE precisa checar se
+    // este método existe antes de chamar: builds antigos não o têm e a chamada
+    // vira "plugin is not implemented on ios".
+    @objc func sharePdfFromHtml(_ call: CAPPluginCall) {
+        guard let html = call.getString("html"), !html.isEmpty else {
+            call.reject("html is required"); return
+        }
+        let rawName = call.getString("fileName") ?? "IronTracks.pdf"
+        let fileName = rawName.hasSuffix(".pdf") ? rawName : rawName + ".pdf"
+
+        DispatchQueue.main.async {
+            let formatter = UIMarkupTextPrintFormatter(markupText: html)
+            let renderer = UIPrintPageRenderer()
+            renderer.addPrintFormatter(formatter, startingAtPageAt: 0)
+
+            // A4 a 72dpi + margem de 24pt. `paperRect`/`printableRect` só são
+            // acessíveis por KVC — é o caminho padrão para renderizar fora de
+            // uma sessão de impressão real.
+            let paper = CGRect(x: 0, y: 0, width: 595.2, height: 841.8)
+            renderer.setValue(paper, forKey: "paperRect")
+            renderer.setValue(paper.insetBy(dx: 24, dy: 24), forKey: "printableRect")
+
+            let data = NSMutableData()
+            UIGraphicsBeginPDFContextToData(data, paper, nil)
+            for page in 0..<renderer.numberOfPages {
+                UIGraphicsBeginPDFPage()
+                renderer.drawPage(at: page, in: UIGraphicsGetPDFContextBounds())
+            }
+            UIGraphicsEndPDFContext()
+
+            guard data.length > 0 else {
+                call.resolve(["shared": false, "error": "empty_pdf"]); return
+            }
+
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                call.resolve(["shared": false, "error": error.localizedDescription]); return
+            }
+
+            guard let viewController = self.bridge?.viewController else {
+                call.resolve(["shared": false, "error": "no_view_controller"]); return
+            }
+            let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            // No iPad, apresentar sem âncora derruba o app.
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = viewController.view
+                popover.sourceRect = CGRect(x: viewController.view.bounds.midX,
+                                            y: viewController.view.bounds.midY,
+                                            width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            sheet.completionWithItemsHandler = { _, completed, _, error in
+                call.resolve(["shared": completed, "error": error?.localizedDescription ?? ""])
+            }
+            viewController.present(sheet, animated: true)
         }
     }
 

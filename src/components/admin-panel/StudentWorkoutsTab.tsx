@@ -2,16 +2,22 @@
 
 import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine } from 'lucide-react';
+import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine, Users, CalendarRange } from 'lucide-react';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
 import { apiAdmin } from '@/lib/api';
 import { safeEmailLike } from '@/utils/safePgFilter';
+import { ApplyWorkoutToStudentsModal } from './ApplyWorkoutToStudentsModal';
+import { eligibleStudentsForApply } from '@/lib/admin/eligibleStudents';
 
 const WorkoutWizardModal = dynamic(
     () => import('@/components/dashboard/WorkoutWizardModal'),
+    { ssr: false }
+);
+const PeriodizationModal = dynamic(
+    () => import('./PeriodizationModal').then(m => ({ default: m.PeriodizationModal })),
     { ssr: false }
 );
 
@@ -32,6 +38,9 @@ export const StudentWorkoutsTab: React.FC = () => {
         setViewWorkout,
         openEditWorkout,
         handleAddTemplateToStudent,
+        usersList,
+        applyManyTemplate, setApplyManyTemplate,
+        handleApplyTemplateToStudents,
         // Wizard / create
         wizardOpen, setWizardOpen,
         toolsPanelOpen, setToolsPanelOpen,
@@ -46,6 +55,7 @@ export const StudentWorkoutsTab: React.FC = () => {
     const toolsRef = useRef<HTMLDivElement>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
+    const [periodizationOpen, setPeriodizationOpen] = useState(false);
 
     if (!selectedStudent) return null;
 
@@ -99,6 +109,14 @@ export const StudentWorkoutsTab: React.FC = () => {
                             className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
                         >
                             <History size={16} /> Histórico
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setPeriodizationOpen(true)}
+                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
+                        >
+                            <CalendarRange size={16} /> Periodização
                         </button>
 
                         {/* Create workout — dropdown trigger */}
@@ -399,20 +417,49 @@ export const StudentWorkoutsTab: React.FC = () => {
             ))}
 
             {/* My templates */}
-            <div className="mt-6">
+            <div className="mt-6 space-y-2">
                 <h3 className="font-bold text-yellow-500 text-xs uppercase tracking-widest mb-2">Meus Treinos</h3>
                 {templates.length === 0 && <p className="text-neutral-400 text-sm">Nenhum treino seu encontrado.</p>}
                 {templates.map((t, idx) => (
-                    <button
+                    <div
                         key={String(t.id ?? t.name ?? `idx:${idx}`)}
-                        onClick={() => handleAddTemplateToStudent(t)}
-                        className="w-full text-left p-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl border border-neutral-700 flex justify-between group"
+                        className="w-full p-3 bg-neutral-800 rounded-xl border border-neutral-700 flex items-center justify-between gap-2"
                     >
-                        <span>{String(t.name ?? '')}</span>
-                        <Plus className="text-neutral-400 group-hover:text-yellow-500" />
-                    </button>
+                        <span className="min-w-0 flex-1 truncate text-white">{String(t.name ?? '')}</span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                                onClick={() => handleAddTemplateToStudent(t)}
+                                title={`Aplicar a ${selectedStudent.name || 'este aluno'}`}
+                                aria-label="Aplicar a este aluno"
+                                className="p-2 hover:bg-neutral-700 rounded-lg text-neutral-400 hover:text-yellow-500 transition-colors"
+                            >
+                                <Plus size={16} />
+                            </button>
+                            <button
+                                onClick={() => setApplyManyTemplate(t)}
+                                title="Aplicar a vários alunos"
+                                aria-label="Aplicar a vários alunos"
+                                className="p-2 hover:bg-neutral-700 rounded-lg text-neutral-400 hover:text-yellow-500 transition-colors"
+                            >
+                                <Users size={16} />
+                            </button>
+                        </div>
+                    </div>
                 ))}
             </div>
+
+            {applyManyTemplate && (
+                <ApplyWorkoutToStudentsModal
+                    workoutName={String(applyManyTemplate.name || 'Treino')}
+                    students={eligibleStudentsForApply(usersList, user?.id)}
+                    onClose={() => setApplyManyTemplate(null)}
+                    onApply={(ids) => handleApplyTemplateToStudents(applyManyTemplate, ids)}
+                />
+            )}
+
+            {periodizationOpen && (
+                <PeriodizationModal onClose={() => setPeriodizationOpen(false)} />
+            )}
         </div>
     );
 };

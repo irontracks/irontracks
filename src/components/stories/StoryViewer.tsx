@@ -24,23 +24,6 @@ const initials = (name: string) => {
   return n.slice(0, 1).toUpperCase()
 }
 
-const formatTime = (iso: string): string => {
-  const d = new Date(iso)
-  if (!Number.isFinite(d.getTime())) return ''
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
-
-const formatDate = (iso: string): string => {
-  const d = new Date(iso)
-  if (!Number.isFinite(d.getTime())) return ''
-  const now = new Date()
-  const isToday = d.toDateString() === now.toDateString()
-  const isYesterday = new Date(now.setDate(now.getDate() - 1)).toDateString() === d.toDateString()
-  if (isToday) return 'Hoje'
-  if (isYesterday) return 'Ontem'
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-}
-
 const formatAgo = (iso: string) => {
   const ms = new Date(iso).getTime()
   if (!Number.isFinite(ms)) return ''
@@ -70,6 +53,10 @@ interface StoryViewerProps {
   onClose: () => void
   onStoryUpdated: (storyId: string, patch: Partial<Story>) => void
   onStoryDeleted: (storyId: string) => void
+  /** Pula pro PRÓXIMO usuário (estilo Instagram). Retorna true se avançou; false se era o último. */
+  onNextUser?: () => boolean
+  /** Volta pro usuário ANTERIOR. Retorna true se voltou; false se era o primeiro. */
+  onPrevUser?: () => boolean
 }
 
 export default function StoryViewer({
@@ -78,6 +65,8 @@ export default function StoryViewer({
   onClose,
   onStoryUpdated,
   onStoryDeleted,
+  onNextUser,
+  onPrevUser,
 }: StoryViewerProps) {
   const { confirm, alert } = useDialog()
   const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
@@ -103,7 +92,8 @@ export default function StoryViewer({
   const [durationMs, setDurationMs] = useState(5000)
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
-  const [reactedEmoji, setReactedEmoji] = useState<string | null>(null)
+  const [reactedEmoji, setReactedEmoji] = useState<string | null>(null) // "pop" temporário de confirmação
+  const [myReaction, setMyReaction] = useState<string | null>(null)     // reação PERSISTENTE do usuário (fixa)
   const [isReacting, setIsReacting] = useState(false)
   const [liking, setLiking] = useState(false)
   const [sendingComment, setSendingComment] = useState(false)
@@ -178,12 +168,23 @@ export default function StoryViewer({
     apiSocial.viewStory(storyId).catch(() => { })
   }, [storyId, storyViewed, onStoryUpdated])
 
+  // Reação persistente: inicializa com o emoji que o usuário já reagiu (vem da list como
+  // `myReaction`). Sem isto, o destaque começava vazio e sumia após 1,2s → "não fixava".
+  useEffect(() => {
+    const mine = String((storyObj?.myReaction as string) || '').trim()
+    setMyReaction(mine || null)
+  }, [storyId, storyObj?.myReaction])
+
   // Navegação e Timer
   const goNext = useCallback(() => {
     setIdx((v) => {
       const nextIdx = v + 1
       if (nextIdx >= stories.length) {
-        if (!closeRequestedRef.current) {
+        // Fim dos stories DESTE usuário → tenta pular pro próximo usuário (estilo Instagram).
+        // Só fecha se não houver próximo. O onNextUser troca o grupo no pai (StoriesBar) e o
+        // key={authorId} remonta o viewer do zero (idx=0, timers resetados).
+        const advanced = onNextUser ? onNextUser() : false
+        if (!advanced && !closeRequestedRef.current) {
           closeRequestedRef.current = true
           setTimeout(() => onClose(), 0)
         }
@@ -191,7 +192,15 @@ export default function StoryViewer({
       }
       return nextIdx
     })
-  }, [onClose, stories.length])
+  }, [onClose, stories.length, onNextUser])
+
+  // Tap na borda ESQUERDA no primeiro story → volta pro usuário anterior (se houver).
+  const goPrev = useCallback(() => {
+    setIdx((v) => {
+      if (v <= 0) { onPrevUser?.(); return 0 }
+      return v - 1
+    })
+  }, [onPrevUser])
 
   useEffect(() => {
     elapsedRef.current = 0
@@ -618,37 +627,13 @@ export default function StoryViewer({
             </motion.div>
           </AnimatePresence>
 
-          {/* Timestamp overlay — purely visual, no effect on saving system */}
-          {story?.createdAt && formatTime(story.createdAt) && (
-            <div
-              className="absolute bottom-20 left-3 z-10 pointer-events-none"
-            >
-              <div
-                className="flex flex-col items-start px-2.5 py-1.5 rounded-xl"
-                style={{
-                  background: 'rgba(0,0,0,0.45)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(234,179,8,0.3)',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(234,179,8,0.15)',
-                }}
-              >
-                <span
-                  className="text-base font-black tabular-nums leading-tight tracking-tight"
-                  style={{ color: '#facc15', textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}
-                >
-                  {formatTime(story.createdAt)}
-                </span>
-                <span className="text-[10px] font-bold text-white/60 leading-none mt-0.5">
-                  {formatDate(story.createdAt)}
-                </span>
-              </div>
-            </div>
-          )}
+          {/* Sem overlay de horário aqui: o badge de hora já vem queimado na imagem
+              gerada pelo composer (bottom-right). Dois relógios = redundância. */}
         </div>
 
         {/* Áreas de Toque para Navegação */}
-        <button className="absolute left-0 top-20 bottom-20 w-1/3 z-10" onClick={() => setIdx((v) => Math.max(0, v - 1))} aria-label="Anterior" />
-        <button className="absolute right-0 top-20 bottom-20 w-1/3 z-10" onClick={() => setIdx((v) => Math.min(stories.length - 1, v + 1))} aria-label="Próximo" />
+        <button className="absolute left-0 top-20 bottom-20 w-1/3 z-10" onClick={goPrev} aria-label="Anterior" />
+        <button className="absolute right-0 top-20 bottom-20 w-1/3 z-10" onClick={goNext} aria-label="Próximo" />
 
         {/* Footer / Controles */}
         <div className="absolute bottom-0 left-0 right-0 p-3 z-20 bg-gradient-to-t from-black/90 to-transparent pt-12">
@@ -689,7 +674,8 @@ export default function StoryViewer({
                   disabled={isReacting}
                   onClick={async () => {
                     setIsReacting(true)
-                    setReactedEmoji(emoji)
+                    setMyReaction(emoji)          // fixa a reação (persistente)
+                    setReactedEmoji(emoji)        // "pop" de confirmação
                     setTimeout(() => setReactedEmoji(null), 1200)
                     try {
                       await fetch('/api/social/stories/react', {
@@ -702,8 +688,8 @@ export default function StoryViewer({
                     }
                   }}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 disabled:opacity-60 ${
-                    reactedEmoji === emoji ? 'scale-125 bg-yellow-500/20 border-yellow-500/50' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
-                  } border`}
+                    myReaction === emoji ? 'bg-yellow-500/20 border-yellow-500/60' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
+                  } ${reactedEmoji === emoji ? 'scale-125' : ''} border`}
                 >
                   {emoji}
                 </button>

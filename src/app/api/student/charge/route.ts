@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
+import { buildStudentPlanReference } from '@/utils/billing/mercadopagoWebhookRules'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
@@ -97,7 +98,12 @@ export async function POST(req: Request) {
         transaction_amount: amount,
         description: `${String((plan as Record<string, unknown>).name ?? 'Plano')} — Mensalidade`,
         payment_method_id: 'pix',
-        external_reference: `student_plan:${sub.teacher_user_id}:${plan.id as string}:${user.id}:${subscription_id}`,
+        external_reference: buildStudentPlanReference({
+          teacherUserId: String(sub.teacher_user_id),
+          planId: String(plan.id),
+          studentUserId: user.id,
+          subscriptionId: String(subscription_id),
+        }),
         notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
         payer: {
           email: user.email || undefined,

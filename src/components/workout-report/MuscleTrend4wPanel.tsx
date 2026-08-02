@@ -13,7 +13,7 @@ export const MuscleTrend4wPanel = ({ data, muscleById, buildSparklinePoints }: M
         <div className="min-w-0">
           <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Histórico 4 semanas</div>
           <div className="text-lg font-black text-white">Sparklines por músculo</div>
-          <div className="text-xs text-neutral-300">Tendência das últimas 4 semanas (sets equivalentes).</div>
+          <div className="text-xs text-neutral-300">Tendência das últimas 4 semanas (séries equivalentes).</div>
         </div>
       </div>
       <div className="mt-4 overflow-x-auto">

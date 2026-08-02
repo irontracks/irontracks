@@ -4,16 +4,14 @@ import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
 import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { fetchMuscleMapAssets } from '@/utils/report/fetchMuscleMapAssets';
-import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { useBackHandler } from '@/hooks/useBackHandler';
-import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { escapeHtml } from '@/utils/escapeHtml'
 import { translateAiError } from '@/utils/ai/clientErrors'
 import {
     formatDate as sharedFormatDate,
@@ -26,7 +24,6 @@ import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCa
 import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
 import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
 import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
-import { ReportTeamSection } from '@/components/workout-report/ReportTeamSection'
 import { ReportTimePanel } from '@/components/workout-report/ReportTimePanel'
 
 /** Skeleton placeholder for lazy-loaded report sections */
@@ -96,8 +93,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     const [sharing, setSharing] = useState(false);
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [templateSaved, setTemplateSaved] = useState(false);
-    const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
-    const [_showStoryPrompt, setShowStoryPrompt] = useState(false);
 
     const { credits } = useVipCredits();
     const _formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : `${limit}`)
@@ -150,12 +145,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         if (raw === 'male' || raw === 'masculino') return 'male';
         return 'not_informed';
     })();
-
-    useEffect(() => {
-        if (!storiesV2Enabled) { setShowStoryPrompt(false); return; }
-        if (!session) { setShowStoryPrompt(false); return; }
-        setShowStoryPrompt(true);
-    }, [storiesV2Enabled, session]);
 
     // Use shared formatters
     const formatDate = sharedFormatDate;
@@ -261,58 +250,19 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
-            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
 
-            // iOS WKWebView blocks window.open() and print().
-            // Web Share API: opens native share sheet → user taps "Print" → save as PDF.
-            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-            if (canShare) {
-                try {
-                    const blob = new Blob([html], { type: 'text/html' })
-                    const file = new File([blob], fileName, { type: 'text/html' })
-                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
-                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
-                    if (canShareFiles) {
-                        await navigator.share({ files: [file], title: `${title} • IronTracks` })
-                    } else {
-                        const url = URL.createObjectURL(blob)
-                        await navigator.share({ title: `${title} • IronTracks`, url })
-                        URL.revokeObjectURL(url)
-                    }
-                    setShowExportMenu(false)
-                    return
-                } catch (shareErr) {
-                    const msg = shareErr instanceof Error ? shareErr.message : ''
-                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
-                    // other error: fall through to desktop fallback
-                }
-            }
-
-            // Desktop fallback: open new tab + native print dialog (Save as PDF)
-            const blobFallback = new Blob([html], { type: 'text/html' });
-            const blobFallbackUrl = URL.createObjectURL(blobFallback);
-            const printWindow = window.open(blobFallbackUrl, '_blank');
-            if (printWindow) {
-                setTimeout(() => {
-                    try {
-                        printWindow.focus();
-                        printWindow.print();
-                    } catch { }
-                    setTimeout(() => URL.revokeObjectURL(blobFallbackUrl), 60_000);
-                }, 500);
-            } else {
-                URL.revokeObjectURL(blobFallbackUrl);
-                // Last resort: downloadable HTML file
-                const blob = new Blob([html], { type: 'text/html' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-            }
+            // Caminho único de export (ver utils/report/exportHtmlAsPdf).
+            // Antes daqui saía um `navigator.share({ url: blobUrl })` quando o iOS
+            // recusava o arquivo .html — e o iOS, sem resolver a `blob:` URL,
+            // compartilhava a PÁGINA ATUAL: o "salvar PDF" gerava a tela do app
+            // em vez do relatório. Agora o iOS gera um PDF nativo de verdade.
+            await exportHtmlAsPdf({
+                html,
+                title,
+                baseFileName: `${title.replace(/\s+/g, '_')}_irontracks`,
+                alert: (msg: string) => { alert(msg); },
+            });
+            setShowExportMenu(false);
 
         } catch (e: unknown) {
             alert('Não foi possível abrir impressão: ' + (getErrorMessage(e)) + '\nPermita pop-ups para este site.');
@@ -375,89 +325,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         );
     };
 
-    const handlePartnerPlan = async (participant: unknown) => {
-        try {
-            const part = participant && typeof participant === 'object' ? (participant as AnyObj) : null
-            if (!part) return;
-            const exercises = Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : [];
-            const workout = {
-                title: escapeHtml(session?.workoutTitle || 'Treino'),
-                exercises: exercises.map((ex: unknown) => {
-                    const e = ex && typeof ex === 'object' ? (ex as AnyObj) : ({} as AnyObj)
-                    return ({
-                        name: escapeHtml(e?.name),
-                        sets: Number(e?.sets) || 0,
-                        reps: escapeHtml(e?.reps),
-                        rpe: escapeHtml(e?.rpe),
-                        cadence: escapeHtml(e?.cadence),
-                        restTime: escapeHtml(e?.restTime),
-                        method: escapeHtml(e?.method),
-                        notes: escapeHtml(e?.notes)
-                    })
-                })
-            };
-            const partnerName = String(part?.name || part?.uid || 'Parceiro').trim() || 'Parceiro'
-            const partnerUser = {
-                displayName: escapeHtml(part?.name || part?.uid || ''),
-                email: escapeHtml(part?.email || '')
-            };
-            const html = workoutPlanHtml(workout, partnerUser);
-            const fileName = `Plano_${partnerName.replace(/\s+/g, '_')}_irontracks.html`
-            const title = `Plano de ${partnerName} • IronTracks`
-
-            // iOS WKWebView bloqueia window.open()/print() → o alerta de pop-up.
-            // Preferir o share sheet nativo (mesmo caminho do PDF principal). A
-            // chamada de share é a 1ª operação async, então o user-gesture é
-            // preservado. Sem await antes disso.
-            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-            if (canShare) {
-                try {
-                    const blob = new Blob([html], { type: 'text/html' })
-                    const file = new File([blob], fileName, { type: 'text/html' })
-                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
-                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
-                    if (canShareFiles) {
-                        await navigator.share({ files: [file], title })
-                    } else {
-                        const url = URL.createObjectURL(blob)
-                        await navigator.share({ title, url })
-                        URL.revokeObjectURL(url)
-                    }
-                    return
-                } catch (shareErr) {
-                    const msg = shareErr instanceof Error ? shareErr.message : ''
-                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
-                    // outro erro: cai pro fallback de desktop
-                }
-            }
-
-            // Desktop: nova aba + diálogo de impressão (Salvar como PDF)
-            const blob = new Blob([html], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            const win = window.open(blobUrl, '_blank');
-            if (win) {
-                setTimeout(() => {
-                    try { win.focus(); win.print(); } catch { }
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-                }, 400);
-            } else {
-                URL.revokeObjectURL(blobUrl);
-                // Último recurso: baixar o HTML do plano
-                const dlBlob = new Blob([html], { type: 'text/html' });
-                const dlUrl = URL.createObjectURL(dlBlob);
-                const a = document.createElement('a');
-                a.href = dlUrl;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(dlUrl);
-            }
-        } catch (e: unknown) {
-            alert('Não foi possível gerar o PDF do parceiro: ' + (getErrorMessage(e)));
-        }
-    };
-
     const closePreview = () => {
         try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch { }
         setPdfUrl(null);
@@ -486,8 +353,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     await navigator.share({ files: [file], title });
                     return;
                 }
-                if (pdfUrl) await navigator.share({ title, url: pdfUrl });
-                return;
+                // ⚠️ NÃO compartilhar `pdfUrl` aqui: é uma object URL, e o iOS não
+                // resolve `blob:` no share sheet — ele compartilha a PÁGINA ATUAL,
+                // que é como o "salvar PDF" acabava gerando a tela do app.
+                // Quando o conteúdo é HTML, refaz pelo caminho único (PDF nativo).
+                if (pdfBlob && !isPdf) {
+                    const html = await pdfBlob.text();
+                    await exportHtmlAsPdf({
+                        html,
+                        title,
+                        baseFileName: 'relatorio-irontracks',
+                        alert: (msg: string) => { alert(msg); },
+                    });
+                    return;
+                }
             }
             if (!pdfUrl) {
                 alert('Não foi possível gerar o link do PDF. Tente novamente.');
@@ -533,17 +412,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         }
     };
 
-    const teamMeta = safeSession?.teamMeta && typeof safeSession.teamMeta === 'object' ? (safeSession.teamMeta as AnyObj) : null;
-    const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? (teamMeta.participants as unknown[]) : [];
-    const currentUserId = user?.id || user?.uid || null;
-    const partners = rawParticipants.filter((p: unknown) => {
-        const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
-        const uid = part && (part.uid || part.id || null);
-        if (!uid || !currentUserId) return true;
-        return uid !== currentUserId;
-    });
-
-    const isTeamSession = partners.length > 0;
     const exercisesList = Array.isArray(safeSession?.exercises) ? (safeSession.exercises as unknown[]) : [];
     const preCheckin = (() => {
         const local = session?.preCheckin && typeof session.preCheckin === 'object' ? (session.preCheckin as AnyObj) : null;
@@ -769,14 +637,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         </div>
                         <button
                             type="button"
-                            onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
+                            onClick={() => { setShowExportMenu(false); setShowStory(true); }}
                             className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
-                            <span className="text-xs uppercase tracking-widest">Storie</span>
+                            <span className="text-xs uppercase tracking-widest">Story</span>
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowShareCard(true); }}
+                            onClick={() => { setShowExportMenu(false); setShowShareCard(true); }}
                             className="min-h-[36px] bg-neutral-800 hover:bg-neutral-700 text-white px-3 rounded-xl font-black inline-flex items-center gap-1.5 border border-neutral-700"
                         >
                             <Share2 size={14} className="text-yellow-500" />
@@ -912,12 +780,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     renderAiRating={renderAiRating}
                 />
 
-                <ReportTeamSection
-                    isTeamSession={isTeamSession}
-                    partners={partners}
-                    onPartnerPlan={handlePartnerPlan}
-                />
-
                 <ReportSummaryCards
                     session={safeSession}
                     currentVolume={currentVolume}
@@ -932,6 +794,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     {exercisesList.length === 0 && (
                         <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
                             Nenhum dado de exercício registrado para este treino.
+                        </div>
+                    )}
+                    {exercisesList.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-400">
+                            <span className="flex items-center gap-1"><span className="text-yellow-400">★</span> recorde pessoal (PR)</span>
+                            <span className="flex items-center gap-1"><span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span> melhor série (maior 1RM est.)</span>
                         </div>
                     )}
                     {exercisesList.map((ex, exIdx) => {

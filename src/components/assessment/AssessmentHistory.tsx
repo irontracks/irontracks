@@ -17,6 +17,7 @@ import { Calendar, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import QuickBIAModal from '@/components/assessment/QuickBIAModal';
+import { WeightTrendCard } from '@/components/assessment/WeightTrendCard';
 import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { AssessmentHeader } from '@/components/assessment/AssessmentHeader';
@@ -25,6 +26,7 @@ import { AssessmentListItem, measurementFields, skinfoldFields } from '@/compone
 import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
 import { BodyPhotoCaptureModal } from '@/components/body-photo/BodyPhotoCaptureModal';
+import { BodyPhotoHistoryModal } from '@/components/body-photo/BodyPhotoHistoryModal';
 import { LabExamsSection } from '@/components/lab-exams/LabExamsSection';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
 import { ArrowLeft } from 'lucide-react';
@@ -65,6 +67,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
   const [photoModalOpen, setPhotoModalOpen] = React.useState(false);
+  // Histórico dos laudos por foto — o laudo fica salvo no banco; sem esta tela
+  // ele só existia enquanto o modal de captura estava aberto.
+  const [photoHistoryOpen, setPhotoHistoryOpen] = React.useState(false);
 
   const {
     // Core data
@@ -148,6 +153,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onClose={undefined}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
+          onPhotoHistory={() => setPhotoHistoryOpen(true)}
         />
 
         <div
@@ -173,6 +179,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           studentUserId={studentId ?? null}
           gender={poseGender}
         />
+        {photoHistoryOpen ? <BodyPhotoHistoryModal onClose={() => setPhotoHistoryOpen(false)} /> : null}
       </div>
     );
   }
@@ -187,6 +194,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onClose={onClose}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
+          onPhotoHistory={() => setPhotoHistoryOpen(true)}
         />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards
@@ -221,6 +229,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               )}
             </div>
           </div>
+
+          {/* Tendência de Peso (avaliações + check-ins de treino) */}
+          <WeightTrendCard studentId={studentId ?? null} />
 
           {/* Body Fat % */}
           <div
@@ -301,7 +312,19 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             </h3>
           </div>
           <div id="assessments-history" className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-            {sortedAssessments.map((assessment, idx) => {
+            {/* Mais RECENTE primeiro (pedido do dono, ago/2026): quem abre o
+                histórico quer ver a última avaliação, não rolar meses até o fim.
+                `sortedAssessments` segue crescente porque os GRÁFICOS dependem
+                disso (linha do tempo e `slice(-N)` das mais recentes) — a
+                inversão é só da lista. */}
+            {[...sortedAssessments].reverse().map((assessment, revIdx) => {
+              // Índice na ordem cronológica, para achar a avaliação ANTERIOR.
+              const idx = sortedAssessments.length - 1 - revIdx;
+              // A anterior no TEMPO — base da variação exibida no card. Na lista
+              // invertida ela é a próxima linha, mas o que importa é a data.
+              // `prevInTime` e não `previousAssessment`: esse nome já existe no
+              // escopo do componente (vem do hook) e o shadow confundiria.
+              const prevInTime = idx > 0 ? sortedAssessments[idx - 1] ?? null : null;
               // Resolve a contraparte (full ↔ bia) para essa avaliação. O
               // pareamento é bidirecional: ambos os registros têm
               // paired_assessment_id apontando um pro outro. O lookup é em
@@ -317,6 +340,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                   key={String(assessment?.id ?? idx)}
                   assessment={assessment}
                   pairedAssessment={pairedAssessment}
+                  previousAssessment={prevInTime}
                   idx={idx}
                   isSelected={selectedAssessment === String(assessment?.id ?? idx)}
                   aiPlanState={aiPlanByAssessmentId[String(assessment.id)]}
@@ -450,6 +474,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           studentUserId={studentId ?? null}
           gender={poseGender}
         />
+        {photoHistoryOpen ? <BodyPhotoHistoryModal onClose={() => setPhotoHistoryOpen(false)} /> : null}
       </div>
     </DialogProvider>
   );

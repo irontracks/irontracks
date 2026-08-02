@@ -34,10 +34,42 @@ export type FeedItem = {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Presença — estabilidade de identidade
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza uma lista de user ids para comparação: trim, remove vazios, tira o
+ * próprio usuário, dedup e ORDENA. A ordem crua do servidor não é garantida
+ * (`/api/social/training-now` não tem `.order()`), então sem o sort duas
+ * respostas idênticas viriam "diferentes" e o setState re-renderizaria à toa.
+ */
+export function normalizePresenceIds(raw: unknown, selfId: string): string[] {
+  const arr = Array.isArray(raw) ? raw : []
+  const self = String(selfId || '').trim()
+  const ids = arr.map((v) => String(v ?? '').trim()).filter((id) => id && id !== self)
+  return Array.from(new Set(ids)).sort()
+}
+
+/** Igualdade posicional — só faz sentido sobre listas já normalizadas (ordenadas). */
+export function sameIdList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i])
+}
+
+/**
+ * Devolve a lista ANTERIOR quando o conteúdo não mudou, preservando a
+ * identidade do array. Sem isso, o poll de presença (30s) trocava o estado a
+ * cada tick mesmo sem ninguém entrar/sair — e cada troca re-renderizava o
+ * CommunityClient inteiro (e, antes do React.memo, os 20+ FeedCards junto).
+ */
+export function keepIfUnchanged(prev: string[], next: string[]): string[] {
+  return sameIdList(prev, next) ? prev : next
+}
+
+// ────────────────────────────────────────────────────────────────
 // Hook
 // ────────────────────────────────────────────────────────────────
 
-export function useCommunityData() {
+export function useCommunityData(notifyError?: (msg: string) => void) {
   const supabase = useMemo(() => createClient(), [])
   const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -57,9 +89,14 @@ export function useCommunityData() {
   const [feedHasMore, setFeedHasMore] = useState(true)
   const feedLoadedRef = useRef(false)
 
-  // ── Presence state ──
-  const [onlineFriends, setOnlineFriends] = useState<string[]>([])
-  const [onlineFriendProfiles, setOnlineFriendProfiles] = useState<ProfileRow[]>([])
+  // ── "Treinando agora" ──
+  // Fonte = sessão de treino REALMENTE aberta (`active_workout_sessions`), não
+  // presença de app aberto. Ver /api/social/training-now.
+  const [trainingNowIds, setTrainingNowIds] = useState<string[]>([])
+  // Online = app aberto nos últimos ~5min (presence/list, já recortado por follow
+  // no servidor). É um indicador VISUAL no app — não gera push (o "friend_online"
+  // como push foi removido por spam). "Treinando" tem prioridade sobre "online".
+  const [onlineIds, setOnlineIds] = useState<string[]>([])
 
   // ── Auth ──
   useEffect(() => {
@@ -242,29 +279,46 @@ export function useCommunityData() {
     finally { setFeedLoading(false) }
   }, [userId, feedCursor])
 
-  // ── Load presence ──
+  // ── Load "treinando agora" ──
+  // A rota já devolve só quem o chamador segue E tem sessão de treino aberta e
+  // fresca — o recorte por follow/frescor é server-side, não dá pra fazer no
+  // cliente (a RLS de active_workout_sessions não entrega a linha do amigo).
+  // O tick de 30s quase sempre devolve exatamente os mesmos ids. `keepIfUnchanged`
+  // preserva a identidade do array nesse caso, então o React não re-renderiza a
+  // árvore da comunidade à toa. `profiles` NÃO entra nas deps: derivar os perfis
+  // aqui recriava o setInterval a cada carga de perfis (ver useMemo abaixo).
   useEffect(() => {
     if (!userId) return
     let mounted = true
     const loadPresence = async () => {
       try {
-        const res = await fetch('/api/social/presence/list')
-        const data = await res.json().catch(() => null)
-        if (!mounted || !data?.ok) return
-        const onlineIds = Array.isArray(data.online_users) ? data.online_users.map((id: unknown) => String(id)) : []
-        const followingIds = Array.from(follows.entries())
-          .filter(([, f]) => f.status === 'accepted')
-          .map(([id]) => id)
-        const friendsOnline = onlineIds.filter((id: string) => followingIds.includes(id) && id !== userId)
-        setOnlineFriends(friendsOnline)
-        const profs = friendsOnline.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[]
-        setOnlineFriendProfiles(profs)
+        const [trainingRes, onlineRes] = await Promise.all([
+          fetch('/api/social/training-now').then((r) => r.json()).catch(() => null),
+          fetch('/api/social/presence/list').then((r) => r.json()).catch(() => null),
+        ])
+        if (!mounted) return
+        if (trainingRes?.ok) {
+          const rows = Array.isArray(trainingRes.training) ? trainingRes.training : []
+          const ids = normalizePresenceIds(rows.map((r: unknown) => (r as { user_id?: string })?.user_id), userId)
+          setTrainingNowIds((prev) => keepIfUnchanged(prev, ids))
+        }
+        if (onlineRes?.ok) {
+          const ids = normalizePresenceIds(onlineRes.online_users, userId)
+          setOnlineIds((prev) => keepIfUnchanged(prev, ids))
+        }
       } catch { }
     }
     loadPresence()
     const interval = setInterval(loadPresence, 30_000)
     return () => { mounted = false; clearInterval(interval) }
-  }, [userId, follows, profiles])
+  }, [userId])
+
+  // Derivado (não estado): antes era um setState dentro do poll, o que forçava
+  // `profiles` nas deps do efeito e recriava o intervalo a cada carga de perfis.
+  const trainingNowProfiles = useMemo(
+    () => trainingNowIds.map((id) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[],
+    [trainingNowIds, profiles],
+  )
 
   // ── Actions ──
   const respondFollowRequest = useCallback(async (followerId: string, decision: 'accept' | 'deny') => {
@@ -278,13 +332,13 @@ export function useCommunityData() {
         const raw = String(data?.error || 'Falha ao responder')
         const lower = raw.toLowerCase()
         const msg = lower.includes('schema cache') || lower.includes('could not find the table') || lower.includes('social_follows') ? 'O Social System não está aplicado no Supabase (tabela social_follows ausente).' : lower.includes('replica identity') ? 'Falha ao atualizar a solicitação. Rode as migrations.' : raw
-        if (typeof window !== 'undefined') window.alert(msg)
+        notifyError?.(msg)
         return
       }
       setFollowRequests((prev) => prev.filter((r) => r.follower_id !== fid))
-    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyRequestId('') }
-  }, [userId, busyRequestId])
+  }, [userId, busyRequestId, notifyError])
 
   const cancelFollowRequest = useCallback(async (profileId: string) => {
     const pid = String(profileId || '').trim()
@@ -293,14 +347,14 @@ export function useCommunityData() {
     try {
       const res = await fetch('/api/social/follow/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ following_id: pid }) })
       const data = await res.json().catch((): null => null)
-      if (!data?.ok) { const raw = String(data?.error || 'Falha ao cancelar'); if (typeof window !== 'undefined') window.alert(raw); return }
+      if (!data?.ok) { const raw = String(data?.error || 'Falha ao cancelar'); notifyError?.(raw); return }
       const status = String(data?.status || '').trim().toLowerCase()
       const already = data?.already === true
       if (!already || status !== 'accepted') setFollows((prev) => { const next = new Map(prev); next.delete(pid); return next })
       try { await loadAll(userId) } catch { }
-    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyId('') }
-  }, [userId, busyId, loadAll])
+  }, [userId, busyId, loadAll, notifyError])
 
   const follow = useCallback(async (profileId: string, showMessage: (msg: string) => void) => {
     const pid = String(profileId || '').trim()
@@ -334,9 +388,9 @@ export function useCommunityData() {
       const { error } = await supabase.from('social_follows').delete().eq('follower_id', userId).eq('following_id', pid)
       if (error) throw error
       try { await supabase.from('notifications').delete().eq('user_id', userId).eq('sender_id', pid) } catch { }
-    } catch (e) { setFollows(rollback); if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { setFollows(rollback); notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyId('') }
-  }, [userId, busyId, follows, supabase])
+  }, [userId, busyId, follows, supabase, notifyError])
 
   return {
     supabase,
@@ -355,9 +409,10 @@ export function useCommunityData() {
     feedHasMore,
     feedLoadedRef,
     loadFeed,
-    // Presence
-    onlineFriends,
-    onlineFriendProfiles,
+    // Treinando agora (sessão de treino aberta — não "app aberto")
+    trainingNowIds,
+    trainingNowProfiles,
+    onlineIds,
     // Actions
     respondFollowRequest,
     cancelFollowRequest,

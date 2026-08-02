@@ -7,9 +7,10 @@ import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
 import { env } from '@/utils/env'
-import { getGeminiModel } from '@/utils/ai/gemini'
+import { getGeminiModel, type GeminiModelShim } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { encodeSseEvent } from '@/utils/ai/sse'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,9 @@ const BodySchema = z
   .object({
     message: z.string().min(1).max(2000),
     mode: z.enum(['coach', 'planner', 'diagnostic']).default('coach'),
+    // Streaming SSE: o client vê a resposta nascendo (time-to-first-token <1s
+    // em vez de esperar a resposta inteira). false = contrato antigo, intacto.
+    stream: z.boolean().optional().default(false),
   })
   .strict()
 
@@ -76,6 +80,59 @@ function summariseAssessment(row: AnyObj): string {
   return parts.join(' | ')
 }
 
+/**
+ * Extração de treino estruturado da resposta (best-effort, 2ª chamada rápida).
+ * Compartilhada entre o caminho JSON e o streaming — era inline e duplicaria.
+ */
+async function extractWorkout(model: GeminiModelShim, answer: string): Promise<Record<string, unknown> | null> {
+  const lowerAnswer = answer.toLowerCase()
+  const signals = [
+    lowerAnswer.includes('exercício') || lowerAnswer.includes('exercicio') || lowerAnswer.includes('exercícios'),
+    lowerAnswer.includes('série') || lowerAnswer.includes('series') || lowerAnswer.includes('séries'),
+    lowerAnswer.includes('rep') || lowerAnswer.includes('repetições') || lowerAnswer.includes('repetiç'),
+    /\d+\s*x\s*\d+/.test(lowerAnswer),
+    lowerAnswer.includes('descanso') || lowerAnswer.includes('intervalo'),
+    lowerAnswer.includes('treino de') || lowerAnswer.includes('treino para'),
+    lowerAnswer.includes('supino') || lowerAnswer.includes('agachamento') || lowerAnswer.includes('rosca') || lowerAnswer.includes('remada') || lowerAnswer.includes('puxada') || lowerAnswer.includes('leg press'),
+  ]
+  const signalCount = signals.filter(Boolean).length
+  const shouldExtract = signalCount >= 2 || (answer.length > 300 && signalCount >= 1)
+  if (!shouldExtract) return null
+
+  try {
+    const extractPrompt = [
+      'Dado o texto abaixo, extraia o treino como JSON.',
+      'Responda APENAS com o JSON, sem explicação, sem markdown, sem blocos de código.',
+      'Formato obrigatório:',
+      '{"title":"Nome do Treino","exercises":[{"name":"Supino Reto","sets":4,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
+      'Se não houver treino estruturado no texto, responda apenas: null',
+      '',
+      'Texto:',
+      answer,
+    ].join('\n')
+    const extractGemini = await safeGemini('vip-coach:extract', () =>
+      model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0]),
+    )
+    if ('errorResponse' in extractGemini) {
+      // Best-effort — falhou, devolve a resposta principal sem treino.
+      logError('api:ai:vip-coach', 'extract step failed; skipping workout extraction')
+      return null
+    }
+    const jsonStr = String((await extractGemini.value?.response?.text()) || '').trim()
+    if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
+      const cleaned = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').replace(/^\s*json\s*/i, '').trim()
+      const parsed = JSON.parse(cleaned)
+      if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+        logInfo('api:ai:vip-coach', 'Workout extracted', { title: parsed.title, exercises: parsed.exercises.length })
+        return parsed
+      }
+    }
+  } catch (extractErr) {
+    logError('api:ai:vip-coach', extractErr)
+  }
+  return null
+}
+
 // ── Main handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -100,7 +157,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { message, mode } = parsedBody.data!
+    const { message, mode, stream } = parsedBody.data!
 
     // Cota consumida ATÔMICA aqui (meter), depois do parse e antes do Gemini: fecha a
     // janela TOCTOU do antigo check-then-act (que deixava requests paralelos furarem o
@@ -247,6 +304,52 @@ export async function POST(req: Request) {
     ].join('\n')
 
     const model = getGeminiModel(apiKey, MODEL)
+
+    // ── Caminho STREAMING (SSE) ───────────────────────────────────────────
+    if (stream) {
+      // O ciclo entrega/reembolso passa a viver DENTRO do stream: o handler
+      // retorna a Response já, mas a geração continua no start() abaixo.
+      // Se nada foi emitido e deu erro → reembolsa lá; o finally externo não
+      // pode decidir (delivered=true aqui evita reembolso duplo).
+      delivered = true
+      const refundFn = refund
+      const encoder = new TextEncoder()
+      const sseBody = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          let sentAny = false
+          try {
+            let full = ''
+            for await (const piece of model.generateContentStream([{ text: prompt }] as Parameters<typeof model.generateContent>[0])) {
+              full += piece
+              sentAny = true
+              controller.enqueue(encoder.encode(encodeSseEvent({ type: 'chunk', text: piece })))
+            }
+            const answer = full.trim()
+            if (!answer) throw new Error('empty_ai_answer')
+            const workout = await extractWorkout(model, answer)
+            controller.enqueue(encoder.encode(encodeSseEvent({ type: 'done', dataUsed: dataSources, followUps: [], actions: [], workout })))
+          } catch (e) {
+            logError('api:ai:vip-coach', e)
+            if (!sentAny && refundFn) {
+              try { await refundFn() } catch { /* refund é best-effort, já logado dentro */ }
+            }
+            try {
+              controller.enqueue(encoder.encode(encodeSseEvent({ type: 'error', error: 'Falha ao consultar a IA.' })))
+            } catch { /* stream pode já ter fechado */ }
+          } finally {
+            try { controller.close() } catch { /* já fechado */ }
+          }
+        },
+      })
+      return new Response(sseBody, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+        },
+      })
+    }
+
     const geminiResult = await safeGemini('vip-coach', () =>
       model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
     )
@@ -255,56 +358,8 @@ export async function POST(req: Request) {
     const answer = String((await result?.response?.text()) || '').trim()
     if (!answer) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
-    // ── Server-side workout extraction ──────────────────────────
-    let workout: Record<string, unknown> | null = null
-    const lowerAnswer = answer.toLowerCase()
-    const signals = [
-      lowerAnswer.includes('exercício') || lowerAnswer.includes('exercicio') || lowerAnswer.includes('exercícios'),
-      lowerAnswer.includes('série') || lowerAnswer.includes('series') || lowerAnswer.includes('séries'),
-      lowerAnswer.includes('rep') || lowerAnswer.includes('repetições') || lowerAnswer.includes('repetiç'),
-      /\d+\s*x\s*\d+/.test(lowerAnswer),
-      lowerAnswer.includes('descanso') || lowerAnswer.includes('intervalo'),
-      lowerAnswer.includes('treino de') || lowerAnswer.includes('treino para'),
-      lowerAnswer.includes('supino') || lowerAnswer.includes('agachamento') || lowerAnswer.includes('rosca') || lowerAnswer.includes('remada') || lowerAnswer.includes('puxada') || lowerAnswer.includes('leg press'),
-    ]
-    const signalCount = signals.filter(Boolean).length
-    const shouldExtract = signalCount >= 2 || (answer.length > 300 && signalCount >= 1)
-
-    if (shouldExtract) {
-      try {
-        const extractPrompt = [
-          'Dado o texto abaixo, extraia o treino como JSON.',
-          'Responda APENAS com o JSON, sem explicação, sem markdown, sem blocos de código.',
-          'Formato obrigatório:',
-          '{"title":"Nome do Treino","exercises":[{"name":"Supino Reto","sets":4,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
-          'Se não houver treino estruturado no texto, responda apenas: null',
-          '',
-          'Texto:',
-          answer,
-        ].join('\n')
-        const extractGemini = await safeGemini('vip-coach:extract', () =>
-          model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0]),
-        )
-        if ('errorResponse' in extractGemini) {
-          // Extraction is best-effort — if it fails, return the main answer
-          // without workout data rather than erroring the whole response.
-          logError('api:ai:vip-coach', 'extract step failed; skipping workout extraction')
-        } else {
-          const extractResult = extractGemini.value
-          const jsonStr = String((await extractResult?.response?.text()) || '').trim()
-          if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
-            const cleaned = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').replace(/^\s*json\s*/i, '').trim()
-            const parsed = JSON.parse(cleaned)
-            if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
-              workout = parsed
-              logInfo('api:ai:vip-coach', 'Workout extracted', { title: parsed.title, exercises: parsed.exercises.length })
-            }
-          }
-        }
-      } catch (extractErr) {
-        logError('api:ai:vip-coach', extractErr)
-      }
-    }
+    // ── Server-side workout extraction (compartilhada com o streaming) ────
+    const workout = await extractWorkout(model, answer)
 
     delivered = true
     return NextResponse.json({ ok: true, answer, dataUsed: dataSources, followUps: [], actions: [], workout })

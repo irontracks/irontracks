@@ -1,10 +1,14 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { ChevronLeft, Trash2 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { ChevronLeft, Trash2, Loader2 } from 'lucide-react'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import type { WorkoutSummary } from '@/components/historyListTypes'
 import { ACTIVITY_TYPES } from '@/components/workout/CardioGPSPanel'
+import { cardioToContent, type CardioStoryContent } from '@/components/stories/cardioStory'
+
+const CardioStoryComposer = dynamic(() => import('@/components/CardioStoryComposer'), { ssr: false })
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,8 +94,40 @@ export default function CardioSessionModal({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [storyLoading, setStoryLoading] = useState(false)
+  const [storyContent, setStoryContent] = useState<CardioStoryContent | null>(null)
+  const [storyError, setStoryError] = useState<string | null>(null)
 
   useBackHandler(true, onClose)
+
+  // Busca a rota da corrida (GET) e abre o Story compartilhável (estilo Strava).
+  const handleShareStory = useCallback(async () => {
+    setStoryLoading(true)
+    setStoryError(null)
+    try {
+      const resp = await fetch(`/api/gps/cardio/${session.id}`)
+      const json = await resp.json()
+      const track = json?.track
+      if (!json?.ok || !track) {
+        setStoryError('Não foi possível carregar a rota desta corrida.')
+        return
+      }
+      setStoryContent(cardioToContent({
+        activityType: String(track.activity_type ?? session.activityType ?? 'running'),
+        distanceMeters: Number(track.distance_meters ?? session.distanceMeters ?? 0),
+        durationSeconds: Number(track.duration_seconds ?? session.totalTime ?? 0),
+        paceMinKm: track.avg_pace_min_km != null ? Number(track.avg_pace_min_km) : (session.avgPaceMinKm ?? null),
+        caloriesEstimated: Number(track.calories_estimated ?? session.caloriesEstimated ?? 0),
+        maxSpeedKmh: track.max_speed_kmh != null ? Number(track.max_speed_kmh) : null,
+        route: Array.isArray(track.route) ? track.route : [],
+        date: session.date ? new Date(session.date) : (track.started_at ? new Date(track.started_at) : undefined),
+      }))
+    } catch {
+      setStoryError('Não foi possível carregar a rota desta corrida.')
+    } finally {
+      setStoryLoading(false)
+    }
+  }, [session.id, session.activityType, session.distanceMeters, session.totalTime, session.avgPaceMinKm, session.caloriesEstimated, session.date])
 
   const isDirty =
     activityType !== (session.activityType ?? 'running') ||
@@ -211,6 +247,20 @@ export default function CardioSessionModal({
           />
         </div>
 
+        {/* Compartilhar Story (estilo Strava) */}
+        <button
+          type="button"
+          onClick={handleShareStory}
+          disabled={storyLoading}
+          className="w-full rounded-2xl py-3.5 text-sm font-black text-black transition-all active:scale-95 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+          style={{ background: 'linear-gradient(135deg, #eab308, #f59e0b)' }}
+        >
+          {storyLoading ? <><Loader2 size={16} className="animate-spin" /> Carregando rota...</> : '📸 Compartilhar Story'}
+        </button>
+        {storyError && (
+          <p className="text-xs text-red-300 font-bold -mt-2">{storyError}</p>
+        )}
+
         {/* Activity type selector */}
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Tipo de atividade</p>
@@ -295,6 +345,14 @@ export default function CardioSessionModal({
           </button>
         )}
       </div>
+
+      {storyContent && (
+        <CardioStoryComposer
+          open={!!storyContent}
+          content={storyContent}
+          onClose={() => setStoryContent(null)}
+        />
+      )}
     </div>
   )
 }

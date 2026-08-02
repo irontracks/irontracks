@@ -15,7 +15,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkLabExamsAccess } from '@/utils/vip/labExamsAccess'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -42,11 +42,11 @@ export async function POST(request: Request) {
     const rl = await checkRateLimitAsync(`lab-exams:create:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    // Gate VIP: feature pro+ (admin/teacher têm acesso ilimitado via role).
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
+    // Gate: VIP — ou o PRIMEIRO exame grátis (demonstração; Fase 1 da tração).
+    const access = await checkLabExamsAccess(auth.supabase, userId, 'create')
     if (!access.allowed) {
       return NextResponse.json(
-        { ok: false, error: 'vip_required', message: 'A análise de exames é exclusiva para assinantes VIP. Se você já assina, tente sair e entrar novamente.' },
+        { ok: false, error: 'vip_required', message: 'Seu primeiro exame foi por nossa conta — os próximos são exclusivos para assinantes VIP. Se você já assina, tente sair e entrar novamente.' },
         { status: 403 },
       )
     }

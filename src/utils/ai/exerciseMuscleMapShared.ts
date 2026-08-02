@@ -6,25 +6,12 @@
  * duplicado byte-a-byte (parse do JSON do modelo + normalização dos itens +
  * schema do prompt).
  */
-import { z } from 'zod'
-import { parseJsonWithSchema } from '@/utils/zod'
 import { isRecord } from '@/utils/guards'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
-
-export const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
-
-export const extractJsonFromModelText = (text: string) => {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return null
-  const direct = safeJsonParse(cleaned)
-  if (direct) return direct
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  return safeJsonParse(cleaned.slice(start, end + 1))
-}
+// Fonte única (re-exportada pra não quebrar quem importa daqui).
+export { safeJsonParse, extractJsonFromModelText } from '@/utils/ai/extractJson'
 
 const toStr = (v: unknown) => String(v || '').trim()
 
@@ -43,6 +30,59 @@ export const MUSCLE_MAP_JSON_SCHEMA = [
   '  ]',
   '}',
 ].join('\n')
+
+/**
+ * Structured output (vai na CHAMADA, não só no texto do prompt).
+ *
+ * Auditoria de 02/08/2026: das 27 rotas de IA, 24 pediam JSON só no prompt — a
+ * mesma classe que produziu o `protocol_failed` dos exames (o modelo caro gasta
+ * budget "pensando" e trunca o JSON; cada retry é chamada paga). Este é o
+ * espelho executável do `MUSCLE_MAP_JSON_SCHEMA` acima; o normalizador continua
+ * sendo o juiz final (filtra muscleId inválido e re-normaliza pesos).
+ */
+export const MUSCLE_MAP_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    items: {
+      type: 'ARRAY',
+      maxItems: 40,
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          canonical_name: { type: 'STRING' },
+          contributions: {
+            type: 'ARRAY',
+            maxItems: 12,
+            items: {
+              type: 'OBJECT',
+              properties: {
+                muscleId: { type: 'STRING' },
+                weight: { type: 'NUMBER' },
+                role: { type: 'STRING', enum: ['primary', 'secondary', 'stabilizer'] },
+              },
+              required: ['muscleId', 'weight', 'role'],
+              propertyOrdering: ['muscleId', 'weight', 'role'],
+            },
+          },
+          unilateral: { type: 'BOOLEAN' },
+          confidence: { type: 'NUMBER' },
+          notes: { type: 'STRING' },
+        },
+        required: ['name', 'canonical_name', 'contributions', 'unilateral', 'confidence', 'notes'],
+        propertyOrdering: ['name', 'canonical_name', 'contributions', 'unilateral', 'confidence', 'notes'],
+      },
+    },
+  },
+  required: ['items'],
+} as const
+
+export const muscleMapGenerationConfig = () => ({
+  responseMimeType: 'application/json',
+  responseSchema: MUSCLE_MAP_RESPONSE_SCHEMA,
+  maxOutputTokens: 8000,
+  temperature: 0.3,
+})
 
 /**
  * Normaliza a resposta do modelo em linhas de exercise_muscle_maps.

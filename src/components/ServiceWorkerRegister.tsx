@@ -23,15 +23,31 @@ export default function ServiceWorkerRegister() {
 
   const [updateReady, setUpdateReady] = useState(false)
   const [updating, setUpdating] = useState(false)
+  /**
+   * Versão nova pronta, mas ADIADA porque há treino em andamento.
+   *
+   * Enquanto isso era invisível, o app podia ficar horas atrás do servidor sem
+   * o usuário saber nem ter como forçar — e correções "no ar" simplesmente não
+   * chegavam a quem estava testando com um treino aberto.
+   */
+  const [deferredByWorkout, setDeferredByWorkout] = useState(false)
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const refreshRef = useRef(false)
+  const controlledRef = useRef(false)
 
   useEffect(() => {
     try {
       if (!('serviceWorker' in navigator)) return
       if (isLocalhost()) return
+      controlledRef.current = Boolean(navigator.serviceWorker.controller)
 
       const onControllerChange = () => {
+        // The first controller claim is a normal fresh install, not an update.
+        // Reloading here caused Android users to see a blocking black overlay.
+        if (!controlledRef.current) {
+          controlledRef.current = true
+          return
+        }
         if (refreshRef.current) return
         refreshRef.current = true
         setUpdating(true)
@@ -53,6 +69,13 @@ export default function ServiceWorkerRegister() {
         // deploy, this guarantees the update check actually sees changes.
         const reg = await navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         registrationRef.current = reg
+
+        // Checa versão nova JÁ NO BOOT. Sem isto, a primeira verificação só
+        // acontecia 15 min depois (ou num visibilitychange): quem abre o app,
+        // testa e fecha ficava com o bundle antigo sem nunca saber. Foi assim
+        // que uma sessão inteira de correções foi testada contra código velho
+        // (ago/2026) — o servidor certo, o aparelho atrasado.
+        try { await reg.update() } catch { /* offline: tenta de novo depois */ }
 
         if (reg.waiting) {
           setUpdateReady(true)
@@ -97,32 +120,87 @@ export default function ServiceWorkerRegister() {
     } catch {}
   }, [appVersion])
 
-  const applyUpdate = () => {
-    const reg = registrationRef.current
-    const waiting = reg?.waiting
+  // ─── Atualização automática ──────────────────────────────────────────────
+  //
+  // Antes isto era um modal que COBRIA a tela inteira (fixed inset-0) e exigia
+  // tocar em "Atualizar agora" pra liberar o app. Virava um pedágio a cada deploy.
+  //
+  // Agora aplica sozinho — mas só num momento SEGURO. Aplicar a atualização
+  // dispara controllerchange, que recarrega a página; se isso acontecer no meio
+  // de uma série, o usuário perde o contexto sem entender por quê. As duas
+  // janelas seguras:
+  //   • app em background (visibilityState hidden) — o reload é invisível;
+  //   • app visível SEM treino em andamento — nada crítico na tela.
+  // Com treino ativo, adia e reavalia (o hook useActiveSession marca o atributo).
+  useEffect(() => {
+    if (!updateReady || updating) return
+
+    const workoutInProgress = () => {
+      try {
+        return document.documentElement.dataset.workoutActive === '1'
+      } catch {
+        return false
+      }
+    }
+
+    const applyIfSafe = () => {
+      const waiting = registrationRef.current?.waiting
+      if (!waiting) return
+      const hidden = document.visibilityState === 'hidden'
+      if (!hidden && workoutInProgress()) { setDeferredByWorkout(true); return }
+      setDeferredByWorkout(false)
+      setUpdating(true)
+      trackUserEvent('sw_update_auto_applied', {
+        type: 'sw',
+        metadata: { version: appVersion, hidden, deferredByWorkout: false },
+      })
+      try {
+        waiting.postMessage({ type: 'SKIP_WAITING' })
+      } catch {}
+    }
+
+    applyIfSafe()
+    // Reavalia quando o app sai/volta do background e periodicamente, pra cobrir o
+    // caso "estava treinando quando a versão ficou pronta".
+    document.addEventListener('visibilitychange', applyIfSafe)
+    const retry = window.setInterval(applyIfSafe, 30_000)
+    return () => {
+      document.removeEventListener('visibilitychange', applyIfSafe)
+      window.clearInterval(retry)
+    }
+  }, [updateReady, updating, appVersion])
+
+  /**
+   * Aplica na marra, a pedido do usuário. Recarrega a página — por isso só
+   * acontece por toque explícito, nunca sozinho durante o treino.
+   */
+  const applyNow = () => {
+    const waiting = registrationRef.current?.waiting
     if (!waiting) return
     setUpdating(true)
-    try {
-      waiting.postMessage({ type: 'SKIP_WAITING' })
-    } catch {}
+    trackUserEvent('sw_update_manual_applied', { type: 'sw', metadata: { version: appVersion } })
+    try { waiting.postMessage({ type: 'SKIP_WAITING' }) } catch { }
   }
 
-  if (!updateReady && !updating) return null
+  // Silencioso no caso normal: quando dá pra aplicar, aplica sozinho e ninguém
+  // precisa ver nada. O aviso só aparece no caso em que ficaria preso —
+  // atualização pronta + treino em andamento.
+  if (!deferredByWorkout || updating) return null
 
   return (
-    <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-950 p-5 text-center shadow-2xl">
-        <div className="text-sm uppercase tracking-[0.25em] text-neutral-500 font-bold">Atualização</div>
-        <div className="mt-2 text-lg font-black text-white">Nova versão pronta</div>
-        <div className="mt-2 text-sm text-neutral-400">Atualize para continuar com a melhor experiência.</div>
-        <button
-          type="button"
-          onClick={applyUpdate}
-          className="mt-4 w-full min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
-        >
-          {updating ? 'Atualizando...' : 'Atualizar agora'}
-        </button>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={applyNow}
+      className="fixed left-1/2 -translate-x-1/2 z-[3000] inline-flex items-center gap-2 px-3 py-2 rounded-full border text-[12px] font-bold shadow-lg active:scale-95 transition"
+      style={{
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 92px)',
+        background: 'rgba(234,179,8,0.95)',
+        borderColor: 'rgba(234,179,8,0.5)',
+        color: '#000',
+      }}
+      aria-label="Atualização disponível — tocar para aplicar agora"
+    >
+      Atualização pronta · tocar para aplicar
+    </button>
   )
 }

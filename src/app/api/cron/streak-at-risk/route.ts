@@ -2,15 +2,24 @@ import { NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
-import { brtDateKey, brtDateKeyDaysAgo } from '@/utils/cron/dateBrt'
+import { brtDateKey } from '@/utils/cron/dateBrt'
+import { shouldNotifyStreakAtRisk } from '@/utils/cron/streakRisk'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Daily cron — fires at 00:00 UTC (21:00 BRT). For each user whose current
- * streak is ≥ 3 and who has NOT trained today (BRT), sends a self push to
- * preserve the streak.
+ * Daily cron — fires at 00:00 UTC (21:00 BRT). Sends a self push to users
+ * whose training week is genuinely at risk and who have NOT trained today
+ * (BRT). The decision itself lives in `utils/cron/streakRisk` (pure +
+ * tested); this route only gathers the data it needs.
+ *
+ * Meta semanal manda no alerta
+ * ────────────────────────────
+ * Até jul/2026 o único critério era "≥3 dias de calendário consecutivos",
+ * então quem treina 5x/semana levava o push no PRÓPRIO dia de descanso
+ * planejado. Agora, quando o usuário declarou
+ * `preferences.trainingFrequencyPerWeek`, a meta é a fonte de verdade.
  *
  * Timezone correctness
  * ────────────────────
@@ -50,19 +59,31 @@ export async function GET(req: Request) {
       datesByUser.get(uid)!.add(brtKey)
     }
 
-    const atRisk: string[] = []
-    datesByUser.forEach((set, uid) => {
-      if (set.has(todayKey)) return // already trained today (BRT)
-      // Compute streak ending yesterday (BRT)
-      let daysAgo = 1
-      let streak = 0
-      while (streak < 365) {
-        const key = brtDateKeyDaysAgo(daysAgo)
-        if (!set.has(key)) break
-        streak += 1
-        daysAgo += 1
+    // Frequência semanal declarada por cada usuário com histórico recente.
+    const candidateIds = Array.from(datesByUser.keys())
+    const targetByUser = new Map<string, number | null>()
+    if (candidateIds.length) {
+      const { data: settingsRows } = await admin
+        .from('user_settings')
+        .select('user_id, preferences')
+        .in('user_id', candidateIds)
+      for (const row of Array.isArray(settingsRows) ? settingsRows : []) {
+        const uid = String((row as { user_id?: string })?.user_id || '').trim()
+        if (!uid) continue
+        const prefs = (row as { preferences?: unknown })?.preferences
+        const target =
+          prefs && typeof prefs === 'object'
+            ? Number((prefs as Record<string, unknown>).trainingFrequencyPerWeek)
+            : NaN
+        targetByUser.set(uid, Number.isFinite(target) ? target : null)
       }
-      if (streak >= 3) atRisk.push(uid)
+    }
+
+    const atRisk: string[] = []
+    datesByUser.forEach((trainedDates, uid) => {
+      if (shouldNotifyStreakAtRisk({ trainedDates, todayKey, weeklyTarget: targetByUser.get(uid) ?? null })) {
+        atRisk.push(uid)
+      }
     })
 
     if (!atRisk.length) return NextResponse.json({ ok: true, sent: 0 })

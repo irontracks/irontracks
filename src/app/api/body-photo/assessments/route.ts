@@ -9,7 +9,10 @@
  */
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent, listCoachedStudentIds } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { pickBodyFatReference, type AssessmentBodyFatRow } from '@/utils/bodyPhoto/bodyFatCrossCheck'
+import { filterVisibleAssessments } from '@/utils/bodyPhoto/listAccess'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto } from '@/types/bodyPhotoAssessment'
@@ -40,7 +43,10 @@ export async function GET(request: Request) {
             if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
             const a = assessment as unknown as BodyPhotoAssessment
-            if (userId !== a.user_id && userId !== a.trainer_id) {
+            // Gate por VÍNCULO REAL (canCoachStudent), não por a.trainer_id — que é
+            // auto-declarável por quem cria a linha. Mesmo gate das rotas de IA desta
+            // feature (correção da brecha de dados de saúde, 2026-07-11).
+            if (userId !== a.user_id && !(await canCoachStudent({ id: userId, email: auth.user.email }, a.user_id))) {
                 return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
             }
 
@@ -57,20 +63,42 @@ export async function GET(request: Request) {
                 }),
             )
 
-            return NextResponse.json({ ok: true, assessment: a, photos: withUrls })
+            // % de gordura MEDIDA (dobras/BIA) mais próxima desta foto, para a tela
+            // cruzar com a faixa que a IA estimou. A IA nunca vê este número antes de
+            // estimar — ver utils/bodyPhoto/bodyFatCrossCheck.ts.
+            const { data: measuredRows } = await admin
+                .from('assessments')
+                .select('assessment_date, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage')
+                .eq('user_id', a.user_id)
+                .order('assessment_date', { ascending: false })
+                .limit(20)
+            const bodyFatReference = pickBodyFatReference(
+                (measuredRows || []) as AssessmentBodyFatRow[],
+                String(a.assessment_date || '').slice(0, 10),
+            )
+
+            return NextResponse.json({ ok: true, assessment: a, photos: withUrls, bodyFatReference })
         }
 
         // ── Lista ────────────────────────────────────────────────────────────
+        // A pré-filtragem no banco recorta pelos DONOS possíveis (self + alunos com
+        // vínculo vivo); `filterVisibleAssessments` aplica a regra completa da RLS
+        // — ver utils/bodyPhoto/listAccess.ts pro porquê de cada metade.
+        const coachedUserIds = await listCoachedStudentIds(userId)
         const { data: rows, error } = await admin
             .from('body_photo_assessments')
             .select('*')
-            .or(`user_id.eq.${userId},trainer_id.eq.${userId}`)
+            .in('user_id', [userId, ...coachedUserIds])
             .order('assessment_date', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(100)
         if (error) return respondDbError('body-photo:assessments:list', error)
 
-        const list = (rows || []) as unknown as BodyPhotoAssessment[]
+        const list = filterVisibleAssessments(
+            (rows || []) as unknown as BodyPhotoAssessment[],
+            userId,
+            coachedUserIds,
+        )
         if (list.length === 0) return NextResponse.json({ ok: true, assessments: [] })
 
         // Thumbnail = foto de frente de cada avaliação

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, ChevronDown, FileText } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { apiAdmin } from '@/lib/api';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 export const SystemTab: React.FC = () => {
     const {
@@ -337,12 +338,12 @@ export const SystemTab: React.FC = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                         <label htmlFor="sys-grant-days" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Dias de degustação</label>
-                        <input
+                        <NumericInput
                             id="sys-grant-days"
                             aria-label="Dias de degustação"
+                            decimal={false}
                             value={grantDays}
-                            onChange={(e) => setGrantDays(Number(e.target.value) || 1)}
-                            type="number"
+                            onValueChange={(n) => setGrantDays((n ?? 0) || 1)}
                             min={1}
                             max={365}
                             placeholder="Quantidade de dias"

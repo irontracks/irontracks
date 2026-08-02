@@ -4,6 +4,7 @@ import React, { memo, useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { pluralize } from '@/utils/format/plural'
 
 type Props = {
   isOpen: boolean
@@ -273,7 +274,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                   <div className="mt-1 flex items-center gap-1">
                     {hasWorkout ? <div className="w-2 h-2 rounded-full bg-yellow-500" /> : <div className="w-2 h-2 rounded-full bg-neutral-700" />}
                     {hasWorkout ? (
-                      <div className="text-[10px] font-bold text-neutral-300">{dayWorkouts.length} treino(s)</div>
+                      <div className="text-[10px] font-bold text-neutral-300">{pluralize(dayWorkouts.length, 'treino')}</div>
                     ) : (
                       <div className="text-[10px] font-bold text-neutral-600">—</div>
                     )}
@@ -290,7 +291,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dia selecionado</div>
                 <div className="text-white font-black">{selectedDayIso}</div>
               </div>
-              <div className="text-xs text-neutral-500">{loading ? 'Carregando…' : `${selectedWorkouts.length} treino(s)`}</div>
+              <div className="text-xs text-neutral-500">{loading ? 'Carregando…' : pluralize(selectedWorkouts.length, 'treino')}</div>
             </div>
             {selectedWorkouts.length ? (
               <div className="mt-3 space-y-2">

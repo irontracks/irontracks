@@ -66,4 +66,8 @@ export const apiAi = {
   /** POST generate workout via AI wizard */
   workoutWizard: (payload: Record<string, unknown>) =>
     apiPost<Record<string, unknown>>('/api/ai/workout-wizard', payload),
+
+  /** POST generate a workout plan personalizado pelos dados do ALUNO (coach) */
+  studentWorkout: (payload: Record<string, unknown>) =>
+    apiPost<Record<string, unknown>>('/api/ai/student-workout', payload),
 }

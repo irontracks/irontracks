@@ -12,17 +12,57 @@ export type { AiErrorCode }
 const RETRYABLE_CODES: ReadonlySet<AiErrorCode> = new Set(['ai_upstream_error', 'ai_timeout'])
 
 /**
+ * gRPC status names that the `@google/genai` SDK returns inside its ApiError
+ * payload, mapped to the HTTP status they correspond to.
+ */
+const GRPC_STATUS_TO_HTTP: Record<string, number> = {
+  RESOURCE_EXHAUSTED: 429,
+  PERMISSION_DENIED: 403,
+  NOT_FOUND: 404,
+  INVALID_ARGUMENT: 400,
+  UNAVAILABLE: 503,
+  DEADLINE_EXCEEDED: 504,
+  INTERNAL: 500,
+}
+
+/**
+ * Extract the upstream HTTP status from a Gemini error message, whatever shape
+ * it arrives in.
+ *
+ * Two shapes exist in the wild, and missing the second one costs real users:
+ *   1. legacy `@google/generative-ai`: "[429 Too Many Requests] …"
+ *   2. current `@google/genai` ApiError: a JSON string
+ *      `{"error":{"code":429,…,"status":"RESOURCE_EXHAUSTED"}}`
+ *
+ * Só o formato (1) era reconhecido. Em 31/07/2026 a quota diária da chave
+ * Gemini estourou e o 429 do formato (2) caiu no default `ai_error` → a tela da
+ * Avaliação por Foto exibia "ai_error" em vez de avisar que era limite de uso.
+ * Isso valia para TODAS as rotas de IA, não só essa.
+ */
+function extractUpstreamStatus(raw: string): number {
+  const bracketed = raw.match(/\[(\d{3})\b/)
+  if (bracketed) return Number(bracketed[1])
+
+  const jsonCode = raw.match(/"code"\s*:\s*(\d{3})\b/)
+  if (jsonCode) return Number(jsonCode[1])
+
+  const grpc = raw.match(/"status"\s*:\s*"([A-Z_]+)"/)
+  if (grpc && GRPC_STATUS_TO_HTTP[grpc[1]]) return GRPC_STATUS_TO_HTTP[grpc[1]]
+
+  return 0
+}
+
+/**
  * Map a raw Gemini SDK / fetch error to one of our canonical codes.
  * Does NOT build a NextResponse — use `handleGeminiError` for that.
  */
 export function classifyGeminiError(e: unknown): AiErrorCode {
   const raw = getErrorMessage(e) || String(e)
-  // Timeout from our AbortController / fetch
-  if (/aborted|timeout/i.test(raw) && !/\[\d{3}\b/.test(raw)) return 'ai_timeout'
+  const upstream = extractUpstreamStatus(raw)
 
-  // Pull the first 3-digit HTTP status between brackets, e.g. "[429 Too Many Requests]"
-  const m = raw.match(/\[(\d{3})\b/)
-  const upstream = m ? Number(m[1]) : 0
+  // Timeout do nosso AbortController / fetch — só quando NÃO há status upstream
+  // (senão um payload que menciona "timeout" mascararia o 429/503 real).
+  if (!upstream && /aborted|timeout/i.test(raw)) return 'ai_timeout'
 
   if (upstream === 429) return 'ai_rate_limited'
   if (upstream === 403) return 'ai_forbidden'

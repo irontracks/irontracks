@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 export interface ManualExercise {
     name: string;
@@ -55,12 +57,15 @@ export function HistoryListEditModal({
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
     useBackHandler(true, onClose);
+    // Congela o body: sem isto o WKWebView rola a página pra revelar o input
+    // focado e arrasta o modal (jitter subindo/descendo no iOS).
+    useBodyScrollLock(true);
     return (
         <div
             role="button"
             tabIndex={-1}
             aria-label="Fechar modal"
-            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-start justify-center p-4"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
@@ -69,7 +74,14 @@ export function HistoryListEditModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="history-edit-title"
-                className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
+                // Ancorado no topo (items-start) + altura capada em coluna flex: ao abrir o
+                // teclado no iOS o WebView encolhe; com o modal CENTRALIZADO isso recentralizava
+                // a cada frame → loop de subir/descer. No topo a posição não depende do viewport.
+                // ALTURA via max-h-full (relativa ao overlay fixo inset-0), NÃO dvh: o `dvh`
+                // oscila rápido no iOS com o teclado aberto (o browser fica recalculando o
+                // dynamic viewport) — era o "subindo/descendo muito rápido". O overlay já
+                // desconta o teclado (inset-0 = área do WebView), então full é estável.
+                className="w-full max-w-2xl max-h-full flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',
@@ -81,8 +93,11 @@ export function HistoryListEditModal({
                     <h3 id="history-edit-title" className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Histórico</h3>
                 </div>
 
-                <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Scroll só no eixo vertical: overflow-x-hidden mata o arrasto lateral
+                    (o overflow-y:auto fazia o x virar 'auto' por spec) e overscroll-none
+                    corta o rubber-band pra além do topo/fim. */}
+                <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none">
+                    <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
                         <div>
                             <div className="text-[10px] uppercase font-bold text-neutral-400">Título</div>
                             <input
@@ -97,7 +112,6 @@ export function HistoryListEditModal({
                             <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                             <input
                                 aria-label="Duração (min)"
-                                type="number"
                                 inputMode="numeric"
                                 value={editDuration}
                                 onChange={(e) => setEditDuration(e.target.value)}
@@ -136,12 +150,11 @@ export function HistoryListEditModal({
                             // não tem id estável (são derivados do session.exercises legado).
                             <div key={`${ex?.name || 'ex'}-${idx}`} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                     <div>
                                         <div className="text-[10px] text-neutral-400">Sets</div>
                                         <input
                                             aria-label="Sets"
-                                            type="number"
                                             inputMode="numeric"
                                             value={ex.sets}
                                             onChange={(e) => updateEditExercise(idx, 'sets', e.target.value)}
@@ -169,19 +182,18 @@ export function HistoryListEditModal({
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-neutral-400">Descanso (s)</div>
-                                        <input
+                                        <NumericInput
                                             aria-label="Descanso (s)"
-                                            type="number"
-                                            inputMode="numeric"
+                                            decimal={false}
                                             value={ex.restTime || 0}
-                                            onChange={(e) => updateEditExercise(idx, 'restTime', e.target.value)}
+                                            onValueChange={(n) => updateEditExercise(idx, 'restTime', n ?? 0)}
                                             className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                         />
                                     </div>
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}
@@ -197,7 +209,7 @@ export function HistoryListEditModal({
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400">Reps por série</div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}

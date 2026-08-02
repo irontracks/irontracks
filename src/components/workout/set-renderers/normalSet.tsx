@@ -14,6 +14,10 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import type { SetType } from '@/types/workout';
 import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
+import { logWarnRemote } from '@/lib/logger';
+import { decideExternalSync } from '../helpers/inputSyncDecision';
+import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
+import { AutoloadNote } from './AutoloadNote';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -23,19 +27,76 @@ import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../
 // global log on change (for immediate persistence), but reads from local state
 // so the displayed value is never clobbered by an external re-render while
 // the user is typing.
-function useInputField(externalValue: string, onChange: (v: string) => void) {
+/** Janela em que um valor DIGITADO é protegido de ser descartado por um
+ *  `externalValue` vazio (a gravação ainda não voltou pelo estado do React). */
+const TYPED_VALUE_GRACE_MS = 2000;
+
+function useInputField(externalValue: string, onChange: (v: string) => void, label?: string) {
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
   const blurredAtRef = useRef(0);
+  // Momento da última DIGITAÇÃO. A guarda abaixo olhava só o blur — e o Sentry
+  // (workout.input.typed-value-discarded, 8 eventos em 24 h no iPhone do dono)
+  // mostrou o descarte acontecendo com `blurredAtRef` ainda ZERO, ou seja SEM blur
+  // nenhum: `Date.now() - 0` é um número gigante, a guarda não pegava e o valor
+  // digitado era jogado fora. Todos os eventos eram unilaterais (L_/R_), onde o
+  // efeito de re-sync do autoload dispara um updateLog extra logo depois da tecla —
+  // re-render que chega ANTES do setState do campo propagar, trazendo externo vazio.
+  const typedAtRef = useRef(0);
+  // `onChange` num ref: o efeito abaixo precisa devolver o valor ao log sem
+  // entrar nas deps (o efeito reage só a `externalValue`, de propósito).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  // Trava de restauração: devolve o valor perdido UMA vez por instância. Se o
+  // externo insistir em voltar vazio, aceita — melhor perder o campo do que ficar
+  // num vai-e-volta infinito com o estado de cima.
+  const restoredRef = useRef(false);
 
   useEffect(() => {
-    if (isFocused.current) return;
-    if (
-      localValue &&
-      !externalValue &&
-      Date.now() - blurredAtRef.current < 2000
-    ) {
+    const agora = Date.now();
+    const decisao = decideExternalSync({
+      localValue,
+      externalValue,
+      isFocused: isFocused.current,
+      blurredAt: blurredAtRef.current,
+      typedAt: typedAtRef.current,
+      now: agora,
+      graceMs: TYPED_VALUE_GRACE_MS,
+      alreadyRestored: restoredRef.current,
+    });
+
+    if (decisao === 'keep') return;
+
+    // O valor sumiu do log sem o usuário ter tocado no campo — devolve. É a
+    // última camada que ainda tem o valor em mãos no momento em que ele some.
+    if (decisao === 'restore') {
+      restoredRef.current = true;
+      if (label) {
+        logWarnRemote('workout.input.persisted-value-vanished', `${label} sumiu do log sem o usuário mexer`, {
+          field: label,
+          value: localValue,
+          focused: isFocused.current,
+        });
+      }
+      try { onChangeRef.current?.(localValue); } catch { /* best effort */ }
       return;
+    }
+    // FLIGHT-RECORDER (bug "digito e some"): um valor DIGITADO está prestes a ser
+    // descartado porque o valor persistido (`externalValue`) voltou vazio. As 4
+    // camadas de merge defensivo (useInputField → updateLog → handleUpdateSessionLog
+    // → reconciliação) deveriam impedir isso, e não reproduz em dev — mas o usuário
+    // relata perda intermitente de RPE/reps no device. Reporta o contexto exato ao
+    // Sentry pra pegar a corrida no ambiente real, em vez de reverter em silêncio.
+    if (label && localValue && !externalValue) {
+      logWarnRemote('workout.input.typed-value-discarded', `${label} digitado descartado p/ vazio`, {
+        field: label,
+        typed: localValue,
+        // `null` quando o evento nunca ocorreu — antes mandávamos `Date.now() - 0`,
+        // um epoch inteiro disfarçado de duração (foi o que denunciou o bug).
+        sinceBlurMs: blurredAtRef.current > 0 ? Date.now() - blurredAtRef.current : null,
+        sinceTypedMs: typedAtRef.current > 0 ? Date.now() - typedAtRef.current : null,
+        focused: isFocused.current,
+      });
     }
     setLocalValue(externalValue);
   // localValue intentionally excluded — we only react to external changes
@@ -45,6 +106,10 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const v = e.target.value;
+      // Marca ANTES de propagar: o re-render disparado por onChange (ou por um
+      // efeito vizinho, como o re-sync do autoload) precisa ver esta digitação
+      // pra não descartar o valor achando que o campo está vazio.
+      typedAtRef.current = Date.now();
       setLocalValue(v);
       onChange(v);
     },
@@ -91,6 +156,8 @@ const NormalSetInner = ({
     openNotesKeys,
     toggleNotes,
     deloadSuggestions,
+    autoLoadEnabled,
+    autoLoadSuggestions,
     setCollapsed,
     reportHistory,
     settings,
@@ -151,6 +218,62 @@ const NormalSetInner = ({
   const lDone = !!log.L_done;
   const rDone = !!log.R_done;
   const done  = !!log.done;
+  // #4a auto-carga: série levada à falha muscular. RPE 10 ≠ sempre falha; esse
+  // sinal explícito muda a decisão de progressão do motor (falhou → não sobe carga).
+  const failed = !!log.failure;
+
+  // #autoload: sugestão do motor para esta série (só quando ligado) + fonte do peso.
+  const autoSuggestion = autoLoadEnabled ? autoLoadSuggestions?.[key] : null;
+  const autoSuggestionWeight = autoSuggestion?.weight ?? null;
+  // O destaque violeta + o 🧠 só valem quando o valor na caixa É a sugestão atual.
+  // Sem esta igualdade a UI mentia: caixa com 90 (preenchimento antigo) e hint
+  // dizendo "subi p/ 95kg" (sugestão nova) — número e explicação divergindo.
+  const isAutoWeight = Boolean(
+    autoLoadEnabled && log.weightSource === 'auto' && !log.done &&
+    autoSuggestionWeight != null && String(log.weight ?? '') === String(autoSuggestionWeight),
+  );
+  // Dica de montagem (barra / máquina de anilha): "8×20 + 1×2,5 por lado".
+  const autoPlateHint = plateHintForExercise(ex?.name, autoSuggestionWeight) ?? '';
+
+  // Preenche a caixa de peso com a sugestão do motor — SÓ em série de trabalho, ainda
+  // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
+  // (source='auto') ou de o usuário editar (source='user'), nunca mais reescreve.
+  useEffect(() => {
+    if (!autoLoadEnabled || isUnilateral) return;
+    if (setType !== 'working' || log.done) return;
+    if (autoSuggestionWeight == null) return;
+    if (log.weightSource === 'user') return; // o usuário assumiu — nunca reescreve
+    const current = String(log.weight ?? '').trim();
+    const next = String(autoSuggestionWeight);
+    if (current === next) return; // já sincronizado
+    // Valor preexistente que NÃO é nosso (sessão restaurada, peso do template) → respeita.
+    if (current !== '' && log.weightSource !== 'auto') return;
+    // Preenche quando vazio E re-sincroniza quando a sugestão muda (o histórico é
+    // carregado do cache primeiro e atualizado pela rede depois). Sem isto o número
+    // congelava desatualizado e passava a contradizer a explicação.
+    updateLog(key, { weight: next, weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null });
+  }, [autoLoadEnabled, isUnilateral, setType, log.done, log.weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
+
+  // Unilateral: preenche AMBOS os lados (L_weight/R_weight) com a sugestão — a série
+  // de trabalho não concluída, lados vazios e não tocados (weightSource nulo).
+  useEffect(() => {
+    if (!autoLoadEnabled || !isUnilateral) return;
+    if (setType !== 'working' || log.done) return;
+    if (autoSuggestionWeight == null) return;
+    if (log.weightSource === 'user') return; // o usuário assumiu um dos lados — não toca
+    const next = String(autoSuggestionWeight);
+    const l = String(log.L_weight ?? '').trim();
+    const r = String(log.R_weight ?? '').trim();
+    // Preenche o lado vazio E re-sincroniza o que ainda é nosso ('auto') quando a
+    // sugestão muda — senão o número congela e contradiz a explicação.
+    const lStale = l !== next && (l === '' || log.weightSource === 'auto');
+    const rStale = r !== next && (r === '' || log.weightSource === 'auto');
+    if (!lStale && !rStale) return;
+    const patch: Record<string, unknown> = { weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null };
+    if (lStale) patch.L_weight = next;
+    if (rStale) patch.R_weight = next;
+    updateLog(key, patch);
+  }, [autoLoadEnabled, isUnilateral, setType, log.done, log.L_weight, log.R_weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
 
   // External values — non-unilateral
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
@@ -195,26 +318,36 @@ const NormalSetInner = ({
   // Peso nunca é negativo (viraria volume negativo no resumo/sugestão). Normaliza
   // tirando o sinal na gravação. (reps NÃO passa por aqui — pode ser faixa "8-12".)
   const noNegWeight = (v: string) => String(v ?? '').replace(/-/g, '');
+  // #autoload: ao editar o peso na mão, marca a fonte como 'user' — isso desliga o
+  // preenchimento automático desta série e alimenta o aprendizado de override (fase futura).
   const weightField = useInputField(extWeight, (v) =>
-    updateLog(key, { weight: noNegWeight(v), advanced_config: cfg ?? log.advanced_config ?? null }),
+    updateLog(key, {
+      weight: noNegWeight(v),
+      ...(autoLoadEnabled ? { weightSource: 'user' } : {}),
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    }),
   );
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
+  'reps');
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
+  'rpe');
   const notesField = useInputField(extNotes, (v) =>
     updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
 
   // ── Input fields — unilateral ─────────────────────────────────────────
-  const lWeightField = useInputField(extLWeight, (v) => updateLog(key, { L_weight: noNegWeight(v) }));
-  const rWeightField = useInputField(extRWeight, (v) => updateLog(key, { R_weight: noNegWeight(v) }));
-  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }));
-  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }));
-  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
-  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }));
+  // Marca a fonte como 'user' ao editar um lado — sem isto a re-sincronização do
+  // autoload sobrescreveria o peso que o usuário digitou no lado.
+  const lWeightField = useInputField(extLWeight, (v) =>
+    updateLog(key, { L_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
+  const rWeightField = useInputField(extRWeight, (v) =>
+    updateLog(key, { R_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
+  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps');
+  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps');
+  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe');
+  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe');
 
   // Shared input style — weight column (3fr, roomy)
   const inputBase =
@@ -254,10 +387,36 @@ const NormalSetInner = ({
       const nextPlanned = getPlannedSet(ex, setIdx + 1);
       const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+    } else {
+      // Concluir a série e NÃO cair no descanso — o app segue direto pra próxima.
+      // Relatado em treino (2026-07-31) como "às vezes não vai pro descanso".
+      // Aqui a causa é sempre a mesma: este exercício não tem tempo de descanso
+      // configurado. Instrumentado porque só o payload diz se é config do treino
+      // (esperado) ou `restTime` chegando vazio por bug de leitura do plano — as
+      // duas hipóteses são indistinguíveis do lado de fora.
+      logWarnRemote('workout.rest.skipped-no-rest-time', 'série concluída sem descanso: restTime ausente', {
+        exercise: String((ex as { name?: unknown })?.name ?? ''),
+        exIdx,
+        setIdx,
+        restTimeRaw: String(restTime ?? ''),
+        method: String((ex as { method?: unknown })?.method ?? ''),
+      });
     }
     if (setsCount != null && setIdx === setsCount - 1) {
       collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
     }
+  };
+
+  // Tempo de execução da série (unilateral): mesmo cálculo do bilateral, a partir
+  // do `startedAtMs` gravado quando o usuário dá START no descanso. Era fixo em 0,
+  // então a coluna EXECUÇÃO do relatório saía vazia em TODO exercício unilateral.
+  const execSecondsFrom = (nowMs: number) => {
+    const startedRaw = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs =
+      typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+    return Number.isFinite(startedAtMs) && startedAtMs > 0
+      ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000))
+      : 0;
   };
 
   // ── Unilateral: complete L side ───────────────────────────────────────
@@ -287,7 +446,7 @@ const NormalSetInner = ({
       L_reps: lRepsField.value,
       L_weight: lWeightField.value,
       L_rpe: lRpeField.value,
-      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: execSecondsFrom(nowMs) } : {}),
       advanced_config: cfg ?? log.advanced_config ?? null,
     });
 
@@ -325,7 +484,7 @@ const NormalSetInner = ({
       R_reps: rRepsField.value,
       R_weight: rWeightField.value,
       R_rpe: rRpeField.value,
-      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: execSecondsFrom(nowMs) } : {}),
       advanced_config: cfg ?? log.advanced_config ?? null,
     });
 
@@ -405,6 +564,12 @@ const NormalSetInner = ({
           ? 'bg-amber-500 text-black border border-amber-500/50 shadow-sm shadow-amber-900/30'
           : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
 
+    // #autoload: destaca o input do lado quando o valor ainda é a sugestão do motor.
+    const sideIsAuto = Boolean(
+      autoLoadEnabled && !done && log.weightSource === 'auto' &&
+      autoSuggestionWeight != null && String(wField.value) === String(autoSuggestionWeight),
+    );
+
     return (
       <div
         {...(isFirst ? { 'data-set-first': exIdx } : {})}
@@ -419,7 +584,7 @@ const NormalSetInner = ({
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}
-        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
+        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -429,7 +594,8 @@ const NormalSetInner = ({
             onFocus={wField.handleFocus}
             onBlur={wField.handleBlur}
             placeholder={weightPlaceholder}
-            className={inputBase}
+            title={sideIsAuto ? (autoSuggestion?.rationale || undefined) : undefined}
+            className={sideIsAuto ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
           />
 
           {/* Reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
@@ -460,10 +626,12 @@ const NormalSetInner = ({
           <button
             type="button"
             onClick={onComplete}
-            className={`inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
+            className={`inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
-            {sideDone ? '✓' : `${side} ✓`}
+            {/* Mesmo rótulo dos demais métodos (Concluir/Feito). O lado não precisa
+                estar aqui: o badge "LADO E/D" logo acima da linha já diz qual é. */}
+            {sideDone ? 'Feito' : 'Concluir'}
           </button>
         </div>
       </div>
@@ -475,7 +643,7 @@ const NormalSetInner = ({
   const renderUnilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
+      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
@@ -486,7 +654,7 @@ const NormalSetInner = ({
   const renderBilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
+      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span className="text-center">Set</span>
       <span />
@@ -497,6 +665,23 @@ const NormalSetInner = ({
     </div>
   );
 
+  const failureToggle = (
+    <button
+      type="button"
+      onClick={() => updateLog(key, { failure: !failed, advanced_config: cfg ?? log.advanced_config ?? null })}
+      aria-pressed={failed}
+      aria-label={`Marcar série ${setIdx + 1} como levada à falha`}
+      className={[
+        'inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest border transition-colors',
+        failed
+          ? 'text-red-300 bg-red-500/15 border-red-500/40'
+          : 'text-neutral-500 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',
+      ].join(' ')}
+    >
+      💥 {failed ? 'Falha' : 'Falha?'}
+    </button>
+  );
+
   return (
     <div className="space-y-1" key={key}>
       {isUnilateral ? (
@@ -504,8 +689,15 @@ const NormalSetInner = ({
           {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
+          <AutoloadNote
+            show={Boolean(autoLoadEnabled && !done && log.weightSource === 'auto')}
+            rationale={autoSuggestion?.rationale ?? ''}
+            plateHint={autoPlateHint}
+            className="px-0.5"
+          />
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
-          <div className="flex items-center justify-end px-0.5 -mt-0.5">
+          <div className="flex items-center justify-end gap-2 px-0.5 -mt-0.5">
+            {failureToggle}
             <button
               type="button"
               aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
@@ -540,7 +732,7 @@ const NormalSetInner = ({
               warmup or feeler (popover) — taps do nothing to avoid accidents
               during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '32px 36px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 36px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}>
 
             {/* Set-number badge with long-press → SetTypePopover */}
             <button
@@ -580,7 +772,8 @@ const NormalSetInner = ({
               onFocus={weightField.handleFocus}
               onBlur={weightField.handleBlur}
               placeholder={weightPlaceholder}
-              className={inputBase}
+              title={isAutoWeight ? (autoSuggestion?.rationale || undefined) : undefined}
+              className={isAutoWeight ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
             />
 
             {/* reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
@@ -612,15 +805,27 @@ const NormalSetInner = ({
               type="button"
               onClick={handleComplete}
               className={[
-                'inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
                   : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
               ].join(' ')}
             >
               <Check size={13} />
-              {done ? 'Feito' : 'OK'}
+              {done ? 'Feito' : 'Concluir'}
             </button>
+          </div>
+          {/* Linha de rodapé: explicação da sugestão (🧠) à esquerda + chip de falha à direita */}
+          <div className="mt-1 flex items-center justify-between gap-2">
+            {isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
+              <AutoloadNote show rationale={autoSuggestion?.rationale ?? ''} plateHint={autoPlateHint} />
+            ) : autoLoadEnabled && setType === 'working' && !done && autoSuggestionWeight == null && autoSuggestion?.rationale ? (
+              /* Motor ligado que não teve base pra sugerir: mostra o PORQUÊ em cinza.
+                 O rationale já era computado e jogado fora, então o usuário via uma
+                 caixa vazia igualzinha à de quem está com o autoload desligado. */
+              <AutoloadNote show muted rationale={autoSuggestion.rationale} />
+            ) : <span />}
+            {failureToggle}
           </div>
           {/* Per-set method picker */}
           {!done && (

@@ -49,6 +49,21 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
+
+    // Anti-hijack (espelha push/register): se este token de Live Activity já está registrado
+    // sob OUTRO usuário, recusa. Impede um atacante de reivindicar o token da vítima sob a
+    // própria conta (redirecionaria updates da Dynamic Island). Registro do próprio token
+    // (mesmo user, outra activity) segue liberado.
+    const { data: otherOwner } = await admin
+      .from('live_activity_push_tokens')
+      .select('user_id')
+      .eq('token', token)
+      .neq('user_id', user.id)
+      .limit(1)
+    if (Array.isArray(otherOwner) && otherOwner.length > 0) {
+      return NextResponse.json({ ok: false, error: 'token_owned_by_another_user' }, { status: 409 })
+    }
+
     const { error } = await admin
       .from('live_activity_push_tokens')
       .upsert(

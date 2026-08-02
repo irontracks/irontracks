@@ -6,7 +6,11 @@ import Link from 'next/link'
 import { ArrowRight, Globe, Star } from 'lucide-react'
 
 const APPLE = 'https://apps.apple.com/br/app/irontracks/id6758735356'
-const PLAY  = 'https://play.google.com/apps/internaltest/4701049092773956563'
+// Android em teste FECHADO (faixa Alpha) via Grupo do Google com entrada livre.
+// O testador entra no grupo (sem aprovação) e depois abre o opt-in pra virar testador.
+const GROUP = 'https://groups.google.com/g/irontracks-beta'
+const PLAY  = 'https://play.google.com/apps/testing/com.irontracks.app'
+const PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.irontracks.app'
 const WEB   = 'https://irontracks.com.br'
 
 // ── Reveal wrapper ──────────────────────────────────────────────────────────
@@ -713,8 +717,15 @@ function Wearables() {
             <h2 style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 'clamp(34px, 4.5vw, 60px)', letterSpacing: '-0.025em', lineHeight: 1.0, margin: '16px 0 20px' }}>
               Seu punho sabe mais<br /><span style={{ color: '#F5B800' }}>que sua desculpa.</span>
             </h2>
-            <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 16, lineHeight: 1.65, maxWidth: 520, marginBottom: 36 }}>
+            <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 16, lineHeight: 1.65, maxWidth: 520, marginBottom: 14 }}>
               BPM, FC de repouso, HRV, calorias e passos — do Apple Watch direto pro app, via Apple Health. Tudo sincronizado, sem precisar abrir o relógio.
+            </p>
+            {/* A página oferece download Android (botão no hero, "iOS · Android · Web"
+                nos números), mas TUDO nesta seção chega por HealthKit — é iOS. Sem este
+                aviso e sem o selo cinza do Android abaixo, o usuário Android baixava
+                esperando FC/HRV e não achava nada. */}
+            <p style={{ color: 'rgba(245,245,245,0.42)', fontSize: 13, lineHeight: 1.5, maxWidth: 520, marginBottom: 30 }}>
+              Requer iPhone com Apple Watch. No Android, a integração de saúde ainda não está disponível.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
@@ -722,6 +733,7 @@ function Wearables() {
                 { label: 'Apple Health', sub: '— HealthKit · iOS nativo', active: true },
                 { label: 'Frequência cardíaca', sub: '— BPM em tempo real', active: true },
                 { label: 'HRV & Recuperação', sub: '— SDNN · FC de repouso', active: true },
+                { label: 'Android', sub: '— Health Connect · em breve', active: false },
               ].map(chip => (
                 <div key={chip.label} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 10,
@@ -1010,61 +1022,92 @@ function Footer() {
 // ── PAGE ROOT ────────────────────────────────────────────────────────────────
 // ── ANDROID MODAL ────────────────────────────────────────────────────────────
 function AndroidModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const bodyOverflow = document.body.style.overflow
+    const rootOverflow = document.documentElement.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = bodyOverflow
+      document.documentElement.style.overflow = rootOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
+
   const steps = [
-    { n: '1', title: 'Acesse o link pelo seu Android', desc: 'Toque no botão abaixo para abrir a página do teste interno no Google Play.' },
-    { n: '2', title: 'Entre com sua conta Google', desc: 'Se não estiver logado, o Play Store vai pedir para você entrar.' },
-    { n: '3', title: 'Aceite o convite de testador', desc: 'Clique em "Aceitar convite" na página que abrir. Isso te adiciona ao programa de teste.' },
-    { n: '4', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar a sua entrada. Não feche o Play Store.' },
-    { n: '5', title: 'Instale o IronTracks', desc: 'Após o processamento, o botão de instalar vai aparecer. Toque em "Instalar" e pronto!' },
+    { n: '1', title: 'Entre no grupo de testadores', desc: 'Toque em "Entrar no grupo de testadores" e em "Participar do grupo" usando a mesma Conta Google da Play Store.' },
+    { n: '2', title: 'Acesse o teste no Google Play', desc: 'Com essa mesma Conta Google, toque em "Acessar o teste" e depois em "Tornar-se testador".' },
+    { n: '3', title: 'Aguarde a liberação do Google', desc: 'Normalmente leva alguns minutos. Em alguns casos, o Google pode levar algumas horas para liberar a instalação.' },
+    { n: '4', title: 'Instale o IronTracks', desc: 'Toque em "Abrir na Play Store" abaixo e depois em "Instalar". Pronto!' },
   ]
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="android-modal-title"
+      data-testid="android-download-overlay"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+        padding: 'max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))',
       }}
     >
       <div
+        data-testid="android-download-panel"
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#111', borderRadius: 24, padding: '36px 32px',
-          maxWidth: 480, width: '100%',
+          background: '#111', borderRadius: 24,
+          padding: 'clamp(20px, 6vw, 36px) clamp(18px, 5vw, 32px)',
+          maxWidth: 480, width: '100%', maxHeight: 'calc(100dvh - 24px)',
+          margin: 'auto 0', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box',
           border: '1px solid rgba(245,184,0,0.2)',
           boxShadow: '0 0 80px rgba(245,184,0,0.08)',
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 1,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          paddingBottom: 16, marginBottom: 12, background: '#111',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <PlaySvg />
-            <span style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>
+            <span id="android-modal-title" style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>
               Baixar para Android
             </span>
           </div>
           <button
+            type="button"
+            aria-label="Fechar"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'rgba(245,245,245,0.4)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4 }}
+            style={{ background: 'none', border: 'none', color: 'rgba(245,245,245,0.4)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4, flexShrink: 0 }}
           >
             ×
           </button>
         </div>
 
-        {/* Tag teste interno */}
+        {/* Tag versão beta (teste fechado) */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '5px 12px', borderRadius: 999, marginBottom: 24,
           background: 'rgba(245,184,0,0.08)', border: '1px solid rgba(245,184,0,0.25)',
           fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#F5B800',
         }}>
-          ⚗ Versão de Teste Interno
+          ⚗ Versão Beta — Teste Fechado
         </div>
 
         <p style={{ color: 'rgba(245,245,245,0.55)', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
-          O IronTracks para Android está em teste. Siga os passos abaixo para instalar:
+          O IronTracks para Android está em teste fechado. Use a mesma Conta Google nos 3 botões abaixo:
         </p>
 
         {/* Steps */}
@@ -1087,24 +1130,62 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {/* CTA */}
-        <a
-          href={PLAY}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
-            background: 'linear-gradient(135deg, #FFD34D 0%, #F5B800 40%, #FF7A1A 100%)',
-            color: '#000', fontWeight: 700, fontSize: 15, width: '100%',
-          }}
-        >
-          <PlaySvg />
-          Acessar o programa de teste
-        </a>
+        <div style={{
+          marginBottom: 24, padding: '12px 14px', borderRadius: 14,
+          background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.1)',
+          color: 'rgba(245,245,245,0.62)', fontSize: 12, lineHeight: 1.55,
+        }}>
+          <strong style={{ color: '#f5f5f5' }}>Apareceu “O item não foi encontrado”?</strong>{' '}
+          Abra a Play Store, toque na foto do perfil e confirme que ela está usando a mesma Conta Google dos passos 1 e 2. Depois, aguarde a liberação e tente novamente pelo botão 3.
+        </div>
+
+        {/* CTA — os 3 botões devem ser abertos com a mesma Conta Google. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <a
+            href={GROUP}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'linear-gradient(135deg, #FFD34D 0%, #F5B800 40%, #FF7A1A 100%)',
+              color: '#000', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            1 · Entrar no grupo de testadores
+          </a>
+          <a
+            href={PLAY}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'transparent', border: '1px solid rgba(245,184,0,0.4)',
+              color: '#F5B800', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            <PlaySvg />
+            2 · Acessar o teste no Google Play
+          </a>
+          <a
+            href={PLAY_STORE}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.14)',
+              color: '#f5f5f5', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            <PlaySvg />
+            3 · Abrir na Play Store
+          </a>
+        </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(245,245,245,0.25)', marginTop: 14 }}>
-          Toque fora para fechar
+          Já é testador? Toque no botão 3 para instalar direto. Toque fora para fechar.
         </p>
       </div>
     </div>

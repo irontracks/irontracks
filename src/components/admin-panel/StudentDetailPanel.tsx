@@ -1,16 +1,20 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     X, ArrowLeft, Edit3, Trash2, Download,
-    FileText, Loader2
+    FileText, Loader2, TrendingUp, MessageSquare
 } from 'lucide-react';
+import { OPEN_TEACHER_CHAT_EVENT } from '@/components/teacher-area/TeacherChatHost';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
 import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
+import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient';
 import dynamic from 'next/dynamic';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -21,6 +25,7 @@ import type { UnknownRecord } from '@/types/app'
 import { StudentCheckinsTab } from './StudentCheckinsTab';
 import { StudentEvolutionTab } from './StudentEvolutionTab';
 import { StudentWorkoutsTab } from './StudentWorkoutsTab';
+import { StudentNutritionTab } from './StudentNutritionTab';
 import { StudentVideosTab } from './StudentVideosTab';
 import { StudentProfileTab } from './StudentProfileTab';
 
@@ -32,6 +37,7 @@ const TeacherStudentWorkout = dynamic(
 
 export const StudentDetailPanel: React.FC = () => {
     const { alert } = useDialog();
+    const router = useRouter();
 
     const {
         selectedStudent,
@@ -236,6 +242,22 @@ export const StudentDetailPanel: React.FC = () => {
                                         </div>
                                     )}
                                     <div className="flex items-center gap-2 w-full">
+                                        {selectedStudent?.user_id ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEACHER_CHAT_EVENT, {
+                                                    detail: {
+                                                        userId: String(selectedStudent.user_id),
+                                                        name: String(selectedStudent.name || selectedStudent.email || ''),
+                                                        photo: selectedStudent.photo_url ?? null,
+                                                    },
+                                                }))}
+                                                className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500/10 border border-yellow-500/25 hover:bg-yellow-500/20 text-yellow-400 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                                title="Conversar com o aluno"
+                                            >
+                                                <MessageSquare size={18} /> Conversar
+                                            </button>
+                                        ) : null}
                                         <button
                                             type="button"
                                             onClick={() => setEditingStudent(true)}
@@ -291,6 +313,15 @@ export const StudentDetailPanel: React.FC = () => {
                                     < div className="mt-1 text-lg font-black text-white truncate" > {selectedStatusLabel} </div>
                                 </div>
                             </div>
+                            {selectedStudent?.user_id ? (
+                                <button
+                                    type="button"
+                                    onClick={() => router.push(`/relatorio/${String(selectedStudent.user_id)}`)}
+                                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/25 text-yellow-400 text-xs font-black uppercase tracking-widest transition-colors"
+                                >
+                                    <TrendingUp size={15} /> Ver evolução completa
+                                </button>
+                            ) : null}
                         </div>
                     )}
 
@@ -305,6 +336,16 @@ export const StudentDetailPanel: React.FC = () => {
                                 }`}
                         >
                             Treinos
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSubTab('nutrition')}
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'nutrition'
+                                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                : 'text-neutral-200'
+                                }`}
+                        >
+                            Nutrição
                         </button>
                         <button
                             type="button"
@@ -367,6 +408,11 @@ export const StudentDetailPanel: React.FC = () => {
                 {
                     !loading && subTab === 'workouts' && (
                         <StudentWorkoutsTab />
+                    )
+                }
+                {
+                    !loading && subTab === 'nutrition' && (
+                        <StudentNutritionTab />
                     )}
 
                 {
@@ -438,24 +484,17 @@ export const StudentDetailPanel: React.FC = () => {
                                             if (editingStudentWorkout.id) {
                                                 await updateWorkout(String(editingStudentWorkout.id || ''), data);
                                             } else {
-                                                const { data: nw } = await supabase
-                                                    .from('workouts')
-                                                    .insert({ user_id: targetUserId, name: data.title || 'Novo Treino', notes: '', created_by: user.id, is_template: true })
-                                                    .select()
-                                                    .single();
-                                                const toInsert = (Array.isArray(data.exercises) ? data.exercises : []).map((e) => ({
-                                                    workout_id: nw.id,
-                                                    name: e.name || '',
-                                                    sets: getSetsCount(e?.sets) || 4,
-                                                    reps: e.reps ?? '10',
-                                                    rpe: e.rpe ?? 8,
-                                                    cadence: e.cadence || '2020',
-                                                    rest_time: e.restTime ?? e.rest_time ?? 60,
-                                                    method: e.method || 'Normal',
-                                                    video_url: e.videoUrl || e.video_url || '',
-                                                    notes: e.notes || ''
-                                                }));
-                                                if (toInsert.length) await supabase.from('exercises').insert(toInsert);
+                                                // Grava via RPC save_workout_atomic (mesma do editor do aluno):
+                                                // exercícios viram linhas na tabela `sets`. Insert direto em
+                                                // `exercises` quebrava (colunas sets/reps/rpe não existem).
+                                                const res = await saveTeacherWorkout(supabase, {
+                                                    ownerUserId: targetUserId,
+                                                    authorUserId: String(user.id),
+                                                    title: data.title || 'Novo Treino',
+                                                    exercises: data.exercises,
+                                                });
+                                                if (!res.ok) throw new Error(res.error || 'Falha ao salvar treino');
+                                                void notifyStudentWorkoutAssigned(targetUserId, data.title || 'Novo Treino');
                                             }
                                             const { data: refreshed } = await supabase
                                                 .from('workouts')

@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { X, Save, Loader2, DollarSign, Clock, Calendar, RefreshCw, FileText } from 'lucide-react'
 import { apiTeacherServicePlans } from '@/lib/api/student-billing'
 import type { ServicePlan, BillingInterval, TrainingDay } from '@/lib/api/student-billing'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -182,15 +183,12 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm font-bold">R$</span>
-              <input
+              <NumericInput
                 id="sp-price"
                 aria-label="Valor do plano em reais"
-                type="number"
-                inputMode="decimal"
                 min={0}
-                step={0.01}
                 value={priceReal || ''}
-                onChange={e => set('price_cents', Math.round(parseFloat(e.target.value || '0') * 100))}
+                onValueChange={n => set('price_cents', n == null ? 0 : Math.round(n * 100))}
                 placeholder="0,00"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />
@@ -228,15 +226,14 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
             <label htmlFor="sp-days" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <Calendar size={11} /> Duração (dias)
             </label>
-            <input
+            <NumericInput
               id="sp-days"
               aria-label="Duração do plano em dias"
-              type="number"
-              inputMode="numeric"
+              decimal={false}
               min={1}
               max={3650}
               value={form.duration_days}
-              onChange={e => set('duration_days', Math.max(1, parseInt(e.target.value || '1', 10)))}
+              onValueChange={n => set('duration_days', Math.max(1, n ?? 1))}
               className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-yellow-500/60"
             />
           </div>
@@ -273,16 +270,14 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               <label htmlFor="sp-duration" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide flex items-center gap-1">
                 <Clock size={11} /> Duração/sessão (min)
               </label>
-              <input
+              <NumericInput
                 id="sp-duration"
                 aria-label="Duração de cada sessão em minutos"
-                type="number"
-                inputMode="numeric"
+                decimal={false}
                 min={15}
                 max={300}
-                step={5}
                 value={form.session_duration_minutes ?? ''}
-                onChange={e => set('session_duration_minutes', parseInt(e.target.value || '0', 10) || null)}
+                onValueChange={n => set('session_duration_minutes', n || null)}
                 placeholder="60"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />
@@ -291,15 +286,14 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               <label htmlFor="sp-sessions" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide">
                 Sessões/semana
               </label>
-              <input
+              <NumericInput
                 id="sp-sessions"
                 aria-label="Número de sessões por semana"
-                type="number"
-                inputMode="numeric"
+                decimal={false}
                 min={1}
                 max={7}
                 value={form.sessions_per_week ?? ''}
-                onChange={e => set('sessions_per_week', parseInt(e.target.value || '0', 10) || null)}
+                onValueChange={n => set('sessions_per_week', n || null)}
                 placeholder="3"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />

@@ -83,7 +83,6 @@ export async function POST(req: Request) {
 
     await safeDelete(admin.from('notifications').delete().eq('user_id', userId))
     await safeDelete(admin.from('messages').delete().eq('user_id', userId))
-    await safeDelete(admin.from('invites').delete().or(`from_uid.eq.${userId},to_uid.eq.${userId}`))
 
     const directChannelIds = await safeSelectIds(
       admin.from('direct_channels').select('id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`).limit(2000),

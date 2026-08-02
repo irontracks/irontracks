@@ -70,6 +70,8 @@ export const env = {
   resend: {
     get apiKey() { return optionalEnv('RESEND_API_KEY') },
     get from() { return optionalEnv('RESEND_FROM', 'IronTracks <noreply@irontracks.com.br>') },
+    /** Segredo do webhook de entrega (formato `whsec_...`, gerado no painel da Resend). */
+    get webhookSecret() { return optionalEnv('RESEND_WEBHOOK_SECRET') },
   },
 
   // ── Firebase Cloud Messaging ──────────────────────────────
@@ -138,14 +140,6 @@ export const env = {
     get internalSecret() { return optionalEnv('IRONTRACKS_INTERNAL_SECRET') },
     get adminEmail() { return optionalEnv('IRONTRACKS_ADMIN_EMAIL', optionalEnv('ADMIN_EMAIL')) },
     get trustedProxyDepth() { return parseInt(optionalEnv('TRUSTED_PROXY_DEPTH', '1'), 10) },
-  },
-
-  // ── Z-API (WhatsApp) ──────────────────────────────────────
-  zapi: {
-    get instanceId() { return optionalEnv('ZAPI_INSTANCE_ID') },
-    get token() { return optionalEnv('ZAPI_TOKEN') },
-    /** Security token sent by Z-API in the "client-token" header on webhooks */
-    get clientToken() { return optionalEnv('ZAPI_CLIENT_TOKEN') },
   },
 
   // ── YouTube ───────────────────────────────────────────────

@@ -1,6 +1,7 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps, setBestE1rm } from './setVolume'
+import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, sessionVolumeKg } from './setVolume'
+import { detectSessionDeload, isDeloadSession, type SessionDeload } from './sessionDeload'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -41,11 +42,20 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   // Melhor 1RM estimado do dia = MÁXIMO por série. Mesma fonte única (setBestE1rm)
   // do baseline histórico, pro Δ1RM comparar maçãs com maçãs.
   let bestE1rm = 0
+  // Séries levadas à FALHA muscular. O flag já era gravado no log e ficava órfão —
+  // nada no relatório lia, então a falha marcada durante o treino sumia do histórico.
+  const failureSetIdxs: number[] = []
   Object.entries(logs).forEach(([key, value]) => {
     const parts = String(key || '').split('-')
     const eIdx = Number(parts[0])
     if (!Number.isFinite(eIdx) || eIdx !== exerciseIndex) return
     if (!isObject(value)) return
+    // Aceita boolean e "true" (o log é serializado como JSON em workouts.notes).
+    const failureRaw = value.failure ?? null
+    if (failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true') {
+      const sIdx = Number(parts[1])
+      if (Number.isFinite(sIdx)) failureSetIdxs.push(sIdx)
+    }
     const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
@@ -59,14 +69,18 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     const e1 = setBestE1rm(value)
     if (e1 > bestE1rm) bestE1rm = e1
 
-    // ── Cluster: soma os blocks (blocksDetailed), não lastWeight×total do topo ──
-    // O saver grava weight=lastWeight/reps=total no topo, que enganaria o cálculo
-    // normal (volume = lastWeight×total). setVolume soma o peso próprio de cada bloco
-    // (igual ao histórico e à tendência semanal).
+    // ── VOLUME: fonte ÚNICA (setVolume), calculado UMA vez pra todos os formatos ──
+    // Cada branch abaixo reimplementava a soma por conta própria e divergiam em
+    // silêncio do card/PDF/IA. O pior era a isometria, que multiplicava peso ×
+    // SEGUNDOS (prancha de 60 s com peso corporal = milhares de kg fantasma). Os
+    // branches agora só derivam reps / peso médio / contagem de séries — o volume
+    // nunca mais é recalculado aqui. Ver sessionVolumeKg em setVolume.ts.
+    const setVol = setVolume(value)
+    if (Number.isFinite(setVol) && setVol > 0) volume += setVol
+
+    // ── Cluster: reps/peso médio vêm do topo (o saver grava lastWeight/total lá) ──
     if (isObject(value.cluster)) {
-      const cv = setVolume(value)
-      if (cv > 0) {
-        volume += cv
+      if (setVol > 0) {
         const cTop = setTopWeightReps(value)
         if (cTop.reps > 0) reps += cTop.reps
         if (cTop.weight > 0) { weightSum += cTop.weight; weightCount += 1 }
@@ -75,11 +89,16 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       return
     }
 
-    // ── Drop-set: sum each stage's volume; use first-stage (main) weight as avg ──
+    // ── Drop-set / Stripping: reps somam as etapas; peso médio = 1ª etapa (a principal) ──
+    // Mesma estrutura `stages: [{weight,reps}]`.
     const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
-    const dropStages = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : []
+    const stripping = isObject(value.stripping) ? (value.stripping as UnknownRecord) : null
+    const dropStages = dropSet && Array.isArray(dropSet.stages)
+      ? (dropSet.stages as unknown[])
+      : stripping && Array.isArray(stripping.stages)
+        ? (stripping.stages as unknown[])
+        : []
     if (dropStages.length > 0) {
-      let dropVol = 0
       let totalReps = 0
       let firstWeight: number | null = null
       for (const stage of dropStages) {
@@ -87,39 +106,60 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         const sw = toNumber((stage as UnknownRecord).weight)
         const sr = toNumber((stage as UnknownRecord).reps)
         if (sw > 0 && sr > 0) {
-          dropVol += sw * sr
           totalReps += sr
           if (firstWeight === null) firstWeight = sw
         }
       }
       if (totalReps > 0) reps += totalReps
-      if (dropVol > 0) volume += dropVol
       if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
       sets += 1
       return
     }
 
+    // ── Wave (onda): reps somam os tiers de cada onda; peso médio = tier pesado ──
+    const wave = isObject(value.wave) ? (value.wave as UnknownRecord) : null
+    const waveList = wave && Array.isArray(wave.waves) ? (wave.waves as unknown[]) : []
+    if (waveList.length > 0) {
+      let waveReps = 0
+      for (const w of waveList) {
+        if (!isObject(w)) continue
+        waveReps += toNumber((w as UnknownRecord).heavy) + toNumber((w as UnknownRecord).medium) + toNumber((w as UnknownRecord).ultra)
+      }
+      if (waveReps > 0) reps += waveReps
+      const bestW = toNumber(wave?.heavyWeight) || toNumber(wave?.weight)
+      if (bestW > 0) { weightSum += bestW; weightCount += 1 }
+      sets += 1
+      return
+    }
+
     // ── Plank / isometric: durationSeconds carries the actual hold time ──
+    // ATENÇÃO: `repsVal` aqui vira a CONTAGEM (reps/segundos aguentados) — nunca
+    // multiplicador de volume. Peso × segundos não é carga levantada; a energia da
+    // isometria já entra pelo modelo MET das calorias.
     const durationSec = toNumber(value.durationSeconds ?? value.duration_seconds ?? 0)
     const weight = toNumber(value.weight ?? value.kg ?? value.load)
     const repsVal = durationSec > 0 ? durationSec : toNumber(value.reps)
 
     if (weight > 0 && repsVal > 0) {
-      volume += weight * repsVal
       reps += repsVal
-      weightSum += weight
-      weightCount += 1
+      // "Peso médio" só faz sentido onde houve carga LEVANTADA (volume > 0). Na
+      // isometria o campo `weight` é preenchido com o PESO CORPORAL por default
+      // (PlankSetInput), então contá-lo aqui punha a tabela do relatório numa
+      // contradição visível desde que o volume da prancha passou a ser 0:
+      // "Peso médio 96,8 kg" na mesma linha de "Volume —".
+      if (setVol > 0) { weightSum += weight; weightCount += 1 }
     } else if (repsVal > 0) {
       reps += repsVal
     } else {
-      // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → caía aqui com
-      // volume 0. Usa a fonte única setVolume/setTopWeightReps (soma L+R).
-      const uniVol = setVolume(value)
-      if (uniVol > 0) {
-        volume += uniVol
+      // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → reps/peso
+      // médio saem da fonte única (setTopWeightReps/setTotalReps, somando L+R).
+      if (setVol > 0) {
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
-        if (top.reps > 0) reps += top.reps
+        // Reps TOTAIS (L+R): o volume desta linha já soma os dois lados, então
+        // contar só um lado deixava reps e volume falando línguas diferentes.
+        const totalReps = setTotalReps(value)
+        if (totalReps > 0) reps += totalReps
       }
     }
     sets += 1
@@ -131,6 +171,7 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     reps,
     avgWeight,
     bestE1rm: bestE1rm > 0 ? Math.round(bestE1rm * 10) / 10 : null,
+    failureSetIdxs: failureSetIdxs.sort((a, b) => a - b),
   }
 }
 
@@ -200,7 +241,14 @@ const buildLogTimes = (
     const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
-    const exec = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
+    // Tempo de execução. ISOMETRIA/CARDIO não gravam `executionSeconds` — o tempo
+    // real está em `durationSeconds` (PlankSetInput/CardioSetInput). Sem este
+    // fallback a coluna "Execução" da prancha ficava vazia embora o app soubesse
+    // exatamente quantos segundos o usuário aguentou, e a série não tinha NENHUMA
+    // base de rateio depois que o volume da isometria (corretamente) virou 0.
+    const execRaw = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
+    const holdSec = toNumber((value as UnknownRecord).durationSeconds ?? (value as UnknownRecord).duration_seconds)
+    const exec = execRaw > 0 ? execRaw : holdSec
     const rest = toNumber((value as UnknownRecord).restSeconds ?? (value as UnknownRecord).rest_seconds)
     if (exec > 0) executionSeconds += Math.round(exec)
     if (rest > 0) {
@@ -297,20 +345,25 @@ const extractSessionDateMs = (session: UnknownRecord) => {
   return Number.isFinite(ms) ? ms : 0
 }
 
+/**
+ * Volume de uma sessão do HISTÓRICO (tendência semanal / flags de carga).
+ *
+ * Recalcula SEMPRE a partir dos logs, mesmo quando a sessão já tem
+ * `reportMeta.totals.volumeKg` gravado: as sessões finalizadas até jul/2026
+ * carregam o total inflado pela isometria (peso × segundos), e confiar nesse
+ * número faria a semana inteira comparar carga fantasma. O reportMeta só entra
+ * como último recurso (sessão sem mapa de logs legível).
+ */
 const getSessionVolumeKg = (session: UnknownRecord) => {
+  const logs = isObject(session.logs) ? (session.logs as UnknownRecord) : {}
+  const fromLogs = Math.round(sessionVolumeKg(logs) * 10) / 10
+  if (fromLogs > 0) return fromLogs
   if (isObject(session.reportMeta) && isObject((session.reportMeta as UnknownRecord).totals)) {
     const totals = (session.reportMeta as UnknownRecord).totals as UnknownRecord
     const v = toNumber(totals.volumeKg)
     if (v > 0) return v
   }
-  const exercises = Array.isArray(session.exercises) ? (session.exercises as unknown[]) : []
-  const logs = isObject(session.logs) ? (session.logs as UnknownRecord) : {}
-  let total = 0
-  exercises.forEach((raw, index) => {
-    if (!isObject(raw)) return
-    total += buildLogVolume(logs, index).volumeKg
-  })
-  return Math.round(total * 10) / 10
+  return 0
 }
 
 export type ReportExerciseMetrics = {
@@ -329,6 +382,10 @@ export type ReportExerciseMetrics = {
   caloriesKcal?: number
   /** Melhor 1RM estimado do dia (máx por série, Epley). null se sem carga válida. */
   bestE1rm: number | null
+  /** Quantas séries deste exercício foram levadas à FALHA muscular (flag `failure`). */
+  setsToFailure: number
+  /** Índices (0-based) das séries levadas à falha — pra marcar 💥 na série certa. */
+  failureSetIdxs: number[]
   delta: {
     volumeKg: number | null
     reps: number | null
@@ -374,6 +431,8 @@ export type ReportMetrics = {
   }
   /** Cadence analysis (null if no exercises had cadence defined) */
   cadence: CadenceCompliance | null
+  /** Descarga aplicada nesta sessão (null quando não houve). Derivado dos logs. */
+  deload: SessionDeload | null
   exerciseOrder: string[]
   exercises: ReportExerciseMetrics[]
 }
@@ -384,7 +443,11 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
   const prevMap = previousSession && isObject(previousSession) ? buildPrevByExercise(previousSession) : null
   const exerciseOrder: string[] = []
   const metrics: ReportExerciseMetrics[] = []
-  let totalVolume = 0
+  // Total NÃO é a soma dos exercícios: a soma por exercício perde os logs que não
+  // casam com nenhum item de `exercises` (exercício removido/sem nome), e era mais
+  // uma via de divergência com o card, o PDF e as métricas da IA — todos varrem o
+  // mapa de logs inteiro. Fonte única: sessionVolumeKg.
+  const totalVolume = sessionVolumeKg(logs)
   let totalSets = 0
   let totalReps = 0
   let restSum = 0
@@ -434,7 +497,6 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       cadenceTotalExpected += logTimes.cadenceExpectedSec
       cadenceTotalActual += logTimes.cadenceActualSec
     }
-    totalVolume += logVolume.volumeKg
     totalSets += logVolume.sets
     totalReps += logVolume.reps
     const prev = prevMap ? prevMap.get(name) : null
@@ -456,6 +518,8 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       repsDone: logVolume.reps,
       avgWeightKg: logVolume.avgWeight,
       bestE1rm: logVolume.bestE1rm,
+      setsToFailure: logVolume.failureSetIdxs.length,
+      failureSetIdxs: logVolume.failureSetIdxs,
       delta: {
         volumeKg: deltaVolume,
         reps: deltaReps,
@@ -517,6 +581,7 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       compliance,
     },
     cadence: cadenceCompliance,
+    deload: (() => { const d = detectSessionDeload(logs); return d.applied ? d : null })(),
     exerciseOrder,
     exercises: metrics,
   }
@@ -543,6 +608,10 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
   const prevSessions = (Array.isArray(history) ? history : [])
     .map((s) => (isObject(s) ? s : null))
     .filter((s): s is UnknownRecord => Boolean(s))
+    // Sessão de DESCARGA não entra na média de referência: ela tem 15–22 % menos
+    // carga por ordem do próprio app, então baixaria a régua e faria a sessão
+    // normal seguinte parecer um pico.
+    .filter((s) => !isDeloadSession(s))
     .map((s) => ({ ms: extractSessionDateMs(s), volume: getSessionVolumeKg(s) }))
     .filter((s) => s.ms > 0 && s.ms < baseDate)
     .sort((a, b) => b.ms - a.ms)
@@ -554,14 +623,20 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
   const dayDropPct = prevAvg > 0 ? Math.round(((currentVolume - prevAvg) / prevAvg) * 1000) / 10 : 0
   const weekDeltaPct = weekly.deltaPct
   const isHeavyWeek = weekly.isHeavyWeek
-  const isBadDay = prevAvg > 0 ? dayDropPct <= -10 : false
-  const reason = isBadDay && isHeavyWeek
-    ? 'Queda no dia com semana pesada'
-    : isBadDay
-      ? 'Queda no dia vs média recente'
-      : isHeavyWeek
-        ? 'Semana pesada sem queda crítica no dia'
-        : 'Dentro do padrão recente'
+  // Descarga PLANEJADA não é dia ruim. A queda é o objetivo do dia — sem esta
+  // guarda o relatório acusa "queda no dia" e o Coach IA escreve que o aluno
+  // regrediu justamente quando ele seguiu a orientação do app.
+  const isDeloadDay = isDeloadSession(currentSession)
+  const isBadDay = prevAvg > 0 && !isDeloadDay ? dayDropPct <= -10 : false
+  const reason = isDeloadDay
+    ? 'Sessão de descarga (deload) — queda de carga planejada'
+    : isBadDay && isHeavyWeek
+      ? 'Queda no dia com semana pesada'
+      : isBadDay
+        ? 'Queda no dia vs média recente'
+        : isHeavyWeek
+          ? 'Semana pesada sem queda crítica no dia'
+          : 'Dentro do padrão recente'
   return { dayDropPct, weekDeltaPct, isBadDay, isHeavyWeek, reason }
 }
 

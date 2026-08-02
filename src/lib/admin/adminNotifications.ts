@@ -27,7 +27,12 @@ interface AdminNotifyArgs {
   type: AdminNotificationType
   title: string
   message: string
-  /** Deep link opcional pra navegar ao clicar (ex: '/admin?tab=requests'). */
+  /**
+   * Deep link opcional. Use caminho REAL do app — `/admin` não existe como
+   * rota (o painel é uma `view` dentro do dashboard). O destino fino de cada
+   * aviso admin é resolvido pelo `type` no listener de push; este link é só o
+   * fallback de quem abre pela web.
+   */
   link?: string
   /** Metadata extra (user_id afetado, plano, etc). */
   metadata?: Record<string, unknown>
@@ -94,10 +99,28 @@ export async function notifyAdminNewSignup(args: {
   const name = args.name.trim() || args.email.trim() || 'Novo usuário'
   const roleLabel = args.role === 'teacher' ? 'professor' : 'aluno'
   await notifyAdmins({
-    type: 'admin_access_request',
+    // ⚠️ `admin_new_signup`, NÃO `admin_access_request`.
+    //
+    // O tipo vai no payload do push e decide se a notificação recebe
+    // `mutable-content: 1` → vira Communication Notification → acorda a tela
+    // bloqueada. A whitelist existe em DOIS lugares que precisam concordar:
+    // `WAKE_SCREEN_TYPES` (src/lib/push/apns.ts) e `wakeScreenTypes`
+    // (ios/App/NotificationService/NotificationService.swift).
+    //
+    // Nenhuma das duas tem `admin_access_request` — era o tipo usado aqui desde
+    // 10/05, e por isso este push (o mais urgente do app: tem gente esperando
+    // aprovação) era o único que chegava mudo, sem acender o iPhone.
+    //
+    // Corrigir pelo outro lado, adicionando o tipo às listas, exigiria build
+    // nova no TestFlight, porque a lista do Swift é compilada no app instalado.
+    // `admin_new_signup` já está nas duas e descreve a mesma coisa.
+    //
+    // `admin_access_request` segue vivo no histórico e em `ADMIN_TYPES`
+    // (api/admin/notifications/*) — notificação antiga continua listando normal.
+    type: 'admin_new_signup',
     title: '🆕 Nova solicitação de acesso',
     message: `${name} (${roleLabel}) está aguardando aprovação.`,
-    link: '/admin?tab=requests',
+    link: '/dashboard',
     metadata: { email: args.email, role: args.role },
   })
 }
@@ -115,7 +138,7 @@ export async function notifyAdminVipExpiring(args: {
     type: 'admin_vip_expiring',
     title: '💳 Plano expirando',
     message: `${args.userName} (${tierLabel}) expira em ${args.daysRemaining} ${dayWord}.`,
-    link: '/admin?tab=vip',
+    link: '/dashboard',
     metadata: {
       userId: args.userId,
       planTier: args.planTier,

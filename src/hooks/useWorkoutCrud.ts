@@ -20,6 +20,7 @@ import {
     calculateExerciseDuration,
 } from '@/utils/pacing'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
+import { parseCheckinWeightKg, shouldSyncProfileWeight } from '@/utils/checkin/bodyWeightSync'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -37,10 +38,16 @@ interface UseWorkoutCrudOptions {
     setReportData: (data: unknown) => void
     setReportBackView: (v: string) => void
     suppressForeignFinishToastUntilRef: React.MutableRefObject<number>
+    /** Carimba o instante do finish — o dashboard usa pra não confundir a janela de
+     *  navegação pro relatório (view='active' + activeSession=null) com "restaurando
+     *  sessão" e jogar o usuário de volta no dashboard. */
+    justFinishedAtRef?: React.MutableRefObject<number>
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string) => Promise<unknown>
     confirm: (msg: string, title?: string) => Promise<boolean>
     requestPreWorkoutCheckin: (workout: unknown) => Promise<unknown>
+    /** Persiste um subconjunto das settings (usado pra sincronizar o peso do check-in). */
+    patchSettings?: (patch: Record<string, unknown>) => Promise<void>
     resolveExerciseVideos: (exercises: unknown) => Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }>
     persistExerciseVideoUrls: (updates: unknown) => void
     normalizeWorkoutForEditor: (raw: unknown) => Record<string, unknown>
@@ -53,7 +60,7 @@ interface UseWorkoutCrudOptions {
 }
 
 interface UseWorkoutCrudReturn {
-    handleStartSession: (workout: unknown, opts?: { skipConfirm?: boolean }) => Promise<void>
+    handleStartSession: (workout: unknown) => Promise<void>
     handleFinishSession: (sessionData: unknown, showReport?: boolean) => Promise<void>
     handleCreateWorkout: () => void
     handleEditWorkout: (workout: unknown) => Promise<void>
@@ -80,10 +87,12 @@ export function useWorkoutCrud({
     setReportData,
     setReportBackView,
     suppressForeignFinishToastUntilRef,
+    justFinishedAtRef,
     fetchWorkouts,
     alert,
     confirm,
     requestPreWorkoutCheckin,
+    patchSettings,
     resolveExerciseVideos,
     persistExerciseVideoUrls,
     normalizeWorkoutForEditor,
@@ -95,7 +104,7 @@ export function useWorkoutCrud({
     setEditActiveOpen,
 }: UseWorkoutCrudOptions): UseWorkoutCrudReturn {
 
-    const handleStartSession = useCallback(async (workout: unknown, opts?: { skipConfirm?: boolean }) => {
+    const handleStartSession = useCallback(async (workout: unknown) => {
         const workoutObj = workout && typeof workout === 'object'
             ? (workout as Record<string, unknown>)
             : ({} as Record<string, unknown>)
@@ -110,8 +119,8 @@ export function useWorkoutCrud({
             return
         }
 
-        // Já treinando? Confirma antes de descartar (ex.: aceitar convite no meio de
-        // outro treino sobrescrevia a sessão em andamento sem aviso). Sempre pergunta.
+        // Já treinando? Confirma antes de descartar — iniciar outro treino
+        // sobrescreveria a sessão em andamento sem aviso.
         if (activeSession?.workout) {
             const trocar = await confirm(
                 'Você já está treinando. Iniciar este treino vai descartar o treino atual em andamento. Continuar?',
@@ -129,10 +138,7 @@ export function useWorkoutCrud({
             )
         )
         const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino')
-        // Vindo de convite, o IncomingInviteModal já é a confirmação ("BORA!") —
-        // pular o 2º confirm evita deixar o convidado preso na sessão se ele recusar
-        // aqui depois de já ter aceitado.
-        if (!opts?.skipConfirm) {
+        {
             const ok = await confirm(
                 `Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`,
                 'Iniciar Treino'
@@ -158,6 +164,8 @@ export function useWorkoutCrud({
                     const energyN = Number(pre.energy || energyFromMood)
                     const sorenessN = Number(pre.soreness)
                     const timeN = Number(pre.timeMinutes)
+                    // #3 auto-carga: sono da última noite (prontidão). Aceita vírgula decimal.
+                    const sleepN = Number(String(pre.sleepHours ?? '').replace(',', '.'))
                     const supabase = createClient()
                     const weightKgN = Number(String(pre.weight ?? '').replace(',', '.'))
                     const { error: checkinError } = await supabase.from('workout_checkins').insert({
@@ -167,6 +175,7 @@ export function useWorkoutCrud({
                         active_session_user_id: null,
                         energy: Number.isFinite(energyN) && energyN >= 1 && energyN <= 5 ? Math.round(energyN) : null,
                         soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
+                        sleep_hours: Number.isFinite(sleepN) && sleepN >= 0 && sleepN <= 24 ? Math.round(sleepN * 10) / 10 : null,
                         notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
                         answers: {
                             mood: moodRaw || null,
@@ -175,6 +184,16 @@ export function useWorkoutCrud({
                         },
                     })
                     if (checkinError) throw checkinError
+
+                    // O peso do check-in é o peso de HOJE — vira o peso do perfil.
+                    // Antes ele morria dentro de `workout_checkins.answers`, e como o
+                    // cálculo de kcal prioriza o perfil sobre o check-in (sessionKcal:
+                    // "profile (opts) first"), o valor recém-digitado era IGNORADO na
+                    // estimativa de calorias. Sincronizar conserta os dois.
+                    const checkinWeight = parseCheckinWeightKg(pre.weight)
+                    if (shouldSyncProfileWeight(checkinWeight, (userSettings as Record<string, unknown> | null)?.bodyWeightKg)) {
+                        await patchSettings?.({ bodyWeightKg: checkinWeight })
+                    }
                 }
             }
         } catch (e) {
@@ -245,6 +264,7 @@ export function useWorkoutCrud({
         activeSession?.workout,
         alert,
         confirm,
+        patchSettings,
         persistExerciseVideoUrls,
         requestPreWorkoutCheckin,
         resolveExerciseVideos,
@@ -256,6 +276,10 @@ export function useWorkoutCrud({
 
     const handleFinishSession = useCallback(async (sessionData: unknown, showReport?: boolean) => {
         suppressForeignFinishToastUntilRef.current = Date.now() + 8000
+        // Abre a janela pós-finish ANTES de limpar a sessão: entre o setActiveSession(null)
+        // e a rota do relatório commitar, view ainda é 'active' sem sessão — sem esta marca
+        // o dashboard trata como "restaurando" e joga o usuário de volta pro dashboard.
+        if (justFinishedAtRef) justFinishedAtRef.current = Date.now()
         try {
             if (user?.id) {
                 localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`)
@@ -270,7 +294,7 @@ export function useWorkoutCrud({
         setReportBackView('dashboard')
         setReportData({ current: sessionData, previous: null })
         setView('report')
-    }, [setActiveSession, setReportBackView, setReportData, setView, suppressForeignFinishToastUntilRef, user?.id])
+    }, [setActiveSession, setReportBackView, setReportData, setView, suppressForeignFinishToastUntilRef, justFinishedAtRef, user?.id])
 
     const handleCreateWorkout = useCallback(() => {
         setCreateWizardOpen(true)

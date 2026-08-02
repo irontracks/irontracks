@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet, epley1rm, setBestE1rm } from '@/utils/report/setVolume'
+import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet, epley1rm, setBestE1rm, waveVolume } from '@/utils/report/setVolume'
 
 describe('parseWeightValue / parseRepsValue', () => {
   it('trata vírgula decimal e inválidos', () => {
@@ -36,15 +36,49 @@ describe('setVolume', () => {
     expect(setVolume({ L_weight: '15', L_reps: '10' })).toBe(150)
   })
 
+  it('drop-set: soma cada etapa (não peso do topo × total)', () => {
+    // Saver grava topo weight=última(mais leve)/reps=total → topo×total SUBESTIMA.
+    const log = { weight: '20', reps: '18', drop_set: { stages: [{ weight: '30', reps: '10' }, { weight: '20', reps: '8' }] } }
+    expect(setVolume(log)).toBe(460) // 30×10 + 20×8, não 20×18=360
+  })
+
+  it('stripping: soma cada etapa (mesma estrutura do drop-set)', () => {
+    // Saver grava topo weight=primeira(mais pesada)/reps=total → topo×total SUPERESTIMA.
+    const log = { weight: '100', reps: '18', stripping: { stages: [{ weight: '100', reps: '8' }, { weight: '80', reps: '6' }, { weight: '60', reps: '4' }] } }
+    expect(setVolume(log)).toBe(1520) // 100×8 + 80×6 + 60×4, não 100×18=1800
+  })
+
   it('cluster tem prioridade e soma os blocks', () => {
     const log = { cluster: { blocks: [{ weight: '50', reps: '5' }, { weight: '50', reps: '5' }] } }
     expect(setVolume(log)).toBe(500)
+  })
+
+  it('wave (peso único, retrocompat): peso base × total de reps dos tiers', () => {
+    const log = { weight: '100', reps: '25', wave: { weight: '100', waves: [{ heavy: 5, medium: 8, ultra: 12 }] } }
+    expect(setVolume(log)).toBe(2500) // 100×(5+8+12)
+  })
+
+  it('wave loading progressivo: peso por tier', () => {
+    const log = { weight: '110', reps: '25', wave: { heavyWeight: '110', mediumWeight: '100', ultraWeight: '90', waves: [{ heavy: 5, medium: 8, ultra: 12 }] } }
+    expect(setVolume(log)).toBe(2430) // 110×5 + 100×8 + 90×12
   })
 
   it('logs vazios/ inválidos → 0', () => {
     expect(setVolume(null)).toBe(0)
     expect(setVolume({})).toBe(0)
     expect(setVolume({ weight: '0', reps: '0' })).toBe(0)
+  })
+})
+
+describe('waveVolume', () => {
+  it('duas ondas, peso por tier', () => {
+    const wave = { heavyWeight: '100', mediumWeight: '80', ultraWeight: '60', waves: [{ heavy: 3, medium: 5, ultra: 8 }, { heavy: 2, medium: 4, ultra: 6 }] }
+    // onda1: 300+400+480=1180 ; onda2: 200+320+360=880 → 2060
+    expect(waveVolume(wave)).toBe(2060)
+  })
+  it('sem ondas → 0', () => {
+    expect(waveVolume({ weight: '100' })).toBe(0)
+    expect(waveVolume(null)).toBe(0)
   })
 })
 
@@ -128,6 +162,15 @@ describe('setBestE1rm — fonte única do Δ1RM (dia + histórico)', () => {
     expect(setBestE1rm(log)).toBe(40)
   })
 
+  it('stripping: melhor etapa (a mais pesada), não o topo inflado (PR falso)', () => {
+    const log = {
+      weight: '100', reps: '18', // topo = primeira etapa × total (enganoso)
+      stripping: { stages: [{ weight: '100', reps: '8' }, { weight: '80', reps: '6' }, { weight: '60', reps: '4' }] },
+    }
+    // epley(100,8) = 126,667, não epley(100,18) = 160
+    expect(setBestE1rm(log)).toBeCloseTo(126.667, 2)
+  })
+
   it('cluster: melhor bloco (blocksDetailed), não lastWeight×total', () => {
     const log = {
       weight: '80', reps: '15',
@@ -135,6 +178,15 @@ describe('setBestE1rm — fonte única do Δ1RM (dia + histórico)', () => {
     }
     // 100×(1+5/30) = 116,67, não 80×(1+15/30) = 120
     expect(setBestE1rm(log)).toBeCloseTo(116.667, 2)
+  })
+
+  it('wave: melhor tier (peso próprio), não o peso base × total', () => {
+    const log = {
+      weight: '110', reps: '25',
+      wave: { heavyWeight: '110', mediumWeight: '100', ultraWeight: '90', waves: [{ heavy: 5, medium: 8, ultra: 12 }] },
+    }
+    // melhor = epley(110,5) = 110×(1+5/30) = 128,33
+    expect(setBestE1rm(log)).toBeCloseTo(128.333, 2)
   })
 
   it('1 rep não infla (peso puro)', () => {

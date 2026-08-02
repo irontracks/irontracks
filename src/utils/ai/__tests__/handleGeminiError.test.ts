@@ -49,6 +49,49 @@ describe('classifyGeminiError', () => {
   })
 })
 
+/**
+ * Guard do formato ApiError do SDK atual (@google/genai).
+ *
+ * Bug real (31/07/2026): a cota DIÁRIA da chave Gemini estourou e a Avaliação
+ * por Foto exibiu literalmente "ai_error" na tela. O 429 chegou como JSON
+ * (`{"error":{"code":429,…,"status":"RESOURCE_EXHAUSTED"}}`), mas o
+ * classificador só entendia o formato antigo `[429 Too Many Requests]` — caiu
+ * no default. Valia para TODAS as rotas de IA, não só essa.
+ *
+ * O payload abaixo é o texto REAL, copiado dos runtime logs da Vercel.
+ */
+describe('classifyGeminiError — payload JSON do @google/genai', () => {
+  const apiError = (code: number, status: string, message = 'boom') =>
+    new Error(JSON.stringify({ error: { code, message, status } }))
+
+  it('reconhece o 429 de cota diária que vazou como ai_error em produção', () => {
+    const real = new Error(
+      '{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. '
+      + 'For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. '
+      + '\\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, '
+      + 'limit: 20, model: gemini-2.5-flash\\nPlease retry in 4.04s.","status":"RESOURCE_EXHAUSTED"}}',
+    )
+    expect(classifyGeminiError(real)).toBe('ai_rate_limited')
+  })
+
+  it('mapeia os demais códigos JSON', () => {
+    expect(classifyGeminiError(apiError(403, 'PERMISSION_DENIED'))).toBe('ai_forbidden')
+    expect(classifyGeminiError(apiError(404, 'NOT_FOUND'))).toBe('ai_model_missing')
+    expect(classifyGeminiError(apiError(400, 'INVALID_ARGUMENT'))).toBe('ai_invalid_input')
+    expect(classifyGeminiError(apiError(503, 'UNAVAILABLE'))).toBe('ai_upstream_error')
+  })
+
+  it('cai no status gRPC quando não há código numérico', () => {
+    expect(classifyGeminiError(new Error('falhou {"status":"RESOURCE_EXHAUSTED"}'))).toBe('ai_rate_limited')
+    expect(classifyGeminiError(new Error('falhou {"status":"UNAVAILABLE"}'))).toBe('ai_upstream_error')
+  })
+
+  it('status upstream tem precedência sobre a palavra "timeout" no payload', () => {
+    // DEADLINE_EXCEEDED vem com "timeout" no texto; antes isso mascarava o 5xx.
+    expect(classifyGeminiError(apiError(503, 'UNAVAILABLE', 'upstream timeout'))).toBe('ai_upstream_error')
+  })
+})
+
 describe('safeGemini', () => {
   it('returns { value } on first-attempt success', async () => {
     const fn = vi.fn().mockResolvedValue('ok')

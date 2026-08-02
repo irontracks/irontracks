@@ -21,6 +21,7 @@ import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { logError, logWarn } from '@/lib/logger'
 import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
+import { diffSessionForSync } from '@/lib/sessionSyncDiff'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -36,30 +37,36 @@ function parseJsonWithSchema<T>(raw: string, schema: z.ZodType<T>): T | null {
 }
 
 /**
- * Strip a stale rest-timer target from a hydrated session.
+ * Marca um descanso que já venceu enquanto o app estava fechado.
  *
- * `timerTargetTime` is an absolute timestamp (ms since epoch). When the app is
- * killed / backgrounded / restored a non-trivial amount of time later, the
- * persisted timestamp ends up in the PAST — which the RestTimerOverlay reads
- * on its first tick as `remaining = targetTime - now < 0`, setting
- * `isFinished = true` immediately and dumping the user on the green "BORA!"
- * screen with a growing overtime counter BEFORE they've even interacted with
- * the app.
+ * `timerTargetTime` é um timestamp absoluto (ms). Se o app é morto/suspenso e
+ * volta depois do fim do descanso, esse alvo está no PASSADO. O tratamento
+ * ANTIGO era descartar o timer inteiro — o que resolvia o problema imediato
+ * (o RestTimerOverlay abria direto no flash verde "BORA!" com contador de
+ * atraso crescendo, sem o usuário ter tocado em nada), mas criava outro:
+ * o app voltava SEM a barra de descanso, ou seja, exatamente como se o usuário
+ * já tivesse apertado START. Ele perdia o botão que marca o início real da
+ * série (relatado pelo dono em jul/2026).
  *
- * Follow-up clicks on OK in this corrupted state appeared to "not start a
- * timer" because the overlay was still stuck finished from the stale target,
- * or because Realtime echo delivered the expired state back from another
- * device and overwrote the fresh `now + duration` value.
+ * Tratamento atual: PRESERVA o timer e marca `restoredExpired` no contexto. O
+ * overlay entende essa marca como "modo silencioso" — mostra a barra com o
+ * START pra o usuário tocar, mas sem flash, sem alarme, sem auto-advance e sem
+ * reagendar notificação/Live Activity (nada disso faz sentido pra um descanso
+ * que terminou enquanto o app estava fechado).
  *
- * Rule: if the persisted `timerTargetTime` is within 5s of now, or in the
- * past, drop it. 5s slack covers legitimate near-live resumes (foregrounding
- * during a rest) while cutting out every stale value.
+ * A folga de 5s cobre o resume legítimo no meio de um descanso (nesse caso o
+ * timer volta contando normalmente, sem marca alguma).
  */
-function sanitizeRestoredSession(session: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeRestoredSession(session: Record<string, unknown>): Record<string, unknown> {
     const raw = session.timerTargetTime
     const t = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
     if (t > 0 && t <= Date.now() + 5000) {
-        return { ...session, timerTargetTime: null, timerContext: null }
+        const ctx = isRecord(session.timerContext) ? session.timerContext : {}
+        return {
+            ...session,
+            timerTargetTime: t,
+            timerContext: { ...ctx, restoredExpired: true, restoredExpiredAtMs: t },
+        }
     }
     return session
 }
@@ -141,6 +148,9 @@ export function useSessionSync({
     // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
     // Used by the Realtime handler as a secondary guard (primary = DEVICE_ID).
     const lastLocalUpsertAtRef = useRef<number>(0)
+    // Último estado que ESTE device gravou no servidor — base do diff que
+    // decide patch (só logs) vs upsert cheio. Ver src/lib/sessionSyncDiff.ts.
+    const lastSyncedStateRef = useRef<Record<string, unknown> | null>(null)
     // Prevents effect #1 from re-running the restore logic if deps change
     // while userId stays the same.
     const restoredForUserRef = useRef<string>('')
@@ -155,6 +165,16 @@ export function useSessionSync({
     // com latência do Realtime, background pós-finish, ou DELETE duplicado.
     const activeSessionRef = useRef(activeSession)
     useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+
+    // Guarda o `startedAt` do treino cujo "clean-slate" de START já foi aplicado.
+    // Um treino recém-iniciado (template) NÃO tem `_savedAt`; se sobrou uma linha
+    // antiga na tabela (zombie — o treino anterior não foi deletado no fim), o upsert
+    // com onConflict:user_id vira UPDATE e PRESERVA controlled_by/control_status: o
+    // professor fica "assumido pra sempre" e, por ser UPDATE (não INSERT), o banner
+    // do professor não dispara no treino novo. Por isso, no PRIMEIRO write de um start
+    // do zero, deletamos a linha antiga antes do upsert → INSERT limpo, sem controle
+    // herdado. Restaurações (têm `_savedAt`) nunca passam por aqui.
+    const startCleanSlateForRef = useRef<string>('')
 
     const notifyMigrationWarning = useCallback(() => {
         if (serverSessionSyncWarnedRef.current) return
@@ -409,6 +429,7 @@ export function useSessionSync({
                     // the workout naturally ends the control session too.
                     const { error } = await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
                     if (error && isMissingTable(error)) notifyMigrationWarning()
+                    lastSyncedStateRef.current = null
                     return
                 }
 
@@ -422,8 +443,49 @@ export function useSessionSync({
                 if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
                 if (!activeSession?.workout) return
 
+                // Clean-slate no START do zero: se a sessão nunca foi persistida (sem
+                // `_savedAt`) e ainda não limpamos esta startedAt, apaga qualquer linha
+                // antiga do usuário antes do upsert. Isso zera controle herdado de um
+                // zombie e força um INSERT (o banner do professor volta a disparar).
+                // Feito no máx. 1x por startedAt (ref) e nunca em restauração (tem _savedAt).
+                const startedKey = String(startedAtMs)
+                const alreadyPersisted = Boolean((activeSession as Record<string, unknown>)?._savedAt)
+                if (!alreadyPersisted && startCleanSlateForRef.current !== startedKey) {
+                    startCleanSlateForRef.current = startedKey
+                    try {
+                        await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
+                    } catch (e) { logWarn('useSessionSync', 'start clean-slate delete failed', { error: String(e) }) }
+                    lastSyncedStateRef.current = null // linha apagada — próximo envio é cheio
+                    if (serverSessionSyncRef.current.lastKey !== key) return
+                }
+
                 const savedAt = Date.now()
                 const state = { ...(activeSession || {}), _savedAt: savedAt, _deviceId: DEVICE_ID }
+
+                // ── Diff: patch só de logs quando NADA mais mudou ─────────────
+                // Corta o payload dominante do treino em 4G (o `workout` estático
+                // ia inteiro a cada série logada). Qualquer mudança estrutural, e
+                // qualquer falha da RPC, cai no upsert CHEIO logo abaixo — e o
+                // heartbeat de 30s continua snapshot cheio (anti-drift).
+                const plan = diffSessionForSync(lastSyncedStateRef.current, state)
+                if (plan.mode === 'skip') return
+                if (plan.mode === 'patch') {
+                    try {
+                        const { data: patched, error: patchErr } = await supabase.rpc('patch_active_session_logs', {
+                            p_set: plan.set,
+                            p_del: plan.del,
+                            p_saved_at: savedAt,
+                            p_device_id: DEVICE_ID,
+                        })
+                        if (!patchErr && patched === true) {
+                            lastLocalUpsertAtRef.current = savedAt
+                            lastSyncedStateRef.current = state
+                            return
+                        }
+                        // RPC ausente (migration ainda não aplicada), linha sumida ou
+                        // erro → segue pro upsert cheio. NUNCA retorna sem gravar.
+                    } catch (e) { logWarn('useSessionSync', 'patch rpc failed; falling back to full upsert', { error: String(e) }) }
+                }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -439,6 +501,7 @@ export function useSessionSync({
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
                     lastLocalUpsertAtRef.current = savedAt
+                    lastSyncedStateRef.current = state
                 }
             } catch (err) { logWarn('useSessionSync', 'sync upsert failed: ' + String(err)) }
         }
@@ -527,6 +590,8 @@ export function useSessionSync({
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
                     lastLocalUpsertAtRef.current = savedAt
+                    // Snapshot cheio vira a nova base do diff do debounce.
+                    lastSyncedStateRef.current = state as Record<string, unknown>
                 }
             } catch (e) { logError('hook:useSessionSync.heartbeat', e) }
         }

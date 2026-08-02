@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
-import { setTopWeightReps } from '@/utils/report/setVolume'
-import { isSetCompleted } from '@/utils/report/setCompletion'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { buildWorkoutStoryRows } from './workoutStoryRows'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { composeStoryVideoOnIos, cancelNativeStoryCompose } from '@/utils/native/videoComposer'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -23,10 +23,13 @@ import {
     CANVAS_H,
     DEFAULT_LIVE_POSITIONS,
     DEFAULT_GROUP_POSITIONS,
+    clampWorkoutScale,
+    pinchToWorkoutTransform,
+    panToWorkoutOffset,
+    dragToBrandOffset,
+    NO_OFFSET,
+    type Offset,
     isIOSUserAgent,
-    parseExt,
-    extFromMime,
-    guessMediaKind,
     formatDatePt,
     calculateTotalVolume,
     fitCover,
@@ -34,6 +37,7 @@ import {
     computeLiveSizes,
     drawStory,
 } from '../storyComposerUtils'
+import { parseExt, extFromMime, guessMediaKind } from '@/utils/mediaUtils'
 import {
     type StoryTemplate,
     STORY_TEMPLATES,
@@ -49,6 +53,10 @@ export type StoryRenderer = (args: {
     transparentBg?: boolean
     skipClear?: boolean
     template: StoryTemplate
+    /** Zoom/reposição do card (pinça + arrasto) — mesmo do layout 'workout'. */
+    workoutTransform?: { scale: number; offsetX: number; offsetY: number }
+    /** Posição própria da marca (IRON·TRACKS) — independente do transform geral. */
+    brandOffset?: Offset
 }) => void
 
 interface UseStoryComposerOptions {
@@ -115,6 +123,27 @@ export function useStoryComposer({
     const userTouchedTemplateRef = useRef(false)
     const [livePositions, setLivePositions] = useState<LivePositions>(DEFAULT_LIVE_POSITIONS)
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
+    // Zoom + reposição do card no layout 'workout' (pinça 2 dedos + arrasto 1 dedo).
+    const [workoutTransform, setWorkoutTransform] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
+    // Espelho em ref: o render de EXPORT (renderComposite) lê daqui, para não ficar
+    // preso no closure velho dos useCallback de export (bug: salvava sempre no
+    // tamanho padrão, ignorando o zoom que o usuário deixou).
+    const workoutTransformRef = useRef(workoutTransform)
+    useEffect(() => { workoutTransformRef.current = workoutTransform }, [workoutTransform])
+    // Marca (IRON·TRACKS) 100% independente: posição própria, imune ao zoom/pan do bloco.
+    // Mesmo motivo do ref acima — o export lê pelo REF, nunca pelo closure.
+    const [brandOffset, setBrandOffset] = useState<Offset>(NO_OFFSET)
+    const brandOffsetRef = useRef(brandOffset)
+    useEffect(() => { brandOffsetRef.current = brandOffset }, [brandOffset])
+    const brandDragRef = useRef<{ pointerId: number | null; startX: number; startY: number; start: Offset }>({
+        pointerId: null, startX: 0, startY: 0, start: NO_OFFSET,
+    })
+    const workoutGestureRef = useRef<{
+        mode: 'none' | 'pan' | 'pinch'
+        startX: number; startY: number
+        startOffsetX: number; startOffsetY: number
+        startScale: number; startDist: number; startMidX: number; startMidY: number
+    }>({ mode: 'none', startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0, startScale: 1, startDist: 0, startMidX: 0, startMidY: 0 })
     const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
     const [showTrimmer, setShowTrimmer] = useState(false)
     const [videoDuration, setVideoDuration] = useState(0)
@@ -188,50 +217,24 @@ export function useStoryComposer({
             }).filter(Boolean) as string[]
             : null
 
-        // Volume per exercise: sum(w × r) for all sets — logs keyed "exerciseIdx-setIdx"
+        // Volume por exercício — FONTE ÚNICA (setVolume + isWorkingSet). Antes somava
+        // `w × r` do TOPO do log: subcontava drop-set (etapas), zerava unilateral
+        // (L_/R_) e contava aquecimento. Logs com chave "exerciseIdx-setIdx".
         const exerciseVolumes = exerciseNames && exerciseNames.length > 0
             ? exerciseNames.map((_, exIdx) => {
                 let vol = 0
                 Object.entries(logs).forEach(([key, log]) => {
-                    const parts = key.split('-')
-                    if (Number(parts[0]) !== exIdx) return
-                    const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
-                    if (!obj) return
-                    const w = Number(String(obj.weight ?? '').replace(',', '.'))
-                    const r = Number(String(obj.reps ?? '').replace(',', '.'))
-                    if (w > 0 && r > 0) vol += w * r
+                    if (Number(key.split('-')[0]) !== exIdx) return
+                    if (!isWorkingSet(log)) return
+                    vol += setVolume(log)
                 })
                 return vol
             })
             : null
 
-        // ── Linhas por exercício pro layout "Treino" — top set (mais pesado) ──
-        const workoutRows = (exerciseNames || []).map((name, exIdx) => {
-            let bestW = 0, bestReps = 0, bestRpe = 0, performed = false
-            let totalReps = 0 // soma das reps de TODAS as séries = total de execuções do exercício
-            Object.entries(logs).forEach(([key, log]) => {
-                if (Number(key.split('-')[0]) !== exIdx) return
-                const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
-                if (!obj || !isSetCompleted(obj)) return
-                const { weight: w, reps: r } = setTopWeightReps(obj)
-                if (w <= 0 && r <= 0) return
-                performed = true
-                if (r > 0) totalReps += r
-                if (w > bestW || (w === bestW && r > bestReps)) {
-                    bestW = w; bestReps = r
-                    const rn = Number(String(obj.rpe ?? obj.L_rpe ?? obj.R_rpe ?? '').replace(',', '.'))
-                    bestRpe = Number.isFinite(rn) && rn > 0 ? rn : 0
-                }
-            })
-            if (!performed) return null
-            return {
-                name,
-                reps: bestReps > 0 ? String(bestReps) : '—',
-                weight: bestW > 0 ? bestW.toLocaleString('pt-BR') : '—',
-                rpe: bestRpe > 0 ? String(bestRpe) : (rpe ? String(rpe) : '—'),
-                totalReps: totalReps > 0 ? String(totalReps) : '—',
-            }
-        }).filter(Boolean) as { name: string; reps: string; weight: string; rpe: string; totalReps: string }[]
+        // Linhas da tabela do layout "Treino" — regra em módulo puro e testado
+        // (musculação pelo log; cardio pelo tempo, mesmo sem série concluída).
+        const workoutRows = buildWorkoutStoryRows(s, rpe)
 
         // ── Prefer explicit exec/rest seconds from session ────────────────────
         const execSeconds = Number(s?.executionTotalSeconds ?? s?.execution_total_seconds ?? 0) || 0
@@ -302,6 +305,10 @@ export function useStoryComposer({
         setShowSafeGuide(true)
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
+        setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        setBrandOffset(NO_OFFSET)
+        brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
+        workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
         if (!isClose) {
             setShowTrimmer(false)
@@ -489,6 +496,10 @@ export function useStoryComposer({
             const safeNext = safeString(nextLayout) || 'bottom-row'
             setLayout(safeNext)
             setDraggingKey(null)
+            // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
+            setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+            setBrandOffset(NO_OFFSET)
+            workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
             // the whole point of Grupo is "drag the bottom-row arrangement around
@@ -500,17 +511,128 @@ export function useStoryComposer({
         } catch { setLayout('bottom-row') }
     }, [livePositions])
 
+    // ── Zoom/reposição do card no layout 'workout' ─────────────────────────────
+    // Matemática (clamp/pinça/pan) em funções puras testáveis no storyComposerUtils.
+    // Passo pequeno = zoom PRECISO nos botões +/−.
+    const nudgeWorkoutScale = useCallback((delta: number) => {
+        setWorkoutTransform((prev) => ({ ...prev, scale: clampWorkoutScale(Number((prev.scale + delta).toFixed(3))) }))
+    }, [])
+    const resetWorkoutTransform = useCallback(() => {
+        setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        setBrandOffset(NO_OFFSET)
+        workoutGestureRef.current.mode = 'none'
+    }, [])
+
+    // Fator px-tela → px-canvas (o canvas 720 é exibido em rect.width).
+    const canvasFactor = (rect: DOMRect | null) => (rect && rect.width > 0 ? CANVAS_W / rect.width : 1)
+
+    const onWorkoutTouchStart = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }) => {
+        const t = e.touches
+        setWorkoutTransform((cur) => {
+            if (t.length >= 2) {
+                const dx = t[0].clientX - t[1].clientX
+                const dy = t[0].clientY - t[1].clientY
+                workoutGestureRef.current = {
+                    mode: 'pinch',
+                    startX: 0, startY: 0,
+                    startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
+                    startScale: cur.scale,
+                    startDist: Math.hypot(dx, dy) || 1,
+                    startMidX: (t[0].clientX + t[1].clientX) / 2,
+                    startMidY: (t[0].clientY + t[1].clientY) / 2,
+                }
+            } else if (t.length === 1) {
+                workoutGestureRef.current = {
+                    mode: 'pan',
+                    startX: t[0].clientX, startY: t[0].clientY,
+                    startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
+                    startScale: cur.scale, startDist: 0, startMidX: 0, startMidY: 0,
+                }
+            }
+            return cur
+        })
+    }, [])
+
+    const onWorkoutTouchMove = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }, rect: DOMRect | null) => {
+        const g = workoutGestureRef.current
+        if (g.mode === 'none') return
+        const t = e.touches
+        const factor = canvasFactor(rect)
+        if (g.mode === 'pinch' && t.length >= 2) {
+            const dx = t[0].clientX - t[1].clientX
+            const dy = t[0].clientY - t[1].clientY
+            const dist = Math.hypot(dx, dy) || 1
+            const midX = (t[0].clientX + t[1].clientX) / 2
+            const midY = (t[0].clientY + t[1].clientY) / 2
+            setWorkoutTransform(pinchToWorkoutTransform(g, dist, midX, midY, factor))
+        } else if (g.mode === 'pan' && t.length >= 1) {
+            const { offsetX, offsetY } = panToWorkoutOffset(g, t[0].clientX, t[0].clientY, factor)
+            setWorkoutTransform((cur) => ({ ...cur, offsetX, offsetY }))
+        }
+    }, [])
+
+    const onWorkoutTouchEnd = useCallback(() => {
+        workoutGestureRef.current.mode = 'none'
+    }, [])
+
+    // Desktop: roda do mouse dá zoom preciso.
+    const onWorkoutWheel = useCallback((deltaY: number) => {
+        nudgeWorkoutScale(deltaY < 0 ? 0.05 : -0.05)
+    }, [nudgeWorkoutScale])
+
+    // ── Arrasto da MARCA (handle próprio, independente do bloco) ───────────────
+    // Handle separado (pointer, com capture) em vez de reusar o overlay de gesto:
+    // o overlay cobre a prévia inteira e move TUDO — a marca precisa sair dele.
+    const onBrandPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            if (typeof e?.pointerId !== 'number') return
+            e.preventDefault?.(); e.stopPropagation?.()
+            brandDragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, start: brandOffsetRef.current }
+            e.currentTarget?.setPointerCapture?.(e.pointerId)
+        } catch { }
+    }, [])
+
+    const onBrandPointerMove = useCallback((e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => {
+        try {
+            const { pointerId, startX, startY, start } = brandDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const factor = canvasFactor(rect)
+            setBrandOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor))
+        } catch { }
+    }, [])
+
+    const onBrandPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            const { pointerId } = brandDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.releasePointerCapture?.(pointerId)
+            brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: brandOffsetRef.current }
+        } catch { }
+    }, [])
+
     // Canvas helpers
     // Desenha o overlay no ctx: renderer injetado (ex.: nutrição) ou o drawStory
     // de treino (default). Centraliza o branch dos 3 call-sites de render.
+    //
+    // ⚠️ Lê o transform pelo REF, não pelo state. Os callbacks de export
+    // (shareImage / postStory) são useCallback com deps enxutas (+ eslint-disable),
+    // então CONGELAVAM o closure e exportavam sempre com o transform INICIAL
+    // (scale 1, offset 0): o usuário dava zoom, e o Story salvava no tamanho padrão.
+    // Pôr `workoutTransform` nas deps recriaria os callbacks a CADA frame da pinça
+    // (o transform muda em todo touchmove) — o ref resolve sem esse custo e é
+    // imune a stale closure.
     const renderComposite = (
         ctx: CanvasRenderingContext2D,
         opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
     ) => {
+        const wt = workoutTransformRef.current
+        const bo = brandOffsetRef.current
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
         }
     }
 
@@ -762,6 +884,11 @@ export function useStoryComposer({
         draggingKey, saveImageUrl, setSaveImageUrl,
         showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime, setPreviewTime,
         metrics,
+        // workout zoom/reposição
+        workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
+        onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
+        // marca (IRON·TRACKS) independente
+        brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,

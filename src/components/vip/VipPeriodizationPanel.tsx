@@ -7,6 +7,7 @@ import { CalendarDays, Crown, RefreshCw, Sparkles, TrendingUp } from 'lucide-rea
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
 import { apiVip } from '@/lib/api'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -560,13 +561,12 @@ export default function VipPeriodizationPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Frequência</div>
-                  <input
-                    type="number"
-                    inputMode="numeric"
+                  <NumericInput
+                    decimal={false}
                     min={2}
                     max={6}
-                    value={String(form.daysPerWeek)}
-                    onChange={(e) => setForm((p) => ({ ...p, daysPerWeek: Number(e.target.value) }))}
+                    value={form.daysPerWeek}
+                    onValueChange={(n) => setForm((p) => ({ ...p, daysPerWeek: n ?? 0 }))}
                     placeholder="Ex.: 4"
                     className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-bold"
                     aria-label="Dias por semana"
@@ -575,13 +575,12 @@ export default function VipPeriodizationPanel({
                 </div>
                 <div className="space-y-1">
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Duração da sessão</div>
-                  <input
-                    type="number"
-                    inputMode="numeric"
+                  <NumericInput
+                    decimal={false}
                     min={30}
                     max={90}
-                    value={String(form.timeMinutes)}
-                    onChange={(e) => setForm((p) => ({ ...p, timeMinutes: Number(e.target.value) }))}
+                    value={form.timeMinutes}
+                    onValueChange={(n) => setForm((p) => ({ ...p, timeMinutes: n ?? 0 }))}
                     placeholder="Ex.: 60"
                     className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-bold"
                     aria-label="Minutos por sessão"

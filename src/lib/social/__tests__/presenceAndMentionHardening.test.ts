@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs'
  *        agora filtra server-side pelos follows accepted do chamador.
  *   #4 — menção @handle (extractMentions resolve global) notificava/pushava qualquer
  *        conta sem relação; agora restrita a quem pode ver o contexto:
- *        story → seguidor accepted do autor; team chat → participante da sessão.
+ *        story → seguidor accepted do autor.
  */
 describe('presence/list — filtra pelos follows do chamador (não vaza set global)', () => {
   const src = readFileSync('src/app/api/social/presence/list/route.ts', 'utf8')
@@ -32,15 +32,5 @@ describe('menção em story — só notifica seguidor accepted do autor', () => 
   it('filtra os mencionados por follow accepted ao autor antes de notificar', () => {
     expect(src).toMatch(/rawMentionedIds/)
     expect(src).toMatch(/from\('social_follows'\)[\s\S]*\.eq\('following_id',\s*authorId\)[\s\S]*\.eq\('status',\s*'accepted'\)[\s\S]*\.in\('follower_id',\s*rawMentionedIds\)/)
-  })
-})
-
-describe('menção em team chat — só notifica participante da sessão', () => {
-  const src = readFileSync('src/app/api/team/chat/notify/route.ts', 'utf8')
-
-  it('resolve os participantes da sessão e filtra os mencionados', () => {
-    expect(src).toMatch(/rawMentionedIds/)
-    expect(src).toMatch(/from\('team_sessions'\)[\s\S]*participants/)
-    expect(src).toMatch(/participantIds\.has\(/)
   })
 })

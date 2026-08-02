@@ -5,6 +5,10 @@ import { AlertTriangle, ChevronDown, ChevronUp, MapPin, Satellite } from 'lucide
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
 import RouteMapLeaflet from './RouteMapLeaflet'
+import dynamic from 'next/dynamic'
+import { cardioToContent } from '@/components/stories/cardioStory'
+
+const CardioStoryComposer = dynamic(() => import('@/components/CardioStoryComposer'), { ssr: false })
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
@@ -73,6 +77,7 @@ interface CompletionScreenProps {
   caloriesEstimated: number
   onReset: () => void
   onClose?: () => void
+  onShareStory?: () => void
 }
 
 function CompletionScreen({
@@ -83,6 +88,7 @@ function CompletionScreen({
   caloriesEstimated,
   onReset,
   onClose,
+  onShareStory,
 }: CompletionScreenProps) {
   const [effort, setEffort] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
@@ -228,6 +234,16 @@ function CompletionScreen({
         >
           {saving ? 'Salvando...' : saved ? '✓ Fechar' : 'Salvar e Fechar'}
         </button>
+        {onShareStory && (
+          <button
+            type="button"
+            onClick={onShareStory}
+            className="w-full rounded-2xl py-3.5 text-sm font-black text-black transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #eab308, #f59e0b)' }}
+          >
+            📸 Compartilhar Story
+          </button>
+        )}
         <button
           type="button"
           onClick={onReset}
@@ -289,6 +305,7 @@ export default function CardioGPSPanel({
     gpsStatus,
     gpsError,
     hasReliableFix,
+    isBackgroundTracking,
     start,
     pause,
     resume,
@@ -307,8 +324,11 @@ export default function CardioGPSPanel({
     durationSeconds: number
     paceMinKm: number | null
     caloriesEstimated: number
+    maxSpeedKmh: number | null
   } | null>(null)
+  const [savedRoute, setSavedRoute] = useState<Array<{ lat: number; lng: number }>>([])
   const [activityType, setActivityType] = useState('running')
+  const [storyOpen, setStoryOpen] = useState(false)
 
   // Accordion state — only used when NOT in standalone mode
   const [isOpen, setIsOpen] = useState(false)
@@ -324,7 +344,7 @@ export default function CardioGPSPanel({
   const handleResume = useCallback(() => { void resume() }, [resume])
 
   const handleStop = useCallback(async () => {
-    const result = stop()
+    const result = await stop()
     if (!result) {
       // Sem nenhum ponto de GPS válido (indoor, permissão negada ou sinal fraco
       // o tempo todo). Antes a sessão sumia sem aviso — agora avisa.
@@ -364,7 +384,10 @@ export default function CardioGPSPanel({
           durationSeconds: result.metrics.durationSeconds,
           paceMinKm: result.metrics.paceMinKm,
           caloriesEstimated: result.metrics.caloriesEstimated,
+          maxSpeedKmh: result.metrics.maxSpeedKmh ?? null,
         })
+        // Guarda a rota pro Story compartilhável (desenha o traçado no canvas).
+        setSavedRoute(result.points.map((p) => ({ lat: p.latitude, lng: p.longitude })))
         // Server save succeeded — clear the IDB zombie so recovery on next
         // mount doesn't offer to resume a run that already lives in the DB.
         await finalizePersistedCardio()
@@ -471,7 +494,18 @@ export default function CardioGPSPanel({
           <span className="text-xs text-white/80">{saveError}</span>
         </div>
       )}
-      {isTracking && (
+      {isTracking && isBackgroundTracking && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-2.5 flex-shrink-0"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}
+        >
+          <Satellite size={14} className="mt-0.5 flex-shrink-0 text-green-300" />
+          <span className="text-[11px] text-white/70">
+            Rastreando em segundo plano — pode bloquear a tela ou trocar de app que o GPS continua contando.
+          </span>
+        </div>
+      )}
+      {isTracking && !isBackgroundTracking && (
         <div
           className="mb-3 flex items-start gap-2 rounded-xl p-2.5 flex-shrink-0"
           style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}
@@ -619,6 +653,23 @@ export default function CardioGPSPanel({
           }
         `}</style>
 
+        {/* Story compartilhável do cardio (overlay fixed, z alto) */}
+        {savedMetrics && (
+          <CardioStoryComposer
+            open={storyOpen}
+            onClose={() => setStoryOpen(false)}
+            content={cardioToContent({
+              activityType,
+              distanceMeters: savedMetrics.distanceMeters,
+              durationSeconds: savedMetrics.durationSeconds,
+              paceMinKm: savedMetrics.paceMinKm,
+              caloriesEstimated: savedMetrics.caloriesEstimated,
+              maxSpeedKmh: savedMetrics.maxSpeedKmh,
+              route: savedRoute,
+            })}
+          />
+        )}
+
         {/* Completion screen — scrollable */}
         {savedTrackId && savedMetrics ? (
           <div className="flex-1 overflow-y-auto">
@@ -630,6 +681,7 @@ export default function CardioGPSPanel({
               caloriesEstimated={savedMetrics.caloriesEstimated}
               onReset={handleReset}
               onClose={onRequestClose}
+              onShareStory={savedRoute.length >= 2 ? () => setStoryOpen(true) : undefined}
             />
           </div>
         ) : (
@@ -690,10 +742,13 @@ export default function CardioGPSPanel({
   // ── Accordion mode (inside a workout) ─────────────────────────────────────
   return (
     <div
-      className="mx-4 rounded-2xl border overflow-hidden"
+      data-cardio-gps-panel
+      className="mx-4 mt-3 rounded-2xl border overflow-hidden"
       style={{
-        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(10,20,15,0.98) 100%)',
-        borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
+        background: isTracking
+          ? 'linear-gradient(135deg, rgba(18,26,21,0.98) 0%, rgba(10,20,15,0.98) 100%)'
+          : 'rgba(255,255,255,0.03)',
+        borderColor: isTracking ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.06)',
       }}
     >
       <button
@@ -701,11 +756,19 @@ export default function CardioGPSPanel({
         onClick={() => setIsOpen((v) => !v)}
         aria-expanded={isOpen}
         aria-label={isOpen ? 'Recolher painel de cardio' : 'Expandir painel de cardio'}
-        className="w-full min-h-[44px] flex items-center justify-between px-4 py-3 text-left"
+        className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-3 text-left"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-base">🏃</span>
-          <span className="text-sm font-bold text-white">Cardio</span>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-[15px]"
+            style={{
+              borderColor: isTracking ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.06)',
+              background: isTracking ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+            }}
+          >
+            🏃
+          </span>
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Cardio</span>
           {isTracking && (
             <div className="flex items-center gap-1.5">
               <span

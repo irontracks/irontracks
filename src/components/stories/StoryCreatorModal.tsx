@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { VideoCompositor } from '@/lib/video/VideoCompositor';
 import { logError, logWarn } from '@/lib/logger'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 const FILTERS = [
     { name: 'Normal', class: '' },
@@ -604,15 +605,13 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     </div>
                                     <div className="flex gap-3 mb-3">
                                         <div className="flex-1">
-                                            <input
-                                                type="number"
+                                            <NumericInput
                                                 min={0}
                                                 max={videoDuration}
-                                                step={0.1}
                                                 value={trimRange.start}
                                                 aria-label="Início do corte"
-                                                onChange={e => {
-                                                    const val = Math.max(0, Number(e.target.value || 0));
+                                                onValueChange={n => {
+                                                    const val = Math.max(0, n ?? 0);
                                                     const end = Math.max(val + MIN_TRIM_SECONDS, Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration));
                                                     setTrimRange({ start: val, end });
                                                     if (videoRef.current) {
@@ -624,15 +623,13 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             />
                                         </div>
                                         <div className="flex-1">
-                                            <input
-                                                type="number"
+                                            <NumericInput
                                                 min={0}
                                                 max={videoDuration}
-                                                step={0.1}
                                                 value={trimRange.end}
                                                 aria-label="Fim do corte"
-                                                onChange={e => {
-                                                    const val = Math.max(0, Number(e.target.value || 0));
+                                                onValueChange={n => {
+                                                    const val = Math.max(0, n ?? 0);
                                                     const start = Math.min(trimRange.start, Math.max(0, val - MAX_VIDEO_SECONDS));
                                                     const end = Math.max(start + MIN_TRIM_SECONDS, Math.min(val, start + MAX_VIDEO_SECONDS, videoDuration));
                                                     setTrimRange({ start, end });

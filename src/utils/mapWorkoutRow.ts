@@ -1,4 +1,5 @@
 import { logError } from '@/lib/logger'
+import { applyNotesMethodToSetDetails } from '@/utils/training/notesMethodParser'
 
 /**
  * Maps a raw Supabase workout row (with nested exercises/sets) into the
@@ -74,6 +75,14 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                 const rpeHeader =
                     rpeValues.length > 0 ? Number(rpeValues[0]) || defaultRpe : defaultRpe
 
+                // Liga o parser de notas → método por série: uma diretiva como
+                // "DROP-SET na última série: ..." marca a série-alvo como drop/cluster/
+                // rest-pause sem o usuário editar. NÃO-destrutivo: nunca sobrescreve
+                // advanced_config já existente (cardio nunca tem notas de método).
+                const setDetailsWithMethods = isCardio
+                    ? setDetails
+                    : applyNotesMethodToSetDetails(setDetails, e.notes, setsCount)
+
                 return {
                     id: e.id,
                     name: e.name,
@@ -85,7 +94,7 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                     sets: setsCount,
                     reps: repsHeader,
                     rpe: rpeHeader,
-                    setDetails,
+                    setDetails: setDetailsWithMethods,
                     isUnilateral: !!e.is_unilateral,
                     sideRestTime: e.side_rest_time ?? null,
                     transitionTime: e.transition_time ?? null,

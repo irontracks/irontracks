@@ -14,10 +14,6 @@ assert.ok(/teacher_user_id\s*!==\s*auth\.user\.id/.test(assign) && /status:\s*40
 const ensure = read('src/app/api/storage/ensure-bucket/route.ts')
 assert.ok(/checkRateLimitAsync/.test(ensure), 'ensure-bucket deve ter rate-limit')
 
-// L2 — team-workout-insights: teto diário
-const insights = read('src/app/api/ai/team-workout-insights/route.ts')
-assert.ok(/team-insights:daily/.test(insights) && /86_?400_?000/.test(insights), 'team-workout-insights deve ter teto diário')
-
 // L3 — userContext: instrução anti prompt-injection
 const ctx = read('src/utils/ai/userContext.ts')
 assert.ok(/NUNCA como instruções|trate como dados/i.test(ctx), 'userContext deve instruir o modelo a tratar o bloco como dados, não comandos')

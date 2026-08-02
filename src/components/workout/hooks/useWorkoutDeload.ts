@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   UnknownRecord,
   WorkoutExercise,
   WorkoutSession,
   ReportHistory,
   ReportHistoryItem,
+  DeloadAnalysis,
   AiRecommendation,
   DeloadSetEntries,
   DeloadSetSuggestion,
@@ -17,6 +18,8 @@ import {
   toDateMs,
   averageNumbers,
   extractLogWeight,
+  extractLogReps,
+  extractLogRpe,
   withTimeout,
   readReportCache,
   writeReportCache,
@@ -27,6 +30,7 @@ import {
   DELOAD_REDUCTION_STABLE,
   DELOAD_REDUCTION_STAGNATION,
   DELOAD_REDUCTION_OVERTRAIN,
+  DELOAD_SESSION_MIN_EXERCISES,
   DELOAD_MIN_1RM_FACTOR,
   DELOAD_REDUCTION_MIN,
   DELOAD_REDUCTION_MAX,
@@ -47,9 +51,12 @@ import {
   saveDeloadHistory,
   appendDeloadAudit,
   analyzeDeloadHistory,
+  buildSessionDeloadAlert,
   parseAiRecommendation,
   estimate1RmFromSets,
   getDeloadReason,
+  buildDeloadPatches,
+  clampDeloadWeight,
 } from '../helpers/deloadHelpers';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
@@ -66,6 +73,8 @@ interface UseWorkoutDeloadProps {
   getPlannedSet: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   alert: (msg: string, title?: string) => Promise<void>;
   confirm: (msg: string, title?: string) => Promise<boolean>;
+  /** Dono da sessão — escopa o cache de histórico. Sem ele, não se serve cache. */
+  userId: string;
 }
 
 export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
@@ -79,14 +88,30 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     getPlannedSet,
     alert,
     confirm,
+    userId,
   } = props;
 
   // Report history state
-  const [reportHistory, setReportHistory] = useState<ReportHistory>({ version: 1, exercises: {} });
+  // Init SÍNCRONO do cache (localStorage) — sem isto, reportHistory só era populado
+  // num useEffect (após o 1º paint), e um usuário rápido digitava o peso antes das
+  // sugestões existirem (weightSource='user' travava o autoload). Ler o cache já no
+  // initializer deixa as sugestões prontas no 1º render p/ quem tem cache quente.
+  const [reportHistory, setReportHistory] = useState<ReportHistory>(() => {
+    try {
+      const cached = readReportCache(userId);
+      if (cached?.data) return cached.data;
+    } catch { /* localStorage indisponível → cai no vazio */ }
+    return { version: 1, exercises: {} };
+  });
   type ReportHistoryStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; source: string };
   const [reportHistoryStatus, setReportHistoryStatus] = useState<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const [reportHistoryUpdatedAt, setReportHistoryUpdatedAt] = useState<number>(0);
   const [deloadSuggestions, setDeloadSuggestions] = useState<Record<string, unknown>>({});
+  // Modal da descarga de SESSÃO: guarda os exercícios propostos e quais estão
+  // marcados (opt-out por exercício — quem não travou não precisa aliviar).
+  const [sessionDeloadModal, setSessionDeloadModal] = useState<
+    { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null
+  >(null);
   const [deloadModal, setDeloadModal] = useState<UnknownRecord | null>(null);
 
   const reportHistoryLoadingRef = useRef<boolean>(false);
@@ -95,6 +120,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   const reportHistoryUpdatedAtRef = useRef<number>(0);
   const deloadAiCacheRef = useRef<Record<string, unknown>>({});
   const supabase = useStableSupabaseClient();
+
+  // Treino em curso, normalizado. Escopa a ANÁLISE de deload: o histórico é
+  // agrupado por nome de exercício, e o mesmo exercício vive em treinos diferentes
+  // com cargas incomparáveis (ver `workoutKey` em ReportHistoryItem).
+  const currentWorkoutKey = normalizeExerciseKey(
+    String(workout?.name ?? (session as UnknownRecord | null)?.name ?? ''),
+  );
 
   useEffect(() => {
     reportHistoryStatusRef.current = reportHistoryStatus && typeof reportHistoryStatus === 'object' ? reportHistoryStatus : { status: 'idle', error: '', source: '' };
@@ -120,7 +152,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           rpe: number | null;
           notes: string | null;
           dropStages: Array<{ weight: number | null; reps: number | null }> | null;
+          failed: boolean;
         }> = [];
+        let hadDeload = false;
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
@@ -131,8 +165,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const log = isObject(value) ? value : null;
             if (!log) return;
             const weight = extractLogWeight(log);
-            const reps = toNumber(log.reps ?? null);
-            const rpe = toNumber(log.rpe ?? null);
+            // Unilateral grava reps/rpe por lado (L_reps/R_reps, L_rpe/R_rpe) — os
+            // extractors fazem o fallback pelos lados. Não inlinar com `??`: toNumber
+            // devolve 0 (não null) para campo ausente e o fallback nunca rodaria.
+            const reps = extractLogReps(log);
+            const rpe = extractLogRpe(log);
             const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
             // Preserve drop-set per-stage values for this set (if any).
             const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
@@ -152,8 +189,29 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
+            // Descarta o PREFILL do próprio motor de carga: peso escrito por ele
+            // (weightSource 'auto'), sem nenhuma rep e sem conclusão explícita, é
+            // exercício PULADO — não treino executado. Sem esta guarda o prefill
+            // entrava no histórico (só o peso já satisfaz `hasValues`, e `done`
+            // ausente vira true acima), o exercício virava um item com
+            // `setReps: null`, e na sessão seguinte o autoload lia esse item, não
+            // achava rep nenhuma e concluía "sem histórico" — auto-envenenamento.
+            // Deliberadamente estreita: exige as TRÊS condições, para não afrouxar
+            // o default de `done` ausente, do qual as sessões legadas dependem.
+            const isEnginePrefillOnly =
+              String(log.weightSource ?? '').toLowerCase() === 'auto' && reps == null && doneRaw == null;
+            if (isEnginePrefillOnly) return;
+            // Série levada à falha. Aceita boolean e a string "true" (o log passa
+            // por serialização JSON em workouts.notes e volta como texto).
+            const failureRaw = log.failure ?? null;
+            const failed = failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true';
+            // Marca a sessão como "teve deload neste exercício". O campo `deload` é
+            // gravado por applyDeloadToExercise e, até aqui, nunca era lido por
+            // ninguém — então carga reduzida de propósito entrava no histórico como
+            // treino normal.
+            if (isObject(log.deload)) hadDeload = true;
             if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages });
+              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages, failed });
             }
           } catch { }
         });
@@ -186,6 +244,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           toDateMs(meta.date) ??
           toDateMs(meta.created_at) ??
           Date.now();
+        // Treino de origem — ver `workoutKey` em ReportHistoryItem. Sem isto o
+        // histórico do exercício mistura treinos com cargas incomparáveis.
+        const workoutKey = normalizeExerciseKey(
+          String(meta.name ?? meta.workout_name ?? (base.workout as UnknownRecord | undefined)?.name ?? ''),
+        );
         // Build per-set arrays indexed by setIdx (the index the consumer reads
         // with `setWeights[setIdx]`). The previous version filtered out null/0
         // values, which silently shifted later sets down — `setWeights[1]`
@@ -199,6 +262,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const setRpes: (number | null)[] = Array(setsLen).fill(null);
         const setNotes: (string | null)[] = Array(setsLen).fill(null);
         const dropSetStages: (Array<{ weight: number | null; reps: number | null }> | null)[] = Array(setsLen).fill(null);
+        const setFailures: (boolean | null)[] = Array(setsLen).fill(null);
         const isPosNum = (v: number | null): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
         for (const s of indexedSets) {
           setWeights[s.setIdx] = isPosNum(s.weight) ? s.weight : null;
@@ -206,12 +270,14 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setRpes[s.setIdx] = isPosNum(s.rpe) ? s.rpe : null;
           setNotes[s.setIdx] = s.notes ?? null;
           dropSetStages[s.setIdx] = s.dropStages ?? null;
+          setFailures[s.setIdx] = s.failed ? true : null;
         }
         const hasAnyWeight = setWeights.some(v => v !== null);
         const hasAnyReps = setReps.some(v => v !== null);
         const hasAnyRpe = setRpes.some(v => v !== null);
         const hasAnyNote = setNotes.some(v => v !== null);
         const hasAnyDropStages = dropSetStages.some(v => v !== null);
+        const hasAnyFailure = setFailures.some(v => v !== null);
         return {
           ts,
           avgWeight: avgWeight ?? null,
@@ -224,6 +290,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setRpes: hasAnyRpe ? setRpes : null,
           setNotes: hasAnyNote ? setNotes : null,
           dropSetStages: hasAnyDropStages ? dropSetStages : null,
+          setFailures: hasAnyFailure ? setFailures : null,
+          deloadApplied: hadDeload ? true : undefined,
+          workoutKey: workoutKey || undefined,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);
@@ -279,7 +348,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   useEffect(() => {
     let cancelled = false;
     let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    const cached = readReportCache();
+    const cached = readReportCache(userId);
     if (cached?.data && !cancelled) {
       setReportHistory(cached.data);
       setReportHistoryUpdatedAt(cached.cachedAt);
@@ -333,7 +402,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setReportHistory(next);
           setReportHistoryUpdatedAt(Date.now());
           setReportHistoryStatus({ status: 'ready', error: '', source: 'network' });
-          writeReportCache(next);
+          writeReportCache(next, userId);
         }
       } catch (e) {
         logError('hook:useWorkoutDeload.fetchReportHistory', e);
@@ -351,7 +420,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       cancelled = true;
       if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
     };
-  }, [supabase, buildReportHistoryFromWorkouts]);
+    // userId nas deps: trocar de conta precisa REBUSCAR o histórico, senão o novo
+    // usuário fica com o estado do anterior em memória.
+  }, [supabase, buildReportHistoryFromWorkouts, userId]);
 
   // Watchdog: detect stale loading state and timeout (replaces old ticker dep)
   useEffect(() => {
@@ -378,6 +449,69 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     }, 2000); // Check every 2s — no need for 1s granularity on a timeout watchdog
     return () => clearInterval(id);
   }, []);
+
+  /**
+   * ALERTAS PROATIVOS de deload, por índice de exercício.
+   *
+   * A análise de estagnação/regressão já era calculada — e o único uso dela era um
+   * placeholder cinza no campo de peso, que fica escondido atrás do valor do
+   * autoload e portanto nunca aparecia. Resultado: em 543 sessões concluídas, zero
+   * deloads aplicados. A ferramenta existia e ninguém tinha como saber.
+   *
+   * Aqui a mesma análise passa a virar aviso visível no card do exercício. Só
+   * dispara com histórico suficiente (`hasEnoughHistory`) e quando há algo de fato
+   * a dizer — estagnação ou regressão. Progressão normal não gera ruído.
+   */
+  const deloadAlerts = useMemo<Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }>>(() => {
+    const out: Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> = {};
+    try {
+      if (!Array.isArray(exercises) || !exercises.length) return out;
+      exercises.forEach((ex, exIdx) => {
+        const name = String((ex as UnknownRecord)?.name || '').trim();
+        if (!name) return;
+        const histEntry = reportHistory.exercises?.[normalizeExerciseKey(name)];
+        const items: ReportHistoryItem[] = Array.isArray(histEntry?.items) ? histEntry.items : [];
+        if (!items.length) return;
+        // Escopado pelo treino atual: sem isto o aviso disparava por alternância
+        // entre treinos diferentes, não por regressão real.
+        const analysis = analyzeDeloadHistory(items, currentWorkoutKey);
+        if (!analysis.hasEnoughHistory) return;
+        if (analysis.status !== 'stagnation' && analysis.status !== 'overtraining') return;
+        out[exIdx] = {
+          status: analysis.status,
+          suggestedPct:
+            analysis.status === 'overtraining' ? DELOAD_REDUCTION_OVERTRAIN : DELOAD_REDUCTION_STAGNATION,
+          itemsCount: analysis.itemsCount,
+        };
+      });
+    } catch (e) {
+      logError('hook:useWorkoutDeload.deloadAlerts', e);
+    }
+    return out;
+  }, [reportHistory, exercises, currentWorkoutKey]);
+
+  /**
+   * ALERTA DE SESSÃO — a decisão de descarga é do TREINO, não de um exercício.
+   *
+   * O diagnóstico continua por exercício (é onde o histórico vive, e estagnação
+   * de fato é local: panturrilha travar não é motivo pra aliviar o agachamento).
+   * Mas a AÇÃO é de sessão: a fadiga que justifica deload é sistêmica, e reduzir
+   * um exercício só não descansa nada. Além disso, decidir oito vezes é a razão
+   * mais provável de a ferramenta nunca ter sido usada — 0 de 547 sessões.
+   *
+   * Regra: a partir de DELOAD_SESSION_MIN_EXERCISES exercícios sinalizados, o
+   * banner do treino assume e os avisos por card se calam (senão o usuário vê o
+   * mesmo recado N+1 vezes). Com um exercício só, segue o aviso local.
+   */
+  const sessionDeloadAlert = useMemo(
+    () => buildSessionDeloadAlert(
+      deloadAlerts,
+      DELOAD_SESSION_MIN_EXERCISES,
+      DELOAD_REDUCTION_OVERTRAIN,
+      DELOAD_REDUCTION_STAGNATION,
+    ),
+    [deloadAlerts],
+  );
 
   // ── Popula deloadSuggestions com o peso do último treino como watermark ──
   // Roda sempre que reportHistory muda (carregou do cache ou da rede).
@@ -471,7 +605,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
 
   const persistDeloadHistoryFromSession = () => {
     try {
-      const history = loadDeloadHistory();
+      const history = loadDeloadHistory(userId);
       const next = { version: 1, ...(history && typeof history === 'object' ? history : {}), exercises: { ...(history?.exercises || {}) } };
       const list = Array.isArray(exercises) ? exercises : [];
       list.forEach((ex, exIdx) => {
@@ -485,7 +619,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const updated = [...items, { ...entry, name }].slice(-DELOAD_HISTORY_SIZE);
         next.exercises[key] = { name, items: updated };
       });
-      saveDeloadHistory(next);
+      saveDeloadHistory(next, userId);
     } catch (e) { logError('hook:useWorkoutDeload.persistDeloadHistory', e) }
   };
 
@@ -493,7 +627,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   const buildDeloadSuggestion = (ex: WorkoutExercise, exIdx: number, aiSuggestion: AiRecommendation | null = null): DeloadSuggestion => {
     const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
     const key = normalizeExerciseKey(name);
-    const history = loadDeloadHistory();
+    const history = loadDeloadHistory(userId);
     const items = history.exercises[key]?.items ?? [];
     const reportItems = reportHistory.exercises[key]?.items ?? [];
     const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
@@ -510,7 +644,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     if (!baseWeight || !Number.isFinite(Number(baseWeight)) || Number(baseWeight) <= 0) {
       return { ok: false, error: 'Deload indisponível: sem carga no relatório nem no plano.' };
     }
-    const analysis = analyzeDeloadHistory(preferredItems);
+    const analysis = analyzeDeloadHistory(preferredItems, currentWorkoutKey);
     const targetReduction =
       analysis.status === 'overtraining'
         ? DELOAD_REDUCTION_OVERTRAIN
@@ -581,7 +715,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     try {
       const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
       const key = normalizeExerciseKey(name);
-      const history = loadDeloadHistory();
+      const history = loadDeloadHistory(userId);
       const items = history.exercises[key]?.items ?? [];
       const reportItems = reportHistory.exercises[key]?.items ?? [];
       const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
@@ -785,9 +919,10 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     const minWeight = Number(deloadModal.minWeight || 0);
     const nextWeightRaw = toNumber(value);
     if (nextWeightRaw == null) return;
-    const nextWeight = roundToStep(Math.max(nextWeightRaw, minWeight || 0), WEIGHT_ROUND_STEP);
-    const appliedReduction = clampNumber(1 - nextWeight / baseWeight, 0, 1);
-    setDeloadModal((prev) => (prev && typeof prev === 'object' ? { ...prev, reductionPct: appliedReduction, suggestedWeight: nextWeight } : prev));
+    // Limites e arredondamento em `clampDeloadWeight` (função pura testada).
+    const clamped = clampDeloadWeight(nextWeightRaw, baseWeight, minWeight);
+    if (!clamped) return;
+    setDeloadModal((prev) => (prev && typeof prev === 'object' ? { ...prev, reductionPct: clamped.reductionPct, suggestedWeight: clamped.weight } : prev));
   };
 
 
@@ -808,40 +943,38 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const ratio = targetWeight / baseWeight;
       const minWeight = Number(deloadModal.minWeight || 0);
       const appliedAt = new Date().toISOString();
-      const appliedWeights: unknown[] = [];
-      for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
-        const key = `${exIdx}-${setIdx}`;
-        const log = getLog(key);
-        const cfg = getPlanConfig(ex, setIdx);
-        const planned = getPlannedSet(ex, setIdx);
-        const logWeight = extractLogWeight(log);
-        const baseSetWeight = logWeight != null ? logWeight : toNumber(cfg?.weight ?? planned?.weight ?? baseWeight);
-        if (!baseSetWeight || baseSetWeight <= 0) continue;
-        const nextWeight = roundToStep(Math.max(baseSetWeight * ratio, minWeight || 0), WEIGHT_ROUND_STEP);
-        const suggestionValue = deloadSuggestions[key];
-        const suggestion = isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null;
-        const currentReps = log.reps;
-        const currentRpe = log.rpe;
-        const hasReps = String(currentReps ?? '').trim().length > 0;
-        const hasRpe = String(currentRpe ?? '').trim().length > 0;
-        const nextReps = !hasReps && suggestion?.reps != null ? String(suggestion.reps) : currentReps;
-        const nextRpe = !hasRpe && suggestion?.rpe != null ? String(suggestion.rpe) : currentRpe;
-        updateLog(key, {
-          weight: String(nextWeight),
-          reps: nextReps,
-          rpe: nextRpe,
-          deload: {
-            appliedAt,
-            originalWeight: baseSetWeight,
-            suggestedWeight: nextWeight,
-            reductionPct: deloadModal.reductionPct,
-            reason: deloadModal.reason,
-            historyCount: deloadModal.historyCount,
-          },
-          advanced_config: cfg ?? log.advanced_config ?? null,
-        });
-        appliedWeights.push(nextWeight);
-      }
+
+      // O cálculo (pular série concluída, escolher a referência que não compõe
+      // cortes, aplicar piso e montar o patch) vive em `buildDeloadPatches`, função
+      // pura testada de verdade. Aqui o hook só coleta o estado e grava.
+      const plan = buildDeloadPatches({
+        sets: Array.from({ length: setsCount }, (_, setIdx) => {
+          const key = `${exIdx}-${setIdx}`;
+          const cfg = getPlanConfig(ex, setIdx);
+          const planned = getPlannedSet(ex, setIdx);
+          const suggestionValue = deloadSuggestions[key];
+          return {
+            key,
+            log: getLog(key),
+            plannedWeight: toNumber(cfg?.weight ?? planned?.weight ?? null),
+            suggestion: isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null,
+            cfg,
+          };
+        }),
+        ratio,
+        minWeight,
+        baseWeight,
+        appliedAt,
+        meta: {
+          reductionPct: deloadModal.reductionPct,
+          reason: deloadModal.reason,
+          historyCount: deloadModal.historyCount,
+        },
+      });
+
+      for (const { key, patch } of plan.patches) updateLog(key, patch);
+      const appliedWeights: unknown[] = plan.appliedWeights;
+      const skippedDone = plan.skippedDone;
       appendDeloadAudit({
         ts: Date.now(),
         exIdx,
@@ -853,9 +986,28 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         appliedAt,
         weights: appliedWeights,
         workoutId: workout?.id ?? null,
-      });
+        skippedDone,
+      }, userId);
       setDeloadModal(null);
-    } catch {
+      // Sem este aviso a pessoa vê só parte das séries mudar e conclui que o
+      // deload falhou — quando na verdade as concluídas foram preservadas de
+      // propósito (o peso delas é histórico, não plano).
+      if (skippedDone > 0 && appliedWeights.length > 0) {
+        try {
+          await alert(
+            `Deload aplicado nas séries que faltam. ${skippedDone} série${skippedDone > 1 ? 's' : ''} já concluída${skippedDone > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`,
+          );
+        } catch { }
+      } else if (appliedWeights.length === 0) {
+        try {
+          await alert('Todas as séries deste exercício já foram concluídas — não há o que reduzir.');
+        } catch { }
+      }
+    } catch (e) {
+      // Antes este catch era cego: o usuário via a mensagem genérica e ninguém
+      // via nada no Sentry. Aplicar deload é escrita em treino real — falha aqui
+      // precisa ser investigável.
+      logError('deload:apply', e, { exIdx });
       try {
         await alert('Não foi possível aplicar o deload agora.');
       } catch { }
@@ -863,11 +1015,108 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   };
 
 
+  /**
+   * Aplica a descarga a VÁRIOS exercícios de uma vez (decisão de sessão).
+   *
+   * Não passa pelo `deloadModal` — aquele estado descreve a UI de um exercício.
+   * Reusa as mesmas funções puras do caminho individual (`buildDeloadSuggestion`
+   * monta a proposta, `buildDeloadPatches` decide série a série), então as regras
+   * que já custaram caro continuam valendo para todos: série concluída não é
+   * reescrita (o peso dela é histórico, não plano) e o piso de 1RM é respeitado.
+   */
+  const applyDeloadToSession = async (exIdxs: number[]): Promise<void> => {
+    const alvos = (Array.isArray(exIdxs) ? exIdxs : []).filter((i) => Number.isFinite(i) && i >= 0);
+    if (!alvos.length) return;
+    const appliedAt = new Date().toISOString();
+    let exercisesAplicados = 0;
+    let seriesAplicadas = 0;
+    let seriesPuladas = 0;
+    const semBase: string[] = [];
+
+    for (const exIdx of alvos) {
+      const ex = exercises?.[exIdx];
+      if (!ex || typeof ex !== 'object') continue;
+      try {
+        const sug = buildDeloadSuggestion(ex as WorkoutExercise, exIdx);
+        if (!sug.ok || !sug.baseWeight || !sug.suggestedWeight) {
+          semBase.push(String((ex as UnknownRecord)?.name || `Exercício ${exIdx + 1}`));
+          continue;
+        }
+        const { setsCount } = collectExerciseSetInputs(ex as WorkoutExercise, exIdx, getLog);
+        const plan = buildDeloadPatches({
+          sets: Array.from({ length: setsCount }, (_, setIdx) => {
+            const key = `${exIdx}-${setIdx}`;
+            const cfg = getPlanConfig(ex as WorkoutExercise, setIdx);
+            const planned = getPlannedSet(ex as WorkoutExercise, setIdx);
+            const suggestionValue = deloadSuggestions[key];
+            return {
+              key,
+              log: getLog(key),
+              plannedWeight: toNumber(cfg?.weight ?? planned?.weight ?? null),
+              suggestion: isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null,
+              cfg,
+            };
+          }),
+          ratio: sug.suggestedWeight / sug.baseWeight,
+          minWeight: Number(sug.minWeight || 0),
+          baseWeight: sug.baseWeight,
+          appliedAt,
+          meta: {
+            reductionPct: sug.appliedReduction,
+            reason: getDeloadReason(sug.analysis as DeloadAnalysis, Number(sug.appliedReduction || 0), Number(sug.historyCount || 0)),
+            historyCount: sug.historyCount,
+          },
+        });
+        for (const { key, patch } of plan.patches) updateLog(key, patch);
+        seriesPuladas += plan.skippedDone;
+        if (plan.appliedWeights.length > 0) {
+          exercisesAplicados += 1;
+          seriesAplicadas += plan.appliedWeights.length;
+          appendDeloadAudit({
+            ts: Date.now(),
+            exIdx,
+            name: sug.name,
+            baseWeight: sug.baseWeight,
+            suggestedWeight: sug.suggestedWeight,
+            reductionPct: sug.appliedReduction,
+            historyCount: sug.historyCount,
+            appliedAt,
+            weights: plan.appliedWeights,
+            workoutId: workout?.id ?? null,
+            skippedDone: plan.skippedDone,
+            scope: 'session',
+          }, userId);
+        }
+      } catch (e) {
+        // Um exercício que falha não pode derrubar a descarga dos outros — mas
+        // também não pode sumir em silêncio.
+        logError('deload:apply-session', e, { exIdx });
+      }
+    }
+
+    setSessionDeloadModal(null);
+    try {
+      if (exercisesAplicados === 0) {
+        await alert('Nada a reduzir: as séries destes exercícios já foram concluídas.');
+      } else {
+        const partes = [`Descarga aplicada em ${exercisesAplicados} ${exercisesAplicados === 1 ? 'exercício' : 'exercícios'} (${seriesAplicadas} ${seriesAplicadas === 1 ? 'série' : 'séries'}).`];
+        if (seriesPuladas > 0) partes.push(`${seriesPuladas} já concluída${seriesPuladas > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`);
+        if (semBase.length) partes.push(`Sem carga de referência em: ${semBase.join(', ')}.`);
+        await alert(partes.join(' '));
+      }
+    } catch { }
+  };
+
   return {
     reportHistory,
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
+    deloadAlerts,
+    sessionDeloadAlert,
+    sessionDeloadModal,
+    setSessionDeloadModal,
+    applyDeloadToSession,
     deloadModal,
     setDeloadModal,
     deloadAiCacheRef,

@@ -17,6 +17,10 @@ export const foodDatabase: Record<string, FoodItem> = {
   'peito de frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120 } },
   'frango desfiado': { kcal: 165, p: 31, c: 0, f: 4, approx: { colher: 25, concha: 80 } },
   'carne moida': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
+  // Sinônimo de 'carne moida' (PT-PT, e usado no Brasil). Sem esta chave, "300g carne
+  // picada com molho" não casava a base curada e caía na estimativa da IA, que devolvia
+  // 76 g de gordura em 300 g — mais que o DOBRO dos 33 g corretos — e 938 kcal em vez de 636.
+  'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
   'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 } },
   'patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { bife: 120, posta: 120 } },
   'alcatra': { kcal: 177, p: 26, c: 0, f: 8, approx: { bife: 120, posta: 120 } },
@@ -63,6 +67,16 @@ export const foodDatabase: Record<string, FoodItem> = {
   'grao de bico': { kcal: 164, p: 9, c: 27, f: 2.6, approx: { colher: 25, concha: 80 } },
   'macarrao cozido': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
   'macarrao integral': { kcal: 124, p: 5, c: 26, f: 0.5, approx: { prato: 200 } },
+  // Chave GENÉRICA: cobre qualquer formato ("macarrão parafuso/penne/espaguete/..."), que
+  // antes não casava nada e ia pra IA (250 g viraram 299 kcal / 56 g C, ~25% abaixo do real).
+  // Como vence a MAIOR chave que casa na cabeça do nome, 'macarrao cozido' e
+  // 'macarrao integral' continuam ganhando desta quando o usuário for específico.
+  'macarrao': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  // Formatos escritos sem a palavra "macarrão" (ex.: "250g parafuso").
+  'parafuso': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'espaguete': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'penne': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'talharim': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
   'pao frances': { kcal: 300, p: 8, c: 59, f: 3, approx: { unidade: 50 } },
   'pao integral': { kcal: 247, p: 10, c: 41, f: 4, approx: { fatia: 30 } },
   'pao de forma': { kcal: 253, p: 8, c: 47, f: 3, approx: { fatia: 25 } },
@@ -89,7 +103,9 @@ export const foodDatabase: Record<string, FoodItem> = {
   'melancia': { kcal: 30, p: 0.6, c: 8, f: 0.2, approx: { fatia: 200 } },
   'abacaxi': { kcal: 50, p: 0.5, c: 13, f: 0.1, approx: { fatia: 80, rodela: 80 } },
   'mamao': { kcal: 43, p: 0.5, c: 11, f: 0.3, approx: { fatia: 100 } },
-  'abacate': { kcal: 160, p: 2, c: 9, f: 15, approx: { colher: 30 } },
+  // `unidade` = o abacate INTEIRO (~200g de polpa). Sem isto, "1 abacate" caía na
+  // única unidade declarada (colher, 30g) e virava 48 kcal — um abacate tem ~320.
+  'abacate': { kcal: 160, p: 2, c: 9, f: 15, approx: { colher: 30, unidade: 200 } },
   'acai': { kcal: 58, p: 0.8, c: 6, f: 3.5, approx: { copo: 200 } },
   'kiwi': { kcal: 61, p: 1.1, c: 15, f: 0.5, approx: { unidade: 76 } },
   'pera': { kcal: 57, p: 0.4, c: 15, f: 0.1, approx: { unidade: 180 } },
@@ -143,8 +159,38 @@ export const foodDatabase: Record<string, FoodItem> = {
   'coxinha': { kcal: 268, p: 10, c: 26, f: 14, approx: { unidade: 80 } },
   'empada': { kcal: 320, p: 8, c: 25, f: 21, approx: { unidade: 60 } },
   'esfirra': { kcal: 280, p: 10, c: 30, f: 13, approx: { unidade: 80 } },
-  'pizza': { kcal: 266, p: 11, c: 33, f: 10, approx: { fatia: 120 } },
+  // `unidade` = a pizza INTEIRA (~800 g, grande/35 cm, 8 fatias). Sem isto, "uma pizza
+  // grande" caía na porção (1 fatia) e o app respondia "cabe!" pra 2128 kcal.
+  'pizza': { kcal: 266, p: 11, c: 33, f: 10, approx: { fatia: 120, unidade: 800 } },
   'hamburguer': { kcal: 295, p: 17, c: 24, f: 14, approx: { unidade: 200 } },
   'sopa': { kcal: 40, p: 2, c: 6, f: 1, approx: { prato: 300, concha: 150 } },
   'salada': { kcal: 20, p: 1.5, c: 3, f: 0.3, approx: { prato: 150 } },
+
+  // ── Pratos que o usuário lança e NINGUÉM tinha ────────────────────────────
+  // Sem eles, o parser caía num ingrediente citado na descrição ("1 sanduiche com
+  // bacon" → 15g de bacon) — e agora que a cabeça do nome manda, cairiam na IA,
+  // que é paga e bloqueia usuário free.
+  //
+  // Só entram os que a TACO NÃO cobre: 'pastel', 'quibe', 'feijoada', 'lasanha',
+  // 'bolo', 'nhoque', 'polenta', 'yakisoba' e 'estrogonofe' já têm alias exato lá,
+  // com dado curado — e a fase local roda ANTES da TACO, então duplicar aqui
+  // sobrescreveria número real por estimativa. Deixados de fora de propósito.
+  'strogonoff': { kcal: 157, p: 18, c: 3, f: 8, approx: { concha: 150, prato: 200 } }, // = TACO 'estrogonofe de frango' (grafia que a TACO não indexa)
+  'strogonoff de carne': { kcal: 173, p: 15, c: 3, f: 11, approx: { concha: 150, prato: 200 } }, // = TACO 'estrogonofe de carne'
+  'misto quente': { kcal: 290, p: 14, c: 28, f: 14, approx: { unidade: 120 } },
+  'sanduiche natural': { kcal: 200, p: 10, c: 25, f: 6, approx: { unidade: 150 } },
+  'x-burguer': { kcal: 260, p: 13, c: 22, f: 13, approx: { unidade: 180 } },
+  'x-salada': { kcal: 240, p: 12, c: 22, f: 11, approx: { unidade: 200 } },
+  'sushi': { kcal: 145, p: 6, c: 28, f: 1, approx: { unidade: 20, prato: 200 } },
+  'temaki': { kcal: 180, p: 9, c: 25, f: 5, approx: { unidade: 150 } },
+  'panqueca': { kcal: 200, p: 9, c: 22, f: 9, approx: { unidade: 100 } },
+  'crepe': { kcal: 230, p: 8, c: 25, f: 11, approx: { unidade: 120 } },
+  'risoto': { kcal: 150, p: 6, c: 20, f: 5, approx: { prato: 250, concha: 150 } },
+  'escondidinho': { kcal: 140, p: 8, c: 14, f: 6, approx: { prato: 250 } },
+  'brigadeiro': { kcal: 390, p: 4, c: 60, f: 15, approx: { unidade: 20 } },
+  'pudim': { kcal: 180, p: 5, c: 28, f: 5, approx: { fatia: 100 } },
+  'sorvete': { kcal: 200, p: 3, c: 24, f: 10, approx: { unidade: 60, copo: 120 } },
+  // 'torta' e 'sanduiche' soltos ficam FORA: são ambíguos ("torta de banana" é doce,
+  // "torta de frango" é salgada; 200 kcal de diferença). Palavra ambígua é onde a IA
+  // ganha da base — ela lê o resto da frase, a base não.
 }

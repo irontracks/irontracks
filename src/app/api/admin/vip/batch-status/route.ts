@@ -27,9 +27,26 @@ export async function POST(req: Request) {
 
         const parsed = await parseJsonBody(req, BodySchema)
         if (parsed.response) return parsed.response
-        const { user_ids } = parsed.data!
+        const { user_ids: requestedIds } = parsed.data!
 
         const admin = createAdminClient()
+
+        // Professor só consulta os PRÓPRIOS alunos. Sem este recorte, um teacher
+        // legítimo mandava 200 UUIDs quaisquer (colhidos no feed social) e lia o
+        // plano, o status e a data de expiração de qualquer usuário — inclusive
+        // de outros professores (auditoria 2026-07-28). Admin segue vendo todos.
+        let user_ids = requestedIds
+        if (auth.role === 'teacher') {
+            const { data: links } = await admin
+                .from('students')
+                .select('user_id')
+                .eq('teacher_id', auth.user.id)
+                .in('user_id', requestedIds)
+            const allowed = new Set((links || []).map((l) => String((l as { user_id?: string }).user_id || '')))
+            allowed.add(auth.user.id) // o próprio professor
+            user_ids = requestedIds.filter((id) => allowed.has(id))
+            if (user_ids.length === 0) return NextResponse.json({ ok: true, data: {} as VipBatchResult })
+        }
 
         // 1. Get roles from profiles
         const { data: profiles } = await admin

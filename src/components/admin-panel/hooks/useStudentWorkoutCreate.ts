@@ -5,6 +5,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AdminUser } from '@/types/admin'
 import type { UnknownRecord } from '@/types/app'
 import { apiAi } from '@/lib/api'
+import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload'
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient'
+import { wizardAnswersToStudentPayload, planToWorkoutDrafts } from '@/lib/workout/studentWorkoutWizard'
 import { useDialog } from '@/contexts/DialogContext'
 import type { WorkoutWizardAnswers, WorkoutDraft } from '@/components/dashboard/WorkoutWizardModal'
 
@@ -51,37 +54,16 @@ export function useStudentWorkoutCreate({
             if (!targetUserId) return { ok: false, error: 'Aluno sem acesso ao app' }
 
             try {
-                const { data: newWorkout, error: wErr } = await supabase
-                    .from('workouts')
-                    .insert({
-                        user_id: targetUserId,
-                        created_by: user?.id,
-                        is_template: true,
-                        name: draft.title || 'Treino',
-                        notes: '',
-                    })
-                    .select()
-                    .single()
-                if (wErr) throw wErr
-
-                const exercises = Array.isArray(draft.exercises) ? draft.exercises as UnknownRecord[] : []
-                if (exercises.length) {
-                    const toInsert = exercises.map((ex) => ({
-                        workout_id: newWorkout.id,
-                        name: String(ex?.name || ''),
-                        sets: Number(ex?.sets) || 3,
-                        reps: ex?.reps ?? '8-12',
-                        rpe: ex?.rpe ?? 8,
-                        cadence: ex?.cadence || '2020',
-                        rest_time: Number(ex?.restTime ?? ex?.rest_time) || 60,
-                        method: ex?.method || 'Normal',
-                        video_url: String(ex?.videoUrl || ex?.video_url || ''),
-                        notes: String(ex?.notes || ''),
-                    }))
-                    const { error: exErr } = await supabase.from('exercises').insert(toInsert)
-                    if (exErr) throw exErr
-                }
-
+                // Via RPC save_workout_atomic (mesma do editor do aluno): cria workout +
+                // exercícios + linhas de `sets` atomicamente. Insert direto em `exercises`
+                // quebrava (colunas sets/reps/rpe não existem na tabela).
+                const res = await saveTeacherWorkout(supabase, {
+                    ownerUserId: targetUserId,
+                    authorUserId: String(user?.id || ''),
+                    title: draft.title || 'Treino',
+                    exercises: draft.exercises,
+                })
+                if (!res.ok) return { ok: false, error: res.error }
                 return { ok: true }
             } catch (e: unknown) {
                 const msg =
@@ -128,18 +110,19 @@ export function useStudentWorkoutCreate({
     const onWizardGenerate = useCallback(
         async (answers: WorkoutWizardAnswers, options?: { mode?: GenerateMode }): Promise<GenerateResult> => {
             const mode = options?.mode ?? 'single'
-            const res = await apiAi.workoutWizard({ answers, mode })
-            // Return shape matches what WorkoutWizardModal expects
-            if (mode === 'program') {
-                const drafts = Array.isArray((res as UnknownRecord)?.drafts)
-                    ? ((res as UnknownRecord).drafts as WorkoutDraft[])
-                    : []
-                return { drafts }
-            }
-            const draft = (res as UnknownRecord)?.draft as WorkoutDraft | undefined
-            return draft ?? { title: 'Treino', exercises: [] }
+            const studentId = String(selectedStudent?.user_id || '').trim()
+            // Sem conta no app não dá pra personalizar pelos dados do aluno.
+            if (!studentId) throw new Error('Este aluno ainda não possui acesso ao app.')
+
+            // Usa a rota que personaliza pelos dados do ALUNO (não do professor).
+            const payload = wizardAnswersToStudentPayload(answers, studentId, mode)
+            const res = await apiAi.studentWorkout(payload as unknown as Record<string, unknown>)
+            const drafts = planToWorkoutDrafts((res as UnknownRecord)?.plan)
+
+            if (mode === 'program') return { drafts }
+            return drafts[0] ?? { title: 'Treino', exercises: [] }
         },
-        []
+        [selectedStudent]
     )
 
     /**
@@ -189,6 +172,8 @@ export function useStudentWorkoutCreate({
                 if (res.ok) saved++
             }
             await refreshStudentWorkouts()
+            // Notifica o aluno UMA vez (não uma por dia do programa) se algo foi salvo.
+            if (saved > 0) void notifyStudentWorkoutAssigned(targetUserId)
             await alert(`${saved} treino(s) salvo(s) para o aluno!`, 'Sucesso')
         },
         [alert, selectedStudent, saveWorkoutDraftToStudent, refreshStudentWorkouts]

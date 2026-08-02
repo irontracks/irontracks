@@ -27,7 +27,6 @@ describe('preferenceKeyForType', () => {
   it('returns the mapped key for known types', () => {
     expect(preferenceKeyForType('friend_pr')).toBe('notifyFriendPRs')
     expect(preferenceKeyForType('message')).toBe('notifyDirectMessages')
-    expect(preferenceKeyForType('team_invite')).toBe('notifyTeamInvites')
   })
 
   it('is case-insensitive and trims whitespace', () => {

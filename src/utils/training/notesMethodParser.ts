@@ -78,8 +78,11 @@ const splitDirectives = (notes: unknown): string[] => {
 const parseSteps = (pattern: unknown): string[] => {
   const raw = normalize(pattern)
   if (!raw) return []
+  // "→"/"»"/"›" já viraram ">" no normalize. Se não houver ">", usa vírgula como
+  // separador de etapas (descrições naturais: "até a falha, reduz 20%, continua").
+  const sep = raw.includes('>') ? '>' : ','
   return raw
-    .split('>')
+    .split(sep)
     .map((p) => safeString(p))
     .map((p) => normalize(p))
     .filter(Boolean)
@@ -155,17 +158,18 @@ const parseDropSet = (pattern: unknown) => {
   const steps = parseSteps(pattern)
   if (!steps.length) return null
   const stages: unknown[] = [];
-  steps.forEach((p) => {
-    if (p.includes('falha') || p.includes('failure')) {
-      stages.push({ weight: null, reps: 'Falha' })
-      return
-    }
-    if (p.includes('%')) return
-    const repsN = parseFirstNumber(p)
-    if (repsN != null && repsN > 0) {
-      stages.push({ weight: null, reps: String(Math.round(repsN)) })
-    }
-  })
+  let sawStage = false
+  for (const p of steps) {
+    const isFailure = p.includes('falha') || p.includes('failure')
+    const repsN = p.includes('%') ? null : parseFirstNumber(p)
+    // "continua/segue/mais uma/de novo/repete" DEPOIS de já ter um estágio = mais
+    // um estágio até a falha (a essência do drop: reduz a carga e continua).
+    const isContinue = /\b(continu|segue|seguir|mais|novamente|de novo|nova|repet)/.test(p)
+    if (isFailure) { stages.push({ weight: null, reps: 'Falha' }); sawStage = true; continue }
+    if (repsN != null && repsN > 0) { stages.push({ weight: null, reps: String(Math.round(repsN)) }); sawStage = true; continue }
+    if (isContinue && sawStage) { stages.push({ weight: null, reps: 'Falha' }); continue }
+    // "reduz ~20%" sozinho é uma TRANSIÇÃO (dropar a carga), não um estágio → ignora.
+  }
   if (stages.length < 2) return null
   return { config: stages }
 }
@@ -252,4 +256,77 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverri
   })
 
   return { overrides, hash: hashString(notes) }
+}
+
+type SetDetailLike = Record<string, unknown>
+
+interface ApplyNotesOptions {
+  /** Chave de leitura/escrita do config na série. Default: `advanced_config`
+   *  (mapWorkoutRow). A periodização VIP usa `advancedConfig` (camelCase). */
+  configKey?: string
+  /** Constrói um setDetail default quando a série-alvo não existe no array
+   *  (plano salvo só com a contagem, sem rows em `sets`). Default = shape do
+   *  mapWorkoutRow. A periodização passa o próprio (isWarmup/advancedConfig). */
+  makeDefault?: (index: number, config: unknown) => SetDetailLike
+}
+
+/**
+ * Aplica, de forma NÃO-DESTRUTIVA, os overrides de método por série derivados das
+ * notas do exercício sobre o array `setDetails`. Regras:
+ *  - Só preenche o config numa série onde ele ainda está ausente (null/undefined).
+ *    Config vindo do banco/editor NUNCA é sobrescrito.
+ *  - Se a série-alvo não existe no `setDetails` (ex.: plano de IA salvo só com a
+ *    contagem, sem rows em `sets`), cria um setDetail default carregando o config.
+ *  - Sem override aplicável → retorna o MESMO array (referência estável).
+ *
+ * Isto é o que "liga" `parseExerciseNotesToSetOverrides` na hidratação: uma nota
+ * "DROP-SET na última série: até a falha → reduz 20% → continua" passa a marcar a
+ * última série como drop automaticamente, sem o usuário editar nada.
+ */
+export function applyNotesMethodToSetDetails(
+  setDetails: SetDetailLike[],
+  notes: unknown,
+  setsCount: number,
+  options: ApplyNotesOptions = {},
+): SetDetailLike[] {
+  const configKey = options.configKey ?? 'advanced_config'
+  const makeDefault =
+    options.makeDefault ??
+    ((index: number, config: unknown): SetDetailLike => ({
+      set_number: index + 1,
+      reps: null,
+      rpe: null,
+      weight: null,
+      is_warmup: false,
+      set_type: 'working',
+      [configKey]: config,
+    }))
+
+  const base = Array.isArray(setDetails) ? setDetails : []
+  const effectiveCount = Math.max(0, Math.floor(Number(setsCount) || 0)) || base.length
+  if (!effectiveCount) return base
+
+  const { overrides } = parseExerciseNotesToSetOverrides({ notes, setsCount: effectiveCount })
+  if (!overrides.some(Boolean)) return base
+
+  const targetLen = Math.max(base.length, effectiveCount)
+  const out: SetDetailLike[] = []
+  let changed = false
+  for (let i = 0; i < targetLen; i += 1) {
+    const existing = base[i]
+    const ov = overrides[i] || null
+    if (existing) {
+      const cfg = existing[configKey]
+      if (ov && (cfg === null || cfg === undefined)) {
+        out.push({ ...existing, [configKey]: ov.advanced_config })
+        changed = true
+      } else {
+        out.push(existing)
+      }
+    } else {
+      out.push(makeDefault(i, ov ? ov.advanced_config : null))
+      changed = true
+    }
+  }
+  return changed ? out : base
 }

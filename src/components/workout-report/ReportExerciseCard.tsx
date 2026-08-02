@@ -1,6 +1,9 @@
 'use client'
 import React from 'react'
-import { setTopWeightReps } from '@/utils/report/setVolume'
+import { setTopWeightReps, setBestE1rm, setVolume } from '@/utils/report/setVolume'
+import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
+import { formatSetStages } from '@/utils/report/formatStages'
+import { isCardioExercise, getCardioSummary } from '@/utils/report/cardioSummary'
 
 type AnyObj = Record<string, unknown>
 
@@ -12,16 +15,10 @@ interface ReportExerciseCardProps {
     baseMs: unknown
 }
 
-// ─── Epley 1RM estimate ───────────────────────────────────────────────────────
-// Formula: e1RM = weight × (1 + reps / 30)
-// Returns null when weight or reps are invalid/zero
-function epley1RM(weight: number, reps: number): number | null {
-    if (!Number.isFinite(weight) || weight <= 0) return null
-    if (!Number.isFinite(reps) || reps <= 0) return null
-    // For 1 rep, the 1RM equals the weight itself
-    if (reps === 1) return weight
-    return weight * (1 + reps / 30)
-}
+// O Epley LOCAL foi removido: ele era aplicado ao topo do log e, no drop-set, o
+// topo guarda a etapa MAIS LEVE × TOTAL de reps → 1RM inflado/sem sentido
+// (57→36kg virava Epley(36,30)=72kg). Agora usamos setBestE1rm (fonte única em
+// setVolume.ts), que pega a MELHOR etapa do drop, o melhor bloco do cluster, etc.
 
 // Parse weight/reps safely from a log object.
 // setTopWeightReps pega o lado (L/R) dos exercícios unilaterais — antes lia só
@@ -43,8 +40,12 @@ type ProgressionResult = {
 function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): ProgressionResult {
     const no: ProgressionResult = { text: '—', rowClass: '', isPr: false, e1rmText: null }
     const { w: cw, r: cr } = parseWR(logObj)
-    const curVolume = cw > 0 && cr > 0 ? cw * cr : 0
-    const curE1rm = epley1RM(cw, cr)
+    // FONTE ÚNICA (setBestE1rm/setVolume): trata drop-set, cluster, wave e unilateral.
+    // Antes usava Epley(topo do log) — no drop, o topo guarda a etapa MAIS LEVE ×
+    // TOTAL de reps, então "57kg→36kg (12+18)" virava Epley(36,30)=72kg, um número
+    // sem sentido físico que ainda gerava uma "evolução" negativa falsa.
+    const curVolume = setVolume(logObj)
+    const curE1rm = setBestE1rm(logObj) || null
 
     // Build 1RM display text
     const e1rmText = curE1rm != null ? `${curE1rm.toFixed(1)} kg` : null
@@ -52,8 +53,8 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
     if (!prevObj) return { ...no, e1rmText }
 
     const { w: pw, r: pr } = parseWR(prevObj)
-    const prevVolume = pw > 0 && pr > 0 ? pw * pr : 0
-    const prevE1rm = epley1RM(pw, pr)
+    const prevVolume = setVolume(prevObj)
+    const prevE1rm = setBestE1rm(prevObj) || null
 
     const hasCurrentData = cw > 0 || cr > 0
     const hasPrevData = pw > 0 || pr > 0
@@ -65,11 +66,16 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
         const deltaPct = prevE1rm > 0 ? (delta1rm / prevE1rm) * 100 : 0
         if (Math.abs(delta1rm) >= 0.1) {
             if (delta1rm > 0) {
-                const isPr = delta1rm > 0
+                // Base fraca/primeiro registro pesado faz o 1RM "dobrar" e gera
+                // "+280kg 1RM (+100%)" — números sem sentido físico. Nesses saltos
+                // (>=2×) mostramos "novo patamar" em vez de inflar a métrica.
+                const bigJump = prevE1rm > 0 && curE1rm != null && curE1rm >= prevE1rm * 2
                 return {
-                    text: `+${delta1rm.toFixed(1)} kg 1RM (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)`,
+                    text: bigJump
+                        ? '↑ novo patamar'
+                        : `+${delta1rm.toFixed(1)} kg 1RM (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)`,
                     rowClass: 'bg-green-500/15 text-green-200 font-bold',
-                    isPr,
+                    isPr: true,
                     e1rmText,
                 }
             } else {
@@ -132,6 +138,9 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
 export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs }: ReportExerciseCardProps) => {
     const obj = exercise
     const exName = String(obj?.name || '').trim()
+    // Cardio (esteira/bike/…) não tem carga/reps/1RM — renderiza tempo/velocidade
+    // em vez da tabela de musculação (senão vira "Cad: 2020", "1RM est: —").
+    const isCardio = isCardioExercise(obj)
     const baseText = (() => {
         try {
             const bms = Number(baseMs)
@@ -145,18 +154,19 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
         }
     })()
 
-    const setsCount = Number(obj?.sets ?? 0) || 0
+    // Conta robusta (sets ausente em unilateral/legado zerava a tabela). Ver helper.
+    const setsCount = resolveReportSetsCount(obj, exIdx, sessionLogs)
 
-    // Calculate best e1RM for this exercise across all sets (for PR badge)
+    // Calculate best e1RM for this exercise across all sets (for PR badge).
+    // setBestE1rm = fonte única (melhor ETAPA no drop, melhor bloco no cluster, etc).
     const bestE1rm = (() => {
         let best = 0
         for (let sIdx = 0; sIdx < setsCount; sIdx++) {
             const key = `${exIdx}-${sIdx}`
             const log = sessionLogs[key]
             if (!log || typeof log !== 'object') continue
-            const { w, r } = parseWR(log as AnyObj)
-            const e1rm = epley1RM(w, r)
-            if (e1rm != null && e1rm > best) best = e1rm
+            const e1rm = setBestE1rm(log)
+            if (e1rm > best) best = e1rm
         }
         return best > 0 ? best : null
     })()
@@ -183,41 +193,92 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
             const key = `${exIdx}-${sIdx}`
             const log = sessionLogs[key]
             if (!log || typeof log !== 'object') continue
-            const { w, r } = parseWR(log as AnyObj)
-            const e1rm = epley1RM(w, r)
-            if (e1rm != null && e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
+            const e1rm = setBestE1rm(log)
+            if (e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
         }
         return bestIdx
     })()
 
     return (
         <div className="break-inside-avoid">
-            <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
-                <h3 className="text-xl font-bold uppercase flex items-center gap-2 min-w-0 flex-1 truncate">
-                    <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
-                    {exName || '—'}
-                    {prCount > 0 && (
-                        <span className="text-xs font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-1.5 py-0.5 rounded-lg tracking-wide">
+            {/* Título em linha própria (quebra em vez de truncar — antes "Cadeira
+                Abdutora" e "Cadeira Adutora" viravam ambas "CAD..."). Metadados
+                abaixo em flex-wrap (o "Cad:" não corta mais na borda). */}
+            <div className="mb-2 border-b-2 border-neutral-800 pb-2">
+                <h3 className="text-lg sm:text-xl font-bold uppercase flex items-start gap-2 flex-wrap leading-tight">
+                    <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs shrink-0">{exIdx + 1}</span>
+                    <span className="break-words min-w-0">{exName || '—'}</span>
+                    {!isCardio && prCount > 0 && (
+                        <span className="text-xs font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-1.5 py-0.5 rounded-lg tracking-wide shrink-0">
                             🏆 {prCount > 1 ? `${prCount} PRs` : 'PR'}
                         </span>
                     )}
                 </h3>
-                <div className="flex gap-3 text-xs font-mono text-neutral-400 shrink-0">
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono text-neutral-400">
                     {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
-                    {bestE1rm != null && (
+                    {!isCardio && bestE1rm != null && (
                         <span>1RM est: <span className="font-bold text-amber-300">{bestE1rm.toFixed(1)} kg</span></span>
                     )}
+                    {/* Quantas séries foram à falha neste exercício. Lê os logs da própria
+                        sessão (mesma fonte da marca por série), então vale também para
+                        relatórios antigos, sem depender do reportMeta gravado no finish. */}
+                    {!isCardio && (() => {
+                        const n = Array.from({ length: setsCount }).reduce<number>((acc, _, sIdx) => {
+                            const l = sessionLogs[`${exIdx}-${sIdx}`] as AnyObj | undefined
+                            const f = l?.failure
+                            return acc + (f === true || String(f ?? '').toLowerCase() === 'true' ? 1 : 0)
+                        }, 0)
+                        return n > 0
+                            ? <span className="text-red-300">💥 <span className="font-bold">{n}</span> {n > 1 ? 'séries à falha' : 'série à falha'}</span>
+                            : null
+                    })()}
                     {(() => {
                         const m = String((obj?.method ?? '') as string).trim()
                         return m && m !== 'Normal' ? <span className="text-red-300 font-bold uppercase">{m}</span> : null
                     })()}
                     {(() => {
                         const r = obj?.rpe as unknown
-                        return r != null && String(r).trim() ? <span>RPE: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null
+                        return r != null && String(r).trim() ? <span>{isCardio ? 'Intensidade' : 'RPE'}: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null
                     })()}
-                    <span>Cad: <span className="font-bold text-neutral-100">{String((obj?.cadence ?? '-') as string)}</span></span>
+                    {/* "Cad" (cadência) é conceito de musculação — nunca em cardio (era o "Cad: 2020"). */}
+                    {!isCardio && (() => {
+                        const c = String((obj?.cadence ?? '') as string).trim()
+                        return c ? <span>Cad: <span className="font-bold text-neutral-100">{c}</span></span> : null
+                    })()}
                 </div>
             </div>
+            {isCardio ? (
+                (() => {
+                    // Pega o log da 1ª série de cardio com dado (tempo/velocidade/…).
+                    let summary = getCardioSummary(obj, null)
+                    for (let sIdx = 0; sIdx < Math.max(1, setsCount); sIdx++) {
+                        const lg = sessionLogs[`${exIdx}-${sIdx}`]
+                        if (lg && typeof lg === 'object') { summary = getCardioSummary(obj, lg); break }
+                    }
+                    const items: Array<{ label: string; value: string }> = []
+                    if (summary.timeMin != null) items.push({ label: 'Tempo', value: `${summary.timeMin} min` })
+                    if (summary.speedKmh) items.push({ label: 'Velocidade', value: `${summary.speedKmh} km/h` })
+                    if (summary.inclinePct) items.push({ label: 'Inclinação', value: `${summary.inclinePct}%` })
+                    if (summary.resistance) items.push({ label: 'Resistência', value: summary.resistance })
+                    if (summary.heartRate) items.push({ label: 'FC', value: `${summary.heartRate} bpm` })
+                    if (summary.isHIT && summary.hitWorkSec != null && summary.hitRestSec != null) {
+                        items.push({ label: 'HIT', value: `${summary.hitWorkSec}s / ${summary.hitRestSec}s${summary.hitRounds != null ? ` × ${summary.hitRounds}` : ''}` })
+                    }
+                    if (items.length === 0) {
+                        return <div className="py-3 text-sm text-neutral-500">Cardio concluído.</div>
+                    }
+                    return (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1">
+                            {items.map((it) => (
+                                <div key={it.label} className="rounded-lg bg-neutral-900/60 border border-neutral-800 px-3 py-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">{it.label}</div>
+                                    <div className="text-base font-bold text-neutral-100 mt-0.5">{it.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()
+            ) : (
             <table className="w-full text-sm">
                 <thead>
                     <tr className="text-[10px] uppercase tracking-widest text-neutral-400 border-b border-neutral-800">
@@ -240,6 +301,8 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         // sumia porque weight/reps do topo vêm vazios nesses exercícios.
                         const { w: dispW, r: dispR } = parseWR(logObj)
                         if (dispW <= 0 && dispR <= 0) return null
+                        // Etapas do drop-set/stripping (null em série normal)
+                        const stages = formatSetStages(logObj)
 
                         const { text: progressionText, rowClass, isPr, e1rmText } = computeProgression(logObj, prevLog)
 
@@ -249,20 +312,30 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                     <td className="py-2 font-mono text-neutral-400 text-xs">
                                         <div className="flex items-center gap-1">
                                             #{sIdx + 1}
-                                            {isPr && <span className="text-yellow-400">★</span>}
-                                            {sIdx === bestSetIdx && !isPr && (
-                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
+                                            {isPr && <span className="text-yellow-400" title="Recorde pessoal">★</span>}
+                                            {sIdx === bestSetIdx && (
+                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black" title="Melhor série (maior 1RM estimado)">Melhor</span>
                                             )}
-                                            {sIdx === bestSetIdx && isPr && (
-                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
+                                            {/* Série levada à falha muscular. O flag `failure` já era gravado
+                                                durante o treino mas NADA no relatório lia — a marca sumia do
+                                                histórico. Aceita boolean e "true" (log serializado em JSON). */}
+                                            {(logObj.failure === true || String(logObj.failure ?? '').toLowerCase() === 'true') && (
+                                                <span className="text-[9px] bg-red-500/15 text-red-300 border border-red-500/40 px-1 rounded font-black" title="Série levada à falha muscular">💥 Falha</span>
                                             )}
                                         </div>
                                     </td>
+                                    {/* Drop-set/stripping: mostra as ETAPAS (ex.: "57 → 36 kg" / "12 → 18").
+                                        O topo do log guarda só a última etapa + a soma das reps, o que
+                                        escondia o drop inteiro. */}
                                     <td className="py-2 text-center font-semibold text-sm">
-                                        {logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : dispW > 0 ? `${dispW} kg` : '—'}
+                                        {stages
+                                            ? <span className="whitespace-nowrap">{stages.weights} kg</span>
+                                            : logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : dispW > 0 ? `${dispW} kg` : '—'}
                                     </td>
                                     <td className="py-2 text-center font-mono text-sm">
-                                        {logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : dispR > 0 ? String(dispR) : '—'}
+                                        {stages
+                                            ? <span className="whitespace-nowrap">{stages.reps}</span>
+                                            : logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : dispR > 0 ? String(dispR) : '—'}
                                     </td>
                                     <td className="py-2 text-center text-[11px] font-mono text-amber-300">
                                         {e1rmText ?? '—'}
@@ -289,6 +362,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                     })}
                 </tbody>
             </table>
+            )}
         </div>
     )
 }

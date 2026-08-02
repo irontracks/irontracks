@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -51,7 +53,12 @@ class RestTimerService : Service() {
         const val EXTRA_BODY = "body"
 
         const val CHANNEL_FOREGROUND = "rest_timer_foreground"
-        const val CHANNEL_DONE = "rest_timer_done"
+        // v2: o canal ANTIGO ("rest_timer_done") era criado SEM AudioAttributes, então o
+        // fim do descanso tocava no volume de NOTIFICAÇÃO — abafado por toque baixo ou
+        // silencioso. O Android não permite alterar som/importância de um canal já criado,
+        // então a única saída é um id novo (e apagar o antigo).
+        const val CHANNEL_DONE = "rest_timer_done_v2"
+        private const val CHANNEL_DONE_LEGACY = "rest_timer_done"
         const val NOTIF_ID_FOREGROUND = 9100
         const val NOTIF_ID_DONE = 9101
     }
@@ -123,6 +130,19 @@ class RestTimerService : Service() {
         }
         nm.createNotificationChannel(fg)
 
+        // Não deixa o canal antigo órfão nos ajustes do usuário.
+        try { nm.deleteNotificationChannel(CHANNEL_DONE_LEGACY) } catch (_: Exception) {}
+
+        // USAGE_ALARM toca no volume de ALARME. É o que aproxima do iOS, onde o fim do
+        // descanso sai por AVAudioPlayer em sessão .playback.
+        val alarmAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        // Som de alarme do próprio sistema — evita binário de áudio no repo.
+        val alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
         val done = NotificationChannel(
             CHANNEL_DONE,
             "Fim do descanso",
@@ -131,6 +151,8 @@ class RestTimerService : Service() {
             description = "Avisa quando o tempo de descanso termina"
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
+            setSound(alarmSound, alarmAttrs)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         nm.createNotificationChannel(done)
     }
@@ -169,11 +191,14 @@ class RestTimerService : Service() {
 
     private fun startForegroundCompat(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Android 14+ requires explicit foregroundServiceType at start.
+            // Android 14+ exige o foregroundServiceType explícito no start. Usamos
+            // SPECIAL_USE (bate com o manifest) — o tipo "health" exigia permissão de
+            // sensor em runtime (BODY_SENSORS/ACTIVITY_RECOGNITION) e lançava
+            // SecurityException, matando a notificação do cronômetro no Android 14+.
             startForeground(
                 NOTIF_ID_FOREGROUND,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         } else {
             startForeground(NOTIF_ID_FOREGROUND, notification)
@@ -225,7 +250,15 @@ class RestTimerService : Service() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_LIGHTS)
+            // Precisa estar AQUI, não só no canal: o setLockscreenVisibility do
+            // NotificationChannel é ignorado para apps comuns (o dumpsys mostra o
+            // canal como -1000/NO_OVERRIDE), e sem isto a notificação sai como
+            // vis=PRIVATE — com a tela bloqueada o usuário via "conteúdo oculto"
+            // em vez do nome do próximo exercício.
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // Sem DEFAULT_SOUND: o som vem do canal (USAGE_ALARM). Com os dois, o
+            // Android prefere o default de notificação e ANULA o alarme.
+            .setDefaults(NotificationCompat.DEFAULT_LIGHTS)
 
         if (contentIntent != null) builder.setContentIntent(contentIntent)
 
@@ -248,12 +281,17 @@ class RestTimerService : Service() {
             getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
 
-        vibrator?.vibrate(
-            VibrationEffect.createWaveform(
-                longArrayOf(0, 400, 200, 400, 200, 400),
-                intArrayOf(0, 255, 0, 255, 0, 255),
-                -1
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0, 400, 200, 400, 200, 400),
+                    intArrayOf(0, 255, 0, 255, 0, 255),
+                    -1
+                )
             )
-        )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 400, 200, 400, 200, 400), -1)
+        }
     }
 }

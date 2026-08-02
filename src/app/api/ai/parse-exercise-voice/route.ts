@@ -7,6 +7,7 @@ import { sanitizeAiInput } from '@/lib/nutrition/security'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { voiceGenerationConfig } from '@/utils/ai/routeContracts'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,11 +92,13 @@ export async function POST(req: Request) {
       '',
       'Formato JSON:',
       '{ "exercises": [{ "name": string, "sets": number|null, "reps": number|null, "weightKg": number|null, "cadence": string|null, "restSeconds": number|null, "rpe": number|null, "method": string|null, "notes": string|null }] }',
+      '"method" vale pra TODAS as séries. Se a pessoa disser a técnica só numa série',
+      '(ex.: "drop na última"), deixe "method": "Normal" e ponha isso em "notes".',
       '',
       `Entrada: "${sanitized}"`,
     ].join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL)
+    const model = getGeminiModel(apiKey, MODEL, voiceGenerationConfig())
     const geminiResult = await safeGemini('parse-exercise-voice', () =>
       model.generateContent([{ text: prompt }]),
     )

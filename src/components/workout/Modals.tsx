@@ -3,15 +3,20 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/control-has-associated-label */
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
+import { CheckinScale } from './CheckinScale';
+import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 
 import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types';
 
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { moveDraftItem } from '@/lib/workoutReorder';
+import { isNonStandardEditorMethod } from './helpers/editorMethod';
 import { useWorkoutContext } from './WorkoutContext';
 import {
   buildBlocksByCount,
@@ -155,9 +160,18 @@ export default function Modals() {
         </div>
       )}
 
-      {postCheckinOpen && (
+      {/* Check-out pós-treino — PORTAL pro document.body, de propósito.
+          O <ActiveWorkout> é um `fixed inset-0 z-[50]`: position + z-index != auto
+          já criam um CONTEXTO DE EMPILHAMENTO, então TODO z-index daqui de dentro é
+          refém do 50 do pai. Contra a barra do descanso (RestTimerOverlay, z-[2100],
+          renderizada no DashboardModals = raiz), a disputa real era 2100 vs 50 → a
+          barra ganhava e cobria o "Pular"/"Continuar" de quem finalizou treinando
+          com um descanso rolando. Subir o z-[1200] NÃO resolvia. O portal tira o
+          modal do contexto do pai; o z-[2300] é o que vence a barra na raiz (mesmo
+          motivo do z-[2200] do editor em IronTracksAppClientImpl). */}
+      {postCheckinOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe"
           onClick={() => {
             setPostCheckinOpen(false);
             const r = postCheckinResolveRef.current;
@@ -168,7 +182,7 @@ export default function Modals() {
           <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-out</div>
                 <div className="text-white font-black text-lg truncate">Pós-treino</div>
                 <div className="text-xs text-neutral-400 truncate">{String(workout?.title || 'Treino')}</div>
               </div>
@@ -186,60 +200,37 @@ export default function Modals() {
                 <X size={18} />
               </button>
             </div>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-rpe-label">Esforço (RPE 1–10)</div>
-                <select
-                  aria-labelledby="checkin-rpe-label"
-                  value={String(postCheckinDraft?.rpe ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
-                >
-                  <option value="">Não informar</option>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <option key={i + 1} value={String(i + 1)}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Corpo rolável: com as escalas em grade o conteúdo pode passar da tela em
+                aparelhos menores — sem isto o "Continuar" ficaria inalcançável. */}
+            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* As 3 escalas usam o MESMO padrão (botão de 1 toque, 44px). RPE e Dor
+                  eram <select> — 2+ toques numa tela em que o usuário está suado e
+                  com pressa. O "Limpar" preserva o "não informar" (campo opcional). */}
+              <CheckinScale
+                label="Esforço (RPE 1–10)"
+                hint="10 = falha total · 8 ≈ 2 reps na reserva · 5 = tranquilo. Isso alimenta as sugestões de carga."
+                values={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                gridCols="grid-cols-5"
+                value={String(postCheckinDraft?.rpe ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, rpe: v }))}
+              />
 
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Satisfação (1–5)</div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: String(n) }))}
-                      className={
-                        String(postCheckinDraft?.satisfaction || '') === String(n)
-                          ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                          : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                      }
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <CheckinScale
+                label="Satisfação (1–5)"
+                values={[1, 2, 3, 4, 5]}
+                gridCols="grid-cols-5"
+                value={String(postCheckinDraft?.satisfaction ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: v }))}
+              />
 
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-soreness-label">Dor / Soreness (0–10)</div>
-                <select
-                  aria-labelledby="checkin-soreness-label"
-                  value={String(postCheckinDraft?.soreness ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
-                >
-                  <option value="">Não informar</option>
-                  {Array.from({ length: 11 }).map((_, i) => (
-                    <option key={i} value={String(i)}>
-                      {i}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CheckinScale
+                label="Dor muscular (0–10)"
+                hint="Dor/desconforto agora. 0 = nenhuma."
+                values={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                gridCols="grid-cols-6"
+                value={String(postCheckinDraft?.soreness ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, soreness: v }))}
+              />
 
               <div className="space-y-2">
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
@@ -279,7 +270,8 @@ export default function Modals() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {deloadModal && (
@@ -317,9 +309,25 @@ export default function Modals() {
               >
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black">Deload</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black">Deload</div>
+                      {/* O modal inteiro assumia que a pessoa já conhece o termo: mostrava
+                          "peso base", "peso mínimo seguro" e "% de redução" sem dizer o que
+                          é deload nem por que aliviar carga ajuda. O texto de ajuda já
+                          existia em HELP_TERMS, só nunca tinha sido ligado. */}
+                      <HelpHint
+                        forceVisible
+                        title={HELP_TERMS.deload.title}
+                        text={HELP_TERMS.deload.text}
+                        tooltip={HELP_TERMS.deload.tooltip}
+                        className="h-4 w-4 text-[10px]"
+                      />
+                    </div>
                     <div className="text-lg font-black text-white truncate">{String(deloadModal?.name || 'Exercício')}</div>
                     <div className="text-xs text-neutral-400 truncate">{String(deloadModal?.reason || '')}</div>
+                    <div className="mt-1 text-[11px] text-neutral-500 leading-snug">
+                      Treinar mais leve por uma sessão para recuperar e voltar mais forte.
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -546,6 +554,11 @@ export default function Modals() {
                   <option value="Cluster">Cluster</option>
                   <option value="Bi-Set">Bi-Set</option>
                   <option value="Cardio">Cardio</option>
+                  {/* Método avançado configurado por modal (FST-7, Sistema 21, Onda…):
+                      aparece como opção pra não sumir do <select> (e não ser perdido ao salvar). */}
+                  {isNonStandardEditorMethod(editExerciseDraft?.method) && (
+                    <option value={String(editExerciseDraft?.method ?? '')}>{String(editExerciseDraft?.method ?? '')}</option>
+                  )}
                 </select>
               </div>
 

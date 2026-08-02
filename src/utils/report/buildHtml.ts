@@ -8,18 +8,44 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
-import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { setTopWeightReps, setTotalReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
+import { formatSetStages } from '@/utils/report/formatStages'
+import { isCardioExercise, getCardioSummary, type CardioSummary } from '@/utils/report/cardioSummary'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 
-const getSetTag = (log: unknown): string | null => {
+// Rótulo do método de uma série no relatório/PDF. Reconhece TODOS os métodos
+// (pelos blobs EXECUTADOS do log + override por série + config planejada), não só
+// os 4 antigos — senão a maioria virava "Método" genérico ou nada.
+export const getSetTag = (log: unknown): string | null => {
   if (!isRecord(log)) return null
   const rawType = (log.set_type ?? log.setType) as string | null | undefined
   if (rawType === 'warmup') return 'Aquecimento'
   if (rawType === 'feeler') return 'Reconhecimento'
   if (!rawType && (log.is_warmup ?? log.isWarmup)) return 'Aquecimento'
+
+  // Override por série (maior precedência), se não for Normal.
+  const psm = String(log.per_set_method ?? '').trim()
+  if (psm && psm.toLowerCase() !== 'normal') return psm
+
+  // Blobs de método EXECUTADO (a verdade do que foi feito na série).
+  if (isRecord(log.drop_set)) return 'Drop-set'
+  if (isRecord(log.stripping)) return 'Stripping'
+  if (isRecord(log.cluster)) return 'Cluster'
+  if (isRecord(log.rest_pause)) return 'Rest-pause'
+  if (isRecord(log.fst7)) return 'FST-7'
+  if (isRecord(log.heavy_duty)) return 'Heavy Duty'
+  if (isRecord(log.ponto_zero)) return 'Ponto Zero'
+  if (isRecord(log.forced_reps)) return 'Rep. Forçadas'
+  if (isRecord(log.negative_reps)) return 'Rep. Negativas'
+  if (isRecord(log.partial_reps)) return 'Rep. Parciais'
+  if (isRecord(log.sistema21)) return 'Sistema 21'
+  if (isRecord(log.wave)) return 'Onda'
+
+  // Config PLANEJADA (série ainda não executada).
   const cfg = log.advanced_config ?? log.advancedConfig
   const cfgObj = isRecord(cfg) ? cfg : null
   const cfgType = cfgObj ? (cfgObj.type ?? cfgObj.kind ?? cfgObj.mode) : null
@@ -150,14 +176,18 @@ export function buildReportData(
   const exercisesArray: unknown[] = Array.isArray(sessionObj?.exercises) ? (sessionObj.exercises as unknown[]) : []
   const exercises = exercisesArray.map((ex, exIdx) => {
     const exObj = isRecord(ex) ? ex : {}
-    const setsPlanned = parseInt(String(exObj?.sets || 0), 10)
+    // Conta robusta (mesma do relatório React): unilateral/legado guarda a config
+    // em setDetails/logs e não em `sets` → iterar só por `sets` zerava a tabela.
+    const setsPlanned = resolveReportSetsCount(exObj, exIdx, sessionLogs)
     const exKey = normalizeExerciseKey(exObj?.name)
     const prevLogs = prevLogsMap[exKey] || []
     const baseMs = prevBaseMap[exKey]
     const baseLabel = baseMs ? `Base: ${formatShortDate(baseMs)}` : null
 
     type Progression = { type: 'weight' | 'reps' | 'volume'; deltaText: string; direction: 'up' | 'down' | 'flat' }
-    type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null }
+    // `failure` é dimensão SEPARADA de `tag` (que carrega o método): uma série de
+    // drop-set também pode ter sido levada à falha, então não dá pra reaproveitar a tag.
+    type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null; failure: boolean }
     const sets: SetRow[] = []
     let exVolume = 0
     for (let sIdx = 0; sIdx < setsPlanned; sIdx++) {
@@ -213,18 +243,35 @@ export function buildReportData(
       const noteRaw = log.notes ?? log.note ?? log.observation ?? null
       const note = noteRaw != null ? String(noteRaw).trim() || null : null
       const tag = getSetTag(log)
+      // Drop-set/stripping: exibe as ETAPAS ("57 → 36"). O topo do log guarda só a
+      // última etapa (a mais leve) + a soma das reps, escondendo o drop inteiro.
+      const stages = formatSetStages(log)
       sets.push({
         index: sIdx + 1,
-        weight: log.weight ?? (cw > 0 ? cw : null),
-        reps: log.reps ?? (cr > 0 ? cr : null),
+        weight: stages ? stages.weights : (log.weight ?? (cw > 0 ? cw : null)),
+        reps: stages ? stages.reps : (log.reps ?? (cr > 0 ? cr : null)),
         cadence: exObj?.cadence ?? null,
         tag,
         note,
         progression,
+        // Aceita boolean e "true" (o log é serializado como JSON em workouts.notes).
+        failure: log.failure === true || String(log.failure ?? '').toLowerCase() === 'true',
       })
     }
 
     const showProgression = sets.some((s) => !!s?.progression)
+
+    // Cardio: pega o resumo (tempo/velocidade/…) do 1º log com dado — a tabela de
+    // carga/reps não se aplica (e o log moderno de cardio nem tem weight/reps).
+    const isCardio = isCardioExercise(exObj)
+    let cardio: CardioSummary | null = null
+    if (isCardio) {
+      cardio = getCardioSummary(exObj, null)
+      for (let sIdx = 0; sIdx < Math.max(1, setsPlanned); sIdx++) {
+        const lg = sessionLogs[`${exIdx}-${sIdx}`]
+        if (isRecord(lg)) { cardio = getCardioSummary(exObj, lg); break }
+      }
+    }
 
     return {
       name: String(exObj?.name || '').trim(),
@@ -235,6 +282,8 @@ export function buildReportData(
       showProgression,
       volumeKg: exVolume,
       caloriesKcal: 0,
+      isCardio,
+      cardio,
       sets,
     }
   })
@@ -282,7 +331,10 @@ export function buildReportData(
         const { weight: w, reps: r } = setTopWeightReps(log) // trata unilateral
         if (w <= 0 && r <= 0) return
         setsLoggedCount += 1
-        if (r > 0) repsTotal += r
+        // Total de reps soma os dois lados no unilateral (setTotalReps); `r`
+        // acima é o lado, usado só para saber se a série tem conteúdo.
+        const totalReps = setTotalReps(log)
+        if (totalReps > 0) repsTotal += totalReps
         if (w > topWeight) topWeight = w
         const parts = String(k || '').split('-')
         const eIdx = parseInt(parts[0] || '0', 10)
@@ -559,9 +611,32 @@ export function buildReportHTML(
   })()
 
   // ─── Exercises ────────────────────────────────────────────────────────────────
+  // Cardio: métricas (tempo/velocidade/…) em vez da tabela de carga/reps.
+  const cardioBlockHtml = (c: CardioSummary | null): string => {
+    const items: Array<[string, string]> = []
+    if (c) {
+      if (c.timeMin != null) items.push(['Tempo', `${c.timeMin} min`])
+      if (c.speedKmh) items.push(['Velocidade', `${escapeHtml(c.speedKmh)} km/h`])
+      if (c.inclinePct) items.push(['Inclinação', `${escapeHtml(c.inclinePct)}%`])
+      if (c.resistance) items.push(['Resistência', escapeHtml(c.resistance)])
+      if (c.heartRate) items.push(['FC', `${escapeHtml(c.heartRate)} bpm`])
+      if (c.isHIT && c.hitWorkSec != null && c.hitRestSec != null) {
+        items.push(['HIT', `${c.hitWorkSec}s / ${c.hitRestSec}s${c.hitRounds != null ? ` &times; ${c.hitRounds}` : ''}`])
+      }
+    }
+    if (!items.length) return `<div style="padding:8px 0;color:#a3a3a3;font-size:13px">Cardio concluído.</div>`
+    const cells = items.map(([label, value]) =>
+      `<div style="background:#171717;border:1px solid #262626;border-radius:8px;padding:8px 12px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#a3a3a3;font-weight:800">${label}</div>
+        <div style="font-size:15px;font-weight:700;color:#f5f5f5;margin-top:2px">${value}</div>
+      </div>`).join('')
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:4px 0">${cells}</div>`
+  }
+
   const exercisesHtml = (Array.isArray(reportData?.exercises) ? reportData.exercises : []).map((ex, exIdx) => {
     const sets = Array.isArray(ex?.sets) ? ex.sets : []
-    if (!sets.length) return ''
+    const isCardio = !!(ex as { isCardio?: unknown })?.isCardio
+    if (!sets.length && !isCardio) return ''
     const showProgression = !!ex?.showProgression
     const baseText = ex?.baseLabel ? String(ex.baseLabel) : ''
     const method = ex?.method ? String(ex.method) : ''
@@ -571,6 +646,10 @@ export function buildReportHTML(
     const rows = sets.map((set, rowIdx) => {
       const tag = set?.tag ? String(set.tag) : ''
       const tagHtml = tag ? `<span class="set-tag">${escapeHtml(tag)}</span>` : ''
+      // Marca 💥 na série levada à falha — mesma informação que o relatório na tela.
+      const failureHtml = set?.failure
+        ? '<span class="set-tag" style="color:#fca5a5;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4)">💥 Falha</span>'
+        : ''
       const note = set?.note ? String(set.note) : ''
       const weight = set?.weight ?? '—'
       const reps = set?.reps ?? '—'
@@ -590,7 +669,7 @@ export function buildReportHTML(
 
       let rowHtml = `
         <tr style="${auxStyle}${zebra}">
-          <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}</td>
+          <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}${failureHtml}</td>
           <td class="td-weight">${escapeHtml(String(weight))}</td>
           <td class="td-mono td-center">${escapeHtml(String(reps))}</td>
           ${showProgression ? `<td style="padding:10px 12px;text-align:center;font-size:11px;font-weight:900;border-radius:6px;${progStyle}">${escapeHtml(progText)}</td>` : ''}
@@ -617,6 +696,7 @@ export function buildReportHTML(
             ${kcal > 0 ? `<span class="meta-pill" style="color:#fbbf24">~${escapeHtml(kcal.toLocaleString('pt-BR'))} kcal</span>` : ''}
           </div>
         </div>
+        ${isCardio ? cardioBlockHtml((ex as { cardio?: CardioSummary | null })?.cardio ?? null) : `
         <div class="table-wrap">
           <table>
             <thead>
@@ -629,7 +709,7 @@ export function buildReportHTML(
             </thead>
             <tbody>${rows}</tbody>
           </table>
-        </div>
+        </div>`}
       </div>`
   }).filter(Boolean).join('')
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
@@ -11,6 +12,13 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight, AUTO_INPUT_CLASS } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
+import { roundSuggestedWeight } from '@/utils/autoload/plateMath';
+import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
+
+/** Queda de carga por etapa do drop (~20%: o que o método manda e o histórico mostra). */
+const DROP_STAGE_DECAY = 0.2;
 
 const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const {
@@ -26,29 +34,44 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
 
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, suggestedWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
   const stagesPlannedRaw: unknown[] = Array.isArray(cfgRaw) ? cfgRaw : [];
   const ds = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : ({} as UnknownRecord);
   const stagesSavedRaw: unknown[] = Array.isArray(ds.stages) ? (ds.stages as unknown[]) : [];
-  const stagesCount = Math.max(stagesPlannedRaw.length, stagesSavedRaw.length);
+  const rawStagesCount = Math.max(stagesPlannedRaw.length, stagesSavedRaw.length);
 
-  // Se não houver estágios, não deveria renderizar DropSetSet, mas retornamos null ou NormalSet (se fosse decidido assim)
-  // No código original, chamava renderNormalSet se !stagesCount.
-  // Aqui assumimos que o pai decide, mas se vier vazio, renderizamos NormalSet (mas não posso importar NormalSet recursivamente se for circular).
-  // Vou assumir que o pai verifica. Se passar aqui com 0, vai renderizar algo estranho ou vazio.
+  // Se o MÉTODO do exercício é drop-set mas ainda não há config/estágios (o usuário
+  // escolheu "Drop-set" no dropdown, que NÃO cria advanced_config), defaulta a 2
+  // etapas — drop-set mínimo. Sem isto, renderizava null (série em branco). O
+  // usuário edita/adiciona etapas pelo botão "Abrir".
+  const isDropMethod = /^drop-?set$/i.test(String((ex as UnknownRecord)?.method ?? '').trim());
+  const stagesCount = rawStagesCount || (isDropMethod ? 2 : 0);
+
   if (!stagesCount) {
-    // Parent controls routing to the proper renderer; return null as a safe fallback
+    // Roteado por engano (nem config, nem estágios, nem método drop) → null seguro.
     return null;
   }
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
   const modeLabel = String(auto?.label || '').trim() || 'Drop';
 
+  // #autoload no drop: o motor sugere o peso de TRABALHO, que aqui é a 1ª etapa.
+  // As seguintes caem ~20% (o que o próprio enunciado do método manda e o que o
+  // histórico real mostra), arredondadas pelo passo montável do equipamento.
+  // Só preenche etapa VAZIA — nunca sobrescreve o que o usuário ou o template puseram.
+  const autoStageWeight = (idx: number): string => {
+    if (suggestedWeight == null || suggestedWeight <= 0) return '';
+    const raw = suggestedWeight * Math.pow(1 - DROP_STAGE_DECAY, idx);
+    const rounded = roundSuggestedWeight(raw, inferEquipmentFromName(ex?.name));
+    return rounded > 0 ? String(rounded) : '';
+  };
+
   const stages: Array<{ weight: string; reps: number | null }> = Array.from({ length: stagesCount }).map((_, idx) => {
     const saved = isObject(stagesSavedRaw[idx]) ? (stagesSavedRaw[idx] as UnknownRecord) : null;
     const planned = isObject(stagesPlannedRaw[idx]) ? (stagesPlannedRaw[idx] as UnknownRecord) : null;
-    const weight = String(saved?.weight ?? planned?.weight ?? '').trim();
+    const weight = String(saved?.weight ?? planned?.weight ?? autoStageWeight(idx) ?? '').trim();
     const reps = parseTrainingNumber(saved?.reps ?? planned?.reps) ?? null;
     return { weight, reps };
   });
@@ -82,6 +105,22 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
 
   const summaryText = stages.map((s) => `${s.weight || '?'}kg×${s.reps ?? '?'}`).join(' → ');
 
+  // Resumo dos pesos por etapa para MOSTRAR na linha. Antes o peso só aparecia
+  // dentro do modal — a série de drop não exibia peso algum na linha (só "Etapas N
+  // • Total: X"), ao contrário das normais que mostram o número na caixa. Isso dava
+  // a impressão de "o drop não automatizou". Violeta quando os pesos vieram do motor.
+  const stageWeightSummary = stages.map((s) => String(s.weight || '').trim()).filter(Boolean).join(' → ');
+  const stagesFilledByMotor = Boolean(
+    suggestedWeight != null && suggestedWeight > 0 && stageWeightSummary &&
+    stages.every((_, idx) => {
+      const saved = isObject(stagesSavedRaw[idx]) ? (stagesSavedRaw[idx] as UnknownRecord) : null;
+      const planned = isObject(stagesPlannedRaw[idx]) ? (stagesPlannedRaw[idx] as UnknownRecord) : null;
+      const hasSavedW = saved?.weight != null && String(saved.weight).trim() !== '';
+      const hasPlannedW = planned?.weight != null && String(planned.weight).trim() !== '';
+      return !hasSavedW && !hasPlannedW;
+    }),
+  );
+
   return (
     <div key={key} className="space-y-1">
       <div
@@ -98,6 +137,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel || 'Drop'}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -125,9 +165,24 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <button
               type="button"
               onClick={() => {
+                // Preenche etapas de peso AINDA vazias com a sugestão atual do motor,
+                // preservando o que já foi digitado. Sem isto, um rascunho salvo com o
+                // peso vazio (modal aberto antes do histórico carregar, ou fechado sem
+                // preencher) CONGELA o campo vazio: reabrir usava o rascunho e ignorava
+                // a sugestão — mesmo já estando disponível. Era um dos jeitos de o drop
+                // aparecer "sem peso automático".
+                const fillEmptyWithSuggestion = (list: unknown[]) =>
+                  list.map((st, idx) => {
+                    const s = isObject(st) ? (st as UnknownRecord) : {};
+                    if (String(s.weight ?? '').trim()) return s;
+                    const auto = autoStageWeight(idx);
+                    return auto ? { ...s, weight: auto } : s;
+                  });
+
                 const draft = dropSetDraftsRef?.current?.[key];
-                if (draft && typeof draft === 'object') {
-                  setDropSetModal({ ...(draft as UnknownRecord), error: '' });
+                if (draft && typeof draft === 'object' && Array.isArray((draft as UnknownRecord).stages)) {
+                  const mergedStages = fillEmptyWithSuggestion((draft as UnknownRecord).stages as unknown[]);
+                  setDropSetModal({ ...(draft as UnknownRecord), stages: mergedStages, error: '' });
                   return;
                 }
                 const baseStages = stages.map((s) => ({
@@ -152,8 +207,15 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   className="h-4 w-4 text-[10px]"
                 />
               </span>
-              <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
+              {/* Só o contador fica inline — a linha é apertada (Abrir + notas +
+                  Concluir) e qualquer texto maior era COLAPSADO pelo truncate, que
+                  foi o que escondeu o peso das etapas na validação de 2026-07-24.
+                  O peso vai na linha de baixo, onde sempre cabe. */}
+              <span className="text-xs truncate text-neutral-400">
+                {stagesCount} etapas{total ? ` • ${total} reps` : ''}
+              </span>
             </div>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -172,21 +234,48 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               aria-label="Concluir série"
               className={
                 canDone
-                  ? 'shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
-                  : 'shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 cursor-not-allowed'
+                  ? 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
+                  : 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
               }
             >
               <Check size={16} />
+              {/* Antes era só o ✓, sem texto — era o único método assim. */}
+              <span className="text-xs">Concluir</span>
             </button>
           </div>
         )}
       </div>
+
+      {/* Peso das etapas na linha de baixo — sem isso o drop era o ÚNICO método que
+          não mostrava peso algum na tela, e a carga automática parecia não funcionar
+          (só aparecia ao abrir o modal). Violeta quando as etapas vieram do motor. */}
+      {!done && stageWeightSummary && (
+        <div className="pl-12">
+          {/* Pílula com a MESMA marcação do input de peso dos outros métodos
+              (AUTO_INPUT_CLASS). Antes era só texto violeta solto: ao lado da
+              caixa violeta da série normal não lia como "o motor preencheu", e
+              o dono reportou que "o drop não marca em roxo igual o rest-pause". */}
+          <span
+            className={[
+              'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+              stagesFilledByMotor
+                ? AUTO_INPUT_CLASS
+                : 'border-neutral-700 bg-black/30 text-neutral-300',
+            ].join(' ')}
+          >
+            {stagesFilledByMotor && <span aria-hidden>🧠</span>}
+            {stageWeightSummary} kg
+          </span>
+        </div>
+      )}
 
       {!done && !canDone && (
         <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
           Preencha peso e reps em todas as etapas no modal para concluir.
         </div>
       )}
+
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
 
       {isNotesOpen && (
         <div className="space-y-1.5">

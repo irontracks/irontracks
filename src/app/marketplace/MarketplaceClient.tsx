@@ -140,10 +140,11 @@ const TIERS = {
     icon: Star,
     tagline: 'Para quem está começando',
     features: [
-      'Coach IA: 10 msg/dia',
+      'Exames de sangue + protocolo IA',
+      'Wizard de treinos: 4/semana',
       'Insights: 3/semana',
-      'Wizard: 1/semana',
-      'Histórico: 60 dias'
+      'Histórico: 60 dias',
+      'Coach IA: 10 msg/dia'
     ]
   },
   pro: {
@@ -154,12 +155,13 @@ const TIERS = {
     icon: Zap,
     tagline: 'Evolução constante e consistente',
     features: [
-      'Coach IA: 40 msg/dia',
-      'Insights: 7/semana',
-      'Wizard: 3/semana',
-      'Histórico Ilimitado',
+      'Exames de sangue + protocolo IA',
+      'Wizard de treinos: 8/semana',
       'Nutrição: Macros',
-      'Modo Offline'
+      'Modo Offline',
+      'Histórico Ilimitado',
+      'Insights: 7/semana',
+      'Coach IA: 40 msg/dia'
     ]
   },
   elite: {
@@ -170,10 +172,11 @@ const TIERS = {
     icon: Crown,
     tagline: 'Alta performance sem limites',
     features: [
-      'Coach IA: Ilimitado',
+      'Exames de sangue + protocolo IA',
+      'Wizard de treinos: Ilimitado',
+      'Analytics Avançado',
       'Insights: Ilimitado',
-      'Wizard: Ilimitado',
-      'Analytics Avançado'
+      'Coach IA: Ilimitado'
     ]
   }
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, ChevronDown, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { FailureToggle } from './FailureToggle';
 import {
   isObject,
   toNumber,
@@ -11,6 +12,9 @@ import {
 } from '../utils';
 
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
+import { buildExerciseGroups } from '@/lib/workoutGroups';
 
 // --- Group Method Set (Bi-Set / Super-Set / Tri-Set / Giant-Set / Pré-exaustão / Pós-exaustão) ---
 
@@ -26,11 +30,23 @@ const GROUP_METHOD_INFO: Record<string, string> = {
 const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
 
 const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory } = useWorkoutContext();
+  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory, exercises, settings } = useWorkoutContext();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  // Este exercício é o ÚLTIMO membro do grupo (Bi-Set/Super-Set…)? Só aí o descanso
+  // deve rolar. Concluir a 1ª metade do par vai DIRETO pra outra ("0s descanso entre
+  // eles", como diz o GROUP_METHOD_INFO) via auto-alternância do ExerciseList. Antes,
+  // handleToggleDone disparava descanso em TODA série concluída — abrindo um timer
+  // espúrio ENTRE as metades e mandando o "próxima" pro lugar errado; no device isso
+  // deixava o 2º exercício do par frequentemente sem concluir. Solo (método de grupo
+  // isolado, sem par consecutivo) não entra no mapa → descansa normal.
+  const isLastGroupMember = useMemo(() => {
+    const g = buildExerciseGroups(Array.isArray(exercises) ? (exercises as unknown[]) : []).get(exIdx);
+    return !g || g.position === g.size - 1;
+  }, [exercises, exIdx]);
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
   const method = String(ex?.method || '').trim();
   const perSetMethod = String(log.per_set_method || '').trim();
   const effectiveMethod = perSetMethod || method;
@@ -43,12 +59,26 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const repsValue = String(log.reps ?? '');
   const rpeValue = String(log.rpe ?? '');
   const done = !!log.done;
-  const canDone = !!String(weightValue || '').trim() && !!String(repsValue || '').trim() && parseTrainingNumber(repsValue) != null && parseTrainingNumber(repsValue)! > 0;
+  // Concluir exige SÓ o peso — igual à série normal (normalSet conclui sem reps).
+  // Antes exigia peso E reps, e o botão ficava travado em silêncio: no treino real de
+  // 2026-07-24 o 2º exercício de um Bi-Set ("Panturrilha em pé") terminou com as 4
+  // séries preenchidas e NENHUMA concluída. Divergir da série normal aqui não tem
+  // razão de ser — reps continua sendo gravado quando preenchido.
+  const canDone = !!String(weightValue || '').trim();
   const notesValue = String(log.notes ?? '');
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
   const hasAnyNote = hasNotes || !!prevNote;
-  const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  // O editor SUGERE restTime 0 ao marcar Bi-Set ("0s entre eles") e isso vale pro
+  // 1º membro — mas quando fica 0 no ÚLTIMO membro, o fim da rodada não descansava
+  // nunca. Mesmo fallback do normalSet (`autoRestTimerWhenMissing`), pra família
+  // não divergir: sem a flag, comportamento antigo intacto.
+  const configuredRestTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const restSettings = settings as Record<string, unknown> | null;
+  const defaultRestSeconds = Math.max(15, Math.min(600, Number(restSettings?.restTimerDefaultSeconds ?? 90) || 90));
+  const restTime = (configuredRestTime && configuredRestTime > 0)
+    ? configuredRestTime
+    : (restSettings?.autoRestTimerWhenMissing ? defaultRestSeconds : configuredRestTime);
   // ex.sets é a CONTAGEM (número), nunca um array — o Array.isArray(ex.sets) dava
   // SEMPRE false e o watermark planejado por-série nunca aparecia. O plano por-série
   // vive em setDetails.
@@ -71,7 +101,9 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const handleToggleDone = () => {
     const nextDone = !done;
     updateLog(key, { done: nextDone, weight: weightValue, reps: repsValue, rpe: rpeValue });
-    if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key, nextKey: null, restStartedAtMs: Date.now() });
+    // Descanso SÓ ao concluir o último membro do par/grupo (fim da rodada). Na 1ª
+    // metade não descansa — a auto-alternância leva direto ao exercício par.
+    if (nextDone && restTime && restTime > 0 && isLastGroupMember) startTimer(restTime, { kind: 'rest', key, nextKey: null, restStartedAtMs: Date.now() });
   };
 
   return (
@@ -87,6 +119,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             <div className="w-8 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{effectiveMethod}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -108,17 +141,19 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             {/* Row 1: número + inputs */}
             <div className="flex items-center gap-2">
               <div className="w-8 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
+              {/* Sem type="number": num WebView (locale != pt-BR) ele REJEITA a vírgula, então
+                  peso decimal (95,5) não entrava — "só números redondos". inputMode="decimal"
+                  já mostra o teclado certo e o valor fica como texto, igual ao normalSet. */}
               <input
-                type="number"
                 inputMode="decimal"
                 aria-label={`Peso em kg – série ${setIdx + 1}`}
                 value={weightValue}
                 onChange={(e) => updateLog(key, { weight: e?.target?.value ?? '' })}
                 placeholder={histWeight != null ? `${histWeight} kg` : plannedWeight != null ? `${plannedWeight} kg` : 'Peso (kg)'}
-                className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <input
-                type="number"
                 inputMode="numeric"
                 aria-label={`Reps – série ${setIdx + 1}`}
                 value={repsValue}
@@ -127,7 +162,6 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
               />
               <input
-                type="number"
                 inputMode="decimal"
                 aria-label={`RPE – série ${setIdx + 1}`}
                 value={rpeValue}
@@ -146,6 +180,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 {effectiveMethod}
                 <ChevronDown size={10} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
               </button>
+              <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
               <button
                 type="button"
                 onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -188,7 +223,8 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
           </>
         )}
       </div>
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps para concluir.</div>}
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha o peso para concluir.</div>}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

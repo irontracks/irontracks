@@ -226,5 +226,44 @@ describe('mapWorkoutRow', () => {
       const exs = r.exercises as { setDetails: { is_warmup: boolean }[] }[]
       expect(exs[0].setDetails[0].is_warmup).toBe(true)
     })
+
+    it('liga método por série a partir das notas (drop na última série)', () => {
+      const row = {
+        exercises: [{
+          id: 'e1', name: 'Supino', order: 1, method: 'Normal',
+          notes: 'DROP-SET na última série: até a falha → reduz ~20% → continua',
+          sets: [
+            { set_number: 1, reps: 10, weight: 80 },
+            { set_number: 2, reps: 10, weight: 80 },
+            { set_number: 3, reps: 10, weight: 80 },
+          ],
+        }],
+      }
+      const r = mapWorkoutRow(row)
+      const ex = (r.exercises as { method: string; setDetails: { advanced_config: unknown }[] }[])[0]
+      // exercício segue Normal; só a última série vira drop
+      expect(ex.method).toBe('Normal')
+      expect(ex.setDetails[0].advanced_config ?? null).toBeNull()
+      expect(ex.setDetails[1].advanced_config ?? null).toBeNull()
+      expect(Array.isArray(ex.setDetails[2].advanced_config)).toBe(true)
+    })
+
+    it('não sobrescreve advanced_config já existente vindo do banco', () => {
+      const cfg = { mini_sets: 3, rest_time_sec: 20 }
+      const row = {
+        exercises: [{
+          id: 'e1', name: 'Supino', order: 1, method: 'Normal',
+          notes: 'DROP na última: 10 > 8 > 6',
+          sets: [
+            { set_number: 1, reps: 10 },
+            { set_number: 2, reps: 10 },
+            { set_number: 3, reps: 10, advanced_config: cfg },
+          ],
+        }],
+      }
+      const r = mapWorkoutRow(row)
+      const ex = (r.exercises as { setDetails: { advanced_config: unknown }[] }[])[0]
+      expect(ex.setDetails[2].advanced_config).toEqual(cfg)
+    })
   })
 })

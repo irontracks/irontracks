@@ -13,12 +13,14 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkLabExamsAccess } from '@/utils/vip/labExamsAccess'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { labExtractGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { LabExamExtractedSchema, LAB_MARKER_CATEGORIES, LAB_MARKER_STATUSES } from '@/schemas/labExam'
@@ -100,7 +102,10 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:lab-extract:${userId}:${ip}`, 5, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
+    // VIP — ou o exame-demonstração (`process` aceita até 1 exame: é a
+    // análise do que o create já deixou entrar; travar aqui deixaria o
+    // free com o arquivo subido e sem o valor).
+    const access = await checkLabExamsAccess(auth.supabase, userId, 'process')
     if (!access.allowed) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
     const parsed = await parseJsonBody(req, BodySchema)
@@ -120,8 +125,10 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
     const assessedUserId = String((exam as { user_id?: string }).user_id || '')
-    const trainerId = (exam as { trainer_id?: string | null }).trainer_id || null
-    if (userId !== assessedUserId && userId !== trainerId) {
+    // Gate por VÍNCULO REAL (canCoachStudent), não por row.trainer_id: o trainer_id
+    // é gravado na criação e nunca revalidado, então um ex-personal continuava
+    // lendo exames do ex-aluno depois do vínculo desfeito (auditoria 2026-07-28).
+    if (userId !== assessedUserId && !(await canCoachStudent({ id: userId, email: auth.user.email }, assessedUserId))) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
@@ -156,7 +163,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'download_failed' }, { status: 400 })
     }
 
-    const model = getGeminiModel(apiKey, env.gemini.fastModelId)
+    const model = getGeminiModel(apiKey, env.gemini.fastModelId, labExtractGenerationConfig())
     const geminiResult = await safeGemini('lab-exam-extract', () => model.generateContent(parts))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)
