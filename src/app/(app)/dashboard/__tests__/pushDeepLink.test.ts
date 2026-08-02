@@ -115,3 +115,47 @@ describe('deep-link do push de admin → painel na aba certa', () => {
     expect(fallback).toBeGreaterThan(porTipo)
   })
 })
+
+/**
+ * Fase 0.1 da tração (02/08/2026, aprovada pelo dono): sem NENHUM treino, o
+ * primeiro uso aterrissa no Wizard — não no dashboard vazio. Medido antes: 24
+ * dos 47 aprovados entraram e nunca criaram treino; 9 clicaram em "Novo
+ * treino" e desistiram no meio.
+ */
+describe('primeiro uso cai no Wizard', () => {
+  const IMPL = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+
+  it('abre o wizard quando não há treino nenhum', () => {
+    expect(IMPL).toMatch(/workouts\.length > 0\) return/)
+    expect(IMPL).toMatch(/trackUserEvent\('wizard_auto_open'/)
+    expect(IMPL).toMatch(/setCreateWizardOpen\(true\)/)
+  })
+
+  it('espera a hidratação — usuário ANTIGO não pode ver flash de wizard', () => {
+    // O timer dá tempo do bootstrap trazer os treinos de quem já tem; se
+    // chegarem, a condição quebra e o timer morre no cleanup.
+    const efeito = IMPL.slice(IMPL.indexOf('Primeiro uso: SEM NENHUM treino'))
+    expect(efeito).toMatch(/if \(!isDashboardReady/)
+    expect(efeito).toMatch(/setTimeout/)
+    expect(efeito).toMatch(/clearTimeout\(t\)/)
+  })
+
+  it('professor e treino ativo ficam de fora', () => {
+    // Professor sem treino PRÓPRIO é normal (monta pros alunos) — seria nag em
+    // todo login. E nunca abrir por cima de sessão ativa.
+    const efeito = IMPL.slice(IMPL.indexOf('Primeiro uso: SEM NENHUM treino'))
+    expect(efeito).toMatch(/isCoach\) return/)
+    expect(efeito).toMatch(/activeSession\) return/)
+  })
+
+  it('fechou sem criar → não reabre na MESMA sessão (mas volta na próxima)', () => {
+    const efeito = IMPL.slice(IMPL.indexOf('Primeiro uso: SEM NENHUM treino'))
+    expect(efeito).toMatch(/sessionStorage\.getItem\('irontracks_first_run_wizard'\)/)
+    expect(efeito).toMatch(/sessionStorage\.setItem\('irontracks_first_run_wizard', '1'\)/)
+  })
+
+  it('a abertura automática é mensurável separada da manual', () => {
+    // Sem o evento próprio, não dá pra saber se a Fase 0.1 ativou alguém.
+    expect(IMPL).toMatch(/screen: 'first_run'/)
+  })
+})

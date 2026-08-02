@@ -72,6 +72,7 @@ import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
 import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { useStudentControlNotice } from '@/hooks/useStudentControlNotice'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
@@ -846,6 +847,42 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // de user_settings — renderiza o dashboard na hora com os defaults e aplica as
     // preferências (som/unidades) quando chegarem. streakLoading segue excluído (secundário).
     const isDashboardReady = userSettingsApi.loaded || hasCachedWorkouts;
+
+    /**
+     * Primeiro uso: SEM NENHUM treino, aterrissa no Wizard — não no dashboard
+     * vazio (Fase 0.1 da tração, 02/08/2026, aprovada pelo dono).
+     *
+     * O porquê, medido em produção: dos 47 aprovados, 24 entraram e NUNCA
+     * criaram um treino; 9 clicaram em "Novo treino" (20 vezes) e desistiram no
+     * meio. O único usuário com acesso pleno real usa o app intensamente — o
+     * gargalo é a porta de entrada, não o produto depois dela.
+     *
+     * Guardas, na ordem em que protegem:
+     * - `isDashboardReady` + timer de 1.5s: dá tempo do bootstrap hidratar os
+     *   treinos de quem JÁ tem — se chegarem, a condição quebra e o timer morre
+     *   (sem flash de wizard pra usuário antigo);
+     * - `!isCoach`: professor sem treino PRÓPRIO é normal (monta pros alunos) —
+     *   seria nag em todo login;
+     * - `!activeSession` e `view === 'dashboard'`: nunca por cima de treino ativo;
+     * - sessionStorage: fechou sem criar, não reabre NESTA sessão. Na próxima
+     *   visita volta — os dados dizem que quem trava tenta de novo (Isabel: 8
+     *   cliques em dias diferentes), então reabrir é ajuda, não spam.
+     */
+    useEffect(() => {
+        if (!isDashboardReady || !user?.id || isCoach) return;
+        if (view !== 'dashboard' || activeSession) return;
+        if (!Array.isArray(workouts) || workouts.length > 0) return;
+        try { if (sessionStorage.getItem('irontracks_first_run_wizard') === '1') return; } catch { }
+        const t = setTimeout(() => {
+            try { sessionStorage.setItem('irontracks_first_run_wizard', '1'); } catch { }
+            // Evento próprio: separa a abertura AUTOMÁTICA da manual no funil —
+            // sem isso, não dá pra medir se a Fase 0.1 ativou alguém.
+            try { trackUserEvent('wizard_auto_open', { type: 'wizard', screen: 'first_run', metadata: { workouts: 0 } }) } catch { }
+            setCreateWizardOpen(true);
+        }, 1500);
+        return () => clearTimeout(t);
+    }, [isDashboardReady, user?.id, isCoach, view, activeSession, workouts, setCreateWizardOpen]);
+
     // Quando view='active' mas activeSession=null: o WKWebView foi morto pelo iOS
     // enquanto o app estava em background. A shell nativa preservou a URL
     // /dashboard/active, mas o JS recomeçou do zero — activeSession ainda não foi
