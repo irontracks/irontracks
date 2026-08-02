@@ -156,7 +156,7 @@ const TIERS = {
     tagline: 'Evolução constante e consistente',
     features: [
       'Exames de sangue + protocolo IA',
-      'Wizard de treinos: 3/semana',
+      'Wizard de treinos: 8/semana',
       'Nutrição: Macros',
       'Modo Offline',
       'Histórico Ilimitado',

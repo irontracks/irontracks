@@ -168,3 +168,22 @@ describe('plano pago nunca é pior que o gratuito', () => {
     }
   })
 })
+
+
+/**
+ * Escada entre PAGOS (bug real de 02/08/2026, causado ao corrigir o bug
+ * pago×free): o Start subiu para 4 wizard/semana e o Pro ficou em 3 — plano
+ * mais caro com cota menor. Trava Start ≤ Pro ≤ Elite em toda cota numérica.
+ */
+describe('escada de tiers: mais caro nunca tem cota menor', () => {
+  const NUMERICOS = ['chat_daily', 'wizard_weekly', 'insights_weekly'] as const
+  it('start ≤ pro ≤ elite em toda cota', () => {
+    const start = applyTierCaps('vip_start', applyTierDefaults('vip_start', { ...UNLIMITED_LIMITS }))
+    const pro = applyTierCaps('vip_pro', applyTierDefaults('vip_pro', { ...UNLIMITED_LIMITS }))
+    const elite = applyTierCaps('vip_elite', applyTierDefaults('vip_elite', { ...UNLIMITED_LIMITS }))
+    for (const k of NUMERICOS) {
+      expect(pro[k], `pro.${k} >= start.${k}`).toBeGreaterThanOrEqual(start[k])
+      expect(elite[k], `elite.${k} >= pro.${k}`).toBeGreaterThanOrEqual(pro[k])
+    }
+  })
+})
