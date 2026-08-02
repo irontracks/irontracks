@@ -132,7 +132,11 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         ...limits,
         chat_daily: capNumber(limits.chat_daily, 40),
         insights_weekly: capNumber(limits.insights_weekly, 7),
-        wizard_weekly: capNumber(limits.wizard_weekly, 3),
+        // 8/semana — precisa ficar ACIMA do Start (4). Ao corrigir a inversão
+        // pago×free em 02/08, o Start subiu para 4 e o Pro ficou em 3: o plano
+        // de R$59,90 com menos wizard que o de R$29,90. Guard de escada trava
+        // Start ≤ Pro ≤ Elite em toda cota numérica.
+        wizard_weekly: capNumber(limits.wizard_weekly, 8),
         history_days: null,
         nutrition_macros: true,
         analytics: false,
