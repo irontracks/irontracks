@@ -22,12 +22,15 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
   const isProcessing = ['pending', 'uploading', 'extracting', 'analyzing'].includes(exam.status)
   const isFailed = exam.status === 'failed'
   const isDone = exam.status === 'done'
+  /** Tem algo para mostrar? Marcadores bastam — o protocolo é a camada de cima.
+   *  Antes o card exigia protocolo, e exame analisado sem ele ficava morto. */
+  const temConteudo = !!(exam.extracted_markers || exam.protocol)
 
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden">
       <button
         onClick={onView}
-        disabled={!isDone}
+        disabled={!isDone || !temConteudo}
         className="w-full text-left p-4 flex items-center gap-3 disabled:cursor-default hover:bg-neutral-900/40 transition"
       >
         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 flex-shrink-0">
@@ -67,7 +70,7 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </span>
         )}
-        {isDone && <ChevronRight className="w-5 h-5 text-neutral-600 flex-shrink-0" />}
+        {isDone && temConteudo && <ChevronRight className="w-5 h-5 text-neutral-600 flex-shrink-0" />}
       </button>
 
       {onDelete && (
