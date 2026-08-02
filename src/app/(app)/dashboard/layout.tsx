@@ -9,7 +9,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardClientEntry from './DashboardClientEntry'
-import { resolveRoleByUser } from '@/utils/auth/route'
+import { getRequestUser, getRequestRole } from '@/utils/auth/serverAuthCache'
 import { safePg } from '@/utils/safePgFilter'
 import { logWarn } from '@/lib/logger'
 
@@ -100,8 +100,9 @@ const tryRpcBootstrap = async (
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user?.id) redirect('/?next=/dashboard')
+  // Dedup por request: mesma resolução do (app)/layout (React.cache).
+  const user = await getRequestUser()
+  if (!user?.id) redirect('/?next=/dashboard')
 
   const initialUser = {
     id: user.id,
@@ -113,7 +114,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // como fallback integral (RPC ausente/erro) — pior caso = comportamento anterior.
   const [rpcData, resolved] = await Promise.all([
     tryRpcBootstrap(supabase, user.id),
-    resolveRoleByUser({ id: user.id, email: user.email ?? null }),
+    getRequestRole(user.id, user.email ?? null),
   ])
 
   let initialProfile: { role: string | null; display_name: string | null; photo_url: string | null }
