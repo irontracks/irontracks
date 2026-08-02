@@ -230,11 +230,44 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
             .eq('is_template', false)
         const totalWorkouts = Number(workoutsCountRes.count) || 0
 
+        // `iron_rank_my_total_volume` varre TODOS os workouts no banco (~95ms de
+        // Postgres por chamada, e o card de rank chama a cada visita ao
+        // dashboard — 11.750 execuções medidas em ago/2026). O volume total só
+        // muda quando um treino entra/sai do histórico, então a chave do cache
+        // inclui `totalWorkouts` (recém-contado acima): finalizar ou excluir
+        // treino muda a contagem → chave nova → RPC fresca. O TTL de 30min
+        // cobre o caso raro de EDITAR pesos de um treino antigo (conta igual,
+        // volume diferente). Guard: ironRankVolumeCache.test.ts.
         let totalVolumeKg = 0
-        try {
-            const { data: vol, error: vErr } = await supabase.rpc('iron_rank_my_total_volume')
-            if (!vErr) totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
-        } catch (e) { logWarn("workout-analytics", "silenced", e) }
+        const volCacheKey = `irontracks.ironRankVol.${user.id}.${totalWorkouts}`
+        const VOL_CACHE_TTL_MS = 30 * 60 * 1000
+        const cachedVol = (() => {
+            try {
+                if (typeof localStorage === 'undefined') return null
+                const raw = localStorage.getItem(volCacheKey)
+                if (!raw) return null
+                const parsed = JSON.parse(raw) as { v?: unknown; exp?: unknown }
+                const exp = Number(parsed?.exp)
+                const v = Number(parsed?.v)
+                if (!Number.isFinite(exp) || exp < Date.now() || !Number.isFinite(v)) return null
+                return v
+            } catch { return null }
+        })()
+        if (cachedVol != null) {
+            totalVolumeKg = cachedVol
+        } else {
+            try {
+                const { data: vol, error: vErr } = await supabase.rpc('iron_rank_my_total_volume')
+                if (!vErr) {
+                    totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
+                    try {
+                        if (typeof localStorage !== 'undefined') {
+                            localStorage.setItem(volCacheKey, JSON.stringify({ v: totalVolumeKg, exp: Date.now() + VOL_CACHE_TTL_MS }))
+                        }
+                    } catch { /* storage cheio/indisponível: segue sem cache */ }
+                }
+            } catch (e) { logWarn("workout-analytics", "silenced", e) }
+        }
 
         const badges: Array<Record<string, unknown>> = []
         if (totalWorkouts > 0) badges.push({ id: 'first_workout', label: 'Primeiro treino', kind: 'milestone' })
