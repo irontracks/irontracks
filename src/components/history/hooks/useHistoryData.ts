@@ -148,18 +148,24 @@ export function useHistoryData({
                         };
                     }
                     // ── Regular workout ────────────────────────────────────
+                    // Rota do próprio usuário manda linha MAGRA (sem notes;
+                    // resumo em workout_title/total_time/volume_kg/ex_count —
+                    // ver slimHistoryRow.ts). A rota de admin ainda manda o
+                    // notes completo — o parse abaixo cobre os dois formatos.
                     const raw = parseRawSession(w.notes);
-                    const dateMs = toDateMs(raw?.date) ?? toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
+                    const dateMs = toDateMs(raw?.date) ?? toDateMs(w?.session_date) ?? toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
                     const dateIso = dateMs ? new Date(dateMs).toISOString() : null;
                     return {
                         id: w.id,
-                        workoutTitle: raw?.workoutTitle || w.name || 'Treino Recuperado',
+                        workoutTitle: raw?.workoutTitle || (w.workout_title != null ? String(w.workout_title) : '') || w.name || 'Treino Recuperado',
                         date: dateIso,
                         dateMs,
-                        totalTime: raw?.totalTime || 0,
+                        totalTime: raw?.totalTime || Number(w.total_time) || 0,
                         rawSession: raw,
                         raw: w,
                         isTemplate: w.is_template === true,
+                        volumeKg: Number(w.volume_kg) || 0,
+                        exCount: Number(w.ex_count) || 0,
                     };
                 });
 
@@ -428,13 +434,40 @@ export function useHistoryData({
         visibleHistory.forEach((s) => {
             const raw = parseRawSession(s?.rawSession ?? s?.notes);
             if (raw?.logs) totalVolume += calculateTotalVolumeFromLogs(raw.logs);
+            // Linha magra: o volume já veio computado do servidor (mesma fonte).
+            else if (Number(s?.volumeKg) > 0) totalVolume += Number(s.volumeKg);
         });
         const volumeLabel = totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}t` : `${Math.round(totalVolume)}kg`;
         return { count, totalMinutes, avgMinutes, totalVolume, volumeLabel };
     }, [visibleHistory]);
 
+    // ── Hidratação em lote (relatório de período) ────────────────────────────
+    // A lista magra não tem os logs por exercício; o relatório precisa deles.
+    // UMA query busca o notes de todos os itens ainda não hidratados e devolve
+    // a lista completa (o state também é atualizado, pra não pagar de novo).
+    const hydrateSessions = useCallback(async (): Promise<WorkoutSummary[]> => {
+        const missing = history.filter(h => h.kind !== 'cardio' && !h.rawSession && !h.notes && h.id);
+        if (!missing.length) return history;
+        try {
+            const { data } = await supabase
+                .from('workouts')
+                .select('id, notes')
+                .in('id', missing.map(h => String(h.id)));
+            const notesById = new Map<string, unknown>((Array.isArray(data) ? data : []).map(r => [String(r.id), r.notes]));
+            const hydrated = history.map(h => {
+                const notes = notesById.get(String(h.id));
+                if (notes == null) return h;
+                return { ...h, rawSession: parseRawSession(notes) };
+            });
+            setHistory(hydrated);
+            return hydrated;
+        } catch {
+            return history;
+        }
+    }, [history, supabase]);
+
     return {
-        history, setHistory, loading, supabase,
+        history, setHistory, loading, supabase, hydrateSessions,
         range, setRange, rangeLabel,
         historyItems, filteredHistory, visibleHistory, blockedCount, summary,
         showManual, setShowManual,

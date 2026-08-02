@@ -6,6 +6,7 @@ import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { buildSlimHistoryRow } from '@/utils/history/slimHistoryRow'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,8 @@ export async function GET(req: Request) {
       cardioQuery = cardioQuery.gte('created_at', cutoff)
     }
 
-    const cacheKey = `workouts:history:${user.id}:${q.limit}:${historyDays ?? 'all'}:${tier}`
+    // v2 = linhas magras (sem `notes`) — não pode servir payload v1 cacheado.
+    const cacheKey = `workouts:history:v2:${user.id}:${q.limit}:${historyDays ?? 'all'}:${tier}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
@@ -99,8 +101,14 @@ export async function GET(req: Request) {
 
     // Merge and sort by date descending
     type AnyRow = Record<string, unknown>
+    // Resumo no servidor: a lista só precisa de título/tempo/volume/nº de
+    // exercícios — o JSON da sessão (workouts.notes, potencialmente centenas de
+    // KB em 50 treinos) NÃO desce pro client. Detalhe é buscado sob demanda.
+    const slimWorkoutRows = (workoutsResult.data ?? []).map((w: Record<string, unknown>) =>
+      buildSlimHistoryRow(w) as unknown as Record<string, unknown>)
+
     const allRows: AnyRow[] = [
-      ...(workoutsResult.data ?? []),
+      ...slimWorkoutRows,
       ...cardioRows,
     ].sort((a, b) => {
       const aDate = String(a.date ?? a.created_at ?? '')

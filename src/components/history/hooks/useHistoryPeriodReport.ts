@@ -19,18 +19,20 @@ interface UseHistoryPeriodReportProps {
     historyItems: WorkoutSummary[];
     user: { displayName?: string; name?: string; email?: string } | null;
     alert: (msg: string, title?: string) => Promise<unknown>;
+    /** Busca os `notes` que a lista magra não baixou (1 query em lote). */
+    hydrateSessions?: () => Promise<WorkoutSummary[]>;
 }
 
-export function useHistoryPeriodReport({ historyItems, user, alert }: UseHistoryPeriodReportProps) {
+export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessions }: UseHistoryPeriodReportProps) {
     const [periodReport, setPeriodReport] = useState<PeriodReport | null>(null);
     const [periodAi, setPeriodAi] = useState<PeriodAiState>({ status: 'idle', ai: null, error: '' });
     const [periodPdf, setPeriodPdf] = useState<PeriodPdfState>({ status: 'idle', url: null, blob: null, error: '' });
     const [shareError, setShareError] = useState('');
 
     // ── buildPeriodStats ─────────────────────────────────────────────────────
-    const buildPeriodStats = (days: unknown): PeriodStats | null => {
+    const buildPeriodStats = (days: unknown, listOverride?: WorkoutSummary[]): PeriodStats | null => {
         try {
-            const historyList = Array.isArray(historyItems) ? historyItems : [];
+            const historyList = Array.isArray(listOverride) ? listOverride : (Array.isArray(historyItems) ? historyItems : []);
             const daysNumber = Number(days);
             if (!Number.isFinite(daysNumber) || daysNumber <= 0) return null;
             const cutoff = Date.now() - daysNumber * DAY_MS;
@@ -118,7 +120,9 @@ export function useHistoryPeriodReport({ historyItems, user, alert }: UseHistory
     const openPeriodReport = async (type: 'week' | 'month') => {
         try {
             const key = type === 'week' ? REPORT_DAYS_WEEK : REPORT_DAYS_MONTH;
-            const stats = buildPeriodStats(key);
+            // Lista magra não tem os logs — hidrata (1 query) antes de agregar.
+            const list = hydrateSessions ? await hydrateSessions() : undefined;
+            const stats = buildPeriodStats(key, list);
             if (!stats) { await alert('Sem treinos suficientes nesse período para gerar um relatório.'); return; }
             setPeriodReport({ type, stats });
             setPeriodAi({ status: 'loading', ai: null, error: '' });

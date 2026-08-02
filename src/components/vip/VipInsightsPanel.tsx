@@ -17,6 +17,7 @@ type Row = {
   date: string | null
   created_at: string | null
   notes: unknown
+  hasAiFlag?: boolean
 }
 
 const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
@@ -64,6 +65,8 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
           date: r?.date != null ? String(r.date) : null,
           created_at: r?.created_at != null ? String(r.created_at) : null,
           notes: r?.notes ?? null,
+          // Linha magra: o servidor já diz se a sessão tem insights (has_ai).
+          hasAiFlag: r?.has_ai === true,
         }))
         .filter((r: Row) => Boolean(r.id))
       setRows(mapped)
@@ -84,7 +87,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     const list = Array.isArray(rows) ? rows : []
     return list.slice(0, 8).map((r) => {
       const session = safeJsonParse(r.notes)
-      const hasAi = !!(session && typeof session === 'object' && (session as Record<string, unknown>)?.ai && typeof (session as Record<string, unknown>).ai === 'object')
+      const hasAi = r.hasAiFlag === true || !!(session && typeof session === 'object' && (session as Record<string, unknown>)?.ai && typeof (session as Record<string, unknown>).ai === 'object')
       const dateIso = String(r.date || r.created_at || '').slice(0, 10)
       return {
         ...r,
