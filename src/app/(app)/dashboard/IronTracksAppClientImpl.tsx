@@ -154,9 +154,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const { streakStats, setStreakStats, streakLoading } = useWorkoutStreak(user?.id);
 
     // ── Apple Watch: user gyms for CheckinView ────────────────────────────────
+    // Só serve ao Watch (iOS nativo) — na web era 1 request desperdiçado em
+    // TODO boot, competindo por banda com o bootstrap em 4G. O gate espera o
+    // bridge do Capacitor (que pode não estar injetado no 1º render — mesma
+    // corrida documentada em useWorkoutLiveActivity), senão o Watch ficaria
+    // sem academias por uma checagem prematura.
     const [watchGyms, setWatchGyms] = useState<WatchGym[]>([])
+    const [gymsBridgeReady, setGymsBridgeReady] = useState<boolean>(() => isIosNative())
+    useEffect(() => {
+        if (gymsBridgeReady) return
+        let tries = 0
+        const id = setInterval(() => {
+            tries += 1
+            if (isIosNative()) { setGymsBridgeReady(true); clearInterval(id); return }
+            if (tries >= 25) clearInterval(id) // ~5s, como no guard da Live Activity
+        }, 200)
+        return () => clearInterval(id)
+    }, [gymsBridgeReady])
     useEffect(() => {
         if (!user?.id) return
+        if (!gymsBridgeReady) return
         fetch('/api/gps/gyms')
             .then((r) => r.json() as Promise<{ ok: boolean; gyms?: Array<{ id: string; name: string; latitude: number; longitude: number; radius_meters: number }> }>)
             .then((data) => {
@@ -170,7 +187,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 })))
             })
             .catch(() => {})
-    }, [user?.id])
+    }, [user?.id, gymsBridgeReady])
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     // Modal flags migrados pro Zustand store (PR#2). Cada seletor só re-renderiza
     // este componente quando ESSE slice muda — antes 11 useStates causavam
