@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkLabExamsAccess } from '@/utils/vip/labExamsAccess'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
@@ -102,7 +102,10 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:lab-extract:${userId}:${ip}`, 5, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
+    // VIP — ou o exame-demonstração (`process` aceita até 1 exame: é a
+    // análise do que o create já deixou entrar; travar aqui deixaria o
+    // free com o arquivo subido e sem o valor).
+    const access = await checkLabExamsAccess(auth.supabase, userId, 'process')
     if (!access.allowed) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
     const parsed = await parseJsonBody(req, BodySchema)

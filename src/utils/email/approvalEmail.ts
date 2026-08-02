@@ -152,6 +152,10 @@ export function buildApprovalEmail(input: ApprovalEmailInput): BuiltEmail {
         ? 'Seu acesso foi liberado. É só entrar com o mesmo e-mail e senha que você já cadastrou.'
         : 'Seu acesso foi liberado. Abra o IronTracks e crie sua conta com este mesmo e-mail para começar.'
     const cta = input.accountExisted ? 'Entrar no IronTracks' : 'Criar minha conta'
+    // Trial de 14 dias do Pro (Fase 1 da tração): o bootstrap concede no
+    // primeiro acesso a quem nunca teve entitlement — este e-mail é onde a
+    // pessoa fica SABENDO. Benefício anunciado no momento de maior atenção.
+    const trialLine = 'Você começa com 14 dias de VIP Pro liberados — treinos por IA, análise de exames de sangue e macros de nutrição, sem pagar nada.'
     const preheader = input.accountExisted
         ? 'Tudo pronto — entre com seu e-mail e senha.'
         : 'Tudo pronto — crie sua conta e comece a treinar.'
@@ -184,6 +188,7 @@ export function buildApprovalEmail(input: ApprovalEmailInput): BuiltEmail {
           <tr><td align="center" style="padding:18px 28px 0;font-family:${FONT}">
             <div style="font-size:27px;font-weight:900;color:#ffffff;line-height:1.25;letter-spacing:-.01em">Bem-vindo, ${safeName}!</div>
             <div style="font-size:15px;color:${MUTED};line-height:1.6;padding:12px 0 0">${escapeHtml(lead)}</div>
+            <div style="margin:14px auto 0;max-width:420px;border:1px solid rgba(250,204,21,.28);background:rgba(250,204,21,.07);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.55;color:#fde68a">${escapeHtml(trialLine)}</div>
           </td></tr>
           <tr><td style="padding:26px 28px 0">${button(cta, APP_URL)}</td></tr>
           <tr><td style="padding:30px 28px 4px">
@@ -202,6 +207,8 @@ ${brandFooter(`Se o botão não abrir, use este endereço:
         `Bem-vindo, ${name}! Seu acesso foi aprovado.`,
         '',
         lead,
+        '',
+        trialLine,
         '',
         `${cta}: ${APP_URL}`,
         '',
