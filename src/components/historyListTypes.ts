@@ -62,6 +62,9 @@ export interface WorkoutSummary {
     perceivedEffort?: number | null;
     /** User notes (cardio sessions) */
     cardioNotes?: string | null;
+    /** Resumo vindo da rota magra (servidor extrai do notes; ver slimHistoryRow.ts) */
+    volumeKg?: number;
+    exCount?: number;
     [key: string]: unknown;
 }
 

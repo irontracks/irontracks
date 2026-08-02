@@ -79,6 +79,34 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         setHistory(prev => prev.map(h => h.id === id ? { ...h, ...changes } : h));
     };
 
+    // ── Hidratação sob demanda ───────────────────────────────────────────────
+    // A rota magra do histórico não manda `workouts.notes` (a sessão inteira).
+    // Quem precisa da sessão completa (detalhe/edição/retomar) busca AQUI, uma
+    // vez, e o resultado volta pro state — cliques seguintes não pagam de novo.
+    // RLS cobre: o usuário só lê os próprios treinos (admin vê alheios pela
+    // rota de admin, que continua mandando notes — aí este fetch nem roda).
+    const ensureRawSession = async (session: WorkoutSummary): Promise<WorkoutSummary> => {
+        if (session?.rawSession || session?.notes || session?.kind === 'cardio') return session;
+        try {
+            const { data, error } = await supabase
+                .from('workouts')
+                .select('id, user_id, student_id, notes')
+                .eq('id', session.id)
+                .maybeSingle();
+            if (error || !data) return session;
+            const raw = parseRawSession(data.notes);
+            const hydrated: WorkoutSummary = {
+                ...session,
+                rawSession: raw,
+                raw: { ...(isRecord(session.raw) ? session.raw : {}), user_id: data.user_id, student_id: data.student_id },
+            };
+            setHistory(prev => prev.map(h => (h.id === session.id ? hydrated : h)));
+            return hydrated;
+        } catch {
+            return session;
+        }
+    };
+
     // ── Edit session state ───────────────────────────────────────────────────
     const [showEdit, setShowEdit] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
@@ -92,7 +120,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // tudo o que ele não sabe editar: reportMeta, ai, check-ins, cardio, RPE.
     const [editBaseSession, setEditBaseSession] = useState<Record<string, unknown>>({});
 
-    const openEdit = (session: WorkoutSummary) => {
+    const openEdit = async (sessionInput: WorkoutSummary) => {
+        const session = await ensureRawSession(sessionInput);
         const raw = parseRawSession(session.rawSession ?? session.notes);
         setEditBaseSession(isRecord(raw) ? (raw as Record<string, unknown>) : {});
         setEditId(session.id);
@@ -210,7 +239,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // ── Open session report ──────────────────────────────────────────────────
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
 
-    const openSession = (session: WorkoutSummary, onViewReport?: (s: unknown) => void) => {
+    const openSession = async (sessionInput: WorkoutSummary, onViewReport?: (s: unknown) => void) => {
+        const session = await ensureRawSession(sessionInput);
         const { RawSessionObjectSchema } = require('@/components/historyListTypes') as typeof import('@/components/historyListTypes');
         const rawSessionParsed = RawSessionObjectSchema.safeParse(session?.rawSession);
         const rawSession = rawSessionParsed.success ? rawSessionParsed.data : null;
@@ -228,10 +258,11 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // PRESERVANDO os logs (séries registradas). Pra quando o usuário finalizou
     // sem querer e quer voltar de onde parou. raw.logs usa o mesmo formato de
     // chave ("exIdx-setIdx") do treino ativo, então é reutilizado direto.
-    const openResume = (
-        session: WorkoutSummary,
+    const openResume = async (
+        sessionInput: WorkoutSummary,
         onResume?: (payload: { title: string; exercises: unknown[]; logs: Record<string, unknown> }) => void,
     ) => {
+        const session = await ensureRawSession(sessionInput);
         const raw = parseRawSession(session?.rawSession ?? session?.notes);
         const exercises = Array.isArray(raw?.exercises) ? raw.exercises : [];
         if (!exercises.length) return;
@@ -243,6 +274,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     // ── Session metadata ─────────────────────────────────────────────────────
     const getSessionMeta = (s: WorkoutSummary) => {
         const raw = parseRawSession(s?.rawSession ?? s?.notes);
+        // Linha magra: servidor já computou (mesma fonte, sessionVolumeKg).
+        if (!raw) return { exCount: Number(s?.exCount) || 0, vol: Number(s?.volumeKg) || 0 };
         const exCount = Array.isArray(raw?.exercises) ? raw.exercises.length : 0;
         const vol = raw?.logs ? calculateTotalVolumeFromLogs(raw.logs) : 0;
         return { exCount, vol };

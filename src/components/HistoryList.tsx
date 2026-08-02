@@ -66,7 +66,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
     };
 
     // ── Period report hook ───────────────────────────────────────────────────
-    const report = useHistoryPeriodReport({ historyItems, user, alert });
+    const report = useHistoryPeriodReport({ historyItems, user, alert, hydrateSessions: data.hydrateSessions });
     const {
         periodReport, periodAi, periodPdf, shareError, buildShareText,
         openPeriodReport, closePeriodReport, downloadPeriodPdf, handleShareReport,
