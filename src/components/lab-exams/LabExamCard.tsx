@@ -25,12 +25,23 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
   /** Tem algo para mostrar? Marcadores bastam — o protocolo é a camada de cima.
    *  Antes o card exigia protocolo, e exame analisado sem ele ficava morto. */
   const temConteudo = !!(exam.extracted_markers || exam.protocol)
+  /**
+   * `failed` TAMBÉM abre quando há marcadores.
+   *
+   * A rota do protocolo marca o exame como `failed` quando a IA devolve algo
+   * que não passa no schema — mas a extração já tinha dado certo e os
+   * marcadores continuam salvos. Sem isto, uma tentativa fracassada de gerar o
+   * protocolo TRANCAVA resultados que já eram do usuário, e ainda escondia o
+   * próprio botão de tentar de novo. Buraco deixado na correção anterior
+   * (ago/2026) e fechado no mesmo dia.
+   */
+  const podeAbrir = (isDone || isFailed) && temConteudo
 
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden">
       <button
         onClick={onView}
-        disabled={!isDone || !temConteudo}
+        disabled={!podeAbrir}
         className="w-full text-left p-4 flex items-center gap-3 disabled:cursor-default hover:bg-neutral-900/40 transition"
       >
         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 flex-shrink-0">
@@ -70,7 +81,7 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </span>
         )}
-        {isDone && temConteudo && <ChevronRight className="w-5 h-5 text-neutral-600 flex-shrink-0" />}
+        {podeAbrir && <ChevronRight className="w-5 h-5 text-neutral-600 flex-shrink-0" />}
       </button>
 
       {onDelete && (
