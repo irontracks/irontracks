@@ -20,6 +20,14 @@ interface AssessmentPDFGeneratorProps {
   trainerName: string;
   assessmentDate: Date;
   photos?: string[]; // Base64 encoded photos
+  /**
+   * `icon` = só o ícone, sem rótulo, em botão quadrado discreto.
+   *
+   * Existe porque a barra de ações do card tinha DOIS botões amarelos
+   * competindo (Gerar PDF e Plano IA) — quando tudo é primário, nada é. O PDF
+   * virou ação secundária; o dourado ficou só para o Plano IA.
+   */
+  variant?: 'primary' | 'icon';
 }
 
 /** Resolve bilateral average: if both left+right exist, average. Otherwise single side or legacy field. */
@@ -152,7 +160,8 @@ export default function AssessmentPDFGenerator({
   studentName,
   trainerName,
   assessmentDate,
-  photos
+  photos,
+  variant = 'primary',
 }: AssessmentPDFGeneratorProps) {
   const [isGenerating, setIsGenerating] = React.useState(false);
 
@@ -182,6 +191,20 @@ export default function AssessmentPDFGenerator({
       setIsGenerating(false);
     }
   };
+
+  if (variant === 'icon') {
+    return (
+      <button
+        onClick={generatePDF}
+        disabled={isGenerating}
+        title="Gerar PDF da avaliação"
+        aria-label="Gerar PDF da avaliação"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95 disabled:opacity-60"
+      >
+        {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+      </button>
+    );
+  }
 
   return (
     <button

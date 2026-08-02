@@ -198,6 +198,55 @@ export function AssessmentListItem({
     || (pairedAssessment && typeof pairedAssessment.bia_attachment_url === 'string' && pairedAssessment.bia_attachment_url)
   )
 
+  const pdfFormData = React.useMemo(() => ({
+    assessment_date: String(assessment.assessment_date ?? ''),
+    weight: String(assessment.weight || ''),
+    height: String(assessment.height || ''),
+    age: String(assessment.age || ''),
+    gender: safeGender(assessment.gender),
+    arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+    chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+    waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+    hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+    thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+    calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+    triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
+    biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
+    subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
+    suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
+    abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
+    thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
+    calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
+    arm_circ_left: '',
+    arm_circ_right: '',
+    thigh_circ_left: '',
+    thigh_circ_right: '',
+    calf_circ_left: '',
+    calf_circ_right: '',
+    triceps_skinfold_left: '',
+    triceps_skinfold_right: '',
+    biceps_skinfold_left: '',
+    biceps_skinfold_right: '',
+    thigh_skinfold_left: '',
+    thigh_skinfold_right: '',
+    calf_skinfold_left: '',
+    calf_skinfold_right: '',
+    bia_body_fat_percentage: String(assessment.bia_body_fat_percentage ?? ''),
+    bia_lean_mass: String(assessment.bia_lean_mass ?? ''),
+    bia_fat_mass: String(assessment.bia_fat_mass ?? ''),
+    bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
+    bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
+    bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
+    bia_attachment_url: String(assessment.bia_attachment_url ?? ''),
+    observations: '',
+              }), [assessment])
+  const pdfStudentName = String(assessment.student_name ?? '')
+  const pdfAssessmentDate = React.useMemo(() => new Date(
+    typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
+      ? assessment.assessment_date
+      : String(assessment.assessment_date ?? Date.now()),
+  ), [assessment.assessment_date])
+
   return (
     <div className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -347,167 +396,97 @@ export function AssessmentListItem({
           })()}
         </div>
 
-        <div className="flex flex-col gap-2 mt-1">
-          {/* Row 1: Main actions
-              Para registros 'bia' standalone (sem dados antropométricos),
-              alguns botões não fazem sentido — Gerar PDF não tem o que
-              imprimir, Plano IA precisa de dobras/medidas. Mostramos só
-              Detalhes + Excluir destacado. Avaliações 'full' mantêm o
-              layout completo com todas as ações. */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onToggleDetails(assessmentId)}
-              className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-              style={{
-                background: isSelected ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.03)',
-                borderColor: isSelected ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
-                color: isSelected ? '#facc15' : '#a3a3a3',
-              }}
-              type="button"
-            >
-              {isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              {isSelected ? 'Ocultar' : 'Detalhes'}
-            </button>
-            {isBiaOnly && (
-              // Botão de excluir destacado com label, já na primeira linha
-              // (registros BIA não têm Row 2). Mantém o mesmo confirm flow
-              // Sim/Não usado pelas avaliações full.
-              confirmDeleteId === assessmentId ? (
-                <div className="flex items-center gap-1 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => onDelete(assessmentId)}
-                    disabled={deletingId === assessmentId}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                  >
-                    {deletingId === assessmentId ? '...' : 'Sim, excluir'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onConfirmDelete(null)}
-                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConfirmDelete(assessmentId)}
-                  className="min-h-[40px] ml-auto px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                  style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Excluir
-                </button>
-              )
-            )}
-            {!isBiaOnly && (
-              <AssessmentPDFGenerator
-              formData={{
-                assessment_date: String(assessment.assessment_date ?? ''),
-                weight: String(assessment.weight || ''),
-                height: String(assessment.height || ''),
-                age: String(assessment.age || ''),
-                gender: safeGender(assessment.gender),
-                arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
-                chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
-                waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
-                hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
-                thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
-                calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
-                triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
-                biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
-                subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
-                suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
-                abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
-                thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
-                calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
-                arm_circ_left: '',
-                arm_circ_right: '',
-                thigh_circ_left: '',
-                thigh_circ_right: '',
-                calf_circ_left: '',
-                calf_circ_right: '',
-                triceps_skinfold_left: '',
-                triceps_skinfold_right: '',
-                biceps_skinfold_left: '',
-                biceps_skinfold_right: '',
-                thigh_skinfold_left: '',
-                thigh_skinfold_right: '',
-                calf_skinfold_left: '',
-                calf_skinfold_right: '',
-                bia_body_fat_percentage: String(assessment.bia_body_fat_percentage ?? ''),
-                bia_lean_mass: String(assessment.bia_lean_mass ?? ''),
-                bia_fat_mass: String(assessment.bia_fat_mass ?? ''),
-                bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
-                bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
-                bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
-                bia_attachment_url: String(assessment.bia_attachment_url ?? ''),
-                observations: '',
-              }}
-              studentName={String(assessment.student_name ?? '')}
-              trainerName={String(assessment.trainer_name ?? '')}
-              assessmentDate={new Date(
-                typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
-                  ? assessment.assessment_date
-                  : String(assessment.assessment_date ?? Date.now()),
-              )}
-            />
-            )}
-          </div>
-          {/* Row 2: AI + Edit + Delete — só pra avaliações 'full'.
-              Registros 'bia' standalone já têm o botão Excluir destacado
-              na Row 1 acima. */}
+        {/* Props do PDF extraídas para constantes: ficavam inline num JSX de
+            ~45 linhas dentro da barra de ações, o que tornava impossível ler o
+            layout dos botões. Mesmo conteúdo, nada renomeado. */}
+        {/* Barra de ações — UMA linha (redesenho ago/2026, "não estou gostando
+            dos botões").
+            O que havia: cinco ações em duas linhas, com DOIS botões amarelos
+            competindo (Gerar PDF e Plano IA). Quando tudo é primário, nada é —
+            e a lixeira vermelha ficava permanentemente em destaque para uma
+            ação rara e destrutiva.
+            Agora: Detalhes (o que mais se usa) e Plano IA (a ação premium, e a
+            ÚNICA dourada) dividem a linha; PDF, Editar e Excluir viram ícones
+            discretos. A confirmação de exclusão continua inline. */}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => onToggleDetails(assessmentId)}
+            type="button"
+            className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition-colors active:scale-95"
+            style={{
+              background: isSelected ? 'rgba(234,179,8,0.12)' : 'rgba(255,255,255,0.03)',
+              borderColor: isSelected ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
+              color: isSelected ? '#facc15' : '#d4d4d4',
+            }}
+          >
+            {isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isSelected ? 'Ocultar' : 'Detalhes'}
+          </button>
+
           {!isBiaOnly && (
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenPlanModal(assessment)}
+              disabled={!!aiPlanState?.loading}
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-3 text-sm font-black text-black transition-transform active:scale-95 disabled:opacity-60"
+            >
+              <Sparkles className="w-4 h-4" />
+              {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
+            </button>
+          )}
+
+          {/* Secundárias: ícone só, com rótulo acessível. */}
+          {!isBiaOnly && (
+            <AssessmentPDFGenerator
+              variant="icon"
+              formData={pdfFormData}
+              studentName={pdfStudentName}
+              trainerName={String(assessment.trainer_name ?? '')}
+              assessmentDate={pdfAssessmentDate}
+              photos={photos}
+            />
+          )}
+
+          {!isBiaOnly && (
+            <button
+              type="button"
+              onClick={() => onEdit(assessmentId)}
+              title="Editar avaliação"
+              aria-label="Editar avaliação"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+
+          {confirmDeleteId === assessmentId ? (
+            <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
-                onClick={() => onOpenPlanModal(assessment)}
-                disabled={!!aiPlanState?.loading}
-                className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                onClick={() => onDelete(assessmentId)}
+                disabled={deletingId === assessmentId}
+                className="min-h-[40px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition-colors hover:bg-red-500 active:scale-95 disabled:opacity-60"
               >
-                <Sparkles className="w-4 h-4" />
-                {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
+                {deletingId === assessmentId ? '…' : 'Excluir'}
               </button>
               <button
                 type="button"
-                onClick={() => onEdit(assessmentId)}
-                className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                onClick={() => onConfirmDelete(null)}
+                className="min-h-[40px] rounded-xl border border-neutral-700 px-3 text-sm font-bold text-neutral-400 transition-colors hover:text-white active:scale-95"
               >
-                <Edit3 className="w-4 h-4" />
-                Editar
+                Não
               </button>
-              {confirmDeleteId === assessmentId ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onDelete(assessmentId)}
-                    disabled={deletingId === assessmentId}
-                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                  >
-                    {deletingId === assessmentId ? '...' : 'Sim'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onConfirmDelete(null)}
-                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                  >
-                    Não
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConfirmDelete(assessmentId)}
-                  className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onConfirmDelete(assessmentId)}
+              title="Excluir avaliação"
+              aria-label="Excluir avaliação"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-500 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
