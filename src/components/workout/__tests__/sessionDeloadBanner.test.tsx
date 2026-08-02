@@ -50,13 +50,22 @@ const renderBanner = () => {
 }
 
 describe('SessionDeloadBanner', () => {
-  it('some quando a carga automática está ligada (o motor já alivia sozinho)', () => {
-    // Com autoLoad ligado o deload é contínuo no `suggestWeight` e o modal manual
-    // está aposentado (#568) — dois donos para a mesma carga seria pior que nenhum.
+  it('com a carga automática ligada mostra o controle ÚNICO do treino', () => {
+    // Invariante SUBSTITUÍDO em ago/2026 por decisão do dono ("deload é por
+    // treino, não por exercício"). Antes o banner sumia aqui e o liga/desliga
+    // vivia em cada card — oito botões para uma decisão só, chaveados por nome
+    // de exercício (desligar o Supino num treino desligava em todos).
+    // O modal manual continua aposentado com autoLoad ligado (#568); o que
+    // aparece agora é só o consentimento do treino.
     ctx = montarCtx(ALERTA)
     ;(ctx as Record<string, unknown>).autoLoadEnabled = true
-    const { container } = renderBanner()
-    expect(container).toBeEmptyDOMElement()
+    ;(ctx as Record<string, unknown>).workoutDeloadEnabled = true
+    ;(ctx as Record<string, unknown>).toggleWorkoutDeload = () => { }
+    const { container, getByRole } = renderBanner()
+    expect(container).not.toBeEmptyDOMElement()
+    expect(getByRole('button', { name: /descarga do treino/i })).toBeTruthy()
+    // e NÃO oferece a aplicação manual em bloco por cima do motor
+    expect(container.textContent || '').not.toMatch(/Reduzir \d+% no treino/)
   })
 
   it('não renderiza nada sem alerta de sessão', () => {

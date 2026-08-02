@@ -238,6 +238,18 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
   }, [settings?.autoLoadDeloadOff])
   const deloadOffKey = useMemo(() => Array.from(deloadOffSet).sort().join('|'), [deloadOffSet])
 
+  /** Treinos com descarga desligada — o escopo certo da decisão (ago/2026). */
+  const deloadOffWorkouts = useMemo(() => {
+    const list = Array.isArray(settings?.autoLoadDeloadOffWorkouts)
+      ? (settings?.autoLoadDeloadOffWorkouts as unknown[])
+      : []
+    return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''))
+  }, [settings?.autoLoadDeloadOffWorkouts])
+  const deloadOffWorkoutsKey = useMemo(
+    () => Array.from(deloadOffWorkouts).sort().join('|'),
+    [deloadOffWorkouts],
+  )
+
   const [readiness, setReadiness] = useState<ReadinessToday | undefined>(undefined)
 
   // Prontidão de hoje: 1 fetch do check-in pré-treino mais recente do dia. One-shot,
@@ -328,8 +340,12 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
         equipment: inferEquipmentFromName(name),
         readiness,
         todaySignal: feeler ? { weight: feeler.weight, reps: feeler.reps, rpe: feeler.rpe } : null,
-        // Deload por-exercício: OFF (chave na lista) ⇒ o motor nunca reduz.
-        deloadEnabled: !deloadOffSet.has(normalizeExerciseKey(name)),
+        // Descarga é do TREINO. O desligamento por exercício (`autoLoadDeloadOff`)
+        // continua sendo respeitado para não virar a chave de quem já tinha algum
+        // exercício desligado antes de ago/2026 — mas ninguém mais o cria.
+        deloadEnabled:
+          !deloadOffWorkouts.has(currentWorkoutKey) &&
+          !deloadOffSet.has(normalizeExerciseKey(name)),
       })
 
       // Motor ligado e mesmo assim sem sugestão: warning pesquisável no Sentry.
@@ -364,7 +380,7 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
   // `deloadOffKey` (string estável) entra p/ recalcular quando o usuário liga/desliga
   // o deload de algum exercício — sem depender do Set (referência nova a cada render).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, exercises, reportHistory, readiness, feelerKey, currentWorkoutKey, deloadOffKey])
+  }, [enabled, exercises, reportHistory, readiness, feelerKey, currentWorkoutKey, deloadOffKey, deloadOffWorkoutsKey])
 
   return { autoLoadEnabled: enabled, autoLoadSuggestions }
 }

@@ -1291,6 +1291,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             userSettingsApi?.updateSetting?.('autoLoadDeloadOff', next)
                                             void userSettingsApi?.save?.({ autoLoadDeloadOff: next })
                                         }}
+                                        onToggleWorkoutDeload={(workoutKey: string, nextEnabled: boolean) => {
+                                            const cur = Array.isArray(userSettingsApi?.settings?.autoLoadDeloadOffWorkouts)
+                                                ? (userSettingsApi.settings.autoLoadDeloadOffWorkouts as string[])
+                                                : []
+                                            const off = new Set(cur.filter((k) => typeof k === 'string' && k.trim() !== ''))
+                                            // nextEnabled = descarga LIGADA → sai da lista de "off"; desligada → entra.
+                                            if (nextEnabled) off.delete(workoutKey)
+                                            else off.add(workoutKey)
+                                            const next = Array.from(off)
+                                            userSettingsApi?.updateSetting?.('autoLoadDeloadOffWorkouts', next)
+                                            void userSettingsApi?.save?.({ autoLoadDeloadOffWorkouts: next })
+                                        }}
                                         onSavePlateSetup={(counts: Record<string, number>, barWeightKg: number) => {
                                             userSettingsApi?.updateSetting?.('plateInventory', counts)
                                             userSettingsApi?.updateSetting?.('barWeightKg', barWeightKg)

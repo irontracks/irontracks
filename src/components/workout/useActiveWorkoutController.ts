@@ -291,6 +291,34 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''));
   }, [settings]);
 
+  /**
+   * Descarga do TREINO — a decisão que substituiu os 8 botões dos cards.
+   *
+   * Chave = nome do treino normalizado, a mesma que o histórico já usa
+   * (`currentWorkoutKey` em useWorkoutAutoload). Assim "Lower B" liga/desliga
+   * sozinho, sem arrastar o Supino de outros treinos junto — que era o efeito
+   * colateral de chavear por exercício.
+   */
+  const workoutDeloadKey = useMemo(
+    () => normalizeExerciseKey(String((workout as Record<string, unknown>)?.name
+      ?? (session as Record<string, unknown>)?.name ?? '')),
+    [workout, session],
+  )
+
+  const workoutDeloadOff = useMemo(() => {
+    const list = Array.isArray((settings as Record<string, unknown> | null)?.autoLoadDeloadOffWorkouts)
+      ? ((settings as Record<string, unknown>).autoLoadDeloadOffWorkouts as unknown[])
+      : []
+    return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''))
+  }, [settings]);
+
+  const workoutDeloadEnabled = !!workoutDeloadKey && !workoutDeloadOff.has(workoutDeloadKey)
+
+  const toggleWorkoutDeload = useCallback(() => {
+    if (!workoutDeloadKey) return
+    propsRef.current?.onToggleWorkoutDeload?.(workoutDeloadKey, workoutDeloadOff.has(workoutDeloadKey))
+  }, [workoutDeloadKey, workoutDeloadOff]);
+
   const toggleExerciseDeload = useCallback((exIdx: number) => {
     const ex = exercises?.[exIdx];
     const name = String((ex as Record<string, unknown>)?.name || '').trim();
@@ -636,6 +664,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     autoLoadEnabled,
     autoLoadSuggestions,
     deloadOffKeys,
+    workoutDeloadEnabled,
+    toggleWorkoutDeload,
     toggleExerciseDeload,
     currentExerciseIdx,
     setCurrentExerciseIdx,
@@ -749,6 +779,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
     deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
     deloadOffKeys, toggleExerciseDeload,
+    workoutDeloadEnabled, toggleWorkoutDeload,
     sessionDeloadAlert, sessionDeloadModal, setSessionDeloadModal, applyDeloadToSession,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,

@@ -15,8 +15,16 @@ describe('useWorkoutAutoload passa deloadEnabled por exercício', () => {
     expect(src).toMatch(/settings\?\.autoLoadDeloadOff/)
   })
 
-  it('deriva deloadEnabled da lista e entrega ao motor (senão o toggle vira enfeite)', () => {
-    expect(src).toMatch(/deloadEnabled:\s*!deloadOffSet\.has\(normalizeExerciseKey\(name\)\)/)
+  it('o consentimento é do TREINO, e o legado por exercício ainda é respeitado', () => {
+    // ago/2026: a decisão migrou para o escopo do treino. A lista antiga
+    // (`autoLoadDeloadOff`) continua sendo lida — quem já tinha um exercício
+    // desligado não pode ver a carga voltar a cair sem ter pedido.
+    expect(src).toMatch(/deloadOffWorkouts\.has\(currentWorkoutKey\)/)
+    expect(src).toMatch(/deloadOffSet\.has\(normalizeExerciseKey\(name\)\)/)
+  })
+
+  it('a chave do treino entra nas deps do memo (recalcula ao ligar/desligar)', () => {
+    expect(src).toMatch(/deloadOffWorkoutsKey/)
   })
 
   it('a chave estável da lista entra nas deps do memo (recalcula ao ligar/desligar)', () => {
@@ -42,10 +50,29 @@ describe('persistência e toggle', () => {
     expect(impl).toMatch(/save\?\.\(\{\s*autoLoadDeloadOff:\s*next\s*\}\)/)
   })
 
-  it('o card só mostra o toggle quando a carga automática está ligada (senão mantém o modal antigo)', () => {
+  it('o card NÃO tem mais liga/desliga de deload — a decisão é do treino', () => {
+    // Se este botão voltar ao card, voltam as oito decisões para uma coisa só.
     const card = readFileSync('src/components/workout/ExerciseCard.tsx', 'utf8')
-    expect(card).toMatch(/autoLoadEnabled \? \(/)
-    expect(card).toMatch(/toggleExerciseDeload\?\.\(exIdx\)/)
-    expect(card).toMatch(/openDeloadModal\(ex, exIdx\)/) // ramo do modal antigo preservado
+    expect(card).not.toMatch(/toggleExerciseDeload\?\.\(exIdx\)/)
+    expect(card).not.toMatch(/Deload \{deloadOn \? 'ON' : 'OFF'\}/)
+    // mas o modal manual (para quem NÃO usa a carga automática) segue vivo
+    expect(card).toMatch(/openDeloadModal\(ex, exIdx\)/)
+    expect(card).toMatch(/autoLoadEnabled \? null : \(/)
+  })
+
+  it('o controle único vive no topo da lista, com a chave do treino', () => {
+    const banner = readFileSync('src/components/workout/SessionDeloadBanner.tsx', 'utf8')
+    expect(banner).toMatch(/if \(autoLoadEnabled\) \{/)
+    expect(banner).toMatch(/toggleWorkoutDeload/)
+    expect(banner).toMatch(/Descarga do treino/)
+    const ctrl = readFileSync('src/components/workout/useActiveWorkoutController.ts', 'utf8')
+    // chave = NOME DO TREINO normalizado, não nome de exercício
+    expect(ctrl).toMatch(/const workoutDeloadKey = useMemo\(/)
+    expect(ctrl).toMatch(/onToggleWorkoutDeload\?\.\(workoutDeloadKey/)
+  })
+
+  it('o schema guarda os treinos com descarga desligada', () => {
+    const schema = readFileSync('src/schemas/settings.ts', 'utf8')
+    expect(schema).toMatch(/autoLoadDeloadOffWorkouts:\s*z\.array\(z\.string\(\)\)\.default\(\[\]\)/)
   })
 })
