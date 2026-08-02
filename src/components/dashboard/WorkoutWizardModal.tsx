@@ -9,13 +9,12 @@ import { type VoiceExerciseDraft } from './VoiceWorkoutModal'
 // a captura por voz (showVoice) — sai do chunk inicial do Wizard.
 const VoiceWorkoutModal = dynamic(() => import('./VoiceWorkoutModal'), { ssr: false })
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { VipUpsellCard } from '@/components/vip/VipUpsellCard'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { useDialog } from '@/contexts/DialogContext'
-import { useRouter } from 'next/navigation'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -175,8 +174,6 @@ function voiceToWorkoutDraft(exercises: VoiceExerciseDraft[]): WorkoutDraft {
 // ── Main Component ─────────────────────────────────────────────────────
 export default function WorkoutWizardModal(props: Props) {
   const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
-  const { confirm } = useDialog()
-  const router = useRouter()
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -197,6 +194,8 @@ export default function WorkoutWizardModal(props: Props) {
   const [savingAll, setSavingAll] = useState(false)
   const [error, setError] = useState('')
   const [showVoice, setShowVoice] = useState(false)
+  /** Limite semanal batido → card de venda inline (era um confirm() seco). */
+  const [showUpsell, setShowUpsell] = useState(false)
 
   // WCAG 2.4.3 + 2.1.2 — Escape fecha (a menos que gerando/salvando) + focus trap
   const focusTrapRef = useFocusTrap(isOpen, (generating || savingAll) ? undefined : props.onClose)
@@ -241,6 +240,7 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     setGenerating(false)
     setSavingAll(false)
+    setShowUpsell(false)
 
     try {
       const raw = window.localStorage.getItem('irontracks_wizard_prefill_v1')
@@ -289,15 +289,10 @@ export default function WorkoutWizardModal(props: Props) {
     if (generating) return
     const wizardCredits = credits?.wizard
     if (isWizardExhausted(wizardCredits)) {
-      const ok = await confirm(
-        'Seus créditos do Wizard acabaram. Assine o VIP para liberar mais gerações.',
-        'Créditos esgotados',
-        { confirmText: 'Assinar VIP', cancelText: 'Agora não' }
-      )
-      if (ok) {
-        try { sessionStorage.setItem('irontracks_open_vip', '1') } catch { }
-        router.push('/dashboard')
-      }
+      // Paywall que VENDE (02/08/2026): o momento de maior desejo — a pessoa
+      // acabou de PEDIR um treino — era respondido por um confirm() de sistema.
+      // O card lista o que cada plano destrava e mede impressão/clique.
+      setShowUpsell(true)
       return
     }
     setGenerating(true)
@@ -430,7 +425,12 @@ export default function WorkoutWizardModal(props: Props) {
         <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
 
           {/* STEP 0: Modo de Criação */}
-          {step === 0 && (
+          {showUpsell && (
+            <div className="px-1 py-2">
+              <VipUpsellCard feature="wizard" onDismiss={() => setShowUpsell(false)} />
+            </div>
+          )}
+          {!showUpsell && step === 0 && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Manual */}
@@ -502,7 +502,7 @@ export default function WorkoutWizardModal(props: Props) {
           )}
 
           {/* STEP 1: Objetivo */}
-          {step === 1 && (
+          {!showUpsell && step === 1 && (
             <div className="space-y-3">
               <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Qual seu objetivo principal?</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -515,7 +515,7 @@ export default function WorkoutWizardModal(props: Props) {
           )}
 
           {/* STEP 2: Divisão & Frequência */}
-          {step === 2 && (
+          {!showUpsell && step === 2 && (
             <div className="space-y-4">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Divisão de treino</div>
@@ -554,7 +554,7 @@ export default function WorkoutWizardModal(props: Props) {
           )}
 
           {/* STEP 3: Tempo & Equipamento */}
-          {step === 3 && (
+          {!showUpsell && step === 3 && (
             <div className="space-y-4">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">⏱️ Duração da sessão</div>
@@ -589,7 +589,7 @@ export default function WorkoutWizardModal(props: Props) {
           )}
 
           {/* STEP 4: Preferências + Preview + Gerar */}
-          {step === 4 && (
+          {!showUpsell && step === 4 && (
             <div className="space-y-4">
               {/* Level */}
               <div>
