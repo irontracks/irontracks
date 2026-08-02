@@ -11,7 +11,8 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { computeWorkoutStreakAndStats } from '@/actions/workout-actions';
 import type { WorkoutStreak } from '@/types/app';
 import { logError } from '@/lib/logger';
@@ -19,22 +20,29 @@ import { logError } from '@/lib/logger';
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/**
+ * Streak/stats via React Query — a action varre os treinos do usuário e era
+ * refeita do ZERO a cada montagem do dashboard (nenhum cache). Com
+ * `staleTime` de 5 min o valor sobrevive a remounts e navegações; o número só
+ * muda quando um treino é finalizado, e nesse caminho o cache é invalidado por
+ * quem grava (ou expira sozinho).
+ */
+const STREAK_STALE_MS = 5 * 60_000;
+
 export function useWorkoutStreak(userId?: string | null) {
-  const [streakStats, setStreakStats] = useState<WorkoutStreak | null>(null);
-  // Track which userId the last successful fetch was for.
-  // Loading is derived: true when userId exists but doesn't match lastFetchedUserId.
-  // This avoids both setState-in-effect (sync) and refs-during-render lint errors.
-  const [lastFetchedUserId, setLastFetchedUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Memoizada: é dependência do setter otimista abaixo — array literal novo a
+  // cada render faria o React Compiler recusar a memoização manual.
+  const queryKey = useMemo(() => ['workout-streak', userId ?? ''] as const, [userId]);
 
-  useEffect(() => {
-    if (!userId) return;
-
-    let cancelled = false;
-
-    computeWorkoutStreakAndStats()
-      .then((res) => {
-        if (cancelled) return;
-        if (!res?.ok || !res?.data) return;
+  const query = useQuery<WorkoutStreak | null>({
+    queryKey,
+    enabled: !!userId,
+    staleTime: STREAK_STALE_MS,
+    queryFn: async (): Promise<WorkoutStreak | null> => {
+      try {
+        const res = await computeWorkoutStreakAndStats();
+        if (!res?.ok || !res?.data) return null;
         const d = isRecord(res.data) ? (res.data as Record<string, unknown>) : {};
 
         const badgesRaw = Array.isArray(d.badges) ? d.badges : [];
@@ -64,16 +72,31 @@ export function useWorkoutStreak(userId?: string | null) {
             d.weekWorkouts != null ? Number(d.weekWorkouts) : undefined,
         };
 
-        setStreakStats(streak);
-      })
-      .catch((err) => logError('useWorkoutStreak', err))
-      .finally(() => { if (!cancelled) setLastFetchedUserId(userId); });
+        return streak;
+      } catch (err) {
+        logError('useWorkoutStreak', err);
+        return null;
+      }
+    },
+  });
 
-    return () => { cancelled = true; };
-  }, [userId]);
+  // Atualização otimista preservada (contrato antigo do hook): escreve direto
+  // no cache do Query em vez de num useState paralelo, senão os dois
+  // divergiriam no próximo refetch.
+  const setStreakStats = useCallback(
+    (next: WorkoutStreak | null | ((prev: WorkoutStreak | null) => WorkoutStreak | null)) => {
+      queryClient.setQueryData<WorkoutStreak | null>(queryKey, (prev) =>
+        typeof next === 'function'
+          ? (next as (p: WorkoutStreak | null) => WorkoutStreak | null)(prev ?? null)
+          : next,
+      );
+    },
+    [queryClient, queryKey],
+  );
 
-  // Loading when userId exists but the fetch for this userId hasn't completed yet
-  const streakLoading = !!userId && userId !== lastFetchedUserId;
-
-  return { streakStats, setStreakStats, streakLoading };
+  return {
+    streakStats: query.data ?? null,
+    setStreakStats,
+    streakLoading: !!userId && query.isPending,
+  };
 }
