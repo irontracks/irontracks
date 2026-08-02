@@ -11,6 +11,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { uploadStoryFile } from '@/utils/storage/mediaUpload'
+import { createStoriesRefreshScheduler } from './storiesRefreshScheduler'
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
@@ -160,38 +161,59 @@ export default function StoriesBar({
     }
   }
 
+  // `reload` é estável (useCallback com deps []), mas o efeito do Realtime abaixo
+  // roda uma única vez — a ref evita capturar uma versão velha se isso mudar.
+  const reloadRef = useRef(reload)
+  useEffect(() => { reloadRef.current = reload }, [reload])
+
+  // Caminho PRIMÁRIO: evento window disparado por quem acabou de postar (imediato).
   useEffect(() => {
     // Initial load — only if empty to avoid unnecessary fetches on tab switches
     if (groups.length === 0) {
       reload()
     }
-    // Fast-path: local window event dispatched by StoryComposer after post
     const onRefresh = () => reload()
     try {
       window.addEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
     } catch { }
-
-    // Reliable path: Supabase Realtime subscription on the stories table.
-    // This handles the iOS native case where window events don't cross component
-    // boundaries after tab switches or component remounts.
-    const supabase = createClient()
-    const channel = supabase
-      .channel('stories-auto-refresh')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
-        // Debounce slightly so CDN/Cloudinary has time to propagate before we fetch
-        setTimeout(() => reload(true), 1500)
-      })
-      .subscribe()
-
     return () => {
       try {
         window.removeEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
       } catch { }
-      try {
-        supabase.removeChannel(channel)
-      } catch { }
     }
   }, [reload, groups.length])
+
+  // Caminho de RESERVA: Supabase Realtime na tabela de stories — cobre o caso iOS
+  // nativo, em que o evento window não cruza fronteira de componente depois de
+  // troca de aba/remount.
+  //
+  // Deps VAZIAS de propósito: antes o efeito também dependia de `groups.length`,
+  // então a primeira carga (0 → N grupos) derrubava e recriava o canal WebSocket
+  // inteiro. O refresh é coalescido pelo scheduler (rajada de INSERTs → 1 fetch)
+  // e nunca dispara com o app em background — ver storiesRefreshScheduler.ts.
+  useEffect(() => {
+    const scheduler = createStoriesRefreshScheduler({
+      onRefresh: () => { reloadRef.current(true) },
+    })
+    const onVisibilityChange = () => {
+      try { if (document.visibilityState === 'visible') scheduler.flushOnVisible() } catch { }
+    }
+    try { document.addEventListener('visibilitychange', onVisibilityChange) } catch { }
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('stories-auto-refresh')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
+        scheduler.request()
+      })
+      .subscribe()
+
+    return () => {
+      scheduler.dispose()
+      try { document.removeEventListener('visibilitychange', onVisibilityChange) } catch { }
+      try { supabase.removeChannel(channel) } catch { }
+    }
+  }, [])
 
 
   const ordered = useMemo(() => {
