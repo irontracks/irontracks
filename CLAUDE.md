@@ -74,7 +74,7 @@ scripts/        # Scripts de build e utilitários
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
-- **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. `gemini-pro` (usado no protocolo de exames, que cruza 4 fontes) é caro; use o `fastModelId` onde couber. Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`) — **o Sentry NÃO recebe erros de rota server** hoje.
+- **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. `gemini-pro` (usado no protocolo de exames, que cruza 4 fontes) é caro; use o `fastModelId` onde couber. Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`). O gap "Sentry não recebe erro de rota server" foi CORRIGIDO em 02/08/2026 — causa: `captureException` só enfileira e a Vercel congela a instância antes do envio; `lib/logger.ts` agora agenda `Sentry.flush` via `waitUntil` (guard em `loggerServerFlush.test.ts`). Se o Sentry voltar a ficar mudo para rotas server, comece por lá.
 - **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (**10 ocorrências** hoje — confira com `grep -c`, não confie no número) antes de um release novo. Ver "iOS — release" pra saber QUANDO ela precisa subir.
 - **App Store Connect API:** chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8` (Key ID `W834H36CBM`); o **Issuer ID não fica no disco** (pegar no painel Users and Access → Integrations). Detalhes em `docs/ios-release.md`.
 
@@ -197,10 +197,11 @@ from audit_events where action like 'approval_email_%' or action like 'email_del
 order by created_at desc limit 20;
 ```
 
-**⚠️ `logWarn` é NO-OP em produção** (`if (IS_PROD) return`) e o Sentry não
-recebe erro de rota server neste projeto. Para sinal de falha em rota, use
-`logError` (vai pro runtime log da Vercel) **e** grave em `audit_events` — o log
-da Vercel expira, a pergunta "fulano recebeu?" não.
+**⚠️ `logWarn` é NO-OP em produção** (`if (IS_PROD) return`). Para sinal de
+falha em rota, use `logError` — desde 02/08/2026 ele chega ao Sentry também em
+rota server (flush via `waitUntil` no `lib/logger.ts`) — **e** grave em
+`audit_events` quando a pergunta precisar de resposta meses depois ("fulano
+recebeu?"): log e Sentry expiram, o banco não.
 
 **Templates:** o nome vem de `access_requests.full_name`, campo de **formulário
 público sem `.max()`** — sempre `escapeHtml`. E-mail é HTML de 2005: tabela (não
