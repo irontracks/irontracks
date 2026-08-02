@@ -61,23 +61,30 @@ export async function resolveRoleByUser(user: { id?: string | null; email?: stri
 
   const admin = createAdminClient()
 
-  try {
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle()
-    const role = String(profile?.role || '').toLowerCase()
+  // As 3 fontes em PARALELO (eram sequenciais — para aluno comum, o caso mais
+  // frequente, todas as 3 rodavam sempre; em série custavam 3 round-trips no
+  // caminho crítico do boot). A PRIORIDADE de decisão continua a mesma:
+  // profiles.role → teachers por user_id → teachers por email.
+  const [profileQ, teacherByIdQ, teacherByEmailQ] = await Promise.allSettled([
+    admin.from('profiles').select('role').eq('id', userId).maybeSingle(),
+    admin.from('teachers').select('id').eq('user_id', userId).maybeSingle(),
+    email
+      ? admin.from('teachers').select('id').ilike('email', safeEmailLike(email)).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  if (profileQ.status === 'fulfilled') {
+    const role = String(profileQ.value?.data?.role || '').toLowerCase()
     if (role === 'admin' || role === 'teacher') return { role: role as IrontracksRole }
-  } catch (e) { logError('resolveRoleByUser.profileRole', e) }
+  } else logError('resolveRoleByUser.profileRole', profileQ.reason)
 
-  try {
-    const { data: teacherById } = await admin.from('teachers').select('id').eq('user_id', userId).maybeSingle()
-    if (teacherById?.id) return { role: 'teacher' as IrontracksRole }
-  } catch (e) { logError('resolveRoleByUser.teacherById', e) }
+  if (teacherByIdQ.status === 'fulfilled') {
+    if (teacherByIdQ.value?.data?.id) return { role: 'teacher' as IrontracksRole }
+  } else logError('resolveRoleByUser.teacherById', teacherByIdQ.reason)
 
-  try {
-    if (email) {
-      const { data: teacherByEmail } = await admin.from('teachers').select('id').ilike('email', safeEmailLike(email)).maybeSingle()
-      if (teacherByEmail?.id) return { role: 'teacher' as IrontracksRole }
-    }
-  } catch (e) { logError('resolveRoleByUser.teacherByEmail', e) }
+  if (teacherByEmailQ.status === 'fulfilled') {
+    if (teacherByEmailQ.value?.data?.id) return { role: 'teacher' as IrontracksRole }
+  } else logError('resolveRoleByUser.teacherByEmail', teacherByEmailQ.reason)
 
   return { role: 'user' as IrontracksRole }
 }
