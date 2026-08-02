@@ -169,3 +169,85 @@ describe('meal-plan', () => {
         expect(ROUTE).toMatch(/mealPlanGenerationConfig\(\)/)
     })
 })
+
+// ─── Lote 4: fecha a catraca ─────────────────────────────────────────────────
+import {
+    BIA_EXTRACT_RESPONSE_SCHEMA,
+    LAB_EXTRACT_RESPONSE_SCHEMA,
+    WEEKLY_REPORT_RESPONSE_SCHEMA,
+    WIZARD_SINGLE_RESPONSE_SCHEMA,
+    WIZARD_PROGRAM_RESPONSE_SCHEMA,
+    wizardGenerationConfig,
+    labExtractGenerationConfig,
+} from '../routeContracts'
+import { LabExamExtractedSchema, LAB_MARKER_STATUSES, LAB_MARKER_CATEGORIES } from '@/schemas/labExam'
+
+describe('bia-extract', () => {
+    it('as 10 medidas são anuláveis — balança nem sempre imprime tudo', () => {
+        const props = BIA_EXTRACT_RESPONSE_SCHEMA.properties as Record<string, Record<string, unknown>>
+        const medidas = Object.keys(props).filter((k) => k !== 'confidence')
+        expect(medidas.length).toBe(10)
+        for (const m of medidas) expect(props[m].nullable, m).toBe(true)
+        // e todas existem no Zod da rota
+        const ROUTE = readFileSync('src/app/api/ai/bia-extract/route.ts', 'utf8')
+        for (const m of medidas) expect(ROUTE, m).toContain(`${m}:`)
+        expect(ROUTE).toMatch(/biaExtractGenerationConfig\(\)/)
+    })
+})
+
+describe('lab-exam-extract', () => {
+    it('espelha o LabExamExtractedSchema campo a campo', () => {
+        const zodKeys = Object.keys(LabExamExtractedSchema.shape).sort()
+        const contractKeys = Object.keys(LAB_EXTRACT_RESPONSE_SCHEMA.properties).sort()
+        expect(contractKeys).toEqual(zodKeys)
+    })
+
+    it('os enums do marcador vêm da MESMA fonte que o Zod', () => {
+        const marker = LAB_EXTRACT_RESPONSE_SCHEMA.properties.markers.items.properties
+        expect([...marker.status.enum]).toEqual([...LAB_MARKER_STATUSES])
+        expect([...marker.category.enum]).toEqual([...LAB_MARKER_CATEGORIES])
+    })
+
+    it('painel completo cabe: 200 marcadores exigem teto alto', () => {
+        expect(LAB_EXTRACT_RESPONSE_SCHEMA.properties.markers.maxItems).toBe(200)
+        expect(labExtractGenerationConfig().maxOutputTokens).toBeGreaterThanOrEqual(8000)
+    })
+})
+
+describe('weekly-report', () => {
+    it('os números continuam sendo do SERVIDOR, não do modelo', () => {
+        // A rota sobrescreve os agregados depois do parse — regra dela, que o
+        // contrato não pode afrouxar: o modelo narra, o servidor conta.
+        const ROUTE = readFileSync('src/app/api/ai/weekly-report/route.ts', 'utf8')
+        expect(ROUTE).toMatch(/sessions: officialTotals\.sessions/)
+        expect(Object.keys(WEEKLY_REPORT_RESPONSE_SCHEMA.properties)).not.toContain('sessions')
+        expect(ROUTE).toMatch(/weeklyReportGenerationConfig\(\)/)
+    })
+})
+
+describe('workout-wizard', () => {
+    const ROUTE = readFileSync('src/app/api/ai/workout-wizard/route.ts', 'utf8')
+
+    it('o contrato muda com o MODO — single embrulha em draft, program em drafts', () => {
+        expect(wizardGenerationConfig('single').responseSchema).toBe(WIZARD_SINGLE_RESPONSE_SCHEMA)
+        expect(wizardGenerationConfig('program').responseSchema).toBe(WIZARD_PROGRAM_RESPONSE_SCHEMA)
+        expect(ROUTE).toMatch(/wizardGenerationConfig\(mode\)/)
+    })
+
+    it('`notes` fica fora do required — é .optional().default no Zod', () => {
+        const ex = WIZARD_PROGRAM_RESPONSE_SCHEMA.properties.drafts.items.properties.exercises.items
+        expect([...ex.required]).toEqual(['name', 'sets', 'reps', 'restTime'])
+        expect(ROUTE).toMatch(/notes: z\.string\(\)\.optional\(\)\.default\(''\)/)
+    })
+})
+
+describe('assessment-report / post-workout-insights / student-workout', () => {
+    it.each([
+        ['assessment-report', 'assessmentReportGenerationConfig'],
+        ['post-workout-insights', 'postWorkoutInsightsGenerationConfig'],
+        ['student-workout', 'studentWorkoutGenerationConfig'],
+    ])('%s passa o contrato na chamada', (rota, cfg) => {
+        const src = readFileSync(`src/app/api/ai/${rota}/route.ts`, 'utf8')
+        expect(src).toContain(`${cfg}()`)
+    })
+})

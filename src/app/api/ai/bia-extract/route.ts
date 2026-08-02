@@ -27,6 +27,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { biaExtractGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { BIA_BUCKET, canAccessBiaPath } from '@/utils/storage/biaAttachmentAccess'
@@ -216,7 +217,7 @@ export async function POST(req: Request) {
     const base64Data = Buffer.from(arrayBuf).toString('base64')
 
     // Flash é suficiente pra OCR estruturado e custa muito menos que Pro.
-    const model = getGeminiModel(apiKey, env.gemini.fastModelId)
+    const model = getGeminiModel(apiKey, env.gemini.fastModelId, biaExtractGenerationConfig())
 
     const geminiResult = await safeGemini('bia-extract', () =>
       model.generateContent([

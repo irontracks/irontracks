@@ -7,6 +7,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { weeklyReportGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
@@ -158,7 +159,7 @@ export async function POST(req: Request) {
       JSON.stringify(sessionData),
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID, weeklyReportGenerationConfig())
     const geminiResult = await safeGemini('weekly-report', () =>
       model.generateContent(prompt),
     )

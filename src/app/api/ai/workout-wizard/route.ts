@@ -8,6 +8,7 @@ import { logError } from '@/lib/logger'
 import { applyWizardConsistency, buildProgressionTargets } from '@/utils/workoutWizardGenerator'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { wizardGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
@@ -341,12 +342,7 @@ export async function POST(req: Request) {
       JSON.stringify(answers),
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL, {
-      // Cap output so a stuck / runaway generation returns instead of timing out
-      maxOutputTokens: 8192,
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-    })
+    const model = getGeminiModel(apiKey, MODEL, wizardGenerationConfig(mode))
     const geminiResult = await safeGemini('workout-wizard', () =>
       model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
     )
