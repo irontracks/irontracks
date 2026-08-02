@@ -17,7 +17,6 @@ describe('constantes de limite VIP (reais, usadas pela /api/vip/status)', () => 
     expect(FREE_LIMITS.nutrition_macros).toBe(false)
     expect(FREE_LIMITS.analytics).toBe(false)
     expect(FREE_LIMITS.offline).toBe(false)
-    expect(FREE_LIMITS.chef_ai).toBe(false)
     expect(FREE_LIMITS.lab_exams).toBe(false)
   })
 
@@ -29,7 +28,6 @@ describe('constantes de limite VIP (reais, usadas pela /api/vip/status)', () => 
     expect(UNLIMITED_LIMITS.nutrition_macros).toBe(true)
     expect(UNLIMITED_LIMITS.analytics).toBe(true)
     expect(UNLIMITED_LIMITS.offline).toBe(true)
-    expect(UNLIMITED_LIMITS.chef_ai).toBe(true)
     expect(UNLIMITED_LIMITS.lab_exams).toBe(true)
   })
 

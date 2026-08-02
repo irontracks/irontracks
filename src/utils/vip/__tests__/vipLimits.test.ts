@@ -24,10 +24,9 @@ describe('FREE_LIMITS e UNLIMITED_LIMITS (constantes públicas)', () => {
     expect(FREE_LIMITS.history_days).toBe(30)
   })
 
-  it('FREE_LIMITS: sem analytics, offline, chef_ai, lab_exams', () => {
+  it('FREE_LIMITS: sem analytics, offline, lab_exams', () => {
     expect(FREE_LIMITS.analytics).toBe(false)
     expect(FREE_LIMITS.offline).toBe(false)
-    expect(FREE_LIMITS.chef_ai).toBe(false)
     expect(FREE_LIMITS.lab_exams).toBe(false)
   })
 
@@ -66,21 +65,19 @@ describe('normalizePlanId', () => {
 })
 
 describe('applyTierDefaults', () => {
-  it('vip_elite: ativa nutrition_macros, analytics, offline, chef_ai e lab_exams', () => {
+  it('vip_elite: ativa nutrition_macros, analytics, offline e lab_exams', () => {
     const limits = applyTierDefaults('vip_elite', { ...FREE_LIMITS })
     expect(limits.nutrition_macros).toBe(true)
     expect(limits.analytics).toBe(true)
     expect(limits.offline).toBe(true)
-    expect(limits.chef_ai).toBe(true)
     expect(limits.lab_exams).toBe(true)
   })
 
-  it('vip_pro: ativa offline e lab_exams, mas não analytics nem chef_ai', () => {
+  it('vip_pro: ativa offline e lab_exams, mas não analytics', () => {
     const limits = applyTierDefaults('vip_pro', { ...FREE_LIMITS })
     expect(limits.offline).toBe(true)
     expect(limits.lab_exams).toBe(true)
     expect(limits.analytics).toBe(false)
-    expect(limits.chef_ai).toBe(false)
   })
 
   it('vip_start: ativa lab_exams (feature básica de todo VIP)', () => {
@@ -100,7 +97,8 @@ describe('applyTierCaps', () => {
     it('caps: chat 10, wizard 1, insights 3, history 60; sem macros/analytics; lab_exams true', () => {
       const l = applyTierCaps('vip_start', { ...UNLIMITED_LIMITS })
       expect(l.chat_daily).toBe(10)
-      expect(l.wizard_weekly).toBe(1)
+      // 4, não 1: até 02/08/2026 o Start pago tinha MENOS wizard que o free (3).
+      expect(l.wizard_weekly).toBe(4)
       expect(l.insights_weekly).toBe(3)
       expect(l.history_days).toBe(60)
       expect(l.nutrition_macros).toBe(false)
@@ -110,7 +108,7 @@ describe('applyTierCaps', () => {
   })
 
   describe('vip_pro', () => {
-    it('caps: chat 40, history ilimitado, macros/offline/lab_exams on, analytics/chef_ai off', () => {
+    it('caps: chat 40, history ilimitado, macros/offline/lab_exams on, analytics off', () => {
       const l = applyTierCaps('vip_pro', { ...UNLIMITED_LIMITS })
       expect(l.chat_daily).toBe(40)
       expect(l.history_days).toBeNull()
@@ -118,7 +116,6 @@ describe('applyTierCaps', () => {
       expect(l.offline).toBe(true)
       expect(l.lab_exams).toBe(true)
       expect(l.analytics).toBe(false)
-      expect(l.chef_ai).toBe(false)
     })
   })
 
@@ -130,7 +127,6 @@ describe('applyTierCaps', () => {
       expect(l.nutrition_macros).toBe(true)
       expect(l.analytics).toBe(true)
       expect(l.offline).toBe(true)
-      expect(l.chef_ai).toBe(true)
       expect(l.lab_exams).toBe(true)
     })
   })
@@ -149,5 +145,26 @@ describe('applyTierCaps', () => {
       expect(applyTierCaps('vip_elite_anual', { ...FREE_LIMITS }))
         .toEqual(applyTierCaps('vip_elite', { ...FREE_LIMITS }))
     })
+  })
+})
+
+
+/**
+ * Invariante de preço (bug real de 02/08/2026): o VIP Start dava 1 Wizard/semana
+ * enquanto o FREE dava 3 — quem pagava recebia MENOS da feature VIP mais usada.
+ * Este guard trava a CLASSE: nenhum limite de plano pago pode ficar abaixo do
+ * free, em nenhum tier, para nenhuma cota numérica.
+ */
+describe('plano pago nunca é pior que o gratuito', () => {
+  const NUMERICOS = ['chat_daily', 'wizard_weekly', 'insights_weekly'] as const
+  it.each(['vip_start', 'vip_pro', 'vip_elite'])('%s ≥ free em toda cota', (tier) => {
+    const pago = applyTierCaps(tier, applyTierDefaults(tier, { ...FREE_LIMITS }))
+    for (const k of NUMERICOS) {
+      expect(pago[k], `${tier}.${k}`).toBeGreaterThanOrEqual(FREE_LIMITS[k])
+    }
+    // histórico: null = ilimitado; se numérico, tem de ser ≥ free
+    if (pago.history_days !== null) {
+      expect(pago.history_days, `${tier}.history_days`).toBeGreaterThanOrEqual(FREE_LIMITS.history_days as number)
+    }
   })
 })
