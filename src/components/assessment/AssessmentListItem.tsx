@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { computeDelta, daysBetween, type MetricDelta } from './assessmentDelta'
 import dynamic from 'next/dynamic'
 
 import type { AssessmentRow } from './assessmentUtils'
@@ -136,6 +137,8 @@ interface AssessmentListItemProps {
    * pareada (full ↔ bia em ±14 dias). null = não tem par.
    */
   pairedAssessment?: AssessmentRow | null
+  /** Avaliação anterior no TEMPO — base da variação mostrada no card. */
+  previousAssessment?: AssessmentRow | null
   idx: number
   isSelected: boolean
   aiPlanState: AiPlanEntry | undefined
@@ -154,6 +157,7 @@ interface AssessmentListItemProps {
 export function AssessmentListItem({
   assessment,
   pairedAssessment,
+  previousAssessment,
   idx,
   isSelected,
   aiPlanState,
@@ -242,20 +246,105 @@ export function AssessmentListItem({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
-            {[
-              { label: 'Peso', value: (() => { const w = getWeightKg(assessment); return w ? `${w.toFixed(1)} kg` : '-' })() },
-              { label: '% Gordura', value: (() => { const bf = getBodyFatPercent(assessment); return bf ? `${bf.toFixed(1)}%` : '-' })() },
-              { label: 'Massa Magra', value: (() => { const lm = getLeanMassKg(assessment); return lm ? `${lm.toFixed(1)} kg` : '-' })() },
-              { label: 'BMR', value: (() => { const v = getBmrKcal(assessment); return v ? `${v.toFixed(0)} kcal` : '-' })() },
-              { label: 'TDEE', value: workoutSessionsLoading ? '...' : tdee ? `${tdee.toFixed(0)} kcal` : '-' },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
-                <div className="text-white font-black mt-1">{value}</div>
+          {(() => {
+            /* Redesign ago/2026 — pedido do dono ("muito amador").
+             *
+             * O que estava errado não era só o acabamento: eram cinco números do
+             * MESMO tamanho, numa grade 2×2+1 que deixava o TDEE órfão, e
+             * NENHUMA evolução. Os dados da mudança estavam na tela (88,2 kg em
+             * março, 92,5 em setembro) e o usuário tinha de fazer a conta de
+             * cabeça, rolando entre cards.
+             *
+             * Agora: peso e gordura em destaque com a variação vs. a avaliação
+             * anterior; composição e metabolismo numa faixa secundária. Peso é
+             * o número que a pessoa procura primeiro — merece ser o maior.
+             */
+            const peso = getWeightKg(assessment)
+            const bf = getBodyFatPercent(assessment)
+            const lean = getLeanMassKg(assessment)
+            const bmr = getBmrKcal(assessment)
+
+            const dPeso = computeDelta(peso, previousAssessment ? getWeightKg(previousAssessment) : null, null)
+            const dBf = computeDelta(bf, previousAssessment ? getBodyFatPercent(previousAssessment) : null, 'down')
+            const dLean = computeDelta(lean, previousAssessment ? getLeanMassKg(previousAssessment) : null, 'up')
+            const dias = previousAssessment
+              ? daysBetween(assessment?.date ?? assessment?.assessment_date,
+                            previousAssessment?.date ?? previousAssessment?.assessment_date)
+              : null
+
+            const tomCor = (d: MetricDelta | null) =>
+              d?.tone === 'good' ? '#4ade80' : d?.tone === 'bad' ? '#f87171' : '#a3a3a3'
+
+            const Delta = ({ d, unidade }: { d: MetricDelta | null; unidade: string }) =>
+              d ? (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[12px] font-bold"
+                  style={{ color: tomCor(d) }}
+                >
+                  {d.diff > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {d.label}{unidade}
+                </span>
+              ) : null
+
+            const Destaque = ({ rotulo, valor, d, unidade }: {
+              rotulo: string; valor: string; d: MetricDelta | null; unidade: string
+            }) => (
+              <div className="flex-1 min-w-0 rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900/80 to-neutral-900/30 px-4 py-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{rotulo}</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-[26px] font-black leading-none text-white tabular-nums">{valor}</span>
+                  <Delta d={d} unidade={unidade} />
+                </div>
               </div>
-            ))}
-          </div>
+            )
+
+            const Secundario = ({ rotulo, valor }: { rotulo: string; valor: string }) => (
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-600">{rotulo}</div>
+                <div className="mt-0.5 truncate text-[13px] font-bold text-neutral-200 tabular-nums">{valor}</div>
+              </div>
+            )
+
+            return (
+              <div className="mt-4">
+                <div className="flex gap-2.5">
+                  <Destaque
+                    rotulo="Peso"
+                    valor={peso ? `${peso.toFixed(1)}` : '—'}
+                    d={dPeso}
+                    unidade=" kg"
+                  />
+                  <Destaque
+                    rotulo="Gordura"
+                    valor={bf ? `${bf.toFixed(1)}%` : '—'}
+                    d={dBf}
+                    unidade="%"
+                  />
+                </div>
+
+                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-neutral-800/70 bg-neutral-900/30 px-4 py-2.5">
+                  <Secundario rotulo="Massa magra" valor={lean ? `${lean.toFixed(1)} kg` : '—'} />
+                  <div className="h-7 w-px shrink-0 bg-neutral-800" />
+                  <Secundario rotulo="BMR" valor={bmr ? `${bmr.toFixed(0)} kcal` : '—'} />
+                  <div className="h-7 w-px shrink-0 bg-neutral-800" />
+                  <Secundario rotulo="TDEE" valor={workoutSessionsLoading ? '…' : tdee ? `${tdee.toFixed(0)} kcal` : '—'} />
+                </div>
+
+                {/* Dá ESCALA à variação: "+4.3 kg" em 30 dias e em 300 dias são
+                    coisas completamente diferentes. */}
+                {dias && (dPeso || dBf || dLean) ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-500">
+                    <span>Desde a anterior, há {dias} {dias === 1 ? 'dia' : 'dias'}:</span>
+                    {dLean ? (
+                      <span style={{ color: tomCor(dLean) }} className="font-bold">
+                        massa magra {dLean.label} kg
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })()}
         </div>
 
         <div className="flex flex-col gap-2 mt-1">
