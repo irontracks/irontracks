@@ -156,10 +156,13 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
                   <LabExamMarkersView extracted={viewing.extracted_markers} />
                   {!viewing.protocol ? (
                     <div className="mt-5 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4">
-                      <p className="text-[13px] font-bold text-white">Protocolo ainda não gerado</p>
+                      <p className="text-[13px] font-bold text-white">
+                        {viewing.status === 'failed' ? 'A geração do protocolo falhou' : 'Protocolo ainda não gerado'}
+                      </p>
                       <p className="mt-1 text-[12px] leading-snug text-neutral-400">
-                        Os resultados foram lidos, mas o plano de treino, dieta e suplementação
-                        em cima deles não chegou a ser criado.
+                        {viewing.status === 'failed'
+                          ? 'Seus resultados estão salvos e completos — só o plano em cima deles não foi concluído. Pode tentar de novo.'
+                          : 'Os resultados foram lidos, mas o plano de treino, dieta e suplementação em cima deles não chegou a ser criado.'}
                       </p>
                       {erroProtocolo ? (
                         <p className="mt-2 text-[12px] text-red-400">{erroProtocolo}</p>

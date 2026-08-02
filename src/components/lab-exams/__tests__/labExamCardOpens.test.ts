@@ -28,12 +28,21 @@ describe('card do exame abre os resultados', () => {
         expect(SECTION).toMatch(/viewing && \(viewing\.extracted_markers \|\| viewing\.protocol\)/)
     })
 
+    it('exame FALHO com marcadores também abre', () => {
+        // A rota marca `failed` quando a IA devolve algo fora do schema — mas a
+        // extração já tinha dado certo. Trancar aí esconderia resultados que já
+        // são do usuário E o próprio botão de tentar de novo.
+        expect(CARD).toMatch(/const podeAbrir = \(isDone \|\| isFailed\) && temConteudo/)
+        expect(SECTION).toMatch(/viewing\.status === 'failed'/)
+        expect(SECTION).toMatch(/A geração do protocolo falhou/)
+    })
+
     it('a seta só aparece quando há mesmo o que abrir', () => {
         // Prometer com a seta e não abrir ao toque foi o pior sintoma: a pessoa
         // acha que o app travou.
         expect(CARD).toMatch(/const temConteudo = !!\(exam\.extracted_markers \|\| exam\.protocol\)/)
-        expect(CARD).toMatch(/\{isDone && temConteudo && <ChevronRight/)
-        expect(CARD).toMatch(/disabled=\{!isDone \|\| !temConteudo\}/)
+        expect(CARD).toMatch(/\{podeAbrir && <ChevronRight/)
+        expect(CARD).toMatch(/disabled=\{!podeAbrir\}/)
     })
 
     it('mostra os marcadores, não só o protocolo', () => {
