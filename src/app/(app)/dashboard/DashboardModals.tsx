@@ -6,7 +6,6 @@ import { X, Check, Upload, ArrowLeft, Clock, Dumbbell, Zap, ChevronRight, PlayCi
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import { BackButton } from '@/components/ui/BackButton'
 import { CheckinScale } from '@/components/workout/CheckinScale'
-import { QuickViewExerciseList } from '@/components/dashboard/QuickViewExerciseList'
 import type { AdminUser } from '@/types/admin'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
@@ -23,6 +22,13 @@ const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOve
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 const MothersDayModal = dynamic(() => import('@/components/MothersDayModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
+// Lazy obrigatório: puxa `Reorder` do framer-motion — import estático aqui
+// arrasta a lib inteira pro bundle inicial do dashboard (guard em
+// dashboardModalsLazyBoundary.test.ts).
+const QuickViewExerciseList = dynamic(
+    () => import('@/components/dashboard/QuickViewExerciseList').then((m) => m.QuickViewExerciseList),
+    { ssr: false },
+)
 
 // Helper
 const isRecord = (v: unknown): v is Record<string, unknown> =>
