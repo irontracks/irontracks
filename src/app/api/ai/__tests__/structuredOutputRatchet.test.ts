@@ -23,13 +23,9 @@ import { join } from 'node:path'
 const DEBITO_CONHECIDO = [
     'assessment-report',
     'bia-extract',
-    'exercise-swap',
     'lab-exam-extract',
     'meal-plan',
-    'muscle-map-day',
-    'muscle-map-week',
     'nutrition-weekly-report',
-    'parse-exercise-voice',
     'post-workout-insights',
     'post-workout-meal',
     'scan-nutrition-label',
@@ -72,7 +68,7 @@ describe('rotas de IA: structured output (catraca)', () => {
     })
 
     it('as rotas migradas passam o contrato NA CHAMADA', () => {
-        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation']) {
+        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation', 'parse-exercise-voice', 'exercise-swap', 'muscle-map-day', 'muscle-map-week']) {
             const src = readFileSync(join(AI_DIR, rota, 'route.ts'), 'utf8')
             expect(src, rota).toMatch(/getGeminiModel\([^)]*GenerationConfig\(\)|generationConfig|GenerationConfig\(/)
         }

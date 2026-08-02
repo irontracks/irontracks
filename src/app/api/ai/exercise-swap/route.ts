@@ -5,6 +5,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { swapGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
       '- Sem markdown, sem texto extra, APENAS o JSON array.',
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID, swapGenerationConfig())
     const geminiResult = await safeGemini('exercise-swap', () =>
       model.generateContent(prompt),
     )

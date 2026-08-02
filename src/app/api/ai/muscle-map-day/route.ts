@@ -12,6 +12,7 @@ import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { dailyMuscleMapGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -224,7 +225,7 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
     JSON.stringify(names),
   ].join('\n')
 
-  const model = getGeminiModel(apiKey, MODEL)
+  const model = getGeminiModel(apiKey, MODEL, dailyMuscleMapGenerationConfig())
   const geminiResult = await safeGemini('muscle-map-day:classify', () =>
     model.generateContent(prompt),
   )
