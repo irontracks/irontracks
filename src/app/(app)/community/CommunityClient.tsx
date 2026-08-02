@@ -181,6 +181,10 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
   // ── Profile modal state ──
   const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null)
+  // Estável de propósito: o FeedCard é memoizado (feedCardPropsAreEqual) e uma
+  // arrow inline aqui recriaria a prop a cada render, anulando a memo e fazendo
+  // o feed inteiro re-renderizar a cada tick do poll de presença (30s).
+  const handleProfileClick = useCallback((id: string) => setProfileModalUserId(id), [])
 
   const showMessage = useCallback(
     (text: string) => {
@@ -494,7 +498,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   <GoldGradientBorder>
                     <div>
                       {(feedItems as unknown as FeedItem[]).map((item) => (
-                        <FeedCard key={item.id} item={item} presence={presenceOf(String((item as { senderId?: string }).senderId || ''))} onProfileClick={(id) => setProfileModalUserId(id)} />
+                        <FeedCard key={item.id} item={item} presence={presenceOf(String((item as { senderId?: string }).senderId || ''))} onProfileClick={handleProfileClick} />
                       ))}
                       {feedHasMore && (
                         <button

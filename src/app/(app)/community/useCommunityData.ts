@@ -34,6 +34,38 @@ export type FeedItem = {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Presença — estabilidade de identidade
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza uma lista de user ids para comparação: trim, remove vazios, tira o
+ * próprio usuário, dedup e ORDENA. A ordem crua do servidor não é garantida
+ * (`/api/social/training-now` não tem `.order()`), então sem o sort duas
+ * respostas idênticas viriam "diferentes" e o setState re-renderizaria à toa.
+ */
+export function normalizePresenceIds(raw: unknown, selfId: string): string[] {
+  const arr = Array.isArray(raw) ? raw : []
+  const self = String(selfId || '').trim()
+  const ids = arr.map((v) => String(v ?? '').trim()).filter((id) => id && id !== self)
+  return Array.from(new Set(ids)).sort()
+}
+
+/** Igualdade posicional — só faz sentido sobre listas já normalizadas (ordenadas). */
+export function sameIdList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i])
+}
+
+/**
+ * Devolve a lista ANTERIOR quando o conteúdo não mudou, preservando a
+ * identidade do array. Sem isso, o poll de presença (30s) trocava o estado a
+ * cada tick mesmo sem ninguém entrar/sair — e cada troca re-renderizava o
+ * CommunityClient inteiro (e, antes do React.memo, os 20+ FeedCards junto).
+ */
+export function keepIfUnchanged(prev: string[], next: string[]): string[] {
+  return sameIdList(prev, next) ? prev : next
+}
+
+// ────────────────────────────────────────────────────────────────
 // Hook
 // ────────────────────────────────────────────────────────────────
 
@@ -65,7 +97,6 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
   // no servidor). É um indicador VISUAL no app — não gera push (o "friend_online"
   // como push foi removido por spam). "Treinando" tem prioridade sobre "online".
   const [onlineIds, setOnlineIds] = useState<string[]>([])
-  const [trainingNowProfiles, setTrainingNowProfiles] = useState<ProfileRow[]>([])
 
   // ── Auth ──
   useEffect(() => {
@@ -252,6 +283,10 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
   // A rota já devolve só quem o chamador segue E tem sessão de treino aberta e
   // fresca — o recorte por follow/frescor é server-side, não dá pra fazer no
   // cliente (a RLS de active_workout_sessions não entrega a linha do amigo).
+  // O tick de 30s quase sempre devolve exatamente os mesmos ids. `keepIfUnchanged`
+  // preserva a identidade do array nesse caso, então o React não re-renderiza a
+  // árvore da comunidade à toa. `profiles` NÃO entra nas deps: derivar os perfis
+  // aqui recriava o setInterval a cada carga de perfis (ver useMemo abaixo).
   useEffect(() => {
     if (!userId) return
     let mounted = true
@@ -263,24 +298,27 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
         ])
         if (!mounted) return
         if (trainingRes?.ok) {
-          const ids = (Array.isArray(trainingRes.training) ? trainingRes.training : [])
-            .map((r: unknown) => String((r as { user_id?: string })?.user_id || '').trim())
-            .filter((id: string) => id && id !== userId)
-          setTrainingNowIds(ids)
-          setTrainingNowProfiles(ids.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[])
+          const rows = Array.isArray(trainingRes.training) ? trainingRes.training : []
+          const ids = normalizePresenceIds(rows.map((r: unknown) => (r as { user_id?: string })?.user_id), userId)
+          setTrainingNowIds((prev) => keepIfUnchanged(prev, ids))
         }
         if (onlineRes?.ok) {
-          const ids = (Array.isArray(onlineRes.online_users) ? onlineRes.online_users : [])
-            .map((v: unknown) => String(v || '').trim())
-            .filter((id: string) => id && id !== userId)
-          setOnlineIds(ids)
+          const ids = normalizePresenceIds(onlineRes.online_users, userId)
+          setOnlineIds((prev) => keepIfUnchanged(prev, ids))
         }
       } catch { }
     }
     loadPresence()
     const interval = setInterval(loadPresence, 30_000)
     return () => { mounted = false; clearInterval(interval) }
-  }, [userId, profiles])
+  }, [userId])
+
+  // Derivado (não estado): antes era um setState dentro do poll, o que forçava
+  // `profiles` nas deps do efeito e recriava o intervalo a cada carga de perfis.
+  const trainingNowProfiles = useMemo(
+    () => trainingNowIds.map((id) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[],
+    [trainingNowIds, profiles],
+  )
 
   // ── Actions ──
   const respondFollowRequest = useCallback(async (followerId: string, decision: 'accept' | 'deny') => {
