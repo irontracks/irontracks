@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { errorResponse } from '@/utils/api'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { logWarn } from '@/lib/logger'
+import { waitUntil } from '@vercel/functions'
+import { maybeGrantTrial } from '@/utils/vip/trial'
 import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
@@ -134,6 +136,13 @@ export async function GET() {
     if (userErr || !user?.id) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
+
+    // Trial de 14 dias do Pro no primeiro contato (Fase 1 da tração).
+    // Fora do caminho quente: `waitUntil` segura a instância sem atrasar a
+    // resposta; o resultado vale a partir da PRÓXIMA checagem de feature, que é
+    // onde o VIP é resolvido de verdade (não aqui). Idempotente por dentro —
+    // qualquer entitlement pré-existente desqualifica.
+    waitUntil(maybeGrantTrial(user.id).then(() => undefined).catch(() => undefined))
 
     const cacheKey = `dashboard:bootstrap:${user.id}`
 
