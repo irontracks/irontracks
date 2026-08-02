@@ -24,11 +24,7 @@ const DEBITO_CONHECIDO = [
     'assessment-report',
     'bia-extract',
     'lab-exam-extract',
-    'meal-plan',
-    'nutrition-weekly-report',
     'post-workout-insights',
-    'post-workout-meal',
-    'scan-nutrition-label',
     'student-workout',
     'weekly-report',
     'workout-wizard',
@@ -68,7 +64,7 @@ describe('rotas de IA: structured output (catraca)', () => {
     })
 
     it('as rotas migradas passam o contrato NA CHAMADA', () => {
-        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation', 'parse-exercise-voice', 'exercise-swap', 'muscle-map-day', 'muscle-map-week']) {
+        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation', 'parse-exercise-voice', 'exercise-swap', 'muscle-map-day', 'muscle-map-week', 'scan-nutrition-label', 'post-workout-meal', 'nutrition-weekly-report', 'meal-plan']) {
             const src = readFileSync(join(AI_DIR, rota, 'route.ts'), 'utf8')
             expect(src, rota).toMatch(/getGeminiModel\([^)]*GenerationConfig\(\)|generationConfig|GenerationConfig\(/)
         }

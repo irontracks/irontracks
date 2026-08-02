@@ -128,3 +128,129 @@ export const dailyMuscleMapGenerationConfig = () => ({
     maxOutputTokens: 8000,
     temperature: 0.3,
 })
+
+// ─── Lote 3: rotas de nutrição (02/08/2026) ──────────────────────────────────
+
+// scan-nutrition-label — espelha `LabelSchema`. Os 4 macros são o núcleo
+// (a rota descarta rótulo sem kcal); o resto tem default no Zod, então fica
+// fora do required para o modelo não inventar porção/fibra que não leu.
+export const NUTRITION_LABEL_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        productName: STR,
+        servingSizeG: NUM,
+        kcalPer100g: NUM,
+        proteinPer100g: NUM,
+        carbsPer100g: NUM,
+        fatPer100g: NUM,
+        fiberPer100g: NUM,
+        confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+    },
+    required: ['kcalPer100g', 'proteinPer100g', 'carbsPer100g', 'fatPer100g'],
+    propertyOrdering: ['productName', 'servingSizeG', 'kcalPer100g', 'proteinPer100g', 'carbsPer100g', 'fatPer100g', 'fiberPer100g', 'confidence'],
+} as const
+
+export const nutritionLabelGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: NUTRITION_LABEL_RESPONSE_SCHEMA,
+    // 1024 era o teto antigo da rota; mantido — rótulo é resposta curta.
+    maxOutputTokens: 1024,
+    // visão + thinking consumia o orçamento e truncava (comentário original da rota)
+    thinkingConfig: { thinkingBudget: 0 },
+} as const)
+
+// post-workout-meal — espelha o normalizador inline da rota (name/description/
+// macros/timing/ingredients).
+export const POST_WORKOUT_MEAL_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        name: STR,
+        description: STR,
+        calories: NUM,
+        protein: NUM,
+        carbs: NUM,
+        fat: NUM,
+        timing: STR,
+        ingredients: { type: 'ARRAY', maxItems: 20, items: STR },
+    },
+    required: ['name', 'description', 'calories', 'protein', 'carbs', 'fat', 'timing', 'ingredients'],
+    propertyOrdering: ['name', 'description', 'calories', 'protein', 'carbs', 'fat', 'timing', 'ingredients'],
+} as const
+
+export const postWorkoutMealGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: POST_WORKOUT_MEAL_RESPONSE_SCHEMA,
+    maxOutputTokens: 2000,
+    temperature: 0.6,
+})
+
+// nutrition-weekly-report — espelha `OutputSchema`: summary + 1..5 highlights;
+// `tip` é `.optional()` no Zod, fora do required.
+export const NUTRITION_WEEKLY_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        summary: STR,
+        highlights: { type: 'ARRAY', maxItems: 5, items: STR },
+        tip: STR,
+    },
+    required: ['summary', 'highlights'],
+    propertyOrdering: ['summary', 'highlights', 'tip'],
+} as const
+
+export const nutritionWeeklyGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: NUTRITION_WEEKLY_RESPONSE_SCHEMA,
+    maxOutputTokens: 2000,
+    temperature: 0.6,
+})
+
+// meal-plan — o plano semanal completo. A rota repassa o objeto ao cliente sem
+// Zod próprio; o contrato vira a ÚNICA definição executável da forma (antes ela
+// existia só como texto dentro do prompt).
+const MEAL = {
+    type: 'OBJECT',
+    properties: {
+        name: STR,
+        time: STR,
+        foods: { type: 'ARRAY', maxItems: 15, items: STR },
+        calories: NUM,
+        protein: NUM,
+        carbs: NUM,
+        fat: NUM,
+    },
+    required: ['name', 'time', 'foods', 'calories', 'protein', 'carbs', 'fat'],
+    propertyOrdering: ['name', 'time', 'foods', 'calories', 'protein', 'carbs', 'fat'],
+} as const
+const DAY_PLAN = {
+    type: 'OBJECT',
+    properties: { meals: { type: 'ARRAY', maxItems: 8, items: MEAL } },
+    required: ['meals'],
+} as const
+
+export const MEAL_PLAN_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        planName: STR,
+        dailyCalories: NUM,
+        macros: {
+            type: 'OBJECT',
+            properties: { protein: NUM, carbs: NUM, fat: NUM },
+            required: ['protein', 'carbs', 'fat'],
+            propertyOrdering: ['protein', 'carbs', 'fat'],
+        },
+        trainingDay: DAY_PLAN,
+        restDay: DAY_PLAN,
+        tips: { type: 'ARRAY', maxItems: 5, items: STR },
+        supplements: { type: 'ARRAY', maxItems: 8, items: STR },
+    },
+    required: ['planName', 'dailyCalories', 'macros', 'trainingDay', 'restDay', 'tips', 'supplements'],
+    propertyOrdering: ['planName', 'dailyCalories', 'macros', 'trainingDay', 'restDay', 'tips', 'supplements'],
+} as const
+
+export const mealPlanGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: MEAL_PLAN_RESPONSE_SCHEMA,
+    // 8192 era o teto antigo da rota; plano de 2 dias com 5-6 refeições é longo.
+    maxOutputTokens: 8192,
+    temperature: 0.7,
+})
