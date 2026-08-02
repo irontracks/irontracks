@@ -6,9 +6,10 @@ import { uploadLabExamFile } from '@/utils/storage/labExamUpload'
 import { LAB_EXAM_MAX_FILES, LAB_EXAM_MAX_FILE_BYTES } from '@/types/labExam'
 import { LAB_PROTOCOL_DISCLAIMER, type LabProtocol } from '@/schemas/labExam'
 import { LabExamProtocolView } from './LabExamProtocolView'
+import { VipUpsellCard } from '@/components/vip/VipUpsellCard'
 import { useBackHandler } from '@/hooks/useBackHandler'
 
-type Stage = 'select' | 'processing' | 'result' | 'error'
+type Stage = 'select' | 'processing' | 'result' | 'error' | 'upsell'
 
 interface Props {
   open: boolean
@@ -76,7 +77,13 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
         examDate: examDate || null,
         labName: labName || null,
       })
-      if (!created.ok || !created.id) throw new Error(created.message || created.error || 'Falha ao criar exame.')
+      if (!created.ok || !created.id) {
+        // Segundo exame sem VIP: em vez do X vermelho genérico ("não" seco no
+        // momento de maior desejo — a pessoa está com o PDF na mão), o card de
+        // venda explica o que o VIP destrava. Paywall que vende, 02/08/2026.
+        if (created.error === 'vip_required') { setStage('upsell'); return }
+        throw new Error(created.message || created.error || 'Falha ao criar exame.')
+      }
       const examId = created.id
 
       for (let i = 0; i < files.length; i++) {
@@ -203,6 +210,11 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
 
           {stage === 'result' && protocol ? <LabExamProtocolView protocol={protocol} /> : null}
 
+          {stage === 'upsell' && (
+            <div className="py-4">
+              <VipUpsellCard feature="lab_exams" onDismiss={onClose} />
+            </div>
+          )}
           {stage === 'error' && (
             <div className="py-10 flex flex-col items-center text-center gap-4">
               <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
