@@ -106,6 +106,7 @@
         { "path": "/api/cron/teacher-plan-suspend", "schedule": "0 6 * * *" },
         { "path": "/api/cron/admin-vip-expiring", "schedule": "30 12 * * *" },
         { "path": "/api/cron/muscle-weekly-insights", "schedule": "0 22 * * 0" },
-        { "path": "/api/cron/clean-live-activity-tokens", "schedule": "0 5 * * *" }
+        { "path": "/api/cron/clean-live-activity-tokens", "schedule": "0 5 * * *" },
+        { "path": "/api/cron/telemetry-retention", "schedule": "0 4 * * *" }
     ]
 }
