@@ -92,34 +92,34 @@ async function hydrateWorkouts(
     const workoutIds = base.map((w) => String(w.id ?? '')).filter(Boolean)
     if (workoutIds.length === 0) return base.map((w) => ({ ...w, exercises: [] as Exercise[] }))
 
-    let exercises: Array<Record<string, unknown>> = []
-    try {
-        const { data: exRows } = await supabase
+    // Exercícios e séries EM PARALELO. Antes eram sequenciais porque o filtro
+    // de séries usava os ids dos exercícios; o join `exercises!inner(workout_id)`
+    // (mesmo padrão já usado no servidor, api/dashboard/bootstrap) filtra pelo
+    // workout direto — some a dependência, e com ela metade da latência da
+    // hidratação, que roda várias vezes por boot de professor/admin.
+    const [exResult, setsResult] = await Promise.all([
+        supabase
             .from('exercises')
             .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
             .in('workout_id', workoutIds)
             .order('order', { ascending: true })
             .limit(5000)
-        exercises = Array.isArray(exRows) ? exRows.filter(isRecord) : []
-    } catch {
-        exercises = []
-    }
+            .then((r) => r, () => ({ data: null })),
+        supabase
+            .from('sets')
+            .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, exercises!inner(workout_id)')
+            .in('exercises.workout_id', workoutIds)
+            .order('set_number', { ascending: true })
+            .limit(20000)
+            .then((r) => r, () => ({ data: null })),
+    ])
 
-    const exIds = exercises.map((e) => String(e.id ?? '')).filter(Boolean)
-    let sets: Array<Record<string, unknown>> = []
-    if (exIds.length > 0) {
-        try {
-            const { data: setRows } = await supabase
-                .from('sets')
-                .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config')
-                .in('exercise_id', exIds)
-                .order('set_number', { ascending: true })
-                .limit(20000)
-            sets = Array.isArray(setRows) ? setRows.filter(isRecord) : []
-        } catch {
-            sets = []
-        }
-    }
+    const exercises: Array<Record<string, unknown>> = Array.isArray(exResult?.data)
+        ? exResult.data.filter(isRecord)
+        : []
+    const sets: Array<Record<string, unknown>> = Array.isArray(setsResult?.data)
+        ? setsResult.data.filter(isRecord)
+        : []
 
     const setsByExercise = new Map<string, Array<Record<string, unknown>>>()
     for (const s of sets) {
@@ -504,9 +504,16 @@ export function useWorkoutFetch({
     const role = user?.role ?? 'user'
     const queryKey = useMemo(() => ['workouts', userId, role] as const, [userId, role])
 
+    // Frescor do `initialData`, decidido junto com ele (ver `initial` abaixo):
+    // dado do SSR nasceu NESTE request → é fresco; cache de localStorage pode
+    // ser de dias atrás → precisa refetch imediato. Ref porque o valor é
+    // metadado do Query, não entra em render (nada de hydration mismatch).
+    const initialIsFreshRef = useRef(false)
+
     // Initial data resolver — chamado pelo Query no primeiro mount.
     // Ordem: (1) initialWorkouts via SSR, (2) localStorage cache, (3) legacy localStorage.
     const initial = useMemo<WorkoutFetchResult | undefined>(() => {
+        initialIsFreshRef.current = false
         if (!userId) return undefined
         if (Array.isArray(initialWorkouts) && initialWorkouts.length > 0) {
             const mapped = sortWorkoutsByOrder(initialWorkouts.map((w) => mapWorkoutRow(w)).filter(Boolean) as Array<Record<string, unknown>>)
@@ -515,6 +522,7 @@ export function useWorkoutFetch({
                     acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0),
                 0,
             )
+            initialIsFreshRef.current = true
             return {
                 workouts: mapped,
                 stats: { workouts: mapped.length, exercises: totalEx, activeStreak: 0 },
@@ -538,7 +546,12 @@ export function useWorkoutFetch({
         queryKey,
         enabled: !!userId,
         initialData: initial,
-        initialDataUpdatedAt: 0, // força refetch após mount pra pegar dado fresco
+        // Dado do SSR já nasceu neste request — marcá-lo como "recém-buscado"
+        // evita que o boot refaça no client a MESMA query que o servidor acabou
+        // de fazer (com role admin/teacher isso eram ~8-10 round-trips ao
+        // Supabase, em série, disparados do browser em toda abertura).
+        // Cache de localStorage continua com 0 → refetch imediato, como antes.
+        initialDataUpdatedAt: initialIsFreshRef.current ? Date.now() : 0,
         queryFn: async (): Promise<WorkoutFetchResult> => {
             if (!userId) return { workouts: [], stats: EMPTY_STATS, studentFolders: [] }
 
