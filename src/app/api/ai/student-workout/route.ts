@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { studentWorkoutGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
@@ -157,11 +158,7 @@ export async function POST(req: Request) {
       }),
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID, {
-      maxOutputTokens: 8192,
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-    })
+    const model = getGeminiModel(apiKey, MODEL_ID, studentWorkoutGenerationConfig())
     const geminiResult = await safeGemini('student-workout', () =>
       model.generateContent(prompt),
     )

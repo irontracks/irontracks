@@ -20,14 +20,10 @@ import { join } from 'node:path'
  * - ⛔ ADICIONAR rota à lista é proibido — é regressão de auditoria. A lista
  *   só encolhe.
  */
-const DEBITO_CONHECIDO = [
-    'assessment-report',
-    'bia-extract',
-    'lab-exam-extract',
-    'post-workout-insights',
-    'student-workout',
-    'weekly-report',
-    'workout-wizard',
+const DEBITO_CONHECIDO: string[] = [
+    // 🎉 VAZIA desde 02/08/2026 (lotes 1-4). Toda rota de IA que exige JSON
+    // passa o contrato na chamada. Se uma rota nova aparecer aqui, ela nasceu
+    // sem contrato — corrija a rota, NÃO adicione à lista.
 ].sort()
 
 const AI_DIR = 'src/app/api/ai'
@@ -64,7 +60,7 @@ describe('rotas de IA: structured output (catraca)', () => {
     })
 
     it('as rotas migradas passam o contrato NA CHAMADA', () => {
-        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation', 'parse-exercise-voice', 'exercise-swap', 'muscle-map-day', 'muscle-map-week', 'scan-nutrition-label', 'post-workout-meal', 'nutrition-weekly-report', 'meal-plan']) {
+        for (const rota of ['lab-exam-protocol', 'exercise-muscle-map', 'exercise-muscle-map-backfill', 'body-composition-photo', 'body-composition-correlation', 'parse-exercise-voice', 'exercise-swap', 'muscle-map-day', 'muscle-map-week', 'scan-nutrition-label', 'post-workout-meal', 'nutrition-weekly-report', 'meal-plan', 'assessment-report', 'bia-extract', 'lab-exam-extract', 'post-workout-insights', 'student-workout', 'weekly-report', 'workout-wizard']) {
             const src = readFileSync(join(AI_DIR, rota, 'route.ts'), 'utf8')
             expect(src, rota).toMatch(/getGeminiModel\([^)]*GenerationConfig\(\)|generationConfig|GenerationConfig\(/)
         }

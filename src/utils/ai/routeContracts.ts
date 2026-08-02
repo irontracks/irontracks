@@ -254,3 +254,288 @@ export const mealPlanGenerationConfig = () => ({
     maxOutputTokens: 8192,
     temperature: 0.7,
 })
+
+// ─── Lote 4 (fecha a catraca, 02/08/2026) ────────────────────────────────────
+
+// assessment-report — forma definida no prompt; a rota repassa `report` direto.
+export const ASSESSMENT_REPORT_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        overallScore: NUM,
+        summary: STR,
+        bodyComposition: {
+            type: 'OBJECT',
+            properties: {
+                analysis: STR,
+                trend: { type: 'STRING', enum: ['improving', 'stable', 'declining'] },
+            },
+            required: ['analysis', 'trend'],
+            propertyOrdering: ['analysis', 'trend'],
+        },
+        strengths: { type: 'ARRAY', maxItems: 5, items: STR },
+        improvements: { type: 'ARRAY', maxItems: 5, items: STR },
+        recommendations: {
+            type: 'ARRAY',
+            maxItems: 8,
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    area: STR,
+                    action: STR,
+                    priority: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                },
+                required: ['area', 'action', 'priority'],
+                propertyOrdering: ['area', 'action', 'priority'],
+            },
+        },
+        comparison: STR,
+        goals: { type: 'ARRAY', maxItems: 3, items: STR },
+    },
+    required: ['overallScore', 'summary', 'bodyComposition', 'strengths', 'improvements', 'recommendations', 'comparison', 'goals'],
+    propertyOrdering: ['overallScore', 'summary', 'bodyComposition', 'strengths', 'improvements', 'recommendations', 'comparison', 'goals'],
+} as const
+
+export const assessmentReportGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: ASSESSMENT_REPORT_RESPONSE_SCHEMA,
+    maxOutputTokens: 4000,
+    temperature: 0.6,
+})
+
+// bia-extract — espelha `ExtractionSchema`: 10 medidas ANULÁVEIS. A balança nem
+// sempre imprime tudo; obrigar faria o modelo inventar gordura visceral.
+const BIA_FIELDS = ['weight_kg', 'height_cm', 'age_years', 'body_fat_percentage', 'lean_mass_kg', 'fat_mass_kg', 'water_percentage', 'visceral_fat', 'metabolic_age_years', 'bmr_kcal'] as const
+export const BIA_EXTRACT_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        ...Object.fromEntries(BIA_FIELDS.map((f) => [f, nullable(NUM)])),
+        confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+    },
+    required: [...BIA_FIELDS],
+    propertyOrdering: [...BIA_FIELDS, 'confidence'],
+} as const
+
+export const biaExtractGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: BIA_EXTRACT_RESPONSE_SCHEMA,
+    maxOutputTokens: 1500,
+    // extração de documento: visão + thinking trunca (mesmo caso do rótulo)
+    thinkingConfig: { thinkingBudget: 0 },
+} as const)
+
+// lab-exam-extract — espelha `LabExamExtractedSchema` (schemas/labExam.ts),
+// inclusive os enums de status/categoria do marcador.
+export const LAB_EXTRACT_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        examTypes: { type: 'ARRAY', maxItems: 40, items: STR },
+        markers: {
+            type: 'ARRAY',
+            maxItems: 200,
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    name: STR,
+                    value: nullable(NUM),
+                    unit: nullable(STR),
+                    refMin: nullable(NUM),
+                    refMax: nullable(NUM),
+                    status: { type: 'STRING', enum: ['normal', 'low', 'high', 'critical_low', 'critical_high'] },
+                    category: { type: 'STRING', enum: ['Hemograma', 'Lipídios', 'Glicemia', 'Hormônios', 'Tireoide', 'Vitaminas e Minerais', 'Função Renal', 'Função Hepática', 'Inflamatórios', 'Eletrólitos', 'Outros'] },
+                },
+                required: ['name', 'value', 'unit', 'refMin', 'refMax', 'status', 'category'],
+                propertyOrdering: ['name', 'value', 'unit', 'refMin', 'refMax', 'status', 'category'],
+            },
+        },
+        examDate: nullable(STR),
+        labName: nullable(STR),
+        notes: nullable(STR),
+        confidence: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+    },
+    required: ['examTypes', 'markers', 'examDate', 'labName', 'notes'],
+    propertyOrdering: ['examTypes', 'markers', 'examDate', 'labName', 'notes', 'confidence'],
+} as const
+
+export const labExtractGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: LAB_EXTRACT_RESPONSE_SCHEMA,
+    // painel completo tem até 200 marcadores — teto generoso
+    maxOutputTokens: 16_000,
+    thinkingConfig: { thinkingBudget: 0 },
+} as const)
+
+// post-workout-insights — forma do prompt (rating 0-5, bullets, PRs etc.).
+export const POST_WORKOUT_INSIGHTS_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        rating: NUM,
+        rating_reason: STR,
+        summary: { type: 'ARRAY', maxItems: 6, items: STR },
+        motivation: STR,
+        highlights: { type: 'ARRAY', maxItems: 6, items: STR },
+        warnings: { type: 'ARRAY', maxItems: 4, items: STR },
+        prs: {
+            type: 'ARRAY', maxItems: 10,
+            items: {
+                type: 'OBJECT',
+                properties: { exercise: STR, label: STR, value: STR },
+                required: ['exercise', 'label', 'value'],
+                propertyOrdering: ['exercise', 'label', 'value'],
+            },
+        },
+        progression: {
+            type: 'ARRAY', maxItems: 10,
+            items: {
+                type: 'OBJECT',
+                properties: { exercise: STR, recommendation: STR, reason: STR },
+                required: ['exercise', 'recommendation', 'reason'],
+                propertyOrdering: ['exercise', 'recommendation', 'reason'],
+            },
+        },
+        pain_suggestions: {
+            type: 'ARRAY', maxItems: 6,
+            items: {
+                type: 'OBJECT',
+                properties: { area: STR, suggestion: STR, reason: STR },
+                required: ['area', 'suggestion', 'reason'],
+                propertyOrdering: ['area', 'suggestion', 'reason'],
+            },
+        },
+    },
+    required: ['rating', 'rating_reason', 'summary', 'motivation', 'highlights', 'warnings', 'prs', 'progression', 'pain_suggestions'],
+    propertyOrdering: ['rating', 'rating_reason', 'summary', 'motivation', 'highlights', 'warnings', 'prs', 'progression', 'pain_suggestions'],
+} as const
+
+export const postWorkoutInsightsGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: POST_WORKOUT_INSIGHTS_RESPONSE_SCHEMA,
+    maxOutputTokens: 4000,
+    temperature: 0.6,
+})
+
+// weekly-report — forma do prompt. Os NÚMEROS continuam vindo do servidor: a
+// rota sobrescreve os agregados depois do parse (regra dela, preservada).
+export const WEEKLY_REPORT_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        summary: STR,
+        highlights: { type: 'ARRAY', maxItems: 5, items: STR },
+        warnings: { type: 'ARRAY', maxItems: 3, items: STR },
+        muscleBalance: {
+            type: 'ARRAY', maxItems: 12,
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    group: STR,
+                    status: { type: 'STRING', enum: ['ok', 'deficit', 'excess'] },
+                    suggestion: STR,
+                },
+                required: ['group', 'status', 'suggestion'],
+                propertyOrdering: ['group', 'status', 'suggestion'],
+            },
+        },
+        progressionTips: { type: 'ARRAY', maxItems: 3, items: STR },
+        motivation: STR,
+    },
+    required: ['summary', 'highlights', 'warnings', 'muscleBalance', 'progressionTips', 'motivation'],
+    propertyOrdering: ['summary', 'highlights', 'warnings', 'muscleBalance', 'progressionTips', 'motivation'],
+} as const
+
+export const weeklyReportGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: WEEKLY_REPORT_RESPONSE_SCHEMA,
+    maxOutputTokens: 4000,
+    temperature: 0.6,
+})
+
+// student-workout — plano multi-dia gerado pelo professor.
+const STUDENT_EXERCISE = {
+    type: 'OBJECT',
+    properties: {
+        name: STR,
+        sets: NUM,
+        reps: STR,
+        rest: NUM,
+        method: STR,
+        notes: STR,
+    },
+    required: ['name', 'sets', 'reps', 'rest', 'method', 'notes'],
+    propertyOrdering: ['name', 'sets', 'reps', 'rest', 'method', 'notes'],
+} as const
+
+export const STUDENT_WORKOUT_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        planName: STR,
+        description: STR,
+        days: {
+            type: 'ARRAY', maxItems: 7,
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    name: STR,
+                    exercises: { type: 'ARRAY', maxItems: 15, items: STUDENT_EXERCISE },
+                },
+                required: ['name', 'exercises'],
+                propertyOrdering: ['name', 'exercises'],
+            },
+        },
+        periodization: STR,
+        notes: STR,
+    },
+    required: ['planName', 'description', 'days', 'periodization', 'notes'],
+    propertyOrdering: ['planName', 'description', 'days', 'periodization', 'notes'],
+} as const
+
+export const studentWorkoutGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: STUDENT_WORKOUT_RESPONSE_SCHEMA,
+    maxOutputTokens: 8192,
+    temperature: 0.7,
+})
+
+// workout-wizard — DUAS formas por modo. `notes` fica FORA do required: é
+// `.optional().default('')` no Zod, e obrigar faria o modelo encher linguiça.
+const WIZARD_DRAFT = {
+    type: 'OBJECT',
+    properties: {
+        title: STR,
+        exercises: {
+            type: 'ARRAY', maxItems: 15,
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    name: STR,
+                    sets: NUM,
+                    reps: STR,
+                    restTime: NUM,
+                    notes: STR,
+                },
+                required: ['name', 'sets', 'reps', 'restTime'],
+                propertyOrdering: ['name', 'sets', 'reps', 'restTime', 'notes'],
+            },
+        },
+    },
+    required: ['title', 'exercises'],
+    propertyOrdering: ['title', 'exercises'],
+} as const
+
+export const WIZARD_SINGLE_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: { draft: WIZARD_DRAFT },
+    required: ['draft'],
+} as const
+
+export const WIZARD_PROGRAM_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: { drafts: { type: 'ARRAY', maxItems: 7, items: WIZARD_DRAFT } },
+    required: ['drafts'],
+} as const
+
+export const wizardGenerationConfig = (mode: 'single' | 'program') => ({
+    responseMimeType: 'application/json',
+    responseSchema: mode === 'program' ? WIZARD_PROGRAM_RESPONSE_SCHEMA : WIZARD_SINGLE_RESPONSE_SCHEMA,
+    // teto antigo da rota, preservado ("cap output so a runaway generation returns")
+    maxOutputTokens: 8192,
+    temperature: 0.7,
+})

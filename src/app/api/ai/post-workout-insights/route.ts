@@ -9,6 +9,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { postWorkoutInsightsGenerationConfig } from '@/utils/ai/routeContracts'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
 import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics'
@@ -314,7 +315,7 @@ export async function POST(req: Request) {
       hasPainData ? '\nObservações de dor/desconforto reportadas:\n' + painContext : '',
     ].filter(s => s !== undefined).join('\n')
 
-    const model = getGeminiModel(apiKey, POST_WORKOUT_MODEL)
+    const model = getGeminiModel(apiKey, POST_WORKOUT_MODEL, postWorkoutInsightsGenerationConfig())
     // Retry transient 503/504/timeout with exponential backoff. Never leaks
     // Google's raw error string — errors become canonical 'ai_*' codes that
     // the client translates to pt-BR.

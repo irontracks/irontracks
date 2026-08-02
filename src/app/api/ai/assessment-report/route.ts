@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { assessmentReportGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
       JSON.stringify({ profile, assessments }),
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID, assessmentReportGenerationConfig())
     const geminiResult = await safeGemini('assessment-report', () =>
       model.generateContent(prompt),
     )
