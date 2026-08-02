@@ -13,7 +13,7 @@ import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { isRecord } from '@/utils/guards'
-import { extractJsonFromModelText, normalizeAiMuscleItems, MUSCLE_MAP_JSON_SCHEMA } from '@/utils/ai/exerciseMuscleMapShared'
+import { extractJsonFromModelText, normalizeAiMuscleItems, MUSCLE_MAP_JSON_SCHEMA, muscleMapGenerationConfig } from '@/utils/ai/exerciseMuscleMapShared'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       JSON.stringify(remaining),
     ].join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL)
+    const model = getGeminiModel(apiKey, MODEL, muscleMapGenerationConfig())
     const geminiResult = await safeGemini('exercise-muscle-map', () =>
       model.generateContent(prompt),
     )

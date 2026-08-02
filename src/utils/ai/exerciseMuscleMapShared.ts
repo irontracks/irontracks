@@ -32,6 +32,59 @@ export const MUSCLE_MAP_JSON_SCHEMA = [
 ].join('\n')
 
 /**
+ * Structured output (vai na CHAMADA, não só no texto do prompt).
+ *
+ * Auditoria de 02/08/2026: das 27 rotas de IA, 24 pediam JSON só no prompt — a
+ * mesma classe que produziu o `protocol_failed` dos exames (o modelo caro gasta
+ * budget "pensando" e trunca o JSON; cada retry é chamada paga). Este é o
+ * espelho executável do `MUSCLE_MAP_JSON_SCHEMA` acima; o normalizador continua
+ * sendo o juiz final (filtra muscleId inválido e re-normaliza pesos).
+ */
+export const MUSCLE_MAP_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    items: {
+      type: 'ARRAY',
+      maxItems: 40,
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING' },
+          canonical_name: { type: 'STRING' },
+          contributions: {
+            type: 'ARRAY',
+            maxItems: 12,
+            items: {
+              type: 'OBJECT',
+              properties: {
+                muscleId: { type: 'STRING' },
+                weight: { type: 'NUMBER' },
+                role: { type: 'STRING', enum: ['primary', 'secondary', 'stabilizer'] },
+              },
+              required: ['muscleId', 'weight', 'role'],
+              propertyOrdering: ['muscleId', 'weight', 'role'],
+            },
+          },
+          unilateral: { type: 'BOOLEAN' },
+          confidence: { type: 'NUMBER' },
+          notes: { type: 'STRING' },
+        },
+        required: ['name', 'canonical_name', 'contributions', 'unilateral', 'confidence', 'notes'],
+        propertyOrdering: ['name', 'canonical_name', 'contributions', 'unilateral', 'confidence', 'notes'],
+      },
+    },
+  },
+  required: ['items'],
+} as const
+
+export const muscleMapGenerationConfig = () => ({
+  responseMimeType: 'application/json',
+  responseSchema: MUSCLE_MAP_RESPONSE_SCHEMA,
+  maxOutputTokens: 8000,
+  temperature: 0.3,
+})
+
+/**
  * Normaliza a resposta do modelo em linhas de exercise_muscle_maps.
  * Retorna o array de itens (cada um com exercise_key, canonical_name, mapping,
  * confidence). Filtra muscleId inválidos, pesos não-positivos, e normaliza os
