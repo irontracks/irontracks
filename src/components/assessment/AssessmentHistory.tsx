@@ -312,7 +312,19 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             </h3>
           </div>
           <div id="assessments-history" className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-            {sortedAssessments.map((assessment, idx) => {
+            {/* Mais RECENTE primeiro (pedido do dono, ago/2026): quem abre o
+                histórico quer ver a última avaliação, não rolar meses até o fim.
+                `sortedAssessments` segue crescente porque os GRÁFICOS dependem
+                disso (linha do tempo e `slice(-N)` das mais recentes) — a
+                inversão é só da lista. */}
+            {[...sortedAssessments].reverse().map((assessment, revIdx) => {
+              // Índice na ordem cronológica, para achar a avaliação ANTERIOR.
+              const idx = sortedAssessments.length - 1 - revIdx;
+              // A anterior no TEMPO — base da variação exibida no card. Na lista
+              // invertida ela é a próxima linha, mas o que importa é a data.
+              // `prevInTime` e não `previousAssessment`: esse nome já existe no
+              // escopo do componente (vem do hook) e o shadow confundiria.
+              const prevInTime = idx > 0 ? sortedAssessments[idx - 1] ?? null : null;
               // Resolve a contraparte (full ↔ bia) para essa avaliação. O
               // pareamento é bidirecional: ambos os registros têm
               // paired_assessment_id apontando um pro outro. O lookup é em
@@ -328,6 +340,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                   key={String(assessment?.id ?? idx)}
                   assessment={assessment}
                   pairedAssessment={pairedAssessment}
+                  previousAssessment={prevInTime}
                   idx={idx}
                   isSelected={selectedAssessment === String(assessment?.id ?? idx)}
                   aiPlanState={aiPlanByAssessmentId[String(assessment.id)]}
