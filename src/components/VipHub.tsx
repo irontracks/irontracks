@@ -17,6 +17,7 @@ import { useDialog } from '@/contexts/DialogContext'
 import { useRouter } from 'next/navigation'
 import type { Workout } from '@/types/app'
 import { parseJsonWithSchema } from '@/utils/zod'
+import { parseSseChunk } from '@/utils/ai/sse'
 import { z } from 'zod'
 import { apiVip } from '@/lib/api'
 
@@ -188,8 +189,85 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       const res = await fetch('/api/ai/vip-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, mode }),
+        // stream: o texto aparece conforme o modelo gera (SSE). Erros de gate
+        // (limite/rate/config) continuam chegando como JSON — tratados abaixo.
+        body: JSON.stringify({ message: text, mode, stream: true }),
       })
+
+      // Normaliza campos extras da resposta (workout/actions/etc) — usado
+      // pelos DOIS caminhos (SSE e JSON).
+      const parseAssistantExtras = (src: Record<string, unknown>) => {
+        const dataUsed = Array.isArray(src.dataUsed)
+          ? (src.dataUsed as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object')
+          : []
+        const followUps = Array.isArray(src.followUps)
+          ? (src.followUps as unknown[]).map((f) => String(f || '').trim()).filter(Boolean)
+          : []
+        const actions = Array.isArray(src.actions)
+          ? (src.actions as unknown[])
+            .map((a) => {
+              if (!a || typeof a !== 'object') return null
+              const obj = a as Record<string, unknown>
+              const label = String(obj.label ?? obj.text ?? '').trim()
+              const action = String(obj.action ?? '').trim()
+              if (!label || !action) return null
+              return { ...(obj as ChatAction), label, action }
+            })
+            .filter((a): a is ChatAction => Boolean(a))
+          : []
+        let workoutData: WorkoutData | null = null
+        const wk = src.workout as Record<string, unknown> | null | undefined
+        if (wk?.title && Array.isArray(wk?.exercises) && (wk.exercises as unknown[]).length > 0) {
+          workoutData = wk as unknown as WorkoutData
+        }
+        return { dataUsed, followUps, actions, workoutData }
+      }
+
+      const bumpChatUsage = () => {
+        if (!vipStatus) return
+        setVipStatus(prev => {
+          if (!prev) return null
+          return { ...prev, usage: { ...prev.usage, chat_daily: (prev.usage?.chat_daily || 0) + 1 } }
+        })
+      }
+
+      // ── Caminho SSE: renderiza a resposta conforme chega ──────────────────
+      const isSse = (res.headers.get('content-type') || '').includes('text/event-stream')
+      if (res.ok && isSse && res.body) {
+        const aid = `${id}-a`
+        setMessages((prev) => [...(Array.isArray(prev) ? prev : []), { id: aid, role: 'assistant', text: '' }].slice(-60))
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let restBuf = ''
+        let fullText = ''
+        let doneEvent: Record<string, unknown> | null = null
+        let errorMsg: string | null = null
+        for (let r = await reader.read(); !r.done; r = await reader.read()) {
+          const { events, rest } = parseSseChunk(restBuf, decoder.decode(r.value, { stream: true }))
+          restBuf = rest
+          for (const ev of events) {
+            if (ev.type === 'chunk') {
+              fullText += ev.text
+              const t = fullText
+              setMessages((prev) => prev.map((m) => (m.id === aid ? { ...m, text: t } : m)))
+            } else if (ev.type === 'done') {
+              doneEvent = ev as unknown as Record<string, unknown>
+            } else if (ev.type === 'error') {
+              errorMsg = String(ev.error || 'Falha ao consultar a IA.')
+            }
+          }
+        }
+        if (!fullText.trim()) {
+          setMessages((prev) => prev.map((m) => (m.id === aid ? { ...m, text: errorMsg || 'Falha ao consultar a IA.' } : m)))
+          return
+        }
+        const extras = parseAssistantExtras(doneEvent || {})
+        const finalText = fullText.trim()
+        setMessages((prev) => prev.map((m) => (m.id === aid ? { ...m, text: finalText, ...extras } : m)))
+        bumpChatUsage()
+        return
+      }
+
       const json = await res.json().catch(() => null) as Record<string, unknown> | null
 
       // Handle Limit Reached
@@ -210,55 +288,14 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         setMessages((prev) => [...(Array.isArray(prev) ? prev : []), msg].slice(-60))
         return
       }
-      const dataUsed = Array.isArray(json.dataUsed)
-        ? (json.dataUsed as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object')
-        : []
-      const followUps = Array.isArray(json.followUps)
-        ? (json.followUps as unknown[]).map((f) => String(f || '').trim()).filter(Boolean)
-        : []
-      const actions = Array.isArray(json.actions)
-        ? (json.actions as unknown[])
-          .map((a) => {
-            if (!a || typeof a !== 'object') return null
-            const obj = a as Record<string, unknown>
-            const label = String(obj.label ?? obj.text ?? '').trim()
-            const action = String(obj.action ?? '').trim()
-            if (!label || !action) return null
-            return { ...(obj as ChatAction), label, action }
-          })
-          .filter((a): a is ChatAction => Boolean(a))
-        : []
-      // Extract workout data from API response
-      let workoutData: WorkoutData | null = null
-      const wk = json.workout as Record<string, unknown> | null | undefined
-      if (wk?.title && Array.isArray(wk?.exercises) && (wk.exercises as unknown[]).length > 0) {
-        workoutData = wk as unknown as WorkoutData
-      }
-
       const assistant: ChatMessage = {
         id: `${id}-a`,
         role: 'assistant',
         text: String(json.answer || '').trim(),
-        dataUsed,
-        followUps,
-        actions,
-        workoutData,
+        ...parseAssistantExtras(json),
       }
       setMessages((prev) => [...(Array.isArray(prev) ? prev : []), assistant].slice(-60))
-
-      // Update usage locally
-      if (vipStatus) {
-        setVipStatus(prev => {
-          if (!prev) return null
-          return {
-            ...prev,
-            usage: {
-              ...prev.usage,
-              chat_daily: (prev.usage?.chat_daily || 0) + 1
-            }
-          }
-        })
-      }
+      bumpChatUsage()
 
     } catch (e) {
       logError('component:VipHub.sendChat', e)

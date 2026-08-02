@@ -41,6 +41,12 @@ export interface GeminiResult {
 
 export interface GeminiModelShim {
   generateContent: (contents: GeminiContents) => Promise<GeminiResult>
+  /**
+   * Streaming: itera pedaços de TEXTO conforme o modelo gera. Mesmo fallback
+   * do generateContent, mas só até o 1º chunk — depois que o primário começou
+   * a responder, trocar de modelo no meio duplicaria/misturaria a resposta.
+   */
+  generateContentStream: (contents: GeminiContents) => AsyncGenerator<string, void, unknown>
 }
 
 /**
@@ -78,7 +84,43 @@ export function getGeminiModel(
     return { response: { text: () => text } }
   }
 
+  async function* streamOnce(m: string, contents: GeminiContents): AsyncGenerator<string, void, unknown> {
+    const stream = await ai.models.generateContentStream({
+      model: m,
+      contents,
+      config: buildConfig(m, generationConfig),
+    })
+    for await (const chunk of stream) {
+      const t = typeof chunk?.text === 'string' ? chunk.text : ''
+      if (t) yield t
+    }
+  }
+
   return {
+    async *generateContentStream(contents: GeminiContents): AsyncGenerator<string, void, unknown> {
+      if (model === FALLBACK_MODEL) {
+        yield* streamOnce(model, contents)
+        return
+      }
+      let started = false
+      try {
+        const it = streamOnce(model, contents)[Symbol.asyncIterator]()
+        // Fallback só vale ANTES do 1º chunk: o timeout cobre a espera inicial.
+        const first = await withTimeout(it.next(), PRIMARY_TIMEOUT_MS)
+        if (!first.done) {
+          started = true
+          yield first.value
+          for (let n = await it.next(); !n.done; n = await it.next()) yield n.value
+        }
+      } catch (e) {
+        if (started) throw e
+        try {
+          logWarn('ai:gemini', `Stream ${model} falhou/lento (${(e as Error)?.message || e}); usando ${FALLBACK_MODEL}`)
+        } catch { /* logger nunca quebra o fallback */ }
+        yield* streamOnce(FALLBACK_MODEL, contents)
+      }
+    },
+
     async generateContent(contents: GeminiContents): Promise<GeminiResult> {
       // Já é o fallback → sem race/segunda tentativa.
       if (model === FALLBACK_MODEL) return callOnce(model, contents)
