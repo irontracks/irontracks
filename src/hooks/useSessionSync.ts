@@ -21,6 +21,7 @@ import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { logError, logWarn } from '@/lib/logger'
 import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
+import { diffSessionForSync } from '@/lib/sessionSyncDiff'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -147,6 +148,9 @@ export function useSessionSync({
     // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
     // Used by the Realtime handler as a secondary guard (primary = DEVICE_ID).
     const lastLocalUpsertAtRef = useRef<number>(0)
+    // Último estado que ESTE device gravou no servidor — base do diff que
+    // decide patch (só logs) vs upsert cheio. Ver src/lib/sessionSyncDiff.ts.
+    const lastSyncedStateRef = useRef<Record<string, unknown> | null>(null)
     // Prevents effect #1 from re-running the restore logic if deps change
     // while userId stays the same.
     const restoredForUserRef = useRef<string>('')
@@ -425,6 +429,7 @@ export function useSessionSync({
                     // the workout naturally ends the control session too.
                     const { error } = await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
                     if (error && isMissingTable(error)) notifyMigrationWarning()
+                    lastSyncedStateRef.current = null
                     return
                 }
 
@@ -450,11 +455,37 @@ export function useSessionSync({
                     try {
                         await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
                     } catch (e) { logWarn('useSessionSync', 'start clean-slate delete failed', { error: String(e) }) }
+                    lastSyncedStateRef.current = null // linha apagada — próximo envio é cheio
                     if (serverSessionSyncRef.current.lastKey !== key) return
                 }
 
                 const savedAt = Date.now()
                 const state = { ...(activeSession || {}), _savedAt: savedAt, _deviceId: DEVICE_ID }
+
+                // ── Diff: patch só de logs quando NADA mais mudou ─────────────
+                // Corta o payload dominante do treino em 4G (o `workout` estático
+                // ia inteiro a cada série logada). Qualquer mudança estrutural, e
+                // qualquer falha da RPC, cai no upsert CHEIO logo abaixo — e o
+                // heartbeat de 30s continua snapshot cheio (anti-drift).
+                const plan = diffSessionForSync(lastSyncedStateRef.current, state)
+                if (plan.mode === 'skip') return
+                if (plan.mode === 'patch') {
+                    try {
+                        const { data: patched, error: patchErr } = await supabase.rpc('patch_active_session_logs', {
+                            p_set: plan.set,
+                            p_del: plan.del,
+                            p_saved_at: savedAt,
+                            p_device_id: DEVICE_ID,
+                        })
+                        if (!patchErr && patched === true) {
+                            lastLocalUpsertAtRef.current = savedAt
+                            lastSyncedStateRef.current = state
+                            return
+                        }
+                        // RPC ausente (migration ainda não aplicada), linha sumida ou
+                        // erro → segue pro upsert cheio. NUNCA retorna sem gravar.
+                    } catch (e) { logWarn('useSessionSync', 'patch rpc failed; falling back to full upsert', { error: String(e) }) }
+                }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -470,6 +501,7 @@ export function useSessionSync({
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
                     lastLocalUpsertAtRef.current = savedAt
+                    lastSyncedStateRef.current = state
                 }
             } catch (err) { logWarn('useSessionSync', 'sync upsert failed: ' + String(err)) }
         }
@@ -558,6 +590,8 @@ export function useSessionSync({
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
                     lastLocalUpsertAtRef.current = savedAt
+                    // Snapshot cheio vira a nova base do diff do debounce.
+                    lastSyncedStateRef.current = state as Record<string, unknown>
                 }
             } catch (e) { logError('hook:useSessionSync.heartbeat', e) }
         }
