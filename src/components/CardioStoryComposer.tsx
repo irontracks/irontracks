@@ -66,7 +66,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -183,7 +183,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                     />
 
                     {/* Guias de alinhamento — só durante o arrasto da marca. */}
-                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
+                    <AlignmentGuides x={alignGuides.x} y={alignGuides.y} />
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}

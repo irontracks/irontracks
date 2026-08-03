@@ -60,7 +60,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     metrics: rawMetrics,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -255,7 +255,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                     )}
 
                     {/* Guias de alinhamento — só durante o arrasto da marca. */}
-                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
+                    <AlignmentGuides x={alignGuides.x} y={alignGuides.y} />
 
                   </div>
 

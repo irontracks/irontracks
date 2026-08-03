@@ -12,6 +12,7 @@ import {
   isPointOverBrand,
   measureBrandBox,
   snapBrandToCenter,
+  snapWorkoutOffset,
   BRAND_SNAP_THRESHOLD,
 } from '../../storyComposerUtils'
 import { DEFAULT_STORY_TEMPLATE } from '../storyTemplates'
@@ -277,7 +278,7 @@ describe('fiação dos guias', () => {
     const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
     const at = src.indexOf('const onBrandPointerUp = useCallback')
     const up = src.slice(at, at + 900)
-    expect(up).toMatch(/setBrandGuides\(\{ x: false, y: false \}\)/)
+    expect(up).toMatch(/setAlignGuides\(\{ x: false, y: false \}\)/)
   })
 
   it('o guia não captura pointer — senão mataria o arrasto que o criou', () => {
@@ -292,7 +293,64 @@ describe('fiação dos guias', () => {
       'src/components/CardioStoryComposer.tsx',
     ]) {
       const src = readFileSync(f, 'utf8')
-      expect(src, f).toMatch(/<AlignmentGuides x=\{brandGuides\.x\} y=\{brandGuides\.y\} \/>/)
+      expect(src, f).toMatch(/<AlignmentGuides x=\{alignGuides\.x\} y=\{alignGuides\.y\} \/>/)
     }
+  })
+})
+
+describe('guias do BLOCO (a parte de baixo)', () => {
+  it('gruda no eixo original quando chega perto', () => {
+    // O relato: as linhas só apareciam no IRONTRACKS. O bloco é arrastado pelo
+    // overlay de gesto, que não tinha snap nenhum.
+    const r = snapWorkoutOffset(6, -5)
+    expect(r.snappedX).toBe(true)
+    expect(r.snappedY).toBe(true)
+    expect(r.offsetX).toBe(0)
+    expect(r.offsetY).toBe(0)
+  })
+
+  it('NÃO gruda longe — arrastar de propósito continua livre', () => {
+    const r = snapWorkoutOffset(150, -200)
+    expect(r.snappedX).toBe(false)
+    expect(r.snappedY).toBe(false)
+    expect(r.offsetX).toBe(150)
+    expect(r.offsetY).toBe(-200)
+  })
+
+  it('os eixos são independentes', () => {
+    const r = snapWorkoutOffset(3, 180)
+    expect(r.snappedX).toBe(true)
+    expect(r.offsetX).toBe(0)
+    expect(r.snappedY).toBe(false)
+    expect(r.offsetY).toBe(180)
+  })
+
+  it('usa o mesmo limiar da marca — um app, um comportamento', () => {
+    expect(snapWorkoutOffset(BRAND_SNAP_THRESHOLD - 1, 0).snappedX).toBe(true)
+    expect(snapWorkoutOffset(BRAND_SNAP_THRESHOLD + 2, 0).snappedX).toBe(false)
+  })
+
+  it('entrada inválida não trava o arrasto', () => {
+    const r = snapWorkoutOffset(NaN, NaN)
+    expect(Number.isFinite(r.offsetX)).toBe(true)
+    expect(Number.isFinite(r.offsetY)).toBe(true)
+  })
+
+  it('o hook aplica o snap no pan do bloco', () => {
+    const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
+    expect(src).toMatch(/snapWorkoutOffset\(raw\.offsetX, raw\.offsetY\)/)
+  })
+
+  it('só o eixo X acende linha no bloco — a horizontal mentiria', () => {
+    // A altura de repouso do bloco é a parte de baixo do story, não o meio: a
+    // linha central ali apontaria um alinhamento que não existe.
+    const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
+    expect(src).toMatch(/const next = \{ x: snap\.snappedX, y: false \}/)
+  })
+
+  it('as linhas somem ao terminar o arrasto do bloco', () => {
+    const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
+    const at = src.indexOf('const onWorkoutTouchEnd')
+    expect(src.slice(at, at + 400)).toMatch(/setAlignGuides\(\{ x: false, y: false \}\)/)
   })
 })
