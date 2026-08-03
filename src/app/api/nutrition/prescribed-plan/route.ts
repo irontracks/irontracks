@@ -11,6 +11,11 @@ export const dynamic = 'force-dynamic'
  * O ALUNO lê o plano alimentar ATIVO que o professor prescreveu pra ele. Usa o client
  * autenticado do próprio aluno — a RLS (student_diet_plans_select_own) já garante que ele
  * só enxerga o próprio plano; nada de service-role aqui.
+ *
+ * `created_by <> user_id` é o que separa PRESCRITO de plano que o usuário salvou
+ * sozinho (03/08/2026, quando o self-service ganhou "salvar"). Sem esse filtro, a
+ * dieta que ele mesmo gerou apareceria como recomendação do professor — e o card
+ * de plano prescrito trava a edição, então ele não conseguiria mexer na própria dieta.
  * ────────────────────────────────────────────────────────── */
 
 export async function GET() {
@@ -21,9 +26,10 @@ export async function GET() {
 
     const { data, error } = await auth.supabase
       .from('student_diet_plans')
-      .select('id, plan_name, meals, notes, created_at, updated_at')
+      .select('id, plan_name, meals, days, plan_kind, notes, created_at, updated_at')
       .eq('user_id', userId)
       .eq('status', 'active')
+      .neq('created_by', userId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
