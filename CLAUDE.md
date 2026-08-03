@@ -113,7 +113,34 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 - **App ID:** `com.irontracks.app`. **Web dir do Capacitor:** `out/` (gerado por `next build`).
 
 ## Teste no simulador iOS (o agente verifica sozinho, não o dono)
-**Regra fixa: o agente testa no simulador — não pede pro dono virar QA.** Build p/ simulador:
+**Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
+
+**REGRA DO DONO (03/08/2026): toda mudança que precise de verificação VISUAL termina
+no simulador iOS — abrir, navegar até a tela e conferir com screenshot.** Não vale
+entregar UI descrevendo o que deveria aparecer, nem substituir a conferência por
+mock/teste de render (eles provam comportamento, não o resultado na tela). **Device
+padrão: iPhone 17 Pro Max** — é o aparelho do dono; só usar outro se ele pedir.
+
+**O simulador mostra PRODUÇÃO, não o seu código local.** `capacitor.config.ts` tem
+`url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br'`, então o app
+nativo carrega o front do servidor remoto. Consequências práticas:
+- **Depois do merge**, o simulador confere a mudança de verdade, sem `.env.local` e
+  sem rebuild — basta relançar o app. É o caminho barato e o default.
+- **Antes do merge**, é preciso `CAPACITOR_SERVER_URL=<url do preview da Vercel>` +
+  `npm run cap:sync` + build nova. Só vale quando o risco de mergear errado é alto.
+- Um `.app` já instalado serve para qualquer mudança **web/JS** — não rebuilde à toa.
+
+**Acesso ao device é concedido pelo dono**, uma vez por aparelho, no link
+"Let Claude use it" do painel. Se `attach`/`launch` responder que falta permissão,
+peça — não fique tentando em loop.
+
+**O caminho do bundle MUDA a cada launch.** Pegue com
+`xcrun simctl get_app_container <UDID> com.irontracks.app`; não reaproveite o path
+de antes (falha com `No such file or directory`). Para copiar o app entre
+simuladores: `xcrun simctl install <UDID-destino> "$(xcrun simctl get_app_container
+<UDID-origem> com.irontracks.app)"`.
+
+Build p/ simulador (só quando precisar de código nativo novo):
 ```bash
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
   -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath /tmp/itsim-dd \
