@@ -18,6 +18,7 @@
  * substituto, check-in de hoje) é resolvida na camada de fiação; aqui só a matemática.
  */
 
+import { learnWeightGrid, snapToLearnedGrid } from './machineGrid'
 import { resolveIncrement, roundToIncrement } from './plateMath'
 
 export interface HistorySet {
@@ -81,6 +82,16 @@ export interface SuggestInput {
    * redução pontual, o usuário decide por exercício se o motor novo pode reduzir.
    */
   deloadEnabled?: boolean
+  /**
+   * TODOS os pesos já registrados neste exercício (todas as sessões, não só a
+   * última), para aprender quais cargas a máquina realmente oferece.
+   *
+   * `history` é a ÚLTIMA sessão — serve para calcular QUANTO sugerir. Isto serve
+   * para saber se o número sugerido EXISTE no aparelho: sem ele o motor arredonda
+   * pelo passo genérico do equipamento (5 kg em máquina) e pede 85 kg numa máquina
+   * cujo stack tem 84. Ver `machineGrid.ts`.
+   */
+  knownWeights?: readonly number[] | null
 }
 
 /**
@@ -291,7 +302,16 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   // Substituto → mais conservador: nunca acima da carga âncora do substituto.
   const preRound = input.fromSubstitute ? Math.min(modulated, topWeight) : modulated
 
-  const rounded = roundToIncrement(preRound, roundIncrement, 'down')
+  // Arredondamento em duas camadas.
+  //
+  // 1ª: o GRID APRENDIDO da máquina — os pesos que o usuário já registrou neste
+  // exercício. É a única fonte que sabe que aquele aparelho tem 84 e não 85.
+  // 2ª: o passo por equipamento (plateMath), quando não há grid confiável ou o
+  // alvo caiu num buraco do histórico. É o comportamento anterior, preservado.
+  const learnedGrid = learnWeightGrid(input.knownWeights)
+  const snapped = snapToLearnedGrid(preRound, learnedGrid)
+  const usedLearnedGrid = snapped !== null
+  const rounded = snapped ?? roundToIncrement(preRound, roundIncrement, 'down')
 
   // Trava anti-regressão PÓS-arredondamento: o incremento é um palpite pelo nome do
   // exercício e nem sempre bate com a máquina real (ex.: "Flexora em pé" → passo de
@@ -325,6 +345,9 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   else if (weight === topWeight) parts.push(`mantém ${fmtKg(weight)}kg`)
   else parts.push(`ajustei p/ ${fmtKg(weight)}kg`)
   if (dayNote) parts.push(dayNote)
+  // Transparência: quando o número saiu do grid da máquina (e não do passo genérico),
+  // dizer isso evita o "por que 84 e não 85?" — e mostra que o app aprendeu com ele.
+  if (usedLearnedGrid && weight === rounded) parts.push('ajustado ao peso que essa máquina tem')
   // Deload off e o motor teria reduzido: explica por que segurou (senão o dayNote/
   // prontidão aparecem apontando pra baixo e o número "mantém", contradizendo).
   if (heldByDeloadOff) parts.push('deload desligado — mantida a carga')

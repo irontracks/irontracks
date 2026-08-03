@@ -94,6 +94,30 @@ export function buildHistorySets(item: {
 }
 
 /**
+ * Todos os pesos já registrados no exercício, de TODAS as sessões.
+ *
+ * `pickUsableHistory` devolve uma sessão só — é o que responde "quanto sugerir".
+ * Isto responde outra pergunta: "esse número existe na máquina?". Para aprender o
+ * grid do aparelho (ver `utils/autoload/machineGrid.ts`) quanto mais observação,
+ * melhor, então aqui NÃO se filtra por sessão pulada, deload ou treino: um peso
+ * registrado prova que aquele furo do pino existe, seja qual for o dia.
+ */
+export function collectKnownWeights(
+  items: Array<{ setWeights?: (number | null)[] | null }> | null | undefined,
+): number[] {
+  if (!Array.isArray(items)) return []
+  const out: number[] = []
+  for (const item of items) {
+    const weights = Array.isArray(item?.setWeights) ? item.setWeights : []
+    for (const raw of weights) {
+      const w = asNum(raw)
+      if (w !== null && w > 0) out.push(w)
+    }
+  }
+  return out
+}
+
+/**
  * Escolhe o histórico utilizável: percorre as sessões do exercício da mais recente
  * para a mais antiga e devolve a primeira que produza séries válidas.
  *
@@ -346,6 +370,10 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
         deloadEnabled:
           !deloadOffWorkouts.has(currentWorkoutKey) &&
           !deloadOffSet.has(normalizeExerciseKey(name)),
+        // Grid da máquina: todas as sessões, não só a escolhida acima. Sem isto o
+        // motor arredonda pelo passo genérico do equipamento e sugere um peso que o
+        // aparelho não tem (ver machineGrid.ts).
+        knownWeights: collectKnownWeights(ordered),
       })
 
       // Motor ligado e mesmo assim sem sugestão: warning pesquisável no Sentry.
