@@ -145,7 +145,17 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
     /// Pending always-permission request (resolved in didChangeAuthorization).
     private var pendingAlwaysAuthCall: CAPPluginCall?
     /// Throttle: don't fire more than one geofence notification per N seconds.
-    private var lastGeofenceFireMs: Double = 0
+    ///
+    /// Persisted in UserDefaults, NOT held in memory. The main case for this
+    /// feature is the app being KILLED: iOS relaunches the process just to deliver
+    /// didEnterRegion, which recreates the plugin — an in-memory counter would be
+    /// back to 0 on every single arrival, exactly where the guard is supposed to
+    /// work. (Found 03/08/2026 while auditing why "Auto Check-in" never checked in.)
+    private static let lastGeofenceFireKey = "irontracks.geofence.lastFireMs"
+    private var lastGeofenceFireMs: Double {
+        get { UserDefaults.standard.double(forKey: Self.lastGeofenceFireKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.lastGeofenceFireKey) }
+    }
 
     // ── Cardio GPS state (continuous background tracking) ────────────────────
     /// DEDICATED manager (separate from the geofence one) so cardio's aggressive
@@ -447,7 +457,28 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             options: []
         )
 
-        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory, assumeControlCategory])
+        // Categoria da chegada na academia (geofence). Sem ela a notificação até
+        // aparecia, mas SEM botão: o texto prometia "Toque para iniciar seu treino"
+        // e o toque no corpo era a única saída. .foreground abre o app; o JS trata
+        // pelo type 'gym_geofence' do userInfo (grava o check-in e leva ao dashboard).
+        let startWorkoutAction = UNNotificationAction(
+            identifier: "START_WORKOUT",
+            title: "Iniciar treino",
+            options: [.foreground]
+        )
+        let gymGeofenceCategory = UNNotificationCategory(
+            identifier: "GYM_GEOFENCE",
+            actions: [startWorkoutAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([
+            restCategory,
+            restDayCategory,
+            assumeControlCategory,
+            gymGeofenceCategory,
+        ])
         call.resolve()
     }
 
@@ -1318,9 +1349,13 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         guard region.identifier == "irontracks.gym" else { return }
         // Throttle: ignore re-entries within 4 hours so a user who steps in/out of
         // the door doesn't get spammed. iOS already filters near-instant re-fires
-        // but we add an app-level guard for the long tail.
+        // but we add an app-level guard for the long tail. Survives the app being
+        // killed and relaunched by iOS (see lastGeofenceFireMs).
         let nowMs = Date().timeIntervalSince1970 * 1000
-        if nowMs - lastGeofenceFireMs < 4 * 60 * 60 * 1000 { return }
+        let sinceLast = nowMs - lastGeofenceFireMs
+        // Relógio andou pra trás (usuário mexeu na hora / fuso): trata como expirado
+        // em vez de travar a notificação até o passado alcançar o futuro.
+        if sinceLast >= 0 && sinceLast < 4 * 60 * 60 * 1000 { return }
         lastGeofenceFireMs = nowMs
 
         let gymName = UserDefaults.standard.string(forKey: "irontracks.geofence.gymName") ?? "Academia"
