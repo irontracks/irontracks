@@ -32,6 +32,7 @@ import {
     measureBrandBox,
     snapBrandToCenter,
     snapWorkoutOffset,
+    SAFE_BOTTOM,
     NO_OFFSET,
     type Offset,
     isIOSUserAgent,
@@ -43,6 +44,13 @@ import {
     drawStory,
 } from '../storyComposerUtils'
 import { parseExt, extFromMime, guessMediaKind } from '@/utils/mediaUtils'
+import {
+    clampCustomText,
+    measureCustomTextBox,
+    customTextOverflows,
+    CUSTOM_TEXT_BASE_X,
+    CUSTOM_TEXT_BASE_Y,
+} from './customText'
 import {
     type StoryTemplate,
     STORY_TEMPLATES,
@@ -62,6 +70,12 @@ export type StoryRenderer = (args: {
     workoutTransform?: { scale: number; offsetX: number; offsetY: number }
     /** Posição própria da marca (IRON·TRACKS) — independente do transform geral. */
     brandOffset?: Offset
+    /** Escala própria da marca (pinça sobre o logo). */
+    brandScale?: number
+    /** Legenda livre do usuário, na tipografia do template. */
+    customText?: string
+    /** Posição própria da legenda (arrastável). */
+    customTextOffset?: Offset
 }) => void
 
 interface UseStoryComposerOptions {
@@ -164,6 +178,40 @@ export function useStoryComposer({
      */
     const [alignGuides, setAlignGuides] = useState({ x: false, y: false })
     const alignGuidesRef = useRef(alignGuides)
+
+    /**
+     * Legenda livre do usuário — sai no story na tipografia do template escolhido.
+     * Posição própria e arrastável, como a marca; o export lê pelos REFS.
+     */
+    const [customText, setCustomTextState] = useState('')
+    const customTextRef = useRef(customText)
+    useEffect(() => { customTextRef.current = customText }, [customText])
+    const [customTextOffset, setCustomTextOffset] = useState<Offset>(NO_OFFSET)
+    const customTextOffsetRef = useRef(customTextOffset)
+    useEffect(() => { customTextOffsetRef.current = customTextOffset }, [customTextOffset])
+    const customTextDragRef = useRef<{ pointerId: number | null; startX: number; startY: number; start: Offset }>({
+        pointerId: null, startX: 0, startY: 0, start: NO_OFFSET,
+    })
+
+    /** Aplica o teto de caracteres na ENTRADA — não deixa o estado guardar o excesso. */
+    const setCustomText = useCallback((raw: string) => {
+        setCustomTextState(clampCustomText(raw))
+    }, [])
+
+    /** Caixa da legenda: alimenta a alça de arrasto e o aviso de área segura. */
+    const customTextBox = useMemo(
+        () => measureCustomTextBox(template, customText),
+        [template, customText],
+    )
+
+    /**
+     * A legenda passou da área segura? Avisa, não bloqueia — cortar a frase do
+     * usuário seria pior do que deixá-lo encurtar ou reposicionar.
+     */
+    const customTextOverflowing = useMemo(
+        () => customTextOverflows(customTextBox, customTextOffset, CANVAS_H - SAFE_BOTTOM),
+        [customTextBox, customTextOffset],
+    )
 
     const workoutGestureRef = useRef<{
         /** `brand_pinch`: nasceu sobre a marca — escala só ela. */
@@ -335,7 +383,7 @@ export function useStoryComposer({
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false })
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
         brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
         workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
@@ -527,7 +575,7 @@ export function useStoryComposer({
             setDraggingKey(null)
             // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
             setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-            setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false })
+            setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
             workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
@@ -548,7 +596,7 @@ export function useStoryComposer({
     }, [])
     const resetWorkoutTransform = useCallback(() => {
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false })
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
         workoutGestureRef.current.mode = 'none'
     }, [])
 
@@ -687,6 +735,52 @@ export function useStoryComposer({
         } catch { }
     }, [template])
 
+    // ── Arrasto da LEGENDA (mesma mecânica da marca) ──────────────────────────
+    const onCustomTextPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.setPointerCapture?.(e.pointerId)
+            customTextDragRef.current = {
+                pointerId: e.pointerId, startX: e.clientX, startY: e.clientY,
+                start: customTextOffsetRef.current,
+            }
+        } catch { }
+    }, [])
+
+    const onCustomTextPointerMove = useCallback((e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => {
+        try {
+            const { pointerId, startX, startY, start } = customTextDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const factor = canvasFactor(rect)
+            const raw = dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor)
+
+            // Mesmas guias da marca — a legenda também merece o alinhamento.
+            const box = measureCustomTextBox(template, customTextRef.current)
+            const snap = snapBrandToCenter(raw, box, undefined, CUSTOM_TEXT_BASE_X, CUSTOM_TEXT_BASE_Y)
+            setCustomTextOffset(snap.offset)
+
+            const prev = alignGuidesRef.current
+            if ((snap.snappedX && !prev.x) || (snap.snappedY && !prev.y)) void triggerHaptic('light')
+            if (snap.snappedX !== prev.x || snap.snappedY !== prev.y) {
+                alignGuidesRef.current = { x: snap.snappedX, y: snap.snappedY }
+                setAlignGuides({ x: snap.snappedX, y: snap.snappedY })
+            }
+        } catch { }
+    }, [template])
+
+    const onCustomTextPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            const { pointerId } = customTextDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.releasePointerCapture?.(pointerId)
+            customTextDragRef.current = { pointerId: null, startX: 0, startY: 0, start: customTextOffsetRef.current }
+            alignGuidesRef.current = { x: false, y: false }
+            setAlignGuides({ x: false, y: false })
+        } catch { }
+    }, [])
+
     const onBrandPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
         try {
             const { pointerId } = brandDragRef.current
@@ -716,12 +810,17 @@ export function useStoryComposer({
         ctx: CanvasRenderingContext2D,
         opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
     ) => {
+        // TUDO pelos REFS: o export roda dentro de callbacks que capturam o closure
+        // do render anterior. Ler do state aqui exportaria valores velhos.
         const wt = workoutTransformRef.current
         const bo = brandOffsetRef.current
+        const bs = brandScaleRef.current
+        const ct = customTextRef.current
+        const cto = customTextOffsetRef.current
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto })
         }
     }
 
@@ -992,6 +1091,8 @@ export function useStoryComposer({
         onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
         // marca (IRON·TRACKS) independente
         brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+        customText, setCustomText, customTextOffset, customTextBox, customTextOverflowing,
+        onCustomTextPointerDown, onCustomTextPointerMove, onCustomTextPointerUp,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,

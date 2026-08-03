@@ -8,6 +8,8 @@ import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
 import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
+import { CustomTextDragHandle } from '@/components/stories/CustomTextDragHandle'
+import { CustomTextPanel } from '@/components/stories/CustomTextPanel'
 import { getTemplateById } from '@/components/stories/storyTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -61,6 +63,8 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
     brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    customText, setCustomText, customTextOffset, customTextBox, customTextOverflowing,
+    onCustomTextPointerDown, onCustomTextPointerMove, onCustomTextPointerUp,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -85,11 +89,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset, brandScale })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset, brandScale, customText, customTextOffset })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset, brandScale])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -254,6 +258,15 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       />
                     )}
 
+                    <CustomTextDragHandle
+                      box={customTextBox}
+                      offset={customTextOffset}
+                      previewRef={previewRef}
+                      onPointerDown={onCustomTextPointerDown}
+                      onPointerMove={onCustomTextPointerMove}
+                      onPointerUp={onCustomTextPointerUp}
+                    />
+
                     {/* Guias de alinhamento — só durante o arrasto da marca. */}
                     <AlignmentGuides x={alignGuides.x} y={alignGuides.y} />
 
@@ -308,6 +321,15 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       GUIA {showSafeGuide ? 'ON' : 'OFF'}
                     </button>
                   </div>
+                </div>
+
+                {/* Legenda livre — sai na fonte do template escolhido. */}
+                <div className="w-full max-w-[340px] lg:max-w-none">
+                  <CustomTextPanel
+                    value={customText}
+                    onChange={setCustomText}
+                    overflowing={customTextOverflowing}
+                  />
                 </div>
 
                 {/* Controls Column */}

@@ -8,6 +8,8 @@ import { NutritionStoryControlPanel } from '@/components/stories/NutritionStoryC
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
 import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
+import { CustomTextDragHandle } from '@/components/stories/CustomTextDragHandle'
+import { CustomTextPanel } from '@/components/stories/CustomTextPanel'
 import { CANVAS_W, CANVAS_H, SAFE_TOP, SAFE_BOTTOM, SAFE_SIDE } from './storyComposerUtils'
 import { drawNutritionStory, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
@@ -66,6 +68,8 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
     brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    customText, setCustomText, customTextOffset, customTextBox, customTextOverflowing,
+    onCustomTextPointerDown, onCustomTextPointerMove, onCustomTextPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -89,8 +93,8 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawNutritionStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset, brandScale })
-  }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset, brandScale])
+    drawNutritionStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset })
+  }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset])
 
   if (!open) return null
 
@@ -181,6 +185,15 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       onPointerUp={onBrandPointerUp}
                     />
 
+                    <CustomTextDragHandle
+                      box={customTextBox}
+                      offset={customTextOffset}
+                      previewRef={previewRef}
+                      onPointerDown={onCustomTextPointerDown}
+                      onPointerMove={onCustomTextPointerMove}
+                      onPointerUp={onCustomTextPointerUp}
+                    />
+
                     {/* Guias de alinhamento — só durante o arrasto da marca. */}
                     <AlignmentGuides x={alignGuides.x} y={alignGuides.y} />
                   </div>
@@ -236,6 +249,15 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                 </div>
 
                 {/* Painel de controle */}
+                {/* Legenda livre — sai na fonte do template escolhido. */}
+                <div className="w-full max-w-[340px] lg:max-w-none">
+                  <CustomTextPanel
+                    value={customText}
+                    onChange={setCustomText}
+                    overflowing={customTextOverflowing}
+                  />
+                </div>
+
                 <NutritionStoryControlPanel
                   templates={NUTRITION_STORY_TEMPLATES}
                   templateId={template.id}
