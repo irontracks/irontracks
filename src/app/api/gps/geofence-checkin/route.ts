@@ -24,6 +24,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { respondDbError } from '@/utils/api/dbError'
+import { parseJsonBody } from '@/utils/zod'
 import { matchFavoriteGym } from '@/utils/gps/matchGym'
 
 export const dynamic = 'force-dynamic'
@@ -45,8 +46,8 @@ export async function POST(req: Request) {
   const rl = await checkRateLimitAsync(`gps:geofence-checkin:${auth.user.id}:${ip}`, 5, 60_000)
   if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null))
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'Invalid input' }, { status: 400 })
+  const parsed = await parseJsonBody(req, bodySchema)
+  if (parsed.response || !parsed.data) return parsed.response ?? NextResponse.json({ ok: false, error: 'Invalid input' }, { status: 400 })
   const { name, latitude, longitude } = parsed.data
 
   const { data: gymRows, error: gymsError } = await auth.supabase
