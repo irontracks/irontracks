@@ -207,6 +207,10 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
       // Fallback: use current GPS position
       const pos = await getCurrentPosition()
       if (!pos) {
+        // Saída silenciosa antes: o botão piscava "Salvando..." e voltava ao normal
+        // sem gravar e sem dizer por quê. Quem negou a permissão de localização (ou
+        // está num lugar sem sinal) ficava tentando o mesmo botão.
+        setActionError('Não foi possível obter sua localização. Permita o acesso ao GPS ou escolha a academia na busca acima.')
         setSaving(false)
         return
       }
