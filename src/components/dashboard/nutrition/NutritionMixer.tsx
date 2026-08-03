@@ -9,7 +9,7 @@ import { saveNutritionPhase } from '@/actions/nutrition-actions'
 import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, X } from 'lucide-react'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -885,8 +885,34 @@ export default function NutritionMixer({
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">Macronutrientes</span>
-            <button type="button" onClick={() => setGoalsOpen(v => !v)} className="text-[10px] text-yellow-500 hover:text-yellow-400 uppercase tracking-wider font-bold">
-              {goalsOpen ? '✕ Fechar' : '⚙ Metas'}
+
+            {/* Antes era TEXTO, não botão: 10px, sem borda, sem fundo, sem padding —
+                nada dizia que aquilo era tocável, e o alvo tinha ~12px de altura
+                (a HIG da Apple e o WCAG 2.5.5 pedem 44pt) num app que se usa com a
+                mão suada no meio do treino. O emoji ⚙ ainda renderizava cinza pelo
+                sistema, brigando com o amarelo do rótulo.
+
+                Vira o pill de badge do design system, com ícone lucide como os
+                componentes irmãos. O rótulo NÃO muda ao abrir — trocar "Metas" por
+                "Fechar" quebrava a permanência do objeto; agora só o ícone e o
+                preenchimento mudam, e o estado vai no aria-expanded.
+
+                `before:-inset-2` estende a área de toque para ~44px sem inflar o
+                layout do cabeçalho. */}
+            <button
+              type="button"
+              onClick={() => setGoalsOpen(v => !v)}
+              aria-expanded={goalsOpen}
+              aria-label={goalsOpen ? 'Fechar edição de metas' : 'Editar metas de macronutrientes'}
+              className={`relative inline-flex items-center gap-1.5 h-9 px-3 rounded-full border text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200 active:scale-95 touch-manipulation
+                before:absolute before:-inset-2 before:content-['']
+                ${goalsOpen
+                  ? 'bg-yellow-500 border-yellow-500 text-black'
+                  : 'bg-yellow-500/10 border-yellow-500/25 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500/40'
+                }`}
+            >
+              {goalsOpen ? <X size={13} strokeWidth={2.5} /> : <SlidersHorizontal size={13} strokeWidth={2.5} />}
+              Metas
             </button>
           </div>
           {/* Cores de CATEGORIA, todas da paleta do app e mutuamente distinguíveis.
