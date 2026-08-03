@@ -47,6 +47,8 @@ scripts/        # Scripts de build e utilitários
 
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
 
+**O motor aprende os pesos que a MÁQUINA tem** (`machineGrid.ts`). `plateMath` assume máquina de 5 em 5 kg — falso em boa parte dos aparelhos: a "Mesa flexora" desta base registra 18, 23, 27, 32, 36, 41… (stack em LIBRAS, 10 lb = 4,54 kg), e o motor pedia 20/25/30/35/40, valores que não existem ali. Agora os pesos JÁ REGISTRADOS são a verdade sobre o que é montável (`collectKnownWeights` varre TODAS as sessões, sem filtrar deload/treino — um peso registrado prova que o furo do pino existe). Snap só desce ou iguala; acima do topo extrapola pelo passo aprendido; **desiste (volta ao plateMath) quando o alvo cai num buraco do histórico** — snapar 45 para 30 seria regressão inventada por falta de dado.
+
 **Falha muscular (`log.failure`) alimenta o motor, não é só enfeite.** `suggestWeight` não progride a carga quando a última sessão foi à falha (`anyFailed`). O caminho é longo e já esteve QUEBRADO no meio: log → `useWorkoutDeload` monta `setFailures` no `ReportHistoryItem` → `buildHistorySets` repassa `failed` → motor. Até jul/2026 os dois últimos elos não existiam, então a trava nunca disparava e a carga subia após séries que estouraram. Exibição: `ReportExerciseCard` (marca + contagem) **e** `buildHtml.ts` (PDF) — os dois. **A flag é SEMPRE marcação manual do usuário** — Heavy Duty e Repetições Forçadas vão à falha por definição e deliberadamente NÃO a gravam: se gravassem, a carga congelaria no `topWeight` para sempre e o aluno nunca progrediria nesses métodos (decisão do dono, jul/2026; guard em `set-renderers/__tests__/failureIsManualOnly.test.ts`). Não confundir com `reps_failure`, que é a CONTAGEM de reps até falhar, coletada no modal desses dois.
 
 **`useInputField` (`set-renderers/normalSet.tsx`) — zona de corrida.** Cada input de série tem estado LOCAL porque o ticker de 1s re-renderiza tudo e um input controlado perderia tecla. O efeito de sincronização com o valor externo já jogou fora valor digitado duas vezes: a guarda anti-descarte precisa considerar a **digitação** (`typedAtRef`), não só o blur — com `blurredAtRef` ainda 0, `Date.now() - 0` é gigante e a guarda não pega. Sintoma no device: "digito o RPE e some", só em campos unilaterais (o re-sync do autoload dispara um `updateLog` extra logo após a tecla).
@@ -63,9 +65,31 @@ scripts/        # Scripts de build e utilitários
 
 **Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`). Ao mexer em meta/nutrição, ajuste as DUAS.
 
+**Fase da dieta ≠ objetivo de treino.** `preferences.nutritionPhase` (CUT/MAINTAIN/BULK) é a INTENÇÃO nutricional, escolhida no painel ⚙ Metas; `fitnessGoal` é o objetivo de TREINO. Eram colapsados num só: quem marcava "hipertrofia" recebia BULK (+10% kcal) para sempre, sem ter pedido superávit. Fonte única em `lib/nutrition/phase.ts` (`resolveNutritionPhase` — fase explícita > fitnessGoal, para não mudar a meta de quem já usa o app). `mapFitnessGoal`/`mapGender`/`mapActivityLevel` vivem SÓ lá: já estiveram duplicados entre página e overlay e divergiram (source-guard trava a re-duplicação).
+
+## ⚠️ Editor de Story — três elementos, três espaços, e uma armadilha de canvas
+
+`StoryComposer`/`NutritionStoryComposer`/`CardioStoryComposer` compartilham `useStoryComposer` + os mesmos sub-componentes. **Mexeu num, confira os três** — o padrão aqui é componente único (`BrandDragHandle`, `AlignmentGuides`, `CustomTextDragHandle`, `CustomTextPanel`) justamente para não replicar 3× e divergir.
+
+Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a **legenda** do usuário (`customText.ts`) e o **bloco** (título + cards, movido por `workoutTransform`).
+
+**A armadilha que custou um bug (03/08/2026):** `enterBrandSpace` desfaz o transform do bloco porque a MARCA é desenhada DENTRO dele. A LEGENDA não é — os renderers a desenham depois do `ctx.restore()` que encerra aquele transform. Copiar a inversa para ela deslocava o texto pelo NEGATIVO do pan do bloco: com o bloco arrastado, a legenda sumia da tela **enquanto a alça (HTML) continuava no lugar certo**. Sintoma: traçado visível, texto invisível.
+
+**Caixa de elemento = TINTA, não em-box.** `measureBrandBox`/`measureCustomTextBox` usam `actualBoundingBoxAscent/Descent` e devolvem `dx`/`dy` (âncora → canto do traçado). Com `textBaseline='top'` o ponto de desenho é o topo da em-box e as maiúsculas começam abaixo — ancorar ali deixa um vão visível. **A alça e o hit-test do gesto usam o MESMO retângulo**; divergir faz o usuário mirar num lugar e acertar outro.
+
+**Alças em % do CANVAS, nunca px de tela.** `marginLeft: '-6px'` somado a `width` em % do canvas valia 14,4px de canvas numa preview de ~300px — e mudava com o tamanho do preview.
+
+**O EXPORT lê tudo por REF** (`renderComposite`). Já esqueceu `brandScale` uma vez: a escala da marca aparecia na prévia e SUMIA no arquivo salvo. Campo novo no desenho = adicionar ali também, senão só a prévia mostra.
+
+**Ciclo de import:** `customText.ts` REPETE `CANVAS_W/H`/`SAFE_SIDE` de propósito — `storyComposerUtils` importa o desenho de lá, e importar de volta faria as constantes (lidas no topo) chegarem `undefined`, virando NaN na âncora e sumindo a legenda SEM erro. Guard trava a igualdade.
+
+**Gestos:** o gesto pertence a quem ele NASCE em cima (`isPointOverBrand`) — sem isso a pinça no logo escalava o story inteiro, porque o 2º dedo cai fora da caixa pequena da marca e o overlay assumia. Guias de alinhamento (`snapBrandToCenter`) grudam no centro; no BLOCO o alvo é o offset ZERO (ele não tem caixa estável — cada layout desenha em coordenadas próprias) e só o eixo X acende linha, porque a altura de repouso dele não é o meio da tela.
+
 **Treino em dupla** (atrás da flag `featureTeamworkV2`) — ⚠️ **AS TABELAS NÃO EXISTEM NO BANCO (verificado 02/08/2026).** `information_schema` não retorna NADA com "team"/"invite" em nenhum schema, e a RPC `can_view_team_session` também sumiu. O código, os hooks e a flag continuam no repo (1 conta com a flag ON), mas em produção a feature quebra com "relation does not exist" — ela não pode estar funcionando. Suspeita não confirmada: perda na reescrita de histórico do repo (a mesma que fechou os PRs #323/#336 e gerou os recriados #505/#506). **Antes de mexer em qualquer coisa dessa área, investigue as migrations e descubra quando/por que as tabelas saíram — não recrie de memória a partir deste parágrafo.** Bloqueia o PR #506 (tornar o canal `team_logs` privado): marcar `private: true` sem as policies de `realtime.messages` — que também não existem — derruba o sync em vez de protegê-lo. A descrição abaixo é o desenho ORIGINAL da feature, mantido como referência do que deveria existir: `contexts/TeamWorkoutContext.tsx` compõe os hooks de `contexts/team/*` (invites/session/presence/broadcast). Tabelas c/ RLS e na publication realtime: `invites`, `team_sessions`, `team_session_presence`, `team_chat_messages`. RPCs SECURITY DEFINER: `accept_team_invite`, `leave_team_session`, `can_view_team_session`. Participantes são gravados como `{uid,name,photo}` no banco mas lidos como `{user_id,display_name,photo_url}` no cliente → **sempre use `normalizeParticipant`** (`contexts/team/types.ts`). Sync ao vivo é **broadcast efêmero** do Supabase (sem replay — perde eventos se o parceiro fica em background). Máx. 5 participantes (`MAX_TEAM_PARTICIPANTS`, host incluso).
 
 **Dashboard shell:** `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx` é o client component central; navega por estado `view` ('dashboard'|'active'|'edit'|'assessments'|'community'|'vip'). Boot: `/api/dashboard/bootstrap` (RPC `get_dashboard_bootstrap`) + `useBootstrap` + `useWorkoutFetch`. **Toda hidratação da lista de treinos (SSR inicial, bootstrap, refetch) deve ordenar por `sortWorkoutsByOrder`** (`utils/mapWorkoutRow.ts`) — senão a lista pisca desordenada.
+
+**Contexto do coach (`utils/ai/userContext.ts`) — as 12 rotas de IA bebem daqui.** O setor `profile` lia SÓ de `vip_profile`, tabela do fluxo VIP com 3 linhas para 57 contas: o bloco `[PERFIL E OBJETIVO]` chegava VAZIO para ~95% dos usuários, e o coach respondia sem saber objetivo, nível nem antropometria. Agora lê também `user_settings.preferences` (objetivo de treino, fase da dieta, nível, antropometria rotulada como "declarado" para não competir com a AVALIAÇÃO medida). Sem `nutrition_goals` salvo, a meta é derivada do TDEE e rotulada — antes o coach ficava sem meta nenhuma e podia contradizer o número na tela do usuário. `preferences` é lido UMA vez por chamada e repassado aos setores.
 
 **Saída de IA: structured output + "normalize, depois valide".** Pedir JSON só no TEXTO do prompt e validar com Zod `.max()` NÃO funciona — medido em jul/2026 na Avaliação por Foto: 8 de 12 chamadas ao `gemini-2.5-flash` reprovavam no `safeParse` (JSON com `}` faltando; strings acima do teto, ex. `action` de 343 num limite de 300) e o usuário via "Não consegui gerar a correlação". Padrão correto, implementado em `utils/bodyPhoto/aiContract.ts`: (1) `responseMimeType: 'application/json'` + `responseSchema` na CHAMADA (derruba o JSON inválido a zero); (2) normalizador que TRUNCA (`utils/ai/coerce.ts`) — structured output não garante `maxLength`; (3) só então o schema estrito, como juiz. `utils/ai/extractJson.ts` ainda REPARA JSON quebrado (fonte única, beneficia todas as rotas). Os limites moram num só lugar (`LAUDO_LIMITS`/`CORRELATION_LIMITS` em `types/bodyPhotoAssessment.ts`) e alimentam Zod + responseSchema + normalizador. **As outras rotas de `api/ai/` ainda usam o padrão antigo** — mesma classe de falha, ainda não migradas.
 
@@ -82,6 +106,20 @@ scripts/        # Scripts de build e utilitários
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
+
+## Suíte de testes — DOIS projetos por ambiente
+
+`vitest.config.ts` roda `.test.tsx` em **jsdom** e `.test.ts` em **node** (2,5× mais rápida: 322s → ~120s). `.test.ts` que mexa em DOM precisa estar em **`vitest.domTests.ts`**, senão quebra com um confuso `document is not defined` — o guard `src/__tests__/vitestDomProjectList.test.ts` cobra a lista e falha com a instrução exata.
+
+`testTimeout` é **15s**, não o default de 5s: a suíte falhava de forma NÃO determinística porque o primeiro caso de um arquivo com `await import()` dinâmico levava 6s sob contenção (isolado roda em 1,3s). Timeout serve para pegar teste TRAVADO, não teste lento sob carga.
+
+## Guard falso — os três jeitos de errar que já aconteceram aqui
+
+Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padrões que passaram verdes COM o bug presente:
+
+1. **Tautológico** — assertar `toBe(MIN_MINI_SETS)` em vez do literal `2`: baixar a constante muda a expectativa junto.
+2. **Acusando o próprio comentário** — source-guard que procura o padrão proibido e casa com a documentação que explica por que ele é proibido. Reduza ao código executável (fora comentário, string, template, regex) antes de casar.
+3. **Cobrindo as pontas e não a fiação** — algoritmo e coletor corretos isoladamente, e ninguém ligando os dois. Foi assim que remover `knownWeights` da chamada no hook deixou 198 testes verdes.
 
 ## Checklist obrigatório antes de declarar qualquer tarefa concluída
 1. **TypeScript:** `npx tsc --noEmit` — zero erros, sem exceção.
@@ -114,6 +152,10 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 
 ## Teste no simulador iOS (o agente verifica sozinho, não o dono)
 **Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
+
+**Caminho do editor de Story** (leva tempo achar às cegas): menu do avatar → **Histórico** → abrir um treino → botão **STORY** no topo. O ícone de compartilhar do card de treino é export PDF/JSON, não é o composer.
+
+**Teste de canvas NÃO prova rendering.** jsdom não implementa `canvas.getContext('2d')`, então `measureText`/matrizes caem em fallback e o teste passa verde com o desenho quebrado. Foi assim que a legenda do Story subiu com 23 guards verdes e o texto invisível no aparelho. Em qualquer coisa que DESENHE, o guard cobre o algoritmo e a fiação; o resultado na tela é conferência visual — declare o limite no próprio arquivo de teste.
 
 **REGRA DO DONO (03/08/2026): toda mudança que precise de verificação VISUAL termina
 no simulador iOS — abrir, navegar até a tela e conferir com screenshot.** Não vale
@@ -151,6 +193,14 @@ Depois instala o `.app` de `/tmp/itsim-dd/Build/Products/Debug-iphonesimulator/A
 **⚠️ SEMPRE CANCELAR o treino de teste — NUNCA finalizar.** O simulador loga numa conta REAL (dados de produção). Finalizar grava um treino falso no histórico do dono e polui o `reportHistory` que alimenta o autoload. Usar o **X → Confirmar** ("não salva no histórico"). O mesmo vale pra qualquer escrita: preferir fluxos reversíveis.
 
 **Limitação conhecida:** com `CODE_SIGNING_ALLOWED=NO` a extensão do widget não registra as `ActivityConfiguration` — o log mostra `activitykit … Fetched descriptors for content states: []` e **a Live Activity não renderiza no simulador**. Isso é do build, NÃO é regressão. Não tire conclusão sobre a Ilha Dinâmica a partir do simulador.
+
+## Descanso do treino — ações nativas chegam ATRASADAS
+
+`REST_DONE` ("Iniciar Serie") e `SKIP_REST` ("Pular Descanso") são botões da notificação de tela bloqueada e ENCERRAM o descanso. **O iOS enfileira essas ações quando o app está suspenso** e as entrega quando ele acorda — depois de o usuário já ter concluído a série seguinte. Resultado relatado em treino: "aperto concluir e vai direto pro tempo de treino", intermitente e sempre na 1ª série do exercício (a que vem logo após o descanso anterior).
+
+Guarda em `useNativeTimerActions`: ação nativa não encerra descanso com menos de 3s de vida — ninguém conclui uma série e decide pular o descanso no mesmo segundo. A decisão é tomada DENTRO do updater do `setState` (ler da closure devolveria o estado do render anterior). Descartes viram `logWarnRemote('workout.rest.native-action-ignored')`.
+
+**Rest-Pause:** piso de 2 minis (`helpers/restPauseRules.ts`) — com uma mini-série o método deixa de existir. `planned_mini_sets` guardava `miniReps.length`, ou seja, o PREENCHIDO sobrescrevia o PLANEJADO e um dia incompleto rebaixava o plano do exercício para sempre.
 
 ## ⚠️ Live Activity (Ilha Dinâmica + tela bloqueada) — ZONA DE NÃO MEXER
 **Esta área já quebrou 12+ vezes, sempre EM SILÊNCIO.** Antes de tocar em qualquer coisa aqui, rode `npx vitest run src/hooks/__tests__/liveActivityRegressionGuards.test.ts` e `.../liveActivityTelemetry.test.ts`. Se um guard falhar, você está reintroduzindo uma regressão conhecida — **corrija o código, não afrouxe o teste.**
