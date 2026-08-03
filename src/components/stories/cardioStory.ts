@@ -120,6 +120,7 @@ export const drawCardioStory = ({
   template,
   workoutTransform,
   brandOffset,
+  brandScale,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -133,6 +134,8 @@ export const drawCardioStory = ({
   workoutTransform?: { scale: number; offsetX: number; offsetY: number }
   /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
   brandOffset?: { x: number; y: number }
+  /** Escala própria da marca (pinça sobre o logo) — só ela cresce. */
+  brandScale?: number
 }) => {
   const C = template.colors
   const F = template.fonts
@@ -193,7 +196,7 @@ export const drawCardioStory = ({
   ctx.save()
   // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
   // dela (independência total do resto do story).
-  enterBrandSpace(ctx, wt, bOff)
+  enterBrandSpace(ctx, wt, bOff, brandScale)
   ctx.shadowColor = 'rgba(0,0,0,0.6)'
   ctx.shadowBlur = 12
   ctx.textBaseline = 'top'

@@ -65,7 +65,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -89,8 +89,8 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawCardioStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset })
-  }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset])
+    drawCardioStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset, brandScale })
+  }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset, brandScale])
 
   if (!open) return null
 
@@ -159,7 +159,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                     {/* Pinça (2 dedos) = zoom · arrasto (1 dedo) = mover o card (a foto/vídeo fica fixo) */}
                     <div
                       className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
-                      onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
+                      onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
                       onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
                       onTouchEnd={onWorkoutTouchEnd}
                       onTouchCancel={onWorkoutTouchEnd}
@@ -173,6 +173,8 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                     {/* Alça da MARCA — arrasta o IRON·TRACKS sozinho, fora do bloco */}
                     <BrandDragHandle
                       brandOffset={brandOffset}
+                      brandScale={brandScale}
+                      template={template}
                       previewRef={previewRef}
                       onPointerDown={onBrandPointerDown}
                       onPointerMove={onBrandPointerMove}

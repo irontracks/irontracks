@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { CANVAS_W, CANVAS_H, brandHandlePct } from '../storyComposerUtils'
+import { CANVAS_W, CANVAS_H, brandHandlePct, measureBrandBox } from '../storyComposerUtils'
+import type { StoryTemplate } from './storyTemplates'
 
 /**
  * Alça de arrasto da MARCA (IRON·TRACKS) sobre a prévia do story.
@@ -18,12 +19,12 @@ import { CANVAS_W, CANVAS_H, brandHandlePct } from '../storyComposerUtils'
  * consomem o MESMO handle, para não repetir a alça 3× e divergirem em silêncio.
  */
 
-/** Caixa aproximada da marca no canvas (largura do "IRON·TRACKS" + folga). */
-const BRAND_BOX_W = 380
-const BRAND_BOX_H = 66
-
 interface BrandDragHandleProps {
     brandOffset: { x: number; y: number }
+    /** Escala própria da marca — a caixa cresce junto, senão o traçado descola. */
+    brandScale?: number
+    /** Necessário para MEDIR a marca: a largura depende da fonte e do separador. */
+    template: StoryTemplate
     previewRef: React.RefObject<HTMLDivElement | null>
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => void
     onPointerMove: (e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => void
@@ -31,10 +32,20 @@ interface BrandDragHandleProps {
 }
 
 export function BrandDragHandle({
-    brandOffset, previewRef,
+    brandOffset, brandScale = 1, template, previewRef,
     onPointerDown, onPointerMove, onPointerUp,
 }: BrandDragHandleProps) {
     const pct = brandHandlePct(brandOffset)
+    // Caixa MEDIDA com a mesma fonte do desenho. Antes eram 380×66 chumbados, e o
+    // traçado aparecia deslocado do logo — a largura muda com a fonte do template e
+    // com o separador (`brandDivider`), então nenhum número fixo serve. (print do
+    // dono, 03/08/2026)
+    const box = React.useMemo(
+        () => measureBrandBox(template, brandScale),
+        [template, brandScale],
+    )
+    const BRAND_BOX_W = box.w
+    const BRAND_BOX_H = box.h
 
     return (
         <button

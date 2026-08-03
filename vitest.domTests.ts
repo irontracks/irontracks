@@ -20,6 +20,7 @@ export const DOM_TEST_FILES = [
   'src/components/workout/__tests__/reportCacheUserScope.test.ts',
   'src/components/workout/hooks/__tests__/methodSaverWeightSource.test.ts',
   'src/hooks/__tests__/liveActivityRegressionGuards.test.ts',
+  'src/components/stories/__tests__/brandBoxAndPinch.test.ts',
   'src/hooks/__tests__/nativeTimerActionRace.test.ts',
   'src/hooks/__tests__/useAppStoreUpdateCheck.test.ts',
   'src/hooks/__tests__/useBodyPhotoHistory.test.ts',

@@ -388,6 +388,7 @@ export const drawStory = ({
     template = DEFAULT_STORY_TEMPLATE,
     workoutTransform,
     brandOffset,
+    brandScale,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -403,6 +404,8 @@ export const drawStory = ({
     workoutTransform?: { scale: number; offsetX: number; offsetY: number };
     /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
     brandOffset?: { x: number; y: number };
+    /** Escala própria da marca (pinça sobre o logo). */
+    brandScale?: number;
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
     // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
@@ -619,7 +622,7 @@ export const drawStory = ({
         ctx.save();
         // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o
         // offset dela (independência total do resto do story).
-        enterBrandSpace(ctx, wt, bOff);
+        enterBrandSpace(ctx, wt, bOff, brandScale);
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 12;
         ctx.font = f(F.brandWeight, bSize, F.brandStyle);
@@ -763,7 +766,7 @@ export const drawStory = ({
     ctx.save();
     // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
     // dela (independência total do resto do story).
-    enterBrandSpace(ctx, wt, bOff);
+    enterBrandSpace(ctx, wt, bOff, brandScale);
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
@@ -996,10 +999,107 @@ export const NO_OFFSET: Offset = { x: 0, y: 0 }
 export const BRAND_BASE_X = SAFE_SIDE
 export const BRAND_BASE_Y = SAFE_TOP + 18
 
+/** Corpo da fonte da marca — o mesmo `brandFontSize` usado ao desenhar. */
+export const BRAND_FONT_SIZE = 54
+
+/**
+ * Caixa REAL ocupada pela marca no canvas, medida com a mesma fonte do desenho.
+ *
+ * Existe porque a alça de arrasto usava 380×66 chumbado, e a caixa tracejada
+ * aparecia deslocada do logo (print do dono, 03/08/2026). A largura do
+ * "IRONTRACKS" depende da fonte do template e do separador (`brandDivider`, que
+ * varia entre '', ' · ', ' — ', ' / '), então nenhum número fixo acerta em todos.
+ *
+ * A mesma caixa também decide, no overlay de gesto, se a pinça é da MARCA ou do
+ * bloco — daí ela precisar ser fiel, e não aproximada.
+ *
+ * Mede num canvas offscreen. Sem canvas disponível (SSR), cai num tamanho
+ * conservador em vez de lançar.
+ */
+export const measureBrandBox = (
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string },
+    scale = 1,
+): { w: number; h: number } => {
+    const s = Number.isFinite(scale) && scale > 0 ? scale : 1
+    const fallback = { w: 380 * s, h: (BRAND_FONT_SIZE + 12) * s }
+    try {
+        if (typeof document === 'undefined') return fallback
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return fallback
+
+        const F = template.fonts
+        const style = F.brandStyle ?? 'normal'
+        ctx.font = storyFont(F.family, F.brandWeight, BRAND_FONT_SIZE, style)
+        const ironW = ctx.measureText('IRON').width
+        const tracksW = ctx.measureText('TRACKS').width
+
+        const divider = template.brandDivider ?? ''
+        let dividerW = 0
+        if (divider) {
+            ctx.font = storyFont(F.family, F.brandWeight, Math.round(BRAND_FONT_SIZE * 0.55), style)
+            dividerW = ctx.measureText(divider).width
+        }
+
+        const w = ironW + dividerW + tracksW
+        if (!Number.isFinite(w) || w <= 0) return fallback
+        // Folga: a marca leva sombra (shadowBlur 12) e o alvo de toque não pode
+        // ficar colado no glifo.
+        return { w: (w + 16) * s, h: (BRAND_FONT_SIZE + 12) * s }
+    } catch {
+        return fallback
+    }
+}
+
 export const clampBrandOffset = (o: Offset | null | undefined): Offset => ({
     x: clampWorkoutOffset(Number(o?.x) || 0),
     y: clampWorkoutOffset(Number(o?.y) || 0),
 })
+
+/**
+ * Faixa da escala PRÓPRIA da marca. Teto menor que o do bloco: a marca é assinatura,
+ * não conteúdo — passar disso ela invade o story em vez de assinar. Piso em 0,5 para
+ * continuar legível e clicável.
+ */
+export const BRAND_SCALE_MIN = 0.5
+export const BRAND_SCALE_MAX = 2.5
+export const clampBrandScale = (s: number | null | undefined): number => {
+    const n = Number(s)
+    if (!Number.isFinite(n) || n <= 0) return 1
+    return Math.min(BRAND_SCALE_MAX, Math.max(BRAND_SCALE_MIN, n))
+}
+
+/**
+ * O ponto (em px de TELA) caiu sobre a marca?
+ *
+ * Decide de quem é o gesto de pinça: da marca ou do bloco. Sem isso, pinçar o logo
+ * escalava o story inteiro — a caixa da marca é pequena, o segundo dedo cai fora
+ * dela, e o overlay de gesto assumia o comando (print do dono, 03/08/2026).
+ *
+ * Usa a caixa MEDIDA (`measureBrandBox`), a mesma do traçado da alça: se as duas
+ * divergirem, o usuário vê um alvo e acerta outro.
+ */
+export const isPointOverBrand = (
+    clientX: number,
+    clientY: number,
+    rect: DOMRect | null | undefined,
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string } | null | undefined,
+    brandOffset: Offset | null | undefined,
+    brandScale?: number | null,
+): boolean => {
+    if (!rect || rect.width <= 0 || rect.height <= 0 || !template) return false
+    const scaleX = CANVAS_W / rect.width
+    const scaleY = CANVAS_H / rect.height
+    // Tela → canvas.
+    const cx = (clientX - rect.left) * scaleX
+    const cy = (clientY - rect.top) * scaleY
+
+    const b = clampBrandOffset(brandOffset)
+    const box = measureBrandBox(template, clampBrandScale(brandScale))
+    const x0 = BRAND_BASE_X + b.x
+    const y0 = BRAND_BASE_Y + b.y
+    return cx >= x0 && cx <= x0 + box.w && cy >= y0 && cy <= y0 + box.h
+}
 
 /**
  * Onde a alça da marca cai no preview (fração 0..1 do lado). NÃO depende do
@@ -1037,6 +1137,7 @@ export const enterBrandSpace = (
     ctx: CanvasRenderingContext2D,
     workoutTransform: { scale: number; offsetX: number; offsetY: number } | null | undefined,
     brandOffset: Offset | null | undefined,
+    brandScale?: number | null,
 ): void => {
     const s = clampWorkoutScale(Number(workoutTransform?.scale) || 1)
     const offX = Number(workoutTransform?.offsetX) || 0
@@ -1051,4 +1152,16 @@ export const enterBrandSpace = (
     if (offX !== 0 || offY !== 0) ctx.translate(-offX, -offY)
     const b = clampBrandOffset(brandOffset)
     if (b.x !== 0 || b.y !== 0) ctx.translate(b.x, b.y)
+
+    // Escala PRÓPRIA da marca, com pivô na âncora dela (canto superior esquerdo do
+    // logo) para que crescer não a arraste para fora da área segura. Aplicada por
+    // último, depois de desfazer o transform do bloco: é o que permite pinçar a
+    // marca sem mexer no resto. (pedido do dono, 03/08/2026 — antes a pinça sobre o
+    // logo escalava todas as peças)
+    const bs = clampBrandScale(brandScale)
+    if (bs !== 1) {
+        ctx.translate(BRAND_BASE_X, BRAND_BASE_Y)
+        ctx.scale(bs, bs)
+        ctx.translate(-BRAND_BASE_X, -BRAND_BASE_Y)
+    }
 }
