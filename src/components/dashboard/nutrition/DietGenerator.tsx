@@ -48,10 +48,17 @@ export default function DietGenerator({
   const [appliedIdx, setAppliedIdx] = useState<Set<number>>(new Set())
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null)
   const [openMeal, setOpenMeal] = useState<number | null>(null)
+  // Salvar ≠ lançar: lançar joga a refeição no diário de HOJE; salvar guarda o
+  // cardápio pra seguir depois. Antes só existia o lançar, e o plano sumia ao fechar.
+  const [saving, setSaving] = useState(false)
+  const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
 
   const generate = useCallback(async () => {
     if (busy) return
     setBusy(true); setError(null); setUpgrade(false); setPlan(null); setAppliedIdx(new Set()); setOpenMeal(null)
+    // Gerou outra? O "salvo" some — senão o selo verde fica dizendo que este
+    // cardápio novo está guardado, quando o guardado é o anterior.
+    setSavedPlanId(null)
     try {
       const res = await fetch('/api/ai/diet-generate', {
         method: 'POST',
@@ -77,6 +84,43 @@ export default function DietGenerator({
       setBusy(false)
     }
   }, [busy, goals.calories, goals.protein, goals.carbs, goals.fat])
+
+  const savePlan = useCallback(async () => {
+    if (!plan || saving) return
+    setSaving(true); setError(null)
+    try {
+      const res = await fetch('/api/nutrition/diet-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          planName: plan.planName,
+          meals: plan.meals.map((m) => ({
+            name: m.name,
+            ...(m.time ? { time: m.time } : {}),
+            items: m.items.map((it) => ({
+              food: it.food,
+              grams: num(it.grams),
+              calories: num(it.calories),
+              protein: num(it.protein),
+              carbs: num(it.carbs),
+              fat: num(it.fat),
+            })),
+          })),
+        }),
+      })
+      const json = await res.json().catch((): null => null)
+      if (!res.ok || !json?.ok) {
+        setError('Não consegui salvar a dieta. Tente novamente.')
+        return
+      }
+      setSavedPlanId(String(json.plan?.id || ''))
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Falha ao salvar a dieta.')
+    } finally {
+      setSaving(false)
+    }
+  }, [plan, saving])
 
   const applyMeal = useCallback(async (meal: PlanMeal, idx: number) => {
     if (applyingIdx !== null) return
@@ -129,6 +173,19 @@ export default function DietGenerator({
                     {Math.round(plan.totals.calories)} kcal · {plan.adherence.calories}% da meta
                   </span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={savePlan}
+                  disabled={saving || !!savedPlanId}
+                  className={`h-10 w-full rounded-xl text-sm font-bold transition active:scale-[0.98] ${
+                    savedPlanId
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-white/[0.06] border border-white/[0.1] text-white hover:bg-white/[0.1] disabled:opacity-50'
+                  }`}
+                >
+                  {savedPlanId ? '✓ Dieta salva — é só seguir' : saving ? 'Salvando...' : '💾 Salvar esta dieta'}
+                </button>
 
                 {plan.meals.map((meal, idx) => {
                   const applied = appliedIdx.has(idx)
