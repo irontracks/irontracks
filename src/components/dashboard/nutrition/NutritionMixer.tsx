@@ -23,6 +23,7 @@ import {
   getCustomFoodsCache,
 } from '@/lib/offline/nutritionCache'
 import { mealToContent, dayToContent, type NutritionStoryContent } from '@/components/stories/nutritionStory'
+import MacroBar, { MACRO_COLORS } from './MacroBar'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
 /** Macros exibidos na projeção do preview. Calorias saem à parte (têm linha própria). */
@@ -142,30 +143,6 @@ function CalorieRing({ pct, size = 140, strokeWidth = 10 }: { pct: number; size?
 }
 
 // ── Compact Macro Bar ──────────────────────────────────────────────────────────
-function MacroBar({ label, value, goal, color, accent }: { label: string; value: number; goal: number; color: string; accent: string }) {
-  const sVal = safeNumber(value)
-  const sGoal = Math.max(1, safeNumber(goal))
-  const pct = Math.round(clamp01(sVal / sGoal) * 100)
-  const over = sVal > sGoal
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400">{label}</span>
-        <span className={`text-xs font-bold tabular-nums ${over ? 'text-red-400' : accent}`}>
-          {Math.round(sVal)}<span className="text-neutral-400">/{Math.round(sGoal)}g</span>
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${Math.min(100, pct)}%`, backgroundColor: over ? '#ef4444' : color }}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ── Section Card wrapper ───────────────────────────────────────────────────────
 function Card({ children, className = '', glow }: { children: React.ReactNode; className?: string; glow?: string }) {
   return (
@@ -912,9 +889,11 @@ export default function NutritionMixer({
               {goalsOpen ? '✕ Fechar' : '⚙ Metas'}
             </button>
           </div>
-          <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color="#fbbf24" accent="text-amber-300" />
-          <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color="#f59e0b" accent="text-amber-400" />
-          <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color="#ef4444" accent="text-red-400" />
+          {/* Cores de CATEGORIA, todas da paleta do app e mutuamente distinguíveis.
+              O vermelho não aparece aqui: ficou reservado para estouro de meta. */}
+          <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color={MACRO_COLORS.protein} />
+          <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color={MACRO_COLORS.carbs} />
+          <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color={MACRO_COLORS.fat} />
 
           {/* Goals editor inline */}
           {goalsOpen && (

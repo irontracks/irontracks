@@ -1,0 +1,90 @@
+import { render, screen } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+
+import MacroBar, { MACRO_COLORS, MACRO_OVER_COLOR } from '../MacroBar'
+
+/**
+ * Barra de macronutriente do card Macronutrientes.
+ *
+ * O card foi refeito em ago/2026 depois de o dono chamá-lo de "confuso e amador".
+ * Os guards abaixo travam as três correções — todas com potencial de voltar em
+ * silêncio numa refatoração de estilo.
+ */
+/** jsdom serializa `background-color` como `rgb(...)`, nunca como hex. */
+const rgb = (hex: string): string => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+describe('MacroBar', () => {
+  it('mostra consumido, meta e o quanto FALTA — sem exigir conta de cabeça', () => {
+    render(<MacroBar label="Proteína" value={60} goal={208} color={MACRO_COLORS.protein} />)
+    expect(screen.getByText('60')).toBeDefined()
+    expect(screen.getByText(/\/ 208 g/)).toBeDefined()
+    expect(screen.getByText(/faltam 148 g/)).toBeDefined()
+    expect(screen.getByText('29%')).toBeDefined()
+  })
+
+  it('em zero, informa a meta inteira como pendente em vez de um vazio mudo', () => {
+    render(<MacroBar label="Proteína" value={0} goal={208} color={MACRO_COLORS.protein} />)
+    expect(screen.getByText('0%')).toBeDefined()
+    expect(screen.getByText(/faltam 208 g/)).toBeDefined()
+  })
+
+  it('VERMELHO só aparece quando estoura a meta — nunca como cor de macro', () => {
+    // A regressão original: gordura era #ef4444, a cor de ERRO do app. Em 0/74g o
+    // usuário lia "algo está errado" sobre um dia que só não tinha começado.
+    const { container, rerender } = render(
+      <MacroBar label="Gordura" value={0} goal={74} color={MACRO_COLORS.fat} />,
+    )
+    expect(container.innerHTML).not.toContain(rgb(MACRO_OVER_COLOR))
+    expect(container.querySelector('.text-red-400')).toBeNull()
+
+    rerender(<MacroBar label="Gordura" value={90} goal={74} color={MACRO_COLORS.fat} />)
+    expect(container.innerHTML).toContain(rgb(MACRO_OVER_COLOR))
+    expect(screen.getByText(/\+16 g acima/)).toBeDefined()
+  })
+
+  it('no estouro, mantém a barra da categoria e sobrepõe só o excesso', () => {
+    // Pintar tudo de vermelho apagaria a informação de que a meta foi ATINGIDA.
+    const { container } = render(
+      <MacroBar label="Carboidratos" value={150} goal={100} color={MACRO_COLORS.carbs} />,
+    )
+    const html = container.innerHTML
+    expect(html).toContain(rgb(MACRO_COLORS.carbs))
+    expect(html).toContain(rgb(MACRO_OVER_COLOR))
+    expect(screen.getByText(/\+50 g acima/)).toBeDefined()
+    expect(screen.queryByText(/faltam/)).toBeNull()
+  })
+
+  it('as três cores de categoria são distinguíveis entre si', () => {
+    // Antes, proteína #fbbf24 e carbo #f59e0b eram a mesma cor a olho nu.
+    const values = Object.values(MACRO_COLORS)
+    expect(new Set(values).size).toBe(values.length)
+    expect(values).not.toContain(MACRO_OVER_COLOR)
+  })
+
+  it('qualquer registro > 0 desenha barra visível, por menor que seja', () => {
+    // 1g de 208g arredonda para 0% e desenharia nada — mentindo que não há registro.
+    const { container } = render(
+      <MacroBar label="Proteína" value={1} goal={208} color={MACRO_COLORS.protein} />,
+    )
+    const fill = container.querySelector('[style*="width"]') as HTMLElement | null
+    expect(fill).not.toBeNull()
+    expect(parseFloat(fill!.style.width)).toBeGreaterThan(0)
+  })
+
+  it('expõe progresso a leitor de tela, com o estado por extenso', () => {
+    render(<MacroBar label="Proteína" value={60} goal={208} color={MACRO_COLORS.protein} />)
+    const bar = screen.getByRole('progressbar', { name: 'Proteína' })
+    expect(bar.getAttribute('aria-valuenow')).toBe('60')
+    expect(bar.getAttribute('aria-valuemax')).toBe('208')
+    expect(bar.getAttribute('aria-valuetext')).toContain('60 de 208 gramas')
+  })
+
+  it('meta zerada não quebra nem gera NaN/Infinity na tela', () => {
+    const { container } = render(<MacroBar label="Gordura" value={10} goal={0} color={MACRO_COLORS.fat} />)
+    expect(container.innerHTML).not.toContain('NaN')
+    expect(container.innerHTML).not.toContain('Infinity')
+  })
+})
