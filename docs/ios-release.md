@@ -3,23 +3,27 @@
 Nota de referência: **temos tudo o que é preciso para lançar em produção na Apple.**
 Este doc registra credenciais, tooling, estado atual e o passo a passo.
 
-## Estado atual (jul/2026)
+## Estado atual (03/08/2026)
 
-- **Versão pública live**: 1.12 (build 49).
-- **Próximo release**: **1.13** — `MARKETING_VERSION` já bumpado para `1.13` no
-  `ios/App/App.xcodeproj/project.pbxproj` (6 build configs).
-- **Builds no App Store Connect**: build 56 subiu como 1.12 (TestFlight) com os
-  botões do push "vai treinar hoje?". Para o release público 1.13, refazer a
-  build (vira build 57 como 1.13).
+- **Em review na Apple**: **1.19 (build 74)**, submetida em 03/08/2026 via
+  `node scripts/ios-submit.mjs`. **Auto-release ligado** — aprovou, vai pros
+  usuários sozinho.
+- **`MARKETING_VERSION` no repo**: `1.19` — **10 ocorrências** hoje, não 6.
+  Confira com `grep -c`, não confie no número escrito aqui.
+- Histórico: 1.12 (build 49) → … → 1.18 → 1.19 (build 74).
 
 ## O que temos (credenciais e acesso)
 
 - **Chave da App Store Connect API**: `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8`
   - Key ID: `W834H36CBM`
-  - Issuer ID: **não fica no disco** — está em App Store Connect → Users and
-    Access → Integrations → App Store Connect API (linha da chave `W834H36CBM`).
-    Necessário apenas para automatizar a *submissão* via API. Preencher aqui
-    quando pego: `ASC_ISSUER_ID = <preencher>`.
+  - **Issuer ID: JÁ ESTÁ NO DISCO**, em `.env.local` (`ASC_ISSUER_ID`), junto com
+    `ASC_KEY_ID`. `scripts/ios-submit.mjs` lê os dois de lá sozinho — não precisa
+    exportar nada nem abrir o painel.
+    > Este parágrafo dizia "não fica no disco — preencher quando pego" e ficou
+    > obsoleto sem ninguém atualizar. Custou uma sessão inteira parada em
+    > 03/08/2026: o agente leu a doc, acreditou, e foi pedir ao dono um dado que
+    > estava a um `grep` de distância. **Doc de credencial mente com o tempo —
+    > confirme no repo antes de declarar que falta alguma coisa.**
 - **Sessão do Xcode** (Apple ID logado em Xcode → Settings → Accounts): é o que o
   `npm run ios:release` usa hoje para **upload** (arquivar + enviar pro TestFlight).
   Já validada — subiu builds 55/56.
@@ -37,22 +41,27 @@ Este doc registra credenciais, tooling, estado atual e o passo a passo.
   (`npm ci`). NÃO usar symlink pro `node_modules` do repo principal — gera
   conflito de versões no grafo SPM do iOS (capacitor-swift-pm 8.4.1 vs 8.0.2).
 
-## Passo a passo para lançar 1.13 em produção
+- `node scripts/ios-submit.mjs "<notas>"` → **submete pro review**, sem painel web:
+  acha a última build processada, cria/reaproveita a versão editável, grava as
+  notas em pt-BR, anexa a build e submete (com auto-release após aprovação).
+  Também garante link de Termos, Privacy URL e App Review Information.
+  - `--dry-run` mostra tudo o que faria **sem submeter** — rode isto primeiro.
+    É como se descobre, de graça, se a versão do momento já está publicada
+    (trem fechado → precisa bumpar a `MARKETING_VERSION` antes).
+  - `--build <n>` fixa a build; `--no-submit` aplica metadata sem submeter.
 
-1. `MARKETING_VERSION = 1.13` (feito).
-2. `npm run ios:release` → gera build 57 (1.13) e sobe pro App Store Connect.
-3. Criar a versão 1.13 na App Store e submeter pro review:
-   - **Painel web**: App Store Connect → app → (+) Version 1.13 → anexar build 57
-     → colar as release notes → *Submit for Review*.
-   - **Ou via ASC API** (Key `W834H36CBM` + Issuer ID): criar version, anexar
-     build, setar `whatsNew`, submeter. (Automatizável com fastlane `deliver`.)
+## Passo a passo para lançar em produção
 
-## Release notes — 1.13 (rascunho)
+1. **`git pull` no repo principal.** Em 03/08/2026 ele estava 32 commits atrás:
+   a build teria saído sem a correção que motivou o release. Confirme no código
+   que a mudança que você quer entregar está lá.
+2. Se a versão pública atual **já está publicada**, bumpe `MARKETING_VERSION`
+   (10 ocorrências) — senão o upload morre no `exportArchive` com 90062/90186,
+   depois de ~5 min de archive perdido. `--dry-run` do submit responde isso antes.
+3. `npm run ios:release` → bumpa o build number, arquiva e sobe pro App Store Connect.
+4. `node scripts/ios-submit.mjs --dry-run` → confere build VALID e versão livre.
+5. `node scripts/ios-submit.mjs "<release notes>"` → submete.
 
-> **Novidades da versão 1.13**
-> • Modo dia de descanso: de manhã o app pergunta se você vai treinar. Se for
->   descansar, sua meta de calorias do dia é ajustada automaticamente — mantendo
->   a proteína.
-> • Responda pela notificação: os botões "Vou treinar" e "Vou descansar" agora
->   aparecem direto no aviso da manhã.
-> • Melhorias de estabilidade e correções.
+As notas são **conteúdo público**: escreva a partir do que entrou de verdade
+(`git log --pretty=%s <bump-anterior>..HEAD --no-merges | grep -E '^(feat|fix)'`),
+em linguagem de usuário, e confirme com o dono antes de submeter.
