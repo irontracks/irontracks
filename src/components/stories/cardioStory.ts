@@ -17,6 +17,7 @@ import {
   enterBrandSpace,
 } from '../storyComposerUtils'
 import { type StoryTemplate, storyFont } from './storyTemplates'
+import { drawCustomTextLayer } from './customText'
 
 export type CardioRoutePoint = { lat: number; lng: number }
 
@@ -121,6 +122,8 @@ export const drawCardioStory = ({
   workoutTransform,
   brandOffset,
   brandScale,
+  customText,
+  customTextOffset,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -136,6 +139,10 @@ export const drawCardioStory = ({
   brandOffset?: { x: number; y: number }
   /** Escala própria da marca (pinça sobre o logo) — só ela cresce. */
   brandScale?: number
+  /** Legenda livre do usuário, na tipografia do template. */
+  customText?: string
+  /** Posição própria da legenda (arrastável). */
+  customTextOffset?: { x: number; y: number }
 }) => {
   const C = template.colors
   const F = template.fonts
@@ -398,6 +405,8 @@ export const drawCardioStory = ({
   })()
 
   if (wtApplied) ctx.restore()
+  // Legenda do usuário por ÚLTIMO — nada do template pode cobri-la.
+  drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset, wt)
 }
 
 // ── Adapter: métricas + rota → conteúdo do story ─────────────────────────────

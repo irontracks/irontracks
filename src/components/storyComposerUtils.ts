@@ -9,6 +9,7 @@ import { safeString } from '@/utils/guards'
 import { calculateTotalVolume as canonicalCalculateTotalVolume } from '@/utils/report/formatters'
 import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { type StoryTemplate, DEFAULT_STORY_TEMPLATE, storyFont } from '@/components/stories/storyTemplates'
+import { drawCustomTextLayer } from '@/components/stories/customText'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -389,6 +390,8 @@ export const drawStory = ({
     workoutTransform,
     brandOffset,
     brandScale,
+    customText,
+    customTextOffset,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -406,6 +409,10 @@ export const drawStory = ({
     brandOffset?: { x: number; y: number };
     /** Escala própria da marca (pinça sobre o logo). */
     brandScale?: number;
+    /** Legenda livre do usuário, na tipografia do template. */
+    customText?: string;
+    /** Posição própria da legenda (arrastável). */
+    customTextOffset?: { x: number; y: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
     // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
@@ -940,6 +947,11 @@ export const drawStory = ({
     })();
 
     if (wtApplied) ctx.restore();
+
+    // Legenda do usuário POR ÚLTIMO: é o que ele acabou de escrever e posicionar,
+    // então nada do template pode cobri-la. Em espaço próprio (desfaz o zoom/pan do
+    // bloco), como a marca — ver customText.ts.
+    drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset, workoutTransform);
 };
 
 // ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────
@@ -1143,12 +1155,15 @@ export const snapBrandToCenter = (
     offset: Offset | null | undefined,
     box: { w: number; h: number; dx: number; dy: number },
     threshold = BRAND_SNAP_THRESHOLD,
+    /** Âncora do elemento. A legenda do usuário tem a sua — ver customText.ts. */
+    baseX = BRAND_BASE_X,
+    baseY = BRAND_BASE_Y,
 ): BrandSnapResult => {
     const o = clampBrandOffset(offset)
     const t = Number.isFinite(threshold) && threshold > 0 ? threshold : BRAND_SNAP_THRESHOLD
 
-    const centerX = BRAND_BASE_X + o.x + box.dx + box.w / 2
-    const centerY = BRAND_BASE_Y + o.y + box.dy + box.h / 2
+    const centerX = baseX + o.x + box.dx + box.w / 2
+    const centerY = baseY + o.y + box.dy + box.h / 2
     const targetX = CANVAS_W / 2
     const targetY = CANVAS_H / 2
 
