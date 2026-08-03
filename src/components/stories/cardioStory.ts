@@ -406,7 +406,7 @@ export const drawCardioStory = ({
 
   if (wtApplied) ctx.restore()
   // Legenda do usuário por ÚLTIMO — nada do template pode cobri-la.
-  drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset, wt)
+  drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset)
 }
 
 // ── Adapter: métricas + rota → conteúdo do story ─────────────────────────────

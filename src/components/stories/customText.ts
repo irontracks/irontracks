@@ -187,7 +187,6 @@ export const drawCustomTextLayer = (
     template: StoryTemplate,
     text: string,
     offset: Offset | null | undefined,
-    workoutTransform: { scale: number; offsetX: number; offsetY: number } | null | undefined,
 ): void => {
     const clean = clampCustomText(text)
     if (!clean.trim()) return
@@ -195,16 +194,17 @@ export const drawCustomTextLayer = (
     const F = template.fonts
     ctx.save()
     try {
-        // Inversa do transform do bloco — mesma ordem de enterBrandSpace.
-        const s = Number(workoutTransform?.scale) || 1
-        const offX = Number(workoutTransform?.offsetX) || 0
-        const offY = Number(workoutTransform?.offsetY) || 0
-        if (s !== 1) {
-            ctx.translate(CANVAS_W / 2, CANVAS_H / 2)
-            ctx.scale(1 / s, 1 / s)
-            ctx.translate(-CANVAS_W / 2, -CANVAS_H / 2)
-        }
-        if (offX !== 0 || offY !== 0) ctx.translate(-offX, -offY)
+        /**
+         * SEM inversa do transform do bloco — e isso é o ponto.
+         *
+         * `enterBrandSpace` precisa da inversa porque a marca é desenhada DENTRO do
+         * transform do bloco. A legenda não: os renderers chamam esta função depois
+         * do `ctx.restore()` que encerra aquele transform, então o contexto já está
+         * limpo. Aplicar a inversa aqui deslocava o texto pelo NEGATIVO do pan do
+         * bloco — com o bloco arrastado, a legenda sumia para fora da tela enquanto
+         * a alça (HTML, alheia ao canvas) continuava no lugar certo. Pego na
+         * conferência no aparelho, 03/08/2026.
+         */
         ctx.translate(Number(offset?.x) || 0, Number(offset?.y) || 0)
 
         ctx.textBaseline = 'top'

@@ -366,7 +366,7 @@ export const drawNutritionStory = ({
 
   if (wtApplied) ctx.restore()
   // Legenda do usuário por ÚLTIMO — nada do template pode cobri-la.
-  drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset, wt)
+  drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset)
 }
 
 // ── Adapters: dados do NutritionMixer → conteúdo do story ────────────────────
