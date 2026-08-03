@@ -65,7 +65,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -182,7 +182,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                     />
 
                     {/* Guias de alinhamento — só durante o arrasto da marca. */}
-                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
+                    <AlignmentGuides x={alignGuides.x} y={alignGuides.y} />
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}

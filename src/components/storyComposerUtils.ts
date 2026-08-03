@@ -1165,6 +1165,54 @@ export const snapBrandToCenter = (
     }
 }
 
+export interface BlockSnapResult {
+    offsetX: number
+    offsetY: number
+    /** Bloco no eixo horizontal original — mostra a linha vertical central. */
+    snappedX: boolean
+    /** Bloco na altura original do template. Sem linha: ver comentário abaixo. */
+    snappedY: boolean
+}
+
+/**
+ * Guias do arrasto do BLOCO (título + cards) — a "parte de baixo" do story.
+ *
+ * O snap da marca não valia aqui: ela é arrastada pela própria alça, o bloco pelo
+ * overlay de gesto. Por isso as linhas só apareciam no IRONTRACKS (relato do dono,
+ * 03/08/2026).
+ *
+ * Aqui o alvo é o offset ZERO, não o centro do canvas — e a diferença importa. O
+ * bloco não tem uma caixa estável para medir: cada layout (normal, direita, topo…)
+ * desenha título e cards em coordenadas próprias, e derivar o centro de cada um
+ * seria frágil e quebraria a cada ajuste de layout. Já o offset zero é, por
+ * construção, o alinhamento que o template define — e nele o bloco fica simétrico
+ * entre as margens seguras, ou seja, horizontalmente CENTRADO.
+ *
+ * Por isso `snappedX` acende a linha vertical central: ela é de fato o eixo do
+ * conteúdo. `snappedY` gruda na altura original mas NÃO acende linha horizontal —
+ * a altura de repouso do bloco fica na parte de baixo do story, não no meio, e
+ * desenhar a linha central ali apontaria para um alinhamento que não existe.
+ */
+export const snapWorkoutOffset = (
+    offsetX: number,
+    offsetY: number,
+    threshold = BRAND_SNAP_THRESHOLD,
+): BlockSnapResult => {
+    const t = Number.isFinite(threshold) && threshold > 0 ? threshold : BRAND_SNAP_THRESHOLD
+    const x = Number.isFinite(offsetX) ? offsetX : 0
+    const y = Number.isFinite(offsetY) ? offsetY : 0
+
+    const snappedX = Math.abs(x) <= t
+    const snappedY = Math.abs(y) <= t
+
+    return {
+        offsetX: snappedX ? 0 : x,
+        offsetY: snappedY ? 0 : y,
+        snappedX,
+        snappedY,
+    }
+}
+
 /**
  * O ponto (em px de TELA) caiu sobre a marca?
  *
