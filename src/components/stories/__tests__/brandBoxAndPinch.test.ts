@@ -11,6 +11,8 @@ import {
   clampBrandScale,
   isPointOverBrand,
   measureBrandBox,
+  snapBrandToCenter,
+  BRAND_SNAP_THRESHOLD,
 } from '../../storyComposerUtils'
 import { DEFAULT_STORY_TEMPLATE } from '../storyTemplates'
 
@@ -199,5 +201,98 @@ describe('alinhamento do traçado com a tinta do logo', () => {
     expect(src, 'voltou a usar recuo em px de tela').not.toMatch(/margin(Left|Top):\s*'-?\d+px'/)
     expect(src).toMatch(/box\.dx/)
     expect(src).toMatch(/box\.dy/)
+  })
+})
+
+describe('guias de alinhamento (padrão Instagram)', () => {
+  const t = DEFAULT_STORY_TEMPLATE
+  const box = measureBrandBox(t, 1)
+
+  /** Offset que põe o centro da marca exatamente no centro do canvas. */
+  const centeredOffset = () => ({
+    x: CANVAS_W / 2 - (BRAND_BASE_X + box.dx + box.w / 2),
+    y: CANVAS_H / 2 - (BRAND_BASE_Y + box.dy + box.h / 2),
+  })
+
+  it('gruda no centro quando chega perto, nos dois eixos', () => {
+    const c = centeredOffset()
+    // 5px fora em cada eixo — dentro do limiar.
+    const r = snapBrandToCenter({ x: c.x + 5, y: c.y - 5 }, box)
+    expect(r.snappedX).toBe(true)
+    expect(r.snappedY).toBe(true)
+    expect(r.offset.x).toBeCloseTo(c.x, 4)
+    expect(r.offset.y).toBeCloseTo(c.y, 4)
+  })
+
+  it('NÃO gruda longe do centro — o guia não pode sequestrar o arrasto', () => {
+    const c = centeredOffset()
+    const r = snapBrandToCenter({ x: c.x + 200, y: c.y + 200 }, box)
+    expect(r.snappedX).toBe(false)
+    expect(r.snappedY).toBe(false)
+    expect(r.offset.x).toBeCloseTo(c.x + 200, 4)
+  })
+
+  it('os eixos são independentes — centralizar na largura não força a altura', () => {
+    const c = centeredOffset()
+    const r = snapBrandToCenter({ x: c.x + 3, y: c.y + 120 }, box)
+    expect(r.snappedX).toBe(true)
+    expect(r.snappedY).toBe(false)
+    expect(r.offset.y).toBeCloseTo(c.y + 120, 4)
+  })
+
+  it('o limiar é a fronteira: dentro gruda, fora não', () => {
+    const c = centeredOffset()
+    const dentro = snapBrandToCenter({ x: c.x + BRAND_SNAP_THRESHOLD - 1, y: c.y }, box)
+    const fora = snapBrandToCenter({ x: c.x + BRAND_SNAP_THRESHOLD + 2, y: c.y }, box)
+    expect(dentro.snappedX).toBe(true)
+    expect(fora.snappedX).toBe(false)
+  })
+
+  it('mede pelo CENTRO da tinta, não pela âncora', () => {
+    // Se usasse a âncora, o "centro" ficaria meia-caixa deslocado e a linha
+    // apareceria com o logo visivelmente fora do eixo.
+    const c = centeredOffset()
+    const r = snapBrandToCenter(c, box)
+    const centerX = BRAND_BASE_X + r.offset.x + box.dx + box.w / 2
+    expect(centerX).toBeCloseTo(CANVAS_W / 2, 4)
+  })
+
+  it('entrada inválida não quebra o arrasto', () => {
+    const r = snapBrandToCenter(null, box)
+    expect(Number.isFinite(r.offset.x)).toBe(true)
+    expect(Number.isFinite(r.offset.y)).toBe(true)
+  })
+})
+
+describe('fiação dos guias', () => {
+  it('o hook aplica o snap e vibra só na TRANSIÇÃO', () => {
+    const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
+    expect(src).toMatch(/snapBrandToCenter\(raw, box\)/)
+    // Vibrar a cada move faria o aparelho tremer sem parar dentro da faixa.
+    expect(src).toMatch(/snap\.snappedX && !prev\.x/)
+    expect(src).toMatch(/triggerHaptic\('light'\)/)
+  })
+
+  it('a linha some ao soltar — é feedback de arrasto, não layout', () => {
+    const src = readFileSync('src/components/stories/useStoryComposer.ts', 'utf8')
+    const at = src.indexOf('const onBrandPointerUp = useCallback')
+    const up = src.slice(at, at + 900)
+    expect(up).toMatch(/setBrandGuides\(\{ x: false, y: false \}\)/)
+  })
+
+  it('o guia não captura pointer — senão mataria o arrasto que o criou', () => {
+    const src = readFileSync('src/components/stories/AlignmentGuides.tsx', 'utf8')
+    expect(src).toMatch(/pointer-events-none/)
+  })
+
+  it('os três composers mostram o guia', () => {
+    for (const f of [
+      'src/components/StoryComposer.tsx',
+      'src/components/NutritionStoryComposer.tsx',
+      'src/components/CardioStoryComposer.tsx',
+    ]) {
+      const src = readFileSync(f, 'utf8')
+      expect(src, f).toMatch(/<AlignmentGuides x=\{brandGuides\.x\} y=\{brandGuides\.y\} \/>/)
+    }
   })
 })

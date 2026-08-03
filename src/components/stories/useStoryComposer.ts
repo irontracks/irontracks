@@ -12,7 +12,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { safeString } from '@/utils/guards'
 import { stripWeekdayHint } from '@/utils/workoutTitle'
-import { saveImageToPhotos, saveBlobToPhotos, openAppSettings } from '@/utils/native/irontracksNative'
+import { saveImageToPhotos, saveBlobToPhotos, openAppSettings, triggerHaptic } from '@/utils/native/irontracksNative'
 import { uploadStoryMedia } from '@/utils/storage/mediaUpload'
 import { logError, logWarn, logWarnRemote } from '@/lib/logger'
 import {
@@ -29,6 +29,8 @@ import {
     dragToBrandOffset,
     clampBrandScale,
     isPointOverBrand,
+    measureBrandBox,
+    snapBrandToCenter,
     NO_OFFSET,
     type Offset,
     isIOSUserAgent,
@@ -149,6 +151,14 @@ export function useStoryComposer({
     const [brandScale, setBrandScale] = useState(1)
     const brandScaleRef = useRef(brandScale)
     useEffect(() => { brandScaleRef.current = brandScale }, [brandScale])
+
+    /**
+     * Guias de alinhamento visíveis durante o arrasto da marca (padrão Instagram).
+     * `x` = grudou no eixo vertical (linha em pé) · `y` = no horizontal (deitada).
+     * O ref espelha o state para detectar a TRANSIÇÃO e vibrar uma vez só.
+     */
+    const [brandGuides, setBrandGuides] = useState({ x: false, y: false })
+    const brandGuidesRef = useRef(brandGuides)
 
     const workoutGestureRef = useRef<{
         /** `brand_pinch`: nasceu sobre a marca — escala só ela. */
@@ -320,7 +330,7 @@ export function useStoryComposer({
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1)
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setBrandGuides({ x: false, y: false })
         brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
         workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
@@ -512,7 +522,7 @@ export function useStoryComposer({
             setDraggingKey(null)
             // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
             setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-            setBrandOffset(NO_OFFSET); setBrandScale(1)
+            setBrandOffset(NO_OFFSET); setBrandScale(1); setBrandGuides({ x: false, y: false })
             workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
@@ -533,7 +543,7 @@ export function useStoryComposer({
     }, [])
     const resetWorkoutTransform = useCallback(() => {
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1)
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setBrandGuides({ x: false, y: false })
         workoutGestureRef.current.mode = 'none'
     }, [])
 
@@ -630,9 +640,27 @@ export function useStoryComposer({
             if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
             e.preventDefault?.(); e.stopPropagation?.()
             const factor = canvasFactor(rect)
-            setBrandOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor))
+            const raw = dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor)
+
+            // Guias de alinhamento: ao cruzar o centro, a marca GRUDA e a linha
+            // aparece. Sem o snap a linha seria decorativa — acertar o centro exato
+            // com o dedo, num canvas exibido a menos da metade, é sorte.
+            const box = measureBrandBox(template, brandScaleRef.current)
+            const snap = snapBrandToCenter(raw, box)
+            setBrandOffset(snap.offset)
+
+            // Vibra só na TRANSIÇÃO para grudado. Disparar a cada move faria o
+            // aparelho tremer sem parar enquanto o dedo estivesse na faixa.
+            const prev = brandGuidesRef.current
+            if ((snap.snappedX && !prev.x) || (snap.snappedY && !prev.y)) {
+                void triggerHaptic('light')
+            }
+            if (snap.snappedX !== prev.x || snap.snappedY !== prev.y) {
+                brandGuidesRef.current = { x: snap.snappedX, y: snap.snappedY }
+                setBrandGuides({ x: snap.snappedX, y: snap.snappedY })
+            }
         } catch { }
-    }, [])
+    }, [template])
 
     const onBrandPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
         try {
@@ -641,6 +669,10 @@ export function useStoryComposer({
             e.preventDefault?.(); e.stopPropagation?.()
             e.currentTarget?.releasePointerCapture?.(pointerId)
             brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: brandOffsetRef.current }
+            // Guia é feedback de ARRASTO: sem isso a linha ficaria na tela depois de
+            // soltar, virando parte do layout em vez de ajuda momentânea.
+            brandGuidesRef.current = { x: false, y: false }
+            setBrandGuides({ x: false, y: false })
         } catch { }
     }, [])
 
@@ -934,7 +966,7 @@ export function useStoryComposer({
         workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
         onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
         // marca (IRON·TRACKS) independente
-        brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+        brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
