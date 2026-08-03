@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
 import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction, resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
+import type { UserStats } from '@/lib/nutrition/goals'
+import { computeGoalsForPhase, type NutritionPhase } from '@/lib/nutrition/phase'
+import { saveNutritionPhase } from '@/actions/nutrition-actions'
+import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
 import { Sparkles } from 'lucide-react'
@@ -202,6 +206,9 @@ export default function NutritionMixer({
   workoutCaloriesToday,
   goalsSource,
   restDayReduction,
+  profileStats,
+  currentPhase,
+  phaseIsExplicit,
 }: {
   dateKey: string
   initialTotals: Totals
@@ -211,6 +218,12 @@ export default function NutritionMixer({
   workoutCaloriesToday?: number
   goalsSource?: 'saved' | 'profile' | 'default'
   restDayReduction?: number
+  /** Perfil (peso/altura/idade/sexo/frequência) p/ o seletor recalcular a meta. Null = incompleto. */
+  profileStats?: UserStats | null
+  /** Fase em vigor: a escolhida, ou a derivada do objetivo de treino. */
+  currentPhase?: NutritionPhase
+  /** false = a fase acima foi DERIVADA, o usuário nunca escolheu. Muda o texto de apoio. */
+  phaseIsExplicit?: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
   const isIosNative = useIsIosNative()
@@ -301,6 +314,24 @@ export default function NutritionMixer({
   }))
   const [goalsSaving, setGoalsSaving] = useState(false)
   const [goalsError, setGoalsError] = useState('')
+
+  // ── Fase nutricional (Cutting / Manutenção / Off) ──────────────────────────
+  // O clique só PREENCHE os campos abaixo com a meta recalculada do TDEE — nada é
+  // gravado até o usuário conferir e apertar Salvar. É o que evita apagar em
+  // silêncio um ajuste manual de macros que ele tenha feito antes.
+  const [phaseDraft, setPhaseDraft] = useState<NutritionPhase>(currentPhase ?? 'MAINTAIN')
+  const [phaseTouched, setPhaseTouched] = useState(false)
+  // Perfil sem peso/altura/idade/sexo não produz TDEE — sem isso o seletor não tem
+  // o que calcular, então some e o painel segue 100% manual.
+  const canUsePhases = !!profileStats
+
+  const selectPhase = useCallback((phase: NutritionPhase) => {
+    setPhaseDraft(phase)
+    setPhaseTouched(true)
+    setGoalsError('')
+    const next = computeGoalsForPhase(profileStats, phase)
+    if (next) setGoalsDraft(next)
+  }, [profileStats])
 
   // ── Date navigation ───────────────────────────────────────────────────────
   const [currentDateKey, setCurrentDateKey] = useState(dateKey)
@@ -717,7 +748,23 @@ export default function NutritionMixer({
       const payload = { user_id: uid, calories: safeNumber(goalsDraft.calories), protein: safeNumber(goalsDraft.protein), carbs: safeNumber(goalsDraft.carbs), fat: safeNumber(goalsDraft.fat), updated_at: new Date().toISOString() }
       if (latest?.id) { const { error } = await supabase.from('nutrition_goals').update(payload).eq('id', latest.id); if (error) throw error }
       else { const { error } = await supabase.from('nutrition_goals').insert(payload); if (error) throw error }
+
+      // Registra a fase escolhida junto da meta. Falhar aqui NÃO invalida o save: os
+      // números — que é o que o usuário veio ajustar — já estão gravados. A fase é
+      // metadado da intenção (usada quando não há meta salva e no contexto da IA);
+      // perdê-la custa um reclique, desfazer a meta custa o trabalho dele.
+      let phaseWarning = ''
+      if (phaseTouched) {
+        const res = await saveNutritionPhase(phaseDraft)
+        if (!res.ok) phaseWarning = 'Meta salva, mas a fase não foi registrada. Tente de novo.'
+      }
+
       setGoalsState({ calories: safeNumber(goalsDraft.calories), protein: safeNumber(goalsDraft.protein), carbs: safeNumber(goalsDraft.carbs), fat: safeNumber(goalsDraft.fat) })
+
+      // Painel fica ABERTO quando só a fase falhou — fechar esconderia o aviso e o
+      // usuário sairia achando que registrou a fase.
+      if (phaseWarning) { setGoalsError(phaseWarning); return }
+      setPhaseTouched(false)
       setGoalsOpen(false)
     } catch (e: unknown) { setGoalsError(getErrorMessage(e) || 'Falha ao salvar metas.') }
     finally { setGoalsSaving(false) }
@@ -872,6 +919,17 @@ export default function NutritionMixer({
           {/* Goals editor inline */}
           {goalsOpen && (
             <div className="mt-2 pt-3 border-t border-white/[0.06] space-y-3">
+
+              {/* ── Fase da dieta ─────────────────────────────────────────── */}
+              {canUsePhases && (
+                <PhaseSelector
+                  value={phaseDraft}
+                  onSelect={selectPhase}
+                  isExplicit={phaseIsExplicit}
+                  touched={phaseTouched}
+                />
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 {(['calories', 'protein', 'carbs', 'fat'] as const).map(f => (
                   <div key={f} className="space-y-1">
@@ -889,6 +947,13 @@ export default function NutritionMixer({
                   </div>
                 ))}
               </div>
+              {/* `null` = sabemos que o perfil está incompleto. `undefined` = não
+                  sabemos (overlay servido do cache offline) — aí não sugerimos nada. */}
+              {profileStats === null && (
+                <p className="text-[10px] leading-snug text-neutral-500">
+                  Informe peso, altura, idade e sexo no perfil para escolher a fase (cutting, manutenção ou off) e calcular a meta automaticamente.
+                </p>
+              )}
               {goalsError && <div className="text-xs text-red-400">{goalsError}</div>}
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setGoalsOpen(false)} className="h-10 px-3 rounded-lg text-xs text-neutral-400 hover:text-white transition">Cancelar</button>

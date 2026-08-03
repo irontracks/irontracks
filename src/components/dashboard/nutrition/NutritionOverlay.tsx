@@ -6,13 +6,16 @@ import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
-import { calculateNutritionGoals } from '@/lib/nutrition/goals'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
+import {
+  computeGoalsFromPrefs,
+  extractProfileStats,
+  resolveNutritionPhase,
+  type NutritionPhase,
+} from '@/lib/nutrition/phase'
+import type { UserStats } from '@/lib/nutrition/goals'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
-type Gender = 'MALE' | 'FEMALE'
-type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE' | 'EXTRA_ACTIVE'
-type Goal = 'CUT' | 'MAINTAIN' | 'BULK'
 
 const DEFAULT_GOALS: Totals = { calories: 2000, protein: 150, carbs: 200, fat: 60 }
 
@@ -21,34 +24,11 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-// O cálculo de metas (BMR + TDEE + macros) vive numa fonte ÚNICA no engine
-// (@/lib/nutrition/engine → calculateNutritionGoals). Antes o overlay tinha uma
-// cópia própria com Harris-Benedict + proteína por %, que divergia do resto do
-// app. Agora reusa o engine (Mifflin-St Jeor + proteína g/kg).
-
-function mapFitnessGoal(fg: string | null | undefined): Goal {
-  switch (fg) {
-    case 'weight_loss': return 'CUT'
-    case 'hypertrophy':
-    case 'strength': return 'BULK'
-    default: return 'MAINTAIN'
-  }
-}
-
-function mapGender(sex: string | null | undefined): Gender | null {
-  if (sex === 'male') return 'MALE'
-  if (sex === 'female') return 'FEMALE'
-  return null
-}
-
-function mapActivityLevel(freq: number | null | undefined): ActivityLevel {
-  const f = Number(freq)
-  if (!Number.isFinite(f) || f <= 0) return 'MODERATE'
-  if (f <= 1) return 'LIGHT'
-  if (f <= 3) return 'MODERATE'
-  if (f <= 5) return 'VERY_ACTIVE'
-  return 'EXTRA_ACTIVE'
-}
+// O cálculo de metas (BMR + TDEE + macros) e os mapeamentos de perfil vivem numa
+// fonte ÚNICA (@/lib/nutrition/phase → computeGoalsFromPrefs). Este arquivo já teve
+// duas vezes a sua própria cópia divergente: primeiro do cálculo (Harris-Benedict +
+// proteína por %, contra o Mifflin-St Jeor do resto do app) e depois dos mapeamentos
+// de objetivo/sexo/atividade. Não recriar nenhum dos dois aqui.
 
 interface NutritionOverlayProps {
   onClose: () => void
@@ -64,6 +44,14 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
     goalsSource: 'saved' | 'profile' | 'default'
     workoutCalories: number
     restDayReduction: number
+    /**
+     * Perfil para o seletor de fase recalcular a meta.
+     * null = perfil incompleto (sabemos) · undefined = não carregamos (cache offline).
+     * A distinção evita o Mixer sugerir "complete o perfil" para quem já completou.
+     */
+    profileStats: UserStats | null | undefined
+    currentPhase: NutritionPhase
+    phaseIsExplicit: boolean
   } | null>(null)
 
   const dateKey = useMemo(() => {
@@ -104,6 +92,12 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           goalsSource: (c.goalsSource as 'saved' | 'profile' | 'default') || 'default',
           workoutCalories: safeNumber(c.workoutCalories),
           restDayReduction: 0,
+          // O cache não guarda o perfil — sem ele o seletor de fase fica oculto neste
+          // caminho degradado (offline). Trocar de fase exige rede de qualquer forma.
+          // `undefined` (não `null`) para o Mixer não acusar perfil incompleto.
+          profileStats: undefined,
+          currentPhase: 'MAINTAIN',
+          phaseIsExplicit: false,
         })
         return true
       }
@@ -151,20 +145,11 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           goalsSource = 'saved'
         } else {
           const prefs = settingsRes.data?.preferences as Record<string, unknown> | null
-          if (prefs) {
-            const weight = Number(prefs.bodyWeightKg)
-            const height = Number(prefs.heightCm)
-            const age = Number(prefs.age)
-            const gender = mapGender(prefs.biologicalSex as string)
-            if (Number.isFinite(weight) && weight > 0 && Number.isFinite(height) && height > 0 && Number.isFinite(age) && age > 0 && gender) {
-              try {
-                goals = calculateNutritionGoals(
-                  { weight, height, age, gender, activityLevel: mapActivityLevel(prefs.trainingFrequencyPerWeek as number) },
-                  mapFitnessGoal(prefs.fitnessGoal as string),
-                )
-                goalsSource = 'profile'
-              } catch { /* entradas inválidas → mantém DEFAULT_GOALS */ }
-            }
+          // Perfil incompleto ou entradas inválidas → null, mantém DEFAULT_GOALS.
+          const computed = computeGoalsFromPrefs(prefs)
+          if (computed) {
+            goals = computed
+            goalsSource = 'profile'
           }
         }
 
@@ -217,13 +202,24 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
         } catch { /* sem ajuste */ }
 
         if (!cancelled) {
-          setData({ dateKey, totals, goals, goalsSource, workoutCalories, restDayReduction })
+          const prefsForPhase = settingsRes.data?.preferences as Record<string, unknown> | null
+          setData({
+            dateKey,
+            totals,
+            goals,
+            goalsSource,
+            workoutCalories,
+            restDayReduction,
+            profileStats: extractProfileStats(prefsForPhase),
+            currentPhase: resolveNutritionPhase(prefsForPhase),
+            phaseIsExplicit: !!prefsForPhase?.nutritionPhase,
+          })
           void setNutritionOverlayCache(uid, dateKey, { totals, goals, goalsSource, workoutCalories })
         }
       } catch {
         // Falha (rede/transitória): tenta o cache antes de cair pro estado vazio.
         if (await serveFromCache(uid)) return
-        if (!cancelled) setData({ dateKey, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals: DEFAULT_GOALS, goalsSource: 'default', workoutCalories: 0, restDayReduction: 0 })
+        if (!cancelled) setData({ dateKey, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals: DEFAULT_GOALS, goalsSource: 'default', workoutCalories: 0, restDayReduction: 0, profileStats: undefined, currentPhase: 'MAINTAIN', phaseIsExplicit: false })
       }
     }
 
@@ -246,6 +242,9 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
             workoutCaloriesToday={data.workoutCalories}
             goalsSource={data.goalsSource}
             restDayReduction={data.restDayReduction}
+            profileStats={data.profileStats}
+            currentPhase={data.currentPhase}
+            phaseIsExplicit={data.phaseIsExplicit}
           />
         ) : (
           <div className="space-y-4">

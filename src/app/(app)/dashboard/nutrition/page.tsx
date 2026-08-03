@@ -5,8 +5,11 @@ import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionCon
 import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { calculateNutritionGoals } from '@/lib/nutrition/engine'
-import type { Gender, ActivityLevel, Goal } from '@/lib/nutrition/engine'
+import {
+  computeGoalsFromPrefs,
+  extractProfileStats,
+  resolveNutritionPhase,
+} from '@/lib/nutrition/phase'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 
@@ -17,52 +20,6 @@ const DEFAULT_GOALS = {
   protein: 150,
   carbs: 200,
   fat: 60,
-}
-
-/** Map user settings fitnessGoal to nutrition Goal */
-function mapFitnessGoal(fg: string | null | undefined): Goal {
-  switch (fg) {
-    case 'weight_loss': return 'CUT'
-    case 'hypertrophy':
-    case 'strength': return 'BULK'
-    default: return 'MAINTAIN'
-  }
-}
-
-/** Map biologicalSex to nutrition Gender */
-function mapGender(sex: string | null | undefined): Gender | null {
-  if (sex === 'male') return 'MALE'
-  if (sex === 'female') return 'FEMALE'
-  return null
-}
-
-/** Map settings to ActivityLevel */
-function mapActivityLevel(freq: number | null | undefined): ActivityLevel {
-  const f = Number(freq)
-  if (!Number.isFinite(f) || f <= 0) return 'MODERATE'
-  if (f <= 1) return 'LIGHT'
-  if (f <= 3) return 'MODERATE'
-  if (f <= 5) return 'VERY_ACTIVE'
-  return 'EXTRA_ACTIVE'
-}
-
-/** Try to compute personalized goals from user settings preferences */
-function computeGoalsFromProfile(prefs: Record<string, unknown>): { calories: number; protein: number; carbs: number; fat: number } | null {
-  try {
-    const weight = Number(prefs?.bodyWeightKg)
-    const height = Number(prefs?.heightCm)
-    const age = Number(prefs?.age)
-    const gender = mapGender(prefs?.biologicalSex as string)
-    if (!Number.isFinite(weight) || weight <= 0) return null
-    if (!Number.isFinite(height) || height <= 0) return null
-    if (!Number.isFinite(age) || age <= 0) return null
-    if (!gender) return null
-
-    const activityLevel = mapActivityLevel(prefs?.trainingFrequencyPerWeek as number)
-    const goal = mapFitnessGoal(prefs?.fitnessGoal as string)
-
-    return calculateNutritionGoals({ weight, height, age, gender, activityLevel }, goal)
-  } catch { return null }
 }
 
 function safeNumber(value: unknown): number {
@@ -181,14 +138,21 @@ export default async function NutritionPage() {
     schemaMissing = schemaMissing || isSchemaMissingError(e)
   }
 
-  // When no saved goals exist, try computing from user profile (TDEE-based)
+  // When no saved goals exist, try computing from user profile (TDEE-based),
+  // usando a fase escolhida pelo usuário (ou, sem escolha, o objetivo de treino).
   if (goalsSource === 'default' && userPrefs) {
-    const computed = computeGoalsFromProfile(userPrefs)
+    const computed = computeGoalsFromPrefs(userPrefs)
     if (computed) {
       goals = computed
       goalsSource = 'profile'
     }
   }
+
+  // Dados do perfil para o seletor de fase recalcular a meta no client sem
+  // round-trip. Null quando o perfil está incompleto — aí o seletor se explica em
+  // vez de mostrar números inventados.
+  const profileStats = extractProfileStats(userPrefs)
+  const currentPhase = resolveNutritionPhase(userPrefs)
 
   // Fetch today's workout calories from completed sessions.
   // Schema: workout_session_logs.finished_at + duration_seconds. A tabela
@@ -301,7 +265,7 @@ export default async function NutritionPage() {
 
   return (
     <NutritionConsoleShell title="Nutrition Console" subtitle={`Hoje · ${dateKey}`}>
-      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} restDayReduction={restDayReduction} />
+      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} restDayReduction={restDayReduction} profileStats={profileStats} currentPhase={currentPhase} phaseIsExplicit={!!userPrefs?.nutritionPhase} />
     </NutritionConsoleShell>
   )
 }

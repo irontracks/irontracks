@@ -15,6 +15,14 @@ export const UserSettingsSchema = z
     trainingFrequencyPerWeek: z.number().int().min(1).max(7).nullable().default(null),
     fitnessLevel: z.enum(['beginner', 'intermediate', 'advanced', 'not_informed']).default('not_informed'),
     fitnessGoal: z.enum(['hypertrophy', 'weight_loss', 'strength', 'performance', 'health', 'not_informed']).default('not_informed'),
+    /**
+     * Fase da DIETA, escolhida no painel ⚙ Metas da nutrição — não confundir com
+     * `fitnessGoal`, que é o objetivo de TREINO. São eixos independentes: dá para
+     * treinar hipertrofia estando em cutting. Null = nunca escolheu, e aí a fase é
+     * derivada do `fitnessGoal` (ver lib/nutrition/phase.ts) para não mudar a meta
+     * de quem já usa o app.
+     */
+    nutritionPhase: z.enum(['CUT', 'MAINTAIN', 'BULK']).nullable().default(null),
     // ── UI & App settings ──────────────────────────────────────────────────────
     units: z.enum(['kg', 'lb']).default('kg'),
     dashboardDensity: z.enum(['comfortable', 'compact']).default('comfortable'),
