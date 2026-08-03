@@ -11,6 +11,7 @@
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { logError } from '@/lib/logger';
 import { isObject } from '../utils';
+import { MIN_MINI_SETS, resolvePlannedMiniSets } from '../helpers/restPauseRules';
 import type { UnknownRecord } from '../types';
 
 // ─── Modal State Types (espelham os do useWorkoutModals) ─────────────────────
@@ -208,6 +209,14 @@ export function useWorkoutMethodSavers({
                 setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Gere e preencha os minis antes de salvar.' } : prev));
                 return;
             }
+            // Rest-Pause com uma mini-série é série normal com uma pausa no meio —
+            // deixar salvar assim é o que corrompia o plano do exercício.
+            if (minis.length < MIN_MINI_SETS) {
+                setRestPauseModal((prev) => (prev && typeof prev === 'object'
+                    ? { ...prev, error: `Rest-Pause precisa de pelo menos ${MIN_MINI_SETS} minis.` }
+                    : prev));
+                return;
+            }
             const miniRepsParsed = minis.map((v) => {
                 const n = parseTrainingNumber(v);
                 return n != null && n > 0 ? n : null;
@@ -230,7 +239,16 @@ export function useWorkoutMethodSavers({
                     activation_reps: 0,
                     mini_reps: miniReps,
                     rest_time_sec: pauseSec,
-                    planned_mini_sets: miniReps.length,
+                    // O PLANO não pode ser rebaixado pelo que foi PREENCHIDO. Antes
+                    // gravava `miniReps.length`, então registrar um dia com menos
+                    // minis do que o previsto rebaixava o plano do exercício para
+                    // sempre — e a abertura seguinte já mostrava o número errado,
+                    // chegando a 1, que não é Rest-Pause. (print do dono, 03/08/2026)
+                    planned_mini_sets: resolvePlannedMiniSets(
+                        parseTrainingNumber(m?.miniSets)
+                        ?? parseTrainingNumber((cfg as UnknownRecord | null)?.mini_sets),
+                        miniReps.length,
+                    ),
                 },
                 advanced_config: cfg,
             });

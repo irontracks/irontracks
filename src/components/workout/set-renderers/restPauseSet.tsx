@@ -3,13 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 
-/**
- * Mini-sets assumidos quando o exercício está marcado como Rest-Pause mas chegou
- * sem configuração. Mesmo valor que o editor grava por padrão — os dois precisam
- * concordar, senão o card mostra uma quantidade e o plano diz outra.
- */
-const DEFAULT_MINI_SETS = 2;
 import { Check, MessageSquare, Pencil } from 'lucide-react';
+import { normalizeMiniSets } from '../helpers/restPauseRules';
 import { useWorkoutContext } from '../WorkoutContext';
 import { FailureToggle } from './FailureToggle';
 import { HelpHint } from '@/components/ui/HelpHint';
@@ -104,22 +99,28 @@ const RestPauseSetInner = ({
   const minisArrRaw: unknown[] = Array.isArray(rp?.mini_reps) ? (rp.mini_reps as unknown[]) : [];
 
   // miniSets: priority chain — sstOverride > cfg.mini_sets > log.rest_pause.planned_mini_sets > mini_reps already saved
-  const miniSets = sstOverride
-    ? sstOverride.miniCount
-    : (() => {
-      const fromCfg = Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0)
-      if (fromCfg > 0) return fromCfg
-      const fromLog = Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0)
-      if (fromLog > 0) return fromLog
-      // If mini_reps are already saved in the log, use their count
-      if (minisArrRaw.length) return minisArrRaw.length
-      // Último recurso: o método é Rest-Pause mas o exercício veio SEM configuração
-      // (treino antigo, ou montado antes de o dropdown de método criar as etapas).
-      // Cair em 0 deixava o card sem nenhum mini-set: a pessoa via o método marcado
-      // e nada para preencher, tendo de configurar do zero em todo treino. Dois é o
-      // mesmo default que o editor usa. (queixa do dono, 30/07)
-      return DEFAULT_MINI_SETS
-    })()
+  // O resultado passa SEMPRE por `normalizeMiniSets`: qualquer fonte pode trazer 1
+  // — plano rebaixado por um registro incompleto (bug corrigido em
+  // helpers/restPauseRules.ts), treino antigo, edição manual — e Rest-Pause com uma
+  // mini-série não é Rest-Pause, é série normal com uma pausa. (print do dono,
+  // 03/08/2026: "1 minis • descanso 15s... não tem como fazer rest-p com 1 mini set")
+  const miniSets = normalizeMiniSets(
+    sstOverride
+      ? sstOverride.miniCount
+      : (() => {
+        const fromCfg = Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0)
+        if (fromCfg > 0) return fromCfg
+        const fromLog = Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0)
+        if (fromLog > 0) return fromLog
+        // Reps já salvas no log: a contagem delas é o último indício de plano.
+        if (minisArrRaw.length) return minisArrRaw.length
+        // O método é Rest-Pause mas o exercício veio SEM configuração (treino antigo,
+        // ou montado antes de o dropdown de método criar as etapas). Cair em 0 deixava
+        // o card sem nenhum mini-set: a pessoa via o método marcado e nada para
+        // preencher, tendo de configurar do zero em todo treino. (queixa do dono, 30/07)
+        return 0
+      })(),
+  )
 
   const minis: Array<number | null> = Array.from({ length: miniSets }).map((_, idx) => {
     const v = minisArrRaw[idx];
