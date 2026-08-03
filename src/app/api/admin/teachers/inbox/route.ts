@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { logError } from '@/lib/logger'
+import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -226,8 +227,12 @@ export async function GET(req: Request) {
         }
 
         if (kind === 'post') {
-          const satisfaction = toNumeric((r as Record<string, unknown>)?.mood)
-          if (Number.isFinite(satisfaction) && satisfaction > 0) {
+          // A satisfação mora em `answers.satisfaction` — a coluna `mood`, lida aqui
+          // antes, nunca é gravada (0 de 1.003 linhas), então o professor via a
+          // média sempre vazia. `readCheckinSatisfaction` mantém a coluna como
+          // fallback legado.
+          const satisfaction = readCheckinSatisfaction(r)
+          if (satisfaction !== null && satisfaction > 0) {
             prev.postSatisfactionSum += satisfaction
             prev.postSatisfactionCount += 1
           }

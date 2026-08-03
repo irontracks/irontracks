@@ -3,6 +3,7 @@
 import { X } from 'lucide-react'
 import type { UnknownRecord } from '@/types/app'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
 
 
 type CheckinsModalProps = {
@@ -110,7 +111,8 @@ export const CheckinsModal = ({
               }),
             )
             const postAvgSoreness = avg(postRows.map((r) => toNumberOrNull(r?.soreness)))
-            const postAvgSatisfaction = avg(postRows.map((r) => toNumberOrNull(r?.mood)))
+            // `answers.satisfaction`, não a coluna `mood` — ela nunca é gravada.
+            const postAvgSatisfaction = avg(postRows.map((r) => readCheckinSatisfaction(r)))
             const postAvgRpe = avg(
               postRows.map((r) => {
                 const answers: UnknownRecord = isPlainRecord(r?.answers) ? r.answers : {}
@@ -197,8 +199,8 @@ export const CheckinsModal = ({
                               <div className="font-semibold">{toNumberOrNull(row?.soreness) ?? '—'}</div>
                             </div>
                             <div>
-                              <div className="text-neutral-400">Humor</div>
-                              <div className="font-semibold">{toNumberOrNull(row?.mood) ?? '—'}</div>
+                              <div className="text-neutral-400">Satisfação</div>
+                              <div className="font-semibold">{readCheckinSatisfaction(row) ?? '—'}</div>
                             </div>
                             <div>
                               <div className="text-neutral-400">RPE</div>

@@ -5,6 +5,15 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
+import {
+  CHECKIN_SCALES,
+  averageCheckinValues,
+  checkinsOfKind,
+  readCheckinEnergy,
+  readCheckinSatisfaction,
+  readCheckinSleepHours,
+  readCheckinSoreness,
+} from '@/utils/checkin/metrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,11 +95,9 @@ const computePrs = (latestNotes: unknown, prevNotesList: unknown[]) => {
   return prs.slice(0, 6)
 }
 
-const avg = (rows: Record<string, unknown>[], key: string) => {
-  const vals = rows.map((r) => Number(r?.[key])).filter((n) => Number.isFinite(n))
-  if (!vals.length) return null
-  return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
-}
+// A média vive em `utils/checkin/metrics` — aqui ela era `Number(r[key])` + filtro
+// por `isFinite`, e como `Number(null) === 0` todo check-in SEM aquele campo entrava
+// na conta valendo zero. Ver o cabeçalho de metrics.ts para os números do caso real.
 
 export async function GET() {
   const auth = await requireUser()
@@ -117,7 +124,9 @@ export async function GET() {
   const skipRateLimit = tier === 'vip_elite' || tier === 'admin'
 
   try {
-    const cacheKey = `vip:weekly-summary:${user.id}`
+    // `v2` no prefixo: o payload antigo (médias diluídas por null + campo `mood`)
+    // ficaria servido por até 2 min após o deploy, mostrando o número errado.
+    const cacheKey = `vip:weekly-summary:v2:${user.id}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
@@ -162,7 +171,7 @@ export async function GET() {
 
     const { data: checkins } = await supabase
       .from('workout_checkins')
-      .select('id, kind, created_at, energy, mood, soreness, sleep_hours')
+      .select('id, kind, created_at, energy, mood, soreness, sleep_hours, answers')
       .eq('user_id', user.id)
       .gte('created_at', startIso)
       .order('created_at', { ascending: false })
@@ -201,17 +210,23 @@ export async function GET() {
     if (checkinsList.length) dataUsed.push(`${Math.min(checkinsList.length, 60)} check-ins (últimos 7d)`)
     if (prs.length) dataUsed.push('PRs do último treino')
 
-    const energy = avg(checkinsList, 'energy')
-    const mood = avg(checkinsList, 'mood')
-    const soreness = avg(checkinsList, 'soreness')
-    const sleep = avg(checkinsList, 'sleep_hours')
+    // Cada métrica sai do check-in que REALMENTE a coleta: energia e sono só
+    // existem no pré, satisfação só no pós. Misturar os dois tipos (o que a média
+    // antiga fazia) diluía a energia e o sono em zeros vindos das linhas de pós.
+    const preCheckins = checkinsOfKind(checkinsList, 'pre')
+    const postCheckins = checkinsOfKind(checkinsList, 'post')
+
+    const energy = averageCheckinValues(preCheckins.map(readCheckinEnergy))
+    const sleep = averageCheckinValues(preCheckins.map(readCheckinSleepHours))
+    const soreness = averageCheckinValues(checkinsList.map(readCheckinSoreness))
+    const satisfaction = averageCheckinValues(postCheckins.map(readCheckinSatisfaction))
 
     const lines: string[] = []
     lines.push(`Resumo VIP • últimos 7 dias`)
     lines.push(`- Frequência: ${trainedDays} dia(s) treinado(s)`)
-    if (energy != null) lines.push(`- Energia média: ${energy}/10`)
-    if (mood != null) lines.push(`- Humor médio: ${mood}/10`)
-    if (soreness != null) lines.push(`- Dor/fadiga média: ${soreness}/10`)
+    if (energy != null) lines.push(`- Energia média: ${energy}/${CHECKIN_SCALES.energy}`)
+    if (satisfaction != null) lines.push(`- Satisfação média: ${satisfaction}/${CHECKIN_SCALES.satisfaction}`)
+    if (soreness != null) lines.push(`- Dor/fadiga média: ${soreness}/${CHECKIN_SCALES.soreness}`)
     if (sleep != null) lines.push(`- Sono médio: ${sleep}h`)
     if (prs.length) {
       const prTxt = prs
@@ -224,7 +239,15 @@ export async function GET() {
 
     const summaryText = lines.join('\n')
 
-    const payload = { ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText }
+    const payload = {
+      ok: true,
+      dataUsed,
+      trainedDays,
+      checkins: { energy, satisfaction, soreness, sleep },
+      scales: CHECKIN_SCALES,
+      prs,
+      summaryText,
+    }
     await cacheSet(cacheKey, payload, 120)
     return NextResponse.json(payload)
   } catch (e: unknown) {
