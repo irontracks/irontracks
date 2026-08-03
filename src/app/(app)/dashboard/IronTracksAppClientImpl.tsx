@@ -61,6 +61,7 @@ import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useSeasonalCampaign } from '@/hooks/useSeasonalCampaign'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
+import { reportGeofenceArrival } from '@/lib/gps/reportGeofenceArrival'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { flushPendingWorkoutsRefresh } from '@/utils/workout/persistWorkoutPlan';
@@ -304,15 +305,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!enabled || lat == null || lng == null || !name) return null
         return { name, lat, lng }
     }, [userSettingsApi?.settings])
+    // A chegada vira check-in gravado — a seção se chama "Auto Check-in" e até
+    // 03/08/2026 nunca gravou nada (geofence ativo, `gym_checkins` com zero linhas
+    // em toda a produção). O mesmo handler serve ao evento com o app aberto e ao
+    // toque na notificação; a janela anti-duplicata é do servidor.
+    const handleGymArrival = useCallback(() => {
+        if (favoriteGym) void reportGeofenceArrival(favoriteGym)
+        setView('dashboard')
+    }, [favoriteGym, setView])
+
     useGymGeofence({
         favoriteGym,
         enabled: favoriteGym !== null,
         onEntered: useCallback((_gymName: string) => {
             // App is in foreground — bring user to dashboard so the start CTA
             // is one tap away. (Local notif handles the killed-app case.)
-            setView('dashboard')
-        }, [setView]),
+            handleGymArrival()
+        }, [handleGymArrival]),
     })
+
     const {
         profileIncomplete,
         setProfileIncomplete,
@@ -812,6 +823,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
             // dashboard por default; com ele, funciona mesmo já aberto em outra view.
             if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
+            // Toque na notificação de chegada na academia (o app estava fechado, então o
+            // evento `gymGeofenceEntered` não rodou). O plugin de push do Capacitor
+            // entrega notificação LOCAL também, com o `userInfo` do Swift em `data`.
+            // Sem link: o destino é o dashboard, e a chegada precisa virar check-in.
+            if (detail?.type === 'gym_geofence') { handleGymArrival(); return; }
             // Avisos de admin abrem o painel na aba certa. Tem de ser pelo TYPE,
             // não por link: o painel é uma `view` deste componente, não uma rota
             // — `/admin` sequer existe em `app/`. O link antigo (`/admin?tab=
@@ -849,7 +865,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView, router, openAdminPanel]);
+    }, [setView, router, openAdminPanel, handleGymArrival]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
