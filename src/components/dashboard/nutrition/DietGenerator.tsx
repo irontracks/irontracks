@@ -52,6 +52,9 @@ export default function DietGenerator({
   // cardápio pra seguir depois. Antes só existia o lançar, e o plano sumia ao fechar.
   const [saving, setSaving] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
+  const [swappingKey, setSwappingKey] = useState<string | null>(null)
+  /** Por item ("mealIdx-itemIdx"): alimentos já recusados, pra não voltarem. */
+  const [rejected, setRejected] = useState<Record<string, string[]>>({})
 
   const generate = useCallback(async () => {
     if (busy) return
@@ -121,6 +124,71 @@ export default function DietGenerator({
       setSaving(false)
     }
   }, [plan, saving])
+
+  /**
+   * Troca um alimento por outro da mesma classe. Só funciona com a dieta SALVA —
+   * a troca grava direto no plano (item 4 do pedido), então precisa existir plano.
+   * `rejected` acumula o que já foi recusado: clicar de novo traz o próximo, não
+   * o mesmo de volta.
+   */
+  const swapItem = useCallback(async (mealIdx: number, itemIdx: number) => {
+    if (!savedPlanId || swappingKey) return
+    const key = `${mealIdx}-${itemIdx}`
+    setSwappingKey(key); setError(null)
+    try {
+      const res = await fetch('/api/nutrition/diet-plan/swap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ dayIndex: 0, mealIndex: mealIdx, itemIndex: itemIdx, reject: rejected[key] ?? [] }),
+      })
+      const json = await res.json().catch((): null => null)
+      if (!res.ok || !json?.ok) {
+        setError(
+          String(json?.error || '') === 'no_alternative'
+            ? 'Não achei outro alimento parecido no seu repertório pra trocar.'
+            : 'Não consegui trocar agora. Tente novamente.',
+        )
+        return
+      }
+      const swappedFood = String(json.swapped?.food || '')
+      setPlan((prev) => {
+        if (!prev) return prev
+        const meals = prev.meals.map((m, mi) =>
+          mi !== mealIdx
+            ? m
+            : {
+                ...m,
+                items: m.items.map((it, ii) => (ii !== itemIdx ? it : { ...it, ...json.swapped })),
+              },
+        )
+        // Totais recalculados aqui também: o card mostra o total da refeição, e
+        // deixá-lo velho depois da troca é a mentira silenciosa que o helper evita.
+        return {
+          ...prev,
+          meals: meals.map((m) => ({
+            ...m,
+            totals: m.items.reduce(
+              (acc, it) => ({
+                calories: acc.calories + num(it.calories),
+                protein: acc.protein + num(it.protein),
+                carbs: acc.carbs + num(it.carbs),
+                fat: acc.fat + num(it.fat),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fat: 0 },
+            ),
+          })),
+        }
+      })
+      if (swappedFood) {
+        setRejected((prev) => ({ ...prev, [key]: [...(prev[key] ?? []), swappedFood] }))
+      }
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Falha ao trocar o alimento.')
+    } finally {
+      setSwappingKey(null)
+    }
+  }, [savedPlanId, swappingKey, rejected])
 
   const applyMeal = useCallback(async (meal: PlanMeal, idx: number) => {
     if (applyingIdx !== null) return
@@ -218,7 +286,20 @@ export default function DietGenerator({
                               <div key={`${it.food}-${j}`} className="px-2.5 py-2">
                                 <div className="flex items-baseline justify-between gap-2">
                                   <span className="text-xs text-white truncate">{it.food}</span>
-                                  <span className="shrink-0 text-xs font-semibold tabular-nums text-neutral-200">{Math.round(it.grams)}g</span>
+                                  <span className="flex shrink-0 items-center gap-1.5">
+                                    <span className="text-xs font-semibold tabular-nums text-neutral-200">{Math.round(it.grams)}g</span>
+                                    {/* Trocar exige plano salvo: a troca grava direto nele. */}
+                                    <button
+                                      type="button"
+                                      onClick={() => swapItem(idx, j)}
+                                      disabled={!savedPlanId || swappingKey !== null}
+                                      title={savedPlanId ? `Trocar ${it.food} por outro parecido` : 'Salve a dieta para poder trocar'}
+                                      aria-label={`Trocar ${it.food}`}
+                                      className="flex size-6 items-center justify-center rounded-md text-[11px] text-neutral-400 transition hover:bg-white/[0.08] hover:text-yellow-300 disabled:opacity-30"
+                                    >
+                                      {swappingKey === `${idx}-${j}` ? '…' : '↻'}
+                                    </button>
+                                  </span>
                                 </div>
                                 <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
                                   <span>{Math.round(it.calories)} kcal</span>
