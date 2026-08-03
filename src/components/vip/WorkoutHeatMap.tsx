@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface CheckinPoint {
   latitude: number
@@ -8,6 +9,21 @@ interface CheckinPoint {
   checked_in_at: string
   gym_name?: string
 }
+
+/**
+ * Por que o card busca as academias além dos check-ins
+ * ────────────────────────────────────────────────────
+ * O vazio tem DUAS causas muito diferentes e a mensagem única escondia a que
+ * importa. Medido em produção (03/08/2026): 10 dos 11 usuários com settings de
+ * localização estavam com GPS e check-in automático LIGADOS, e `user_gyms` tinha
+ * ZERO linhas na base inteira — logo `gym_checkins` também tinha zero. O fluxo de
+ * cadastro funciona (testado ponta a ponta: permissão iOS → busca → insert); o que
+ * faltava era o passo seguinte ficar visível.
+ *
+ * "Nenhum check-in neste período" lê como "você não treinou". Sem academia salva o
+ * check-in é IMPOSSÍVEL, e o card precisa dizer isso e levar ao cadastro.
+ */
+type EmptyReason = 'no-gym' | 'no-checkin' | 'error'
 
 interface WorkoutHeatMapProps {
   userId: string
@@ -19,35 +35,64 @@ interface WorkoutHeatMapProps {
  * Uses simple colored dots on a dark canvas — no external map library needed for the basic version.
  */
 export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeatMapProps) {
+  const router = useRouter()
   const [checkins, setCheckins] = useState<CheckinPoint[]>([])
+  const [gymCount, setGymCount] = useState<number | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(period)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    fetch(`/api/gps/checkin?limit=100`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.ok && d.checkins) {
-          const now = Date.now()
-          const cutoff = selectedPeriod === 'year'
-            ? now - 365 * 24 * 60 * 60 * 1000
-            : now - 30 * 24 * 60 * 60 * 1000
+    setLoadError(false)
 
-          const filtered = d.checkins
-            .filter((c: Record<string, unknown>) => c.latitude && c.longitude && new Date(c.checked_in_at as string).getTime() > cutoff)
-            .map((c: Record<string, unknown>) => ({
-              latitude: c.latitude as number,
-              longitude: c.longitude as number,
-              checked_in_at: c.checked_in_at as string,
-              gym_name: (c.user_gyms as Record<string, unknown>)?.name as string || undefined,
-            }))
-          setCheckins(filtered)
-        }
-      })
-      .catch(() => { /* intentional: non-critical VIP feature */ })
-      .finally(() => setLoading(false))
+    const load = async () => {
+      const [checkinRes, gymRes] = await Promise.allSettled([
+        fetch('/api/gps/checkin?limit=100').then(r => r.json()),
+        fetch('/api/gps/gyms').then(r => r.json()),
+      ])
+      if (cancelled) return
+
+      // Falha de rede não pode virar "sem check-in" — antes o `.catch` vazio
+      // engolia o erro e o card acusava vazio como se fosse dado.
+      if (checkinRes.status !== 'fulfilled' || !checkinRes.value?.ok) {
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
+
+      const now = Date.now()
+      const cutoff = selectedPeriod === 'year'
+        ? now - 365 * 24 * 60 * 60 * 1000
+        : now - 30 * 24 * 60 * 60 * 1000
+
+      const raw: Record<string, unknown>[] = Array.isArray(checkinRes.value.checkins) ? checkinRes.value.checkins : []
+      const filtered = raw
+        .filter((c) => c.latitude && c.longitude && new Date(c.checked_in_at as string).getTime() > cutoff)
+        .map((c) => ({
+          latitude: c.latitude as number,
+          longitude: c.longitude as number,
+          checked_in_at: c.checked_in_at as string,
+          gym_name: (c.user_gyms as Record<string, unknown>)?.name as string || undefined,
+        }))
+      setCheckins(filtered)
+
+      // Academias falhando não derruba o card: sem a contagem, o vazio cai no
+      // texto genérico em vez de acusar "cadastre sua academia" sem saber.
+      setGymCount(
+        gymRes.status === 'fulfilled' && gymRes.value?.ok && Array.isArray(gymRes.value.gyms)
+          ? gymRes.value.gyms.length
+          : null,
+      )
+      setLoading(false)
+    }
+
+    load()
+    return () => { cancelled = true }
   }, [userId, selectedPeriod])
+
+  const emptyReason: EmptyReason = loadError ? 'error' : gymCount === 0 ? 'no-gym' : 'no-checkin'
 
   // Group by location (round to ~100m)
   const clusters = useMemo(() => {
@@ -111,8 +156,32 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
           <div className="h-6 w-6 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
         </div>
       ) : checkins.length === 0 ? (
-        <div className="h-32 flex items-center justify-center text-white/30 text-sm">
-          Nenhum check-in neste período
+        <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+          {emptyReason === 'no-gym' ? (
+            <>
+              <p className="text-sm font-semibold text-white/80">Cadastre sua academia para começar</p>
+              <p className="max-w-[280px] text-xs leading-relaxed text-white/40">
+                O check-in é automático: assim que você chega na academia salva, o app registra a presença e ela aparece aqui.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/profile')}
+                className="mt-1 rounded-xl px-4 py-2 text-xs font-black text-black transition-transform active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+              >
+                📍 Cadastrar academia
+              </button>
+            </>
+          ) : emptyReason === 'error' ? (
+            <p className="text-sm text-white/30">Não foi possível carregar seus check-ins agora.</p>
+          ) : (
+            <>
+              <p className="text-sm text-white/40">Nenhum check-in neste período</p>
+              <p className="max-w-[280px] text-xs leading-relaxed text-white/30">
+                Abra o app na sua academia para registrar a presença.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <>
