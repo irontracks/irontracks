@@ -162,3 +162,42 @@ describe('a fiação nos componentes', () => {
     }
   })
 })
+
+describe('alinhamento do traçado com a tinta do logo', () => {
+  const t = DEFAULT_STORY_TEMPLATE
+
+  it('devolve o deslocamento da âncora até o canto do traçado', () => {
+    // Sem `dx`/`dy` a caixa era ancorada no ponto de DESENHO. Com
+    // `textBaseline='top'` esse ponto é o topo da em-box, e as maiúsculas começam
+    // abaixo dele — sobrava um vão visível acima do logo. (2ª rodada do relato do
+    // dono, 03/08/2026: "ainda não está totalmente alinhado")
+    const box = measureBrandBox(t, 1)
+    expect(typeof box.dx).toBe('number')
+    expect(typeof box.dy).toBe('number')
+    // A folga puxa o traçado para fora da tinta, nunca para dentro.
+    expect(box.dx).toBeLessThanOrEqual(0)
+  })
+
+  it('o deslocamento acompanha a escala, como o resto da caixa', () => {
+    const base = measureBrandBox(t, 1)
+    const big = measureBrandBox(t, 2)
+    expect(big.dx).toBeCloseTo(base.dx * 2, 5)
+    expect(big.dy).toBeCloseTo(base.dy * 2, 5)
+  })
+
+  it('o hit-test usa o MESMO retângulo do traçado', () => {
+    // Divergir aqui faz o usuário mirar num lugar e acertar outro.
+    const src = readFileSync('src/components/storyComposerUtils.ts', 'utf8')
+    expect(src).toMatch(/const x0 = BRAND_BASE_X \+ b\.x \+ box\.dx/)
+    expect(src).toMatch(/const y0 = BRAND_BASE_Y \+ b\.y \+ box\.dy/)
+  })
+
+  it('a alça não mistura px de tela com % de canvas', () => {
+    // `marginLeft/-Top: -6px` eram pixels de TELA somados a dimensões em % do
+    // CANVAS: na preview (~300px exibindo 720) valiam 14,4px de canvas.
+    const src = readFileSync('src/components/stories/BrandDragHandle.tsx', 'utf8')
+    expect(src, 'voltou a usar recuo em px de tela').not.toMatch(/margin(Left|Top):\s*'-?\d+px'/)
+    expect(src).toMatch(/box\.dx/)
+    expect(src).toMatch(/box\.dy/)
+  })
+})
