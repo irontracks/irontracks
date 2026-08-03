@@ -10,7 +10,8 @@ type WeeklySummary = {
   summaryText?: string
   dataUsed?: string[]
   trainedDays?: number
-  checkins?: { energy: number | null; mood: number | null; soreness: number | null; sleep: number | null }
+  checkins?: { energy: number | null; satisfaction: number | null; soreness: number | null; sleep: number | null }
+  scales?: { energy: number; soreness: number; satisfaction: number; rpe: number }
   prs?: unknown[]
   error?: string
 }
@@ -59,6 +60,7 @@ export default function VipWeeklySummaryCard() {
   const trainedDays = data?.trainedDays ?? 0
   const prsCount = safeArray(data?.prs).length
   const checkins = data?.checkins
+  const energyScale = data?.scales?.energy ?? 5
 
   return (
     <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(234,179,8,0.08) 100%)' }}>
@@ -128,7 +130,9 @@ export default function VipWeeklySummaryCard() {
                   <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Energia</span>
                 </div>
                 <div className="text-xl font-black text-white">{Math.round(checkins.energy * 10) / 10}</div>
-                <div className="text-[10px] text-neutral-500">média</div>
+                {/* A escala é 1–5 ('Ótimo/Normal/Cansado'), não 0–10 — sem o rótulo,
+                    um 5 (o máximo possível) parecia nota medíocre. */}
+                <div className="text-[10px] text-neutral-500">média de {energyScale}</div>
               </div>
             )}
 

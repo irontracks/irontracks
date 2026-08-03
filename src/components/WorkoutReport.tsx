@@ -55,6 +55,7 @@ import {
     type AiState,
 } from '@/hooks/useReportData'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
+import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
 import { useMuscleMapWeek } from '@/hooks/useMuscleMapWeek'
 
 type AnyObj = Record<string, unknown>
@@ -436,7 +437,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             const rpe = answers?.rpe ?? null;
             const base: AnyObj = local ? ({ ...local } as AnyObj) : {};
             if (rpe != null && String(rpe) !== '') base.rpe = rpe;
-            if (db?.mood != null) base.satisfaction = db.mood;
+            // `answers.satisfaction` primeiro: a coluna `mood` nunca é gravada, então
+            // um relatório aberto pelo histórico (sem o rascunho local) vinha sem nota.
+            const satisfaction = readCheckinSatisfaction(db);
+            if (satisfaction != null) base.satisfaction = satisfaction;
             if (db?.soreness != null) base.soreness = db.soreness;
             if (db?.notes != null && String(db.notes).trim()) base.notes = db.notes;
             return base;

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAdminPanel } from './AdminPanelContext';
 import type { UnknownRecord } from '@/types/app';
+import { readCheckinSatisfaction } from '@/utils/checkin/metrics';
 
 export function StudentCheckinsTab() {
     const {
@@ -38,7 +39,8 @@ export function StudentCheckinsTab() {
         return toNumberOrNull(answers.time_minutes ?? answers.timeMinutes);
     }));
     const postAvgSoreness = avg(postRows.map((r) => toNumberOrNull(r?.soreness)));
-    const postAvgSatisfaction = avg(postRows.map((r) => toNumberOrNull(r?.mood)));
+    // `answers.satisfaction`, não a coluna `mood` — ela nunca é gravada.
+    const postAvgSatisfaction = avg(postRows.map((r) => readCheckinSatisfaction(r)));
     const postAvgRpe = avg(postRows.map((r) => {
         const answers: UnknownRecord = r?.answers && typeof r.answers === 'object' ? (r.answers as UnknownRecord) : {};
         return toNumberOrNull(answers.rpe);
@@ -143,7 +145,7 @@ export function StudentCheckinsTab() {
                             const dateLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString('pt-BR') : '—';
                             const energy = r?.energy != null ? String(r.energy) : '—';
                             const soreness = r?.soreness != null ? String(r.soreness) : '—';
-                            const mood = r?.mood != null ? String(r.mood) : '—';
+                            const satisfaction = readCheckinSatisfaction(r) ?? '—';
                             const answers: UnknownRecord = r?.answers && typeof r.answers === 'object' ? (r.answers as UnknownRecord) : {};
                             const rpe = answers.rpe != null ? String(answers.rpe) : '—';
                             const timeMinutes = answers.time_minutes != null ? String(answers.time_minutes) : answers.timeMinutes != null ? String(answers.timeMinutes) : '—';
@@ -156,7 +158,7 @@ export function StudentCheckinsTab() {
                                             <div className="text-xs text-neutral-400">{dateLabel}</div>
                                         </div>
                                         <div className="text-xs text-neutral-300 font-mono">
-                                            {kind === 'pre' ? `E:${energy} D:${soreness} T:${timeMinutes}` : `RPE:${rpe} Sat:${mood} D:${soreness}`}
+                                            {kind === 'pre' ? `E:${energy} D:${soreness} T:${timeMinutes}` : `RPE:${rpe} Sat:${satisfaction} D:${soreness}`}
                                         </div>
                                     </div>
                                     {notes ? <div className="mt-2 text-sm text-neutral-200">{notes}</div> : null}
