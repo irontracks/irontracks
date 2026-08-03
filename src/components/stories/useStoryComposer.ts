@@ -14,7 +14,7 @@ import { safeString } from '@/utils/guards'
 import { stripWeekdayHint } from '@/utils/workoutTitle'
 import { saveImageToPhotos, saveBlobToPhotos, openAppSettings } from '@/utils/native/irontracksNative'
 import { uploadStoryMedia } from '@/utils/storage/mediaUpload'
-import { logError, logWarn } from '@/lib/logger'
+import { logError, logWarn, logWarnRemote } from '@/lib/logger'
 import {
     SessionLite,
     Metrics,
@@ -688,14 +688,28 @@ export function useStoryComposer({
                             trimStartSec: trimRange[0],
                             trimEndSec: trimRange[1],
                             onDiagnostic: (d) => {
-                                // Surface which path actually ran + how long it took. Helps
-                                // diagnose silent native failures in production builds.
-                                const secs = (d.durationMs / 1000).toFixed(1)
-                                if (d.path === 'native') {
-                                    setInfo(`Render nativo: ${secs}s`)
-                                } else {
-                                    setInfo(`Native indisponível (${d.stage || 'erro'}: ${d.error || '—'}), usando JS…`)
+                                // O diagnóstico do motor de vídeo é para NÓS, não para o
+                                // usuário. Ele chegou a ver "Native indisponível (read_output:
+                                // Load failed ()), usando JS…" — num toast VERDE, de sucesso
+                                // (relatado com print em 03/08/2026). Nomes de estágio interno
+                                // e mensagem do WebKit não significam nada para quem só quer
+                                // publicar um story, e o fallback é transparente: muda o tempo,
+                                // não o resultado.
+                                //
+                                // Vai para o Sentry, onde a informação serve. `logWarnRemote`
+                                // (não `logWarn`) porque este é justamente o caso que precisa
+                                // ser visível em PRODUÇÃO — logWarn é no-op lá.
+                                if (d.path === 'fallback') {
+                                    logWarnRemote('story.video.native-fallback', 'render nativo indisponível, usando JS', {
+                                        stage: d.stage ?? 'erro',
+                                        error: d.error ?? '',
+                                        durationMs: d.durationMs,
+                                        base64Bytes: d.base64Bytes ?? 0,
+                                    })
+                                    // Sem `setInfo`: o botão já mostra "Processando".
+                                    return
                                 }
+                                setInfo(`Render nativo: ${(d.durationMs / 1000).toFixed(1)}s`)
                             },
                         })
                         if (nativeResult) {

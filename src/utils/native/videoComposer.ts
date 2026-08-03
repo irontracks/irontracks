@@ -53,6 +53,36 @@ export type NativeComposeDiagnostic = {
   durationMs: number
   stage?: 'write_video' | 'write_overlay' | 'native_export' | 'read_output' | 'precondition'
   error?: string
+  /** Tamanho do base64 lido de volta, quando a falha for na leitura do resultado. */
+  base64Bytes?: number
+}
+
+/**
+ * Decodifica base64 → Blob sem passar por `data:` URL.
+ *
+ * A versão anterior montava `data:video/mp4;base64,…` e chamava `fetch()` nela,
+ * contando com o WebKit para decodificar em código nativo. Funciona para arquivo
+ * pequeno e falha em vídeo real: o WebKit recusa `data:` URLs acima de um limite e
+ * o fetch morre com "Load failed ()" — exatamente o erro que apareceu na tela do
+ * dono (03/08/2026). O efeito era perverso: o caminho rápido (AVFoundation, 3-8s)
+ * caía no lento (Canvas, 30-60s) justamente nos clipes maiores, que são os que mais
+ * precisam dele.
+ *
+ * `atob` devolve uma binary string; a cópia é feita em blocos para não estourar a
+ * pilha com `String.fromCharCode(...spread)` num arquivo de dezenas de MB.
+ */
+const base64ToBlob = (base64: string, mime: string): Blob => {
+  const binary = atob(base64)
+  const total = binary.length
+  const CHUNK = 32_768
+  const parts: Uint8Array[] = []
+  for (let offset = 0; offset < total; offset += CHUNK) {
+    const end = Math.min(offset + CHUNK, total)
+    const bytes = new Uint8Array(end - offset)
+    for (let i = offset; i < end; i++) bytes[i - offset] = binary.charCodeAt(i)
+    parts.push(bytes)
+  }
+  return new Blob(parts as BlobPart[], { type: mime })
 }
 
 /**
@@ -219,9 +249,9 @@ export const composeStoryVideoOnIos = async (
     // Capacitor.convertFileSrc returns capacitor://localhost/... which fails
     // when server.url is set to a real domain (the WebView's https origin
     // can't fetch from a custom scheme). Going through the plugin call instead
-    // avoids the cross-origin issue entirely. The base64 → Blob decode uses
-    // a data: URL so WebKit handles the decoding in native code.
+    // avoids the cross-origin issue entirely.
     let blob: Blob
+    let base64Len = 0
     try {
       const { Filesystem, Directory } = await import('@capacitor/filesystem')
       const outputFilename = outputNativePath.split('/').pop() || ''
@@ -234,12 +264,14 @@ export const composeStoryVideoOnIos = async (
         ? readResult.data
         : ''
       if (!base64) throw new Error('empty_read_data')
-      const dataUrl = `data:video/mp4;base64,${base64}`
-      const dataResp = await fetch(dataUrl)
-      blob = await dataResp.blob()
+      base64Len = base64.length
+      blob = base64ToBlob(base64, 'video/mp4')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'read_failed'
-      emitDiag({ path: 'fallback', stage: 'read_output', error: msg })
+      // `base64Bytes` no payload: a hipótese de origem é que o caminho anterior
+      // (data: URL + fetch) estourava o limite do WebKit em vídeos grandes. Com o
+      // tamanho no diagnóstico dá para confirmar em vez de supor, se voltar a falhar.
+      emitDiag({ path: 'fallback', stage: 'read_output', error: msg, base64Bytes: base64Len })
       return null
     }
     if (!blob || blob.size === 0) {
