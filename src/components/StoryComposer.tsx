@@ -59,7 +59,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     metrics: rawMetrics,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -84,11 +84,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset, brandScale })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset, brandScale])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -229,7 +229,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                     {layout !== 'live' && layout !== 'group' && (
                       <div
                         className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
-                        onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
+                        onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
                         onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
                         onTouchEnd={onWorkoutTouchEnd}
                         onTouchCancel={onWorkoutTouchEnd}
@@ -244,6 +244,8 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                     {layout !== 'live' && layout !== 'group' && (
                       <BrandDragHandle
                         brandOffset={brandOffset}
+                        brandScale={brandScale}
+                        template={template}
                         previewRef={previewRef}
                         onPointerDown={onBrandPointerDown}
                         onPointerMove={onBrandPointerMove}

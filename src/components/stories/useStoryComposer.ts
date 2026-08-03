@@ -27,6 +27,8 @@ import {
     pinchToWorkoutTransform,
     panToWorkoutOffset,
     dragToBrandOffset,
+    clampBrandScale,
+    isPointOverBrand,
     NO_OFFSET,
     type Offset,
     isIOSUserAgent,
@@ -138,12 +140,24 @@ export function useStoryComposer({
     const brandDragRef = useRef<{ pointerId: number | null; startX: number; startY: number; start: Offset }>({
         pointerId: null, startX: 0, startY: 0, start: NO_OFFSET,
     })
+    /**
+     * Escala PRÓPRIA da marca. Pinçar o logo escalava TODAS as peças do story
+     * (relatado com print em 03/08/2026): a caixa da marca é pequena, então o
+     * segundo dedo caía fora dela, no overlay de gesto — que via dois toques e
+     * escalava o bloco inteiro. Agora o gesto que NASCE sobre a marca é dela.
+     */
+    const [brandScale, setBrandScale] = useState(1)
+    const brandScaleRef = useRef(brandScale)
+    useEffect(() => { brandScaleRef.current = brandScale }, [brandScale])
+
     const workoutGestureRef = useRef<{
-        mode: 'none' | 'pan' | 'pinch'
+        /** `brand_pinch`: nasceu sobre a marca — escala só ela. */
+        mode: 'none' | 'pan' | 'pinch' | 'brand_pinch'
         startX: number; startY: number
         startOffsetX: number; startOffsetY: number
         startScale: number; startDist: number; startMidX: number; startMidY: number
-    }>({ mode: 'none', startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0, startScale: 1, startDist: 0, startMidX: 0, startMidY: 0 })
+        startBrandScale: number
+    }>({ mode: 'none', startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0, startScale: 1, startDist: 0, startMidX: 0, startMidY: 0, startBrandScale: 1 })
     const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
     const [showTrimmer, setShowTrimmer] = useState(false)
     const [videoDuration, setVideoDuration] = useState(0)
@@ -306,7 +320,7 @@ export function useStoryComposer({
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET)
+        setBrandOffset(NO_OFFSET); setBrandScale(1)
         brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
         workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
@@ -498,7 +512,7 @@ export function useStoryComposer({
             setDraggingKey(null)
             // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
             setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-            setBrandOffset(NO_OFFSET)
+            setBrandOffset(NO_OFFSET); setBrandScale(1)
             workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
@@ -519,27 +533,38 @@ export function useStoryComposer({
     }, [])
     const resetWorkoutTransform = useCallback(() => {
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET)
+        setBrandOffset(NO_OFFSET); setBrandScale(1)
         workoutGestureRef.current.mode = 'none'
     }, [])
 
     // Fator px-tela → px-canvas (o canvas 720 é exibido em rect.width).
     const canvasFactor = (rect: DOMRect | null) => (rect && rect.width > 0 ? CANVAS_W / rect.width : 1)
 
-    const onWorkoutTouchStart = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }) => {
+    const onWorkoutTouchStart = useCallback((
+        e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> },
+        rect?: DOMRect | null,
+    ) => {
         const t = e.touches
         setWorkoutTransform((cur) => {
             if (t.length >= 2) {
                 const dx = t[0].clientX - t[1].clientX
                 const dy = t[0].clientY - t[1].clientY
+                const midX = (t[0].clientX + t[1].clientX) / 2
+                const midY = (t[0].clientY + t[1].clientY) / 2
+                // O gesto pertence a quem ele NASCE em cima. Sem esta checagem, pinçar
+                // o logo escalava o story inteiro: a caixa da marca é pequena e o
+                // segundo dedo cai fora dela, então o overlay via dois toques e
+                // assumia o comando.
+                const onBrand = isPointOverBrand(midX, midY, rect ?? null, template, brandOffsetRef.current, brandScaleRef.current)
                 workoutGestureRef.current = {
-                    mode: 'pinch',
+                    mode: onBrand ? 'brand_pinch' : 'pinch',
                     startX: 0, startY: 0,
                     startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
                     startScale: cur.scale,
                     startDist: Math.hypot(dx, dy) || 1,
-                    startMidX: (t[0].clientX + t[1].clientX) / 2,
-                    startMidY: (t[0].clientY + t[1].clientY) / 2,
+                    startMidX: midX,
+                    startMidY: midY,
+                    startBrandScale: brandScaleRef.current,
                 }
             } else if (t.length === 1) {
                 workoutGestureRef.current = {
@@ -547,18 +572,25 @@ export function useStoryComposer({
                     startX: t[0].clientX, startY: t[0].clientY,
                     startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
                     startScale: cur.scale, startDist: 0, startMidX: 0, startMidY: 0,
+                    startBrandScale: brandScaleRef.current,
                 }
             }
             return cur
         })
-    }, [])
+    }, [template])
 
     const onWorkoutTouchMove = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }, rect: DOMRect | null) => {
         const g = workoutGestureRef.current
         if (g.mode === 'none') return
         const t = e.touches
         const factor = canvasFactor(rect)
-        if (g.mode === 'pinch' && t.length >= 2) {
+        if (g.mode === 'brand_pinch' && t.length >= 2) {
+            // Só a marca muda de tamanho — bloco e fundo ficam onde estão.
+            const dx = t[0].clientX - t[1].clientX
+            const dy = t[0].clientY - t[1].clientY
+            const dist = Math.hypot(dx, dy) || 1
+            setBrandScale(clampBrandScale(g.startBrandScale * (dist / (g.startDist || 1))))
+        } else if (g.mode === 'pinch' && t.length >= 2) {
             const dx = t[0].clientX - t[1].clientX
             const dy = t[0].clientY - t[1].clientY
             const dist = Math.hypot(dx, dy) || 1
@@ -902,7 +934,7 @@ export function useStoryComposer({
         workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
         onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
         // marca (IRON·TRACKS) independente
-        brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+        brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
