@@ -1113,6 +1113,59 @@ export const clampBrandScale = (s: number | null | undefined): number => {
 }
 
 /**
+ * Distância (px de CANVAS) em que o arrasto passa a grudar no eixo central.
+ *
+ * 14px num canvas de 720 ≈ 2% do lado — perto o bastante para o dedo alcançar sem
+ * mirar, longe o bastante para não capturar quem quer parar ali do lado.
+ */
+export const BRAND_SNAP_THRESHOLD = 14
+
+export interface BrandSnapResult {
+    offset: Offset
+    /** Centro da marca grudado no eixo VERTICAL do canvas (linha em pé). */
+    snappedX: boolean
+    /** Centro da marca grudado no eixo HORIZONTAL do canvas (linha deitada). */
+    snappedY: boolean
+}
+
+/**
+ * Guias de alinhamento no arrasto da marca — o comportamento do Instagram Stories:
+ * ao cruzar o centro, o elemento GRUDA e uma linha aparece confirmando.
+ *
+ * Sem o snap a linha seria decorativa: acertar o centro exato com o dedo, num canvas
+ * exibido a menos da metade do tamanho, é questão de sorte — o usuário pararia
+ * sempre 1-2px fora e o guia ficaria piscando.
+ *
+ * Trabalha com o CENTRO da caixa da tinta (não com a âncora), que é o que o olho
+ * usa para julgar se algo está centralizado.
+ */
+export const snapBrandToCenter = (
+    offset: Offset | null | undefined,
+    box: { w: number; h: number; dx: number; dy: number },
+    threshold = BRAND_SNAP_THRESHOLD,
+): BrandSnapResult => {
+    const o = clampBrandOffset(offset)
+    const t = Number.isFinite(threshold) && threshold > 0 ? threshold : BRAND_SNAP_THRESHOLD
+
+    const centerX = BRAND_BASE_X + o.x + box.dx + box.w / 2
+    const centerY = BRAND_BASE_Y + o.y + box.dy + box.h / 2
+    const targetX = CANVAS_W / 2
+    const targetY = CANVAS_H / 2
+
+    const snappedX = Math.abs(centerX - targetX) <= t
+    const snappedY = Math.abs(centerY - targetY) <= t
+
+    return {
+        offset: clampBrandOffset({
+            x: snappedX ? o.x + (targetX - centerX) : o.x,
+            y: snappedY ? o.y + (targetY - centerY) : o.y,
+        }),
+        snappedX,
+        snappedY,
+    }
+}
+
+/**
  * O ponto (em px de TELA) caiu sobre a marca?
  *
  * Decide de quem é o gesto de pinça: da marca ou do bloco. Sem isso, pinçar o logo

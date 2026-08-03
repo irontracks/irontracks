@@ -7,6 +7,7 @@ import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { NutritionStoryControlPanel } from '@/components/stories/NutritionStoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
+import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
 import { CANVAS_W, CANVAS_H, SAFE_TOP, SAFE_BOTTOM, SAFE_SIDE } from './storyComposerUtils'
 import { drawCardioStory, activityLabel, type CardioStoryContent } from '@/components/stories/cardioStory'
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
@@ -65,7 +66,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -180,6 +181,9 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                       onPointerMove={onBrandPointerMove}
                       onPointerUp={onBrandPointerUp}
                     />
+
+                    {/* Guias de alinhamento — só durante o arrasto da marca. */}
+                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}

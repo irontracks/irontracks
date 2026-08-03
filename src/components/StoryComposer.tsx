@@ -7,6 +7,7 @@ import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
+import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
 import { getTemplateById } from '@/components/stories/storyTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -59,7 +60,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     metrics: rawMetrics,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -252,6 +253,9 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                         onPointerUp={onBrandPointerUp}
                       />
                     )}
+
+                    {/* Guias de alinhamento — só durante o arrasto da marca. */}
+                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
 
                   </div>
 

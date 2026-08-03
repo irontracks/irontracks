@@ -7,6 +7,7 @@ import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { NutritionStoryControlPanel } from '@/components/stories/NutritionStoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
+import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
 import { CANVAS_W, CANVAS_H, SAFE_TOP, SAFE_BOTTOM, SAFE_SIDE } from './storyComposerUtils'
 import { drawNutritionStory, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
@@ -64,7 +65,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
-    brandOffset, brandScale, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    brandOffset, brandScale, brandGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -179,6 +180,9 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       onPointerMove={onBrandPointerMove}
                       onPointerUp={onBrandPointerUp}
                     />
+
+                    {/* Guias de alinhamento — só durante o arrasto da marca. */}
+                    <AlignmentGuides x={brandGuides.x} y={brandGuides.y} />
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}
