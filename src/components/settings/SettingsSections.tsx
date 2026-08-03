@@ -1096,6 +1096,15 @@ export function SettingsGymGeofenceSection({
 
     const handleSetCurrent = async () => {
         setError('')
+        // O nome era opcional e caía num fallback silencioso: quem apertava o botão
+        // com o campo vazio levava "Minha academia" sem nunca ter digitado isso. O
+        // placeholder ("Smart Fit Centro") parecia valor preenchido e escondia que o
+        // campo estava em branco — aconteceu na conta do dono, 03/08/2026.
+        const safeName = nameDraft.trim().slice(0, 60)
+        if (!safeName) {
+            setError('Dê um nome pra essa academia antes de capturar — é ele que aparece no aviso de chegada.')
+            return
+        }
         setBusy(true)
         try {
             const status = await onRequestAlwaysPermission()
@@ -1110,7 +1119,6 @@ export function SettingsGymGeofenceSection({
             }
             setValue('favoriteGymLat', coords.lat)
             setValue('favoriteGymLng', coords.lng)
-            const safeName = (nameDraft || 'Minha academia').trim().slice(0, 60)
             setValue('favoriteGymName', safeName)
             setValue('gymGeofenceEnabled', true)
         } catch (e) {
@@ -1178,10 +1186,12 @@ export function SettingsGymGeofenceSection({
                     type="text"
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Smart Fit Centro"
+                    placeholder="Ex.: Smart Fit Centro"
                     maxLength={60}
                     aria-label="Nome da academia favorita"
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 placeholder:text-neutral-400 text-sm"
+                    /* placeholder mais apagado que o texto real: no tom antigo
+                       (neutral-400, o mesmo dos rótulos) ele passava por valor digitado. */
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 placeholder:text-neutral-600 text-sm"
                 />
             </div>
 
