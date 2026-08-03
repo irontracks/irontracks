@@ -7,6 +7,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import { isObject, buildBlocksByCount, normalizeExerciseKey, getSuggestion, watermarkPlaceholder } from './utils';
+import { normalizeMiniSets } from './helpers/restPauseRules';
 import { UnknownRecord, WorkoutExercise } from './types';
 
 /**
@@ -122,16 +123,25 @@ export function ModalsComplexMethods() {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            const minisCount = Math.max(0, Math.floor(parseTrainingNumber(restPauseModal?.miniSets) ?? 0));
-                                            if (!minisCount) {
+                                            const raw = Math.max(0, Math.floor(parseTrainingNumber(restPauseModal?.miniSets) ?? 0));
+                                            if (!raw) {
                                                 setRestPauseModal((prev) =>
                                                     prev && typeof prev === 'object' ? { ...prev, error: 'Defina a quantidade de minis.' } : prev,
                                                 );
                                                 return;
                                             }
+                                            // Piso do método: 1 mini não é Rest-Pause. Em vez de recusar com
+                                            // erro, corrige para o mínimo válido — o usuário quer minis, e
+                                            // travar o botão só o deixaria sem entender o que fazer.
+                                            const minisCount = normalizeMiniSets(raw);
                                             setRestPauseModal((prev) => {
                                                 if (!prev || typeof prev !== 'object') return prev;
-                                                return { ...prev, miniSets: minisCount, minis: Array.from({ length: minisCount }).map((): number | null => null), error: '' };
+                                                return {
+                                                    ...prev,
+                                                    miniSets: minisCount,
+                                                    minis: Array.from({ length: minisCount }).map((): number | null => null),
+                                                    error: minisCount !== raw ? `Rest-Pause precisa de pelo menos ${minisCount} minis — ajustei.` : '',
+                                                };
                                             });
                                         }}
                                         className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
