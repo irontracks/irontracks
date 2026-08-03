@@ -102,7 +102,20 @@ Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a *
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
 - **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. `gemini-pro` (usado no protocolo de exames, que cruza 4 fontes) é caro; use o `fastModelId` onde couber. Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`). O gap "Sentry não recebe erro de rota server" foi CORRIGIDO em 02/08/2026 — causa: `captureException` só enfileira e a Vercel congela a instância antes do envio; `lib/logger.ts` agora agenda `Sentry.flush` via `waitUntil` (guard em `loggerServerFlush.test.ts`). Se o Sentry voltar a ficar mudo para rotas server, comece por lá.
 - **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (**10 ocorrências** hoje — confira com `grep -c`, não confie no número) antes de um release novo. Ver "iOS — release" pra saber QUANDO ela precisa subir.
-- **App Store Connect API:** chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8` (Key ID `W834H36CBM`); o **Issuer ID não fica no disco** (pegar no painel Users and Access → Integrations). Detalhes em `docs/ios-release.md`.
+- **App Store Connect API — está TUDO no repo, não peça ao dono.** Chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8`; `ASC_KEY_ID` e **`ASC_ISSUER_ID` no `.env.local`**, lidos sozinhos por `scripts/ios-submit.mjs` (submete pro review sem painel web; `--dry-run` primeiro). Esta linha dizia "o Issuer ID não fica no disco (pegar no painel)" e **estava errada** — em 03/08/2026 o agente acreditou, parou o trabalho e foi pedir ao dono um dado que estava a um `grep` de distância, com o script de submissão pronto ao lado. Detalhes em `docs/ios-release.md`.
+
+### Antes de dizer "não tenho X", procure X no repo
+Vale para credencial, script, endpoint, chave — qualquer coisa. Parar e pedir ao dono
+algo que já existe custa a sessão inteira dele, e é o erro mais caro que dá pra cometer
+aqui: o trabalho já estava feito.
+
+- **Nota que descreve o que NÃO temos é a que apodrece primeiro.** Ninguém volta pra
+  apagá-la quando a lacuna é preenchida. Trate "não existe / falta / preencher quando
+  pego" como **pista datada**, nunca como fato — inclusive neste arquivo.
+- **A varredura mínima leva 30 segundos:** `.env.local` e `.env.example`, `scripts/`,
+  `package.json` (um script pronto costuma existir), e `grep -ri "<termo>"` no repo.
+- Confirmou que a lacuna é real? **Corrija a nota** que dizia o contrário, na mesma
+  tarefa — senão o próximo agente cai no mesmo buraco.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
