@@ -1016,12 +1016,21 @@ export const BRAND_FONT_SIZE = 54
  * Mede num canvas offscreen. Sem canvas disponível (SSR), cai num tamanho
  * conservador em vez de lançar.
  */
+/** Folga em px de CANVAS entre a tinta do logo e o traçado da alça. */
+const BRAND_BOX_PAD = 8
+
 export const measureBrandBox = (
     template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string },
     scale = 1,
-): { w: number; h: number } => {
+): { w: number; h: number; dx: number; dy: number } => {
     const s = Number.isFinite(scale) && scale > 0 ? scale : 1
-    const fallback = { w: 380 * s, h: (BRAND_FONT_SIZE + 12) * s }
+    // Sem canvas (SSR/jsdom): números conservadores, com o mesmo formato.
+    const fallback = {
+        w: (380 + BRAND_BOX_PAD * 2) * s,
+        h: (BRAND_FONT_SIZE + BRAND_BOX_PAD * 2) * s,
+        dx: -BRAND_BOX_PAD * s,
+        dy: -BRAND_BOX_PAD * s,
+    }
     try {
         if (typeof document === 'undefined') return fallback
         const canvas = document.createElement('canvas')
@@ -1030,9 +1039,11 @@ export const measureBrandBox = (
 
         const F = template.fonts
         const style = F.brandStyle ?? 'normal'
+        // MESMO baseline do desenho: as métricas abaixo são relativas a ele.
+        ctx.textBaseline = 'top'
         ctx.font = storyFont(F.family, F.brandWeight, BRAND_FONT_SIZE, style)
-        const ironW = ctx.measureText('IRON').width
-        const tracksW = ctx.measureText('TRACKS').width
+        const iron = ctx.measureText('IRON')
+        const tracks = ctx.measureText('TRACKS')
 
         const divider = template.brandDivider ?? ''
         let dividerW = 0
@@ -1041,11 +1052,43 @@ export const measureBrandBox = (
             dividerW = ctx.measureText(divider).width
         }
 
-        const w = ironW + dividerW + tracksW
-        if (!Number.isFinite(w) || w <= 0) return fallback
-        // Folga: a marca leva sombra (shadowBlur 12) e o alvo de toque não pode
-        // ficar colado no glifo.
-        return { w: (w + 16) * s, h: (BRAND_FONT_SIZE + 12) * s }
+        const inkW = iron.width + dividerW + tracks.width
+        if (!Number.isFinite(inkW) || inkW <= 0) return fallback
+
+        /**
+         * Caixa VERTICAL da tinta, não da em-box da fonte.
+         *
+         * Com `textBaseline = 'top'` o ponto de desenho é o topo da em-box, e as
+         * MAIÚSCULAS começam bem abaixo dele — o gap do ascender. Usar a âncora
+         * como topo da caixa deixava uma sobra visível acima do logo, que foi
+         * exatamente o desalinhamento que sobrou depois da primeira correção.
+         *
+         * Pela spec, `actualBoundingBoxAscent` é positivo PARA CIMA a partir da
+         * linha do baseline corrente; com baseline 'top' a tinta fica abaixo dela,
+         * então o valor vem negativo e `-ascent` é a distância até o topo da tinta.
+         */
+        const ascent = Math.max(
+            Number(iron.actualBoundingBoxAscent) || 0,
+            Number(tracks.actualBoundingBoxAscent) || 0,
+        )
+        const descent = Math.max(
+            Number(iron.actualBoundingBoxDescent) || 0,
+            Number(tracks.actualBoundingBoxDescent) || 0,
+        )
+        const inkTop = -ascent
+        const inkH = ascent + descent
+
+        // Métricas ausentes (navegador antigo) → altura pela em-box, como antes.
+        const usableH = Number.isFinite(inkH) && inkH > 0 ? inkH : BRAND_FONT_SIZE
+        const usableTop = Number.isFinite(inkTop) ? inkTop : 0
+
+        return {
+            w: (inkW + BRAND_BOX_PAD * 2) * s,
+            h: (usableH + BRAND_BOX_PAD * 2) * s,
+            // Deslocamento da ÂNCORA até o canto superior esquerdo do traçado.
+            dx: -BRAND_BOX_PAD * s,
+            dy: (usableTop - BRAND_BOX_PAD) * s,
+        }
     } catch {
         return fallback
     }
@@ -1096,8 +1139,11 @@ export const isPointOverBrand = (
 
     const b = clampBrandOffset(brandOffset)
     const box = measureBrandBox(template, clampBrandScale(brandScale))
-    const x0 = BRAND_BASE_X + b.x
-    const y0 = BRAND_BASE_Y + b.y
+    // `dx`/`dy` são o mesmo deslocamento que a alça usa: o alvo do gesto e o
+    // traçado que o usuário vê PRECISAM ser o mesmo retângulo, senão ele mira num
+    // lugar e acerta outro.
+    const x0 = BRAND_BASE_X + b.x + box.dx
+    const y0 = BRAND_BASE_Y + b.y + box.dy
     return cx >= x0 && cx <= x0 + box.w && cy >= y0 && cy <= y0 + box.h
 }
 

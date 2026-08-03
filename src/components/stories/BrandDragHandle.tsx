@@ -44,21 +44,20 @@ export function BrandDragHandle({
         () => measureBrandBox(template, brandScale),
         [template, brandScale],
     )
-    const BRAND_BOX_W = box.w
-    const BRAND_BOX_H = box.h
-
     return (
         <button
             type="button"
             aria-label="Arrastar a marca IRONTRACKS"
             className="absolute z-30 touch-none select-none cursor-grab active:cursor-grabbing rounded-lg border border-dashed border-yellow-400/40 hover:border-yellow-400/80 bg-yellow-400/5 active:bg-yellow-400/15 transition-colors"
             style={{
-                left: `${pct.x * 100}%`,
-                top: `${pct.y * 100}%`,
-                width: `${(BRAND_BOX_W / CANVAS_W) * 100}%`,
-                height: `${(BRAND_BOX_H / CANVAS_H) * 100}%`,
-                marginLeft: '-6px',
-                marginTop: '-6px',
+                // TUDO em % do canvas — inclusive a folga. Antes o recuo saía por
+                // `marginLeft/-Top: -6px`, pixels de TELA somados a dimensões em % do
+                // CANVAS: na preview (~300px exibindo 720) aqueles 6px valiam 14,4px
+                // de canvas, e a folga nem sequer acompanhava o tamanho do preview.
+                left: `${((pct.x * CANVAS_W + box.dx) / CANVAS_W) * 100}%`,
+                top: `${((pct.y * CANVAS_H + box.dy) / CANVAS_H) * 100}%`,
+                width: `${(box.w / CANVAS_W) * 100}%`,
+                height: `${(box.h / CANVAS_H) * 100}%`,
             }}
             onPointerDown={onPointerDown}
             onPointerMove={(e) => onPointerMove(e, previewRef.current?.getBoundingClientRect() ?? null)}
