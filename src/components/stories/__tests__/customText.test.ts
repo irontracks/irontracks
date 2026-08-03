@@ -196,3 +196,41 @@ describe('fiação da legenda', () => {
     }
   })
 })
+
+describe('a legenda NÃO desfaz o transform do bloco', () => {
+  /**
+   * BUG pego na conferência no aparelho (03/08/2026): a alça tracejada aparecia no
+   * lugar certo e o TEXTO não aparecia.
+   *
+   * Causa: `drawCustomTextLayer` aplicava a inversa do transform do bloco, como
+   * `enterBrandSpace` faz. Só que a marca é desenhada DENTRO daquele transform e a
+   * legenda não — os renderers a chamam depois do `ctx.restore()` que o encerra.
+   * A inversa deslocava o texto pelo NEGATIVO do pan do bloco: com o bloco
+   * arrastado, a legenda saía da tela enquanto a alça (HTML) ficava parada.
+   */
+  const src = readFileSync('src/components/stories/customText.ts', 'utf8')
+  const fn = src.slice(src.indexOf('export const drawCustomTextLayer'))
+
+  it('não aplica a inversa do zoom do bloco', () => {
+    expect(fn, 'voltou a inverter a escala do bloco').not.toMatch(/ctx\.scale\(1 \/ s, 1 \/ s\)/)
+  })
+
+  it('não aplica a inversa do pan do bloco', () => {
+    expect(fn, 'voltou a inverter o pan do bloco').not.toMatch(/ctx\.translate\(-offX, -offY\)/)
+  })
+
+  it('aplica apenas o offset próprio da legenda', () => {
+    expect(fn).toMatch(/ctx\.translate\(Number\(offset\?\.x\) \|\| 0, Number\(offset\?\.y\) \|\| 0\)/)
+  })
+
+  it('nenhum renderer passa mais o workoutTransform para a legenda', () => {
+    for (const f of [
+      'src/components/storyComposerUtils.ts',
+      'src/components/stories/nutritionStory.ts',
+      'src/components/stories/cardioStory.ts',
+    ]) {
+      const s = readFileSync(f, 'utf8')
+      expect(s, f).not.toMatch(/drawCustomTextLayer\([^)]*customTextOffset,\s*(workoutTransform|wt)\)/)
+    }
+  })
+})

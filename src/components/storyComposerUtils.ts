@@ -951,7 +951,7 @@ export const drawStory = ({
     // Legenda do usuário POR ÚLTIMO: é o que ele acabou de escrever e posicionar,
     // então nada do template pode cobri-la. Em espaço próprio (desfaz o zoom/pan do
     // bloco), como a marca — ver customText.ts.
-    drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset, workoutTransform);
+    drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset);
 };
 
 // ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────
