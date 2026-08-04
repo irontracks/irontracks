@@ -55,6 +55,8 @@ export default function DietGenerator({
   const [swappingKey, setSwappingKey] = useState<string | null>(null)
   /** Por item ("mealIdx-itemIdx"): alimentos já recusados, pra não voltarem. */
   const [rejected, setRejected] = useState<Record<string, string[]>>({})
+  /** Salvar como plano de um dia ou da semana inteira (item 5 do pedido). */
+  const [scope, setScope] = useState<'day' | 'week'>('day')
 
   const generate = useCallback(async () => {
     if (busy) return
@@ -92,7 +94,10 @@ export default function DietGenerator({
     if (!plan || saving) return
     setSaving(true); setError(null)
     try {
-      const res = await fetch('/api/nutrition/diet-plan', {
+      // Semana: o servidor deriva os outros 6 dias variando alimentos, sem nova
+      // chamada de IA (ver lib/nutrition/weekPlan). O corpo enviado é o mesmo.
+      const endpoint = scope === 'week' ? '/api/nutrition/diet-plan/week' : '/api/nutrition/diet-plan'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -123,7 +128,7 @@ export default function DietGenerator({
     } finally {
       setSaving(false)
     }
-  }, [plan, saving])
+  }, [plan, saving, scope])
 
   /**
    * Troca um alimento por outro da mesma classe. Só funciona com a dieta SALVA —
@@ -242,6 +247,31 @@ export default function DietGenerator({
                   </span>
                 </div>
 
+                {/* Salvar pra UM dia ou repetir a semana com variação — item 5. */}
+                <div className="flex gap-1 rounded-xl bg-white/[0.03] border border-white/[0.06] p-1" role="group" aria-label="Salvar para">
+                  {(['day', 'week'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScope(s)}
+                      disabled={!!savedPlanId}
+                      aria-pressed={scope === s}
+                      className={`h-8 flex-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
+                        scope === s ? 'bg-yellow-500/20 text-yellow-300' : 'text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {s === 'day' ? 'Só hoje' : 'Semana toda'}
+                    </button>
+                  ))}
+                </div>
+
+                {scope === 'week' && !savedPlanId && (
+                  <p className="px-1 text-[10px] leading-relaxed text-neutral-500">
+                    Os outros 6 dias saem deste cardápio, variando os alimentos por outros do
+                    seu repertório — mesma meta, sem repetir a semana inteira.
+                  </p>
+                )}
+
                 <button
                   type="button"
                   onClick={savePlan}
@@ -252,7 +282,9 @@ export default function DietGenerator({
                       : 'bg-white/[0.06] border border-white/[0.1] text-white hover:bg-white/[0.1] disabled:opacity-50'
                   }`}
                 >
-                  {savedPlanId ? '✓ Dieta salva — é só seguir' : saving ? 'Salvando...' : '💾 Salvar esta dieta'}
+                  {savedPlanId
+                    ? scope === 'week' ? '✓ Semana salva — é só seguir' : '✓ Dieta salva — é só seguir'
+                    : saving ? 'Salvando...' : scope === 'week' ? '💾 Salvar a semana' : '💾 Salvar esta dieta'}
                 </button>
 
                 {plan.meals.map((meal, idx) => {

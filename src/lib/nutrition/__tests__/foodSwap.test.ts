@@ -160,10 +160,19 @@ describe('swapFood — a troca em si', () => {
     expect(out?.food).toBe('atum')
   })
 
-  it('empatada a fonte, ganha a densidade calórica mais parecida — a porção fica realista', () => {
+  it('empatada a fonte, ganha quem MENOS desanda as calorias do prato', () => {
+    // Não é a densidade parecida, é o resultado: 62 g de proteína dão 240 g de atum
+    // (278 kcal, −16%) ou 310 g de tilápia (298 kcal, −10%) contra os 330 kcal do
+    // frango. A tilápia entrega a mesma proteína ficando mais perto das calorias.
     const out = swapFood(item, [ALFACE, TILAPIA, ATUM])
-    // 165 kcal/100 g (frango) está mais perto de 116 (atum) que de 96 (tilápia).
-    expect(out?.food).toBe('atum')
+    expect(out?.food).toBe('tilapia')
+  })
+
+  it('recusa o substituto que preserva o macro mas DOBRA as calorias', () => {
+    // Salmão (20 P / 208 kcal por 100 g): 62 g de proteína pedem 310 g e entregam
+    // ~645 kcal no lugar de 330. "Manteve a proteína" e destruiu a dieta.
+    const SALMAO = cand('salmao', 208, 20, 0, 13)
+    expect(swapFood(item, [SALMAO])).toBeNull()
   })
 
   it('macros do resultado batem com a porção devolvida', () => {

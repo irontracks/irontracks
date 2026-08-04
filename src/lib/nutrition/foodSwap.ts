@@ -121,6 +121,12 @@ const PORTION_MIN_G = 10
 const PORTION_MAX_G = 1_000
 
 /**
+ * Teto de desvio calórico da troca (35%). O substituto tem de manter o macro-âncora
+ * E não desandar as calorias do prato — as duas coisas, não uma. Ver `kcalDrift`.
+ */
+const MAX_KCAL_DRIFT = 0.35
+
+/**
  * Porção do substituto que entrega a mesma quantidade do macro-âncora.
  * Arredonda em 5 g — ninguém pesa 137 g de arroz — e limita a faixa: sem o teto,
  * casar 40 g de proteína com alface pediria quilos.
@@ -134,6 +140,25 @@ export function portionFor(candidate: SwapCandidate, target: number, anchor: 'pr
 }
 
 const SOURCE_RANK: Record<SwapCandidate['source'], number> = { learned: 0, custom: 1, database: 2 }
+
+/**
+ * Mesmo alimento com outro nome? Comparar a chave inteira não basta: "Arroz" e
+ * "arroz cozido" são chaves diferentes, e trocar um pelo outro devolveria
+ * praticamente a mesma comida — o usuário aperta "trocar" e nada muda de verdade.
+ *
+ * Regra: se TODAS as palavras do nome mais curto aparecem no mais longo, é o mesmo
+ * alimento base ("arroz" ⊂ "arroz cozido", "frango" ⊂ "peito de frango").
+ * Assume falso positivo ocasional ("leite" ⊂ "leite de coco") de propósito — perder
+ * um candidato é bem menos ruim que entregar o mesmo prato como se fosse novidade.
+ */
+function isSameBaseFood(a: string, b: string): boolean {
+  const ta = a.split(' ').filter(Boolean)
+  const tb = b.split(' ').filter(Boolean)
+  if (!ta.length || !tb.length) return false
+  const [shorter, longer] = ta.length <= tb.length ? [ta, tb] : [tb, ta]
+  const longerSet = new Set(longer)
+  return shorter.every((t) => longerSet.has(t))
+}
 
 export interface SwapResult {
   food: string
@@ -171,24 +196,43 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
       .filter(Boolean),
   )
 
+  const blockedList = [...blocked]
   const pool = (Array.isArray(candidates) ? candidates : [])
     .filter((c) => c && String(c.name ?? '').trim())
-    .filter((c) => !blocked.has(normalizeFoodKey(c.name)))
+    .filter((c) => {
+      const key = normalizeFoodKey(c.name)
+      if (blocked.has(key)) return false
+      // "Arroz" → "arroz cozido" seria trocar por si mesmo.
+      return !blockedList.some((b) => isSameBaseFood(key, b))
+    })
     .filter((c) => classifyFood(c) === cls)
 
   if (!pool.length) return null
 
   const targetAmount = anchor === 'kcal' ? num(item.calories) : num(item[anchor])
+  const originalKcal = num(item.calories)
+
+  /**
+   * Desvio calórico que a troca provoca. Preservar só o macro-âncora não basta:
+   * 62 g de proteína em salmão (20 P / 208 kcal por 100 g) pedem 310 g e entregam
+   * ~645 kcal no lugar de 330 — quase o DOBRO. A dieta inteira desanda por uma
+   * troca que, no papel, "manteve a proteína".
+   */
+  const kcalDrift = (c: SwapCandidate, portion: number): number => {
+    if (originalKcal <= 0) return 0
+    return Math.abs(num(c.kcal) * (portion / 100) - originalKcal) / originalKcal
+  }
 
   const ranked = pool
     .map((c) => ({ c, portion: portionFor(c, targetAmount, anchor) }))
     .filter((x) => x.portion > 0)
+    .map((x) => ({ ...x, drift: kcalDrift(x.c, x.portion) }))
+    // Acima disso não é substituto, é outra refeição.
+    .filter((x) => x.drift <= MAX_KCAL_DRIFT)
     .sort((a, b) => {
       const bySource = SOURCE_RANK[a.c.source] - SOURCE_RANK[b.c.source]
       if (bySource !== 0) return bySource
-      const densityA = Math.abs(num(a.c.kcal) - per100.kcal)
-      const densityB = Math.abs(num(b.c.kcal) - per100.kcal)
-      if (densityA !== densityB) return densityA - densityB
+      if (a.drift !== b.drift) return a.drift - b.drift
       return a.c.name.localeCompare(b.c.name)
     })
 
