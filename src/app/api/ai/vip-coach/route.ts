@@ -182,7 +182,7 @@ export async function POST(req: Request) {
     }
 
     // ── Fetch user context in parallel ────────────────────────────────────
-    const [workoutsRes, assessmentRes, settingsRes, profileRes] = await Promise.all([
+    const [workoutsRes, assessmentRes, profileRes] = await Promise.all([
       supabase
         .from('workouts')
         .select('name, date, created_at, notes')
@@ -195,11 +195,6 @@ export async function POST(req: Request) {
         .or(`student_id.eq.${safePg(userId)},user_id.eq.${safePg(userId)}`)
         .order('assessment_date', { ascending: false })
         .limit(1),
-      supabase
-        .from('user_settings')
-        .select('preferences')
-        .eq('user_id', userId)
-        .maybeSingle(),
       supabase
         .from('profiles')
         .select('display_name, email, role')
@@ -217,16 +212,13 @@ export async function POST(req: Request) {
       if (name) contextParts.push(`Nome do usuário: ${name}`)
     }
 
-    // Settings
-    const settings = (settingsRes.data as AnyObj | null)?.preferences
-    if (settings && typeof settings === 'object') {
-      const s = settings as AnyObj
-      const parts: string[] = []
-      if (s.units) parts.push(`Unidade: ${s.units}`)
-      if (s.biologicalSex) parts.push(`Sexo: ${s.biologicalSex}`)
-      if (s.uiMode) parts.push(`Nível: ${s.uiMode}`)
-      if (parts.length) contextParts.push(`Perfil: ${parts.join(', ')}`)
-    }
+    // O PERFIL não é montado aqui: `buildUserContextBlock(['profile', …])` mais
+    // abaixo já traz sexo, antropometria, objetivo, nível de TREINO e unidade, pelo
+    // leitor único. O bloco que existia aqui mandava o sexo uma SEGUNDA vez e — pior
+    // — rotulava `uiMode` (modo da INTERFACE: beginner/intermediate/advanced) como
+    // "Nível", competindo com o `fitnessLevel` do outro bloco. Os dois enums têm os
+    // mesmos valores e divergem em 23 das 37 contas: o coach recebia dois "Nível"
+    // contraditórios e nada dizia qual era o de treino.
 
     // Assessment
     const assessments = Array.isArray(assessmentRes.data) ? assessmentRes.data : []

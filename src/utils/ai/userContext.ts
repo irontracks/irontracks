@@ -128,6 +128,9 @@ async function profileSection(
     ].filter(Boolean).join(' · ')
     if (routine) bits.push(routine)
 
+    // Unidade preferida: o coach responde na unidade que o usuário configurou.
+    if (p?.units) bits.push(`Unidade preferida: ${p.units}`)
+
     // ── Campos do fluxo VIP (texto livre) ─────────────────────────────────────
     if (vipRes?.equipment) bits.push(`Equipamento: ${String(vipRes.equipment)}`)
     if (vipRes?.constraints) bits.push(`Observações/restrições: ${typeof vipRes.constraints === 'string' ? vipRes.constraints : JSON.stringify(vipRes.constraints)}`)

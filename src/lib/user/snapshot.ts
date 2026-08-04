@@ -65,6 +65,12 @@ export interface ProfileFacts {
   nutritionPhase: NutritionPhase
   /** Entradas do motor de TDEE. `null` quando falta peso/altura/idade/sexo. */
   stats: UserStats | null
+  /**
+   * Unidade preferida de peso. É apresentação, mas muda a RESPOSTA da IA (falar em
+   * kg ou lb com quem configurou o contrário confunde), então vive junto do perfil
+   * em vez de obrigar cada rota a reler `preferences` só por causa dela.
+   */
+  units: 'kg' | 'lb' | null
 }
 
 export interface NutritionFacts {
@@ -142,6 +148,7 @@ function buildProfile(prefs: Record<string, unknown> | null): ProfileFacts | nul
     nutritionPhaseExplicit: normalizeNutritionPhase(prefs.nutritionPhase),
     nutritionPhase: resolveNutritionPhase(prefs),
     stats: extractProfileStats(prefs),
+    units: prefs.units === 'lb' ? 'lb' : prefs.units === 'kg' ? 'kg' : null,
   }
 }
 

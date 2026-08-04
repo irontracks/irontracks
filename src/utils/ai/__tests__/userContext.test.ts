@@ -85,6 +85,17 @@ describe('buildUserContextBlock — setor profile', () => {
     expect(block).toContain('4x/semana')
   })
 
+  it('leva a unidade preferida — o coach responde em kg ou lb', async () => {
+    // Vivia num bloco "Perfil:" que o vip-coach montava por conta, lendo
+    // `preferences` direto em paralelo a este setor. Agora entra por um caminho só.
+    const block = await buildUserContextBlock(
+      makeSupabase({ preferences: { ...PREFS_COMPLETE, units: 'lb' } }),
+      'user-1',
+      ['profile'],
+    )
+    expect(block).toContain('Unidade preferida: lb')
+  })
+
   it('rotula a antropometria como DECLARADA, para não competir com a avaliação medida', async () => {
     const block = await buildUserContextBlock(
       makeSupabase({ preferences: PREFS_COMPLETE }),

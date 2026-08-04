@@ -27,11 +27,14 @@ const PADRAO = /from\(\s*['"]user_settings['"]\s*\)/
 const LEITOR_UNICO = 'lib/user/snapshot.ts'
 
 const DEBITO: readonly string[] = [
-  // Nutrição/coach: candidatos naturais aos próximos PRs — já existe setor no snapshot.
+  // ESCRITA e ESTADO DE FEATURE — não são débito, e migrar seria ERRADO. O snapshot
+  // resolve fatos para LEITURA; nenhum destes lê o perfil para decidir algo:
+  //  · nutrition-actions faz read-modify-write da linha de preferências (precisa do
+  //    objeto cru para mesclar — pegar só os fatos apagaria o resto no upsert);
+  //  · workout-wizard lê e grava `preferences.aiProgression`, estado da própria
+  //    feature. O PERFIL dele já vem do snapshot, via `buildUserContextBlock`.
   'actions/nutrition-actions.ts',
-  'app/api/ai/vip-coach/route.ts',
   'app/api/ai/workout-wizard/route.ts',
-  'app/api/calories/estimate/route.ts',
   // Notificações e push: leem preferências de canal/horário, não o perfil físico.
   // Precisariam de um setor `notifications` no snapshot antes de migrar.
   'app/api/cron/streak-at-risk/route.ts',
@@ -90,10 +93,35 @@ describe('ratchet — leitura direta de user_settings', () => {
     expect(obsoletas).toEqual([])
   })
 
-  it('a página e o overlay de nutrição não voltam para a lista', () => {
-    // As duas superfícies que o CLAUDE.md manda manter em sincronia — foram as
-    // primeiras a sair do débito (PRs #667 e este).
-    expect(leitores).not.toContain('app/(app)/dashboard/nutrition/page.tsx')
-    expect(leitores).not.toContain('components/dashboard/nutrition/NutritionOverlay.tsx')
+  it.each([
+    // As duas superfícies que o CLAUDE.md manda manter em sincronia.
+    'app/(app)/dashboard/nutrition/page.tsx',
+    'components/dashboard/nutrition/NutritionOverlay.tsx',
+    // Rotas que resolvem fatos do usuário: o perfil delas vem do snapshot.
+    'app/api/ai/vip-coach/route.ts',
+    'app/api/calories/estimate/route.ts',
+  ])('%s não volta para a lista', (arquivo) => {
+    expect(leitores).not.toContain(arquivo)
+  })
+})
+
+/**
+ * O vip-coach montava um bloco "Perfil: Unidade, Sexo, Nível" lendo `preferences`
+ * direto, EM PARALELO ao `[PERFIL E OBJETIVO]` que ele já recebe do
+ * `buildUserContextBlock`. Além do sexo duplicado, ele rotulava `uiMode` — o modo da
+ * INTERFACE — como "Nível", competindo com o `fitnessLevel` (nível de TREINO) do
+ * outro bloco. Os dois enums têm os mesmos valores (beginner/intermediate/advanced)
+ * e divergem em 23 das 37 contas: o coach recebia dois "Nível" contraditórios.
+ */
+describe('vip-coach — o perfil do prompt vem de um lugar só', () => {
+  const code = readFileSync(join(SRC, 'app', 'api', 'ai', 'vip-coach', 'route.ts'), 'utf8')
+  const executavel = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+  it('não manda `uiMode` para a IA — não é o nível de treino', () => {
+    expect(executavel).not.toContain('uiMode')
+  })
+
+  it('segue pedindo o setor `profile` ao contexto unificado', () => {
+    expect(executavel).toMatch(/buildUserContextBlock\([^)]*'profile'/s)
   })
 })
