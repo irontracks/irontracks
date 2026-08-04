@@ -18,6 +18,7 @@ import { logWarnRemote } from '@/lib/logger';
 import { decideExternalSync } from '../helpers/inputSyncDecision';
 import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
 import { AutoloadNote } from './AutoloadNote';
+import { FailureToggle } from './FailureToggle';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -218,9 +219,6 @@ const NormalSetInner = ({
   const lDone = !!log.L_done;
   const rDone = !!log.R_done;
   const done  = !!log.done;
-  // #4a auto-carga: série levada à falha muscular. RPE 10 ≠ sempre falha; esse
-  // sinal explícito muda a decisão de progressão do motor (falhou → não sobe carga).
-  const failed = !!log.failure;
 
   // #autoload: sugestão do motor para esta série (só quando ligado) + fonte do peso.
   const autoSuggestion = autoLoadEnabled ? autoLoadSuggestions?.[key] : null;
@@ -665,21 +663,16 @@ const NormalSetInner = ({
     </div>
   );
 
+  // Chip de falha: o MESMO componente dos outros 13 renderers. A cópia inline que
+  // vivia aqui não tinha `whitespace-nowrap`/`shrink-0`, então o flex do rodapé —
+  // onde a explicação do motor (🧠) disputa a largura — espremia o botão e o
+  // rótulo quebrava em duas linhas (💥 em cima, FALHA? embaixo).
   const failureToggle = (
-    <button
-      type="button"
-      onClick={() => updateLog(key, { failure: !failed, advanced_config: cfg ?? log.advanced_config ?? null })}
-      aria-pressed={failed}
-      aria-label={`Marcar série ${setIdx + 1} como levada à falha`}
-      className={[
-        'inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest border transition-colors',
-        failed
-          ? 'text-red-300 bg-red-500/15 border-red-500/40'
-          : 'text-neutral-500 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',
-      ].join(' ')}
-    >
-      💥 {failed ? 'Falha' : 'Falha?'}
-    </button>
+    <FailureToggle
+      exIdx={exIdx}
+      setIdx={setIdx}
+      extraPatch={{ advanced_config: cfg ?? log.advanced_config ?? null }}
+    />
   );
 
   return (

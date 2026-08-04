@@ -18,10 +18,19 @@ import { useWorkoutContext } from '../WorkoutContext';
  * Compacto por padrão (`compact`) porque as linhas dos métodos avançados são bem
  * mais apertadas que a da série normal.
  */
-export function FailureToggle({ exIdx, setIdx, compact = false }: {
+export function FailureToggle({ exIdx, setIdx, compact = false, extraPatch }: {
   exIdx: number;
   setIdx: number;
   compact?: boolean;
+  /**
+   * Campos que o renderer precisa carimbar junto no MESMO patch. A série normal
+   * persiste `advanced_config` em toda escrita do log — por isso ela mantinha um
+   * botão inline próprio, que ficou para trás quando este componente ganhou o
+   * `whitespace-nowrap`/`shrink-0` e voltou a quebrar em duas linhas (print do
+   * dono, 04/08/2026: 💥 em cima, FALHA? embaixo). Com este parâmetro não há mais
+   * motivo para existir uma segunda cópia do chip.
+   */
+  extraPatch?: Record<string, unknown>;
 }) {
   const { getLog, updateLog } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
@@ -31,7 +40,7 @@ export function FailureToggle({ exIdx, setIdx, compact = false }: {
   return (
     <button
       type="button"
-      onClick={() => updateLog(key, { failure: !failed })}
+      onClick={() => updateLog(key, { failure: !failed, ...extraPatch })}
       aria-pressed={failed}
       aria-label={`Marcar série ${setIdx + 1} como levada à falha`}
       title={failed ? 'Série levada à falha' : 'Marcar como levada à falha'}
