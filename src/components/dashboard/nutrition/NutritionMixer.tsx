@@ -39,6 +39,7 @@ const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: 
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
 const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
 const PrescribedDietPlan = dynamic(() => import('./PrescribedDietPlan'), { ssr: false })
+const MyDietPlan = dynamic(() => import('./MyDietPlan'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
@@ -1043,6 +1044,16 @@ export default function NutritionMixer({
           renderiza se existir plano ativo (senão retorna null). Gatear pelo VIP do aluno
           escondia a dieta prescrita de alunos sem assinatura própria (achado da revisão). */}
       <PrescribedDietPlan
+        dateKey={currentDateKey}
+        canApply={isToday}
+        onApplied={() => setEntriesTick(v => v + 1)}
+      />
+
+      {/* ══ MINHA DIETA (salva pelo próprio usuário) ══════════════════════ */}
+      {/* Mesma regra do prescrito: sem gate de VIP aqui — o componente só renderiza
+          se existir plano salvo, e quem gatear a GERAÇÃO é o DietGenerator. Esconder
+          a dieta já salva de quem perdeu o VIP seria tirar dele um dado próprio. */}
+      <MyDietPlan
         dateKey={currentDateKey}
         canApply={isToday}
         onApplied={() => setEntriesTick(v => v + 1)}
