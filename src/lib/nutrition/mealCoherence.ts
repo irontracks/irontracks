@@ -58,14 +58,31 @@ const DRY_FOODS: readonly DryFood[] = [
  * que ele existe pra pegar.
  */
 const NOT_A_LIQUID = /doce de leite|leite condensado|leite em po|creme de leite/
-const LIQUID = /\bleite\b|\biogurte\b|\bagua\b|\bsuco\b|bebida vegetal|\bkefir\b|\bcafe\b|\bcha\b|\bvitamina\b|\bsmoothie\b|\bshake\b|\bcoalhada\b/
+/** Base láctea/cremosa — serve para QUALQUER pó, inclusive os que exigem `creamy`. */
+const CREAMY_LIQUID = /\bleite\b|\biogurte\b|\bkefir\b|\bcoalhada\b|bebida vegetal|\bvitamina\b|\bsmoothie\b|\bshake\b/
+/** Líquido fino — dissolve whey e creatina, NÃO faz mingau de aveia nem cereal. */
+const THIN_LIQUID = /\bagua\b|\bsuco\b|\bcafe\b|\bcha\b|\bchimarrao\b/
 
-/** Este item é um líquido que serve de veículo? */
-export function isLiquidVehicle(foodName: unknown): boolean {
+/**
+ * Que tipo de veículo este item FORNECE — `null` se não for líquido.
+ *
+ * A distinção importa: um lanche com "sucrilhos + Água" satisfazia o guard antigo
+ * (que só perguntava "tem líquido?") e continua sendo cereal com água. Caso real:
+ * a variação da semana trocou o abacate por sucrilhos numa refeição cujo único
+ * líquido era água, e o guard deixou passar.
+ */
+export function liquidKindOf(foodName: unknown): VehicleKind | null {
   const n = normalize(foodName)
-  if (!n) return false
-  if (NOT_A_LIQUID.test(n)) return false
-  return LIQUID.test(n)
+  if (!n) return null
+  if (NOT_A_LIQUID.test(n)) return null
+  if (CREAMY_LIQUID.test(n)) return 'creamy'
+  if (THIN_LIQUID.test(n)) return 'any'
+  return null
+}
+
+/** Este item é um líquido que serve de veículo (de qualquer tipo)? */
+export function isLiquidVehicle(foodName: unknown): boolean {
+  return liquidKindOf(foodName) !== null
 }
 
 /** Este item é um pó/seco que exige líquido? Devolve o tipo exigido, ou null. */
@@ -131,17 +148,37 @@ export type CoherenceIssue = {
  */
 export function missingVehicleOf(meal: CoherenceMeal): { vehicle: VehicleKind; foods: string[] } | null {
   const items = Array.isArray(meal?.items) ? meal.items : []
-  if (items.some((it) => isLiquidVehicle(it?.food))) return null
 
   const dry = items
     .map((it) => ({ food: String(it?.food ?? ''), vehicle: requiredVehicle(it?.food) }))
     .filter((x): x is { food: string; vehicle: VehicleKind } => x.vehicle !== null)
   if (!dry.length) return null
 
-  return {
-    vehicle: dry.some((d) => d.vehicle === 'creamy') ? 'creamy' : 'any',
-    foods: dry.map((d) => d.food),
-  }
+  const needed: VehicleKind = dry.some((d) => d.vehicle === 'creamy') ? 'creamy' : 'any'
+  // Água satisfaz `any` e NÃO satisfaz `creamy` — cereal com água não é refeição.
+  const satisfied = items.some((it) => {
+    const kind = liquidKindOf(it?.food)
+    return kind === 'creamy' || (kind === 'any' && needed === 'any')
+  })
+  if (satisfied) return null
+
+  return { vehicle: needed, foods: dry.map((d) => d.food) }
+}
+
+/**
+ * Tirar este item deixaria a refeição sem veículo?
+ *
+ * Existe por causa da variação da semana: o motor de troca não sabe que o "leite
+ * desnatado" do café da manhã é o que dissolve o whey, e trocou-o por "ovo mexido"
+ * — devolvendo ao usuário exatamente o prato seco que a geração tinha consertado.
+ * Item que sustenta o veículo não entra no sorteio da troca.
+ */
+export function isVehicleLoadBearing(meal: CoherenceMeal, index: number): boolean {
+  const items = Array.isArray(meal?.items) ? meal.items : []
+  const target = items[index]
+  if (!target || !isLiquidVehicle(target.food)) return false
+  const without = { ...meal, items: items.filter((_, i) => i !== index) }
+  return missingVehicleOf(without) !== null
 }
 
 /**
@@ -163,7 +200,9 @@ export function findCoherenceIssues(meals: CoherenceMeal[]): CoherenceIssue[] {
         mealName,
         kind: 'missing_vehicle',
         vehicle: missing.vehicle,
-        message: `"${mealName}" tem ${missing.foods.join(' e ')} sem nenhum líquido para preparar. Inclua o líquido (leite, iogurte ou água) como item da refeição.`,
+        message: missing.vehicle === 'creamy'
+          ? `"${mealName}" tem ${missing.foods.join(' e ')} sem uma base láctea. Inclua leite ou iogurte como item da refeição — água não prepara cereal nem aveia.`
+          : `"${mealName}" tem ${missing.foods.join(' e ')} sem nenhum líquido para preparar. Inclua o líquido (leite, iogurte ou água) como item da refeição.`,
       })
     }
 

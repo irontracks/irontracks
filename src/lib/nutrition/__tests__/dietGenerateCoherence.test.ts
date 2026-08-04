@@ -168,7 +168,8 @@ describe('cardápio incoerente é devolvido ao modelo antes de virar plano', () 
     expect(generateContent).toHaveBeenCalledTimes(2)
     const retryPrompt = String(generateContent.mock.calls[1]![0])
     expect(retryPrompt).toContain('REPROVADO')
-    expect(retryPrompt).toMatch(/"Café da Manhã" tem .* sem nenhum líquido/)
+    // Aveia exige base láctea — a mensagem tem que dizer isso, não "algum líquido".
+    expect(retryPrompt).toMatch(/"Café da Manhã" tem .* sem uma base láctea/)
 
     // Corrigido pelo modelo: nada a reparar no servidor.
     expect(out.ok && out.plan.repairedMeals).toBe(0)
