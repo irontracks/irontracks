@@ -60,13 +60,51 @@ describe('usePeriodizedWorkouts', () => {
   it('falha da API também chega a estado terminal (erro visível, sem loading eterno)', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ json: async () => ({ ok: false, error: 'sem programa ativo' }) })),
+      vi.fn(async () => ({ json: async () => ({ ok: false, error: 'db_timeout' }) })),
     )
 
     const { result } = renderHook(() => usePeriodizedWorkouts({ view: 'dashboard', workoutsTab: 'periodized' }))
 
     await waitFor(() => expect(result.current.periodizedLoaded).toBe(true))
     expect(result.current.periodizedLoading).toBe(false)
-    expect(result.current.periodizedError).toBe('sem programa ativo')
+    // A frase é do app, não o código da rota: `db_timeout` na tela não diz nada
+    // a ninguém. O bloco com "Tentar novamente" continua fazendo sentido aqui.
+    expect(result.current.periodizedError).toBe('Falha ao carregar periodização.')
+  })
+
+  it('programa SEM treinos vinculados não vira erro na tela', async () => {
+    /*
+     * Reportado pelo dono com print: embaixo do botão "Criar periodização" havia
+     * um bloco vermelho "Programa encontrado, mas sem treinos vinculados." com um
+     * "Tentar novamente" ao lado. Não é falha de carregamento — é um programa
+     * órfão, e o retry buscava de novo o mesmo nada. Quem resolve é o botão de
+     * criar, que já está logo acima.
+     */
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        json: async () => ({ ok: true, program: { id: '99999999-9999-4999-8999-999999999999' }, workouts: [] }),
+      })),
+    )
+
+    const { result } = renderHook(() => usePeriodizedWorkouts({ view: 'dashboard', workoutsTab: 'periodized' }))
+
+    await waitFor(() => expect(result.current.periodizedLoaded).toBe(true))
+    expect(result.current.periodizedError).toBe('')
+    expect(result.current.periodizedWorkouts).toEqual([])
+  })
+
+  it('quem não tem VIP não vê bloco de erro — o vazio já mostra o CTA de planos', async () => {
+    // Antes o CÓDIGO CRU `vip_required` aparecia na tela, com um "Tentar
+    // novamente" que jamais funcionaria: sem VIP, a rota nega sempre.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ json: async () => ({ ok: false, error: 'vip_required' }) })),
+    )
+
+    const { result } = renderHook(() => usePeriodizedWorkouts({ view: 'dashboard', workoutsTab: 'periodized' }))
+
+    await waitFor(() => expect(result.current.periodizedLoaded).toBe(true))
+    expect(result.current.periodizedError).toBe('')
   })
 })

@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { WorkoutRowSchema, ExerciseRowSchema, SetRowSchema } from '@/schemas/database'
 import { AdvancedConfig } from '@/types/app'
 import { applyNotesMethodToSetDetails } from '@/utils/training/notesMethodParser'
-import { getErrorMessage } from '@/utils/errorMessage'
 import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/types/dashboard'
 
 // ────────────────────────────────────────────────────────────────
@@ -111,6 +110,22 @@ interface UsePeriodizedWorkoutsOpts {
   workoutsTab: 'normal' | 'periodized'
 }
 
+
+/**
+ * Código de erro da rota → frase para a tela, ou `''` quando não há o que mostrar.
+ *
+ * `vip_required` devolve vazio de propósito: quem não tem VIP já vê o CTA de planos
+ * no vazio da aba, e um bloco vermelho com "Tentar novamente" ao lado dele promete
+ * um retry que nunca vai funcionar. Antes o código CRU aparecia na tela.
+ */
+export function friendlyLoadError(code: unknown): string {
+  const c = String(code ?? '').trim().toLowerCase()
+  if (!c) return 'Falha ao carregar periodização.'
+  if (c === 'vip_required') return ''
+  if (c === 'unauthorized' || c === 'forbidden') return ''
+  return 'Falha ao carregar periodização.'
+}
+
 export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkoutsOpts) {
   const supabase = useMemo(() => createClient(), [])
   const [periodizedLoading, setPeriodizedLoading] = useState(false)
@@ -148,10 +163,9 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         const json = jsonParsed.success ? jsonParsed.data : null
         if (cancelled) return
         if (!json?.ok) {
-          const msg = json?.error != null ? String(json.error) : 'Falha ao carregar periodização.'
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
-          setPeriodizedError(msg)
+          setPeriodizedError(friendlyLoadError(json?.error))
           return
         }
         const rows = Array.isArray(json?.workouts) ? json.workouts : []
@@ -165,9 +179,15 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
           countById.set(id, Math.max(0, Math.floor(n)))
         })
         if (ids.length === 0) {
+          /*
+           * Programa sem treinos vinculados NÃO é falha de carregamento: é um
+           * programa órfão, e "Tentar novamente" ia buscar de novo o mesmo nada.
+           * O vazio da aba já oferece "Criar periodização", que é o que resolve —
+           * o bloco vermelho ao lado dele era só ruído (reportado pelo dono).
+           */
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
-          setPeriodizedError(json?.program?.id ? 'Programa encontrado, mas sem treinos vinculados.' : '')
+          setPeriodizedError('')
           return
         }
 
@@ -181,7 +201,9 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         if (error) {
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
-          setPeriodizedError(String(getErrorMessage(error) || 'Falha ao carregar treinos periodizados.'))
+          // Sem `getErrorMessage` aqui: ele vaza o texto cru do Postgres pra tela.
+          // Isto É um erro de carregamento de verdade — o retry ao lado resolve.
+          setPeriodizedError('Falha ao carregar treinos periodizados.')
           return
         }
 
