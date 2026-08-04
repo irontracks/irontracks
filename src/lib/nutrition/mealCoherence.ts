@@ -160,7 +160,7 @@ export type CoherenceIssue = {
   /** Índice da refeição no dia — o reparo e a mensagem de retry apontam pra cá. */
   mealIndex: number
   mealName: string
-  kind: 'missing_vehicle' | 'sweet_overload' | 'sweet_as_base'
+  kind: 'missing_vehicle' | 'sweet_overload' | 'sweet_as_base' | 'training_window'
   /** Frase pronta pra devolver à IA no retry. Em pt-BR: o prompt inteiro é pt-BR. */
   message: string
   /** Só em `missing_vehicle`: que líquido resolve. */
@@ -268,6 +268,84 @@ export function findCoherenceIssues(meals: CoherenceMeal[]): CoherenceIssue[] {
       message: `O dia inteiro tem ${totalSweets} doces concentrados. Use no máximo ${MAX_SWEETS_PER_DAY} no dia.`,
     })
   }
+
+  return issues
+}
+
+/* ── Janela de treino ─────────────────────────────────────────────────────── */
+
+/** Quão longe do fim do treino o pós-treino ainda faz sentido. */
+const POST_WORKOUT_MAX_LAG_HOURS = 2.5
+/** Quão cedo o pré-treino pode ser servido antes do início. */
+const PRE_WORKOUT_MAX_LEAD_HOURS = 2.5
+
+const MEAL_TIME = /^(\d{1,2})[:h](\d{2})/
+
+/** Horas decimais a partir do campo `time` da refeição ("07:30" → 7.5). */
+export function parseMealTime(time: unknown): number | null {
+  const m = String(time ?? '').trim().match(MEAL_TIME)
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) return null
+  return h + min / 60
+}
+
+const normalizedName = (meal: CoherenceMeal): string => normalize(meal?.name)
+const isPostWorkout = (meal: CoherenceMeal): boolean => /pos.?treino/.test(normalizedName(meal))
+const isPreWorkout = (meal: CoherenceMeal): boolean => /pre.?treino/.test(normalizedName(meal))
+
+/**
+ * As refeições de treino batem com a hora em que ele TREINA?
+ *
+ * O gerador entregou "Pós-Treino 18:30" para quem treina às 6 da manhã — e o app
+ * tinha o horário real gravado o tempo todo (ver `trainingSchedule`). Um pós-treino
+ * onze horas depois do treino não é pós-treino de nada.
+ *
+ * `schedule` nulo (usuário sem histórico) = nada a verificar: sem rotina conhecida,
+ * qualquer horário é palpite legítimo do modelo.
+ */
+export function findTrainingWindowIssues(
+  meals: CoherenceMeal[],
+  schedule: { startHour: number; endHour: number; fasted: boolean } | null,
+): CoherenceIssue[] {
+  if (!schedule) return []
+  const list = Array.isArray(meals) ? meals : []
+  const issues: CoherenceIssue[] = []
+  const hhmm = (h: number) => `${String(Math.floor(h) % 24).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`
+
+  list.forEach((meal, mealIndex) => {
+    const mealName = String(meal?.name ?? '')
+    const at = parseMealTime(meal?.time)
+    if (at === null) return
+
+    if (isPostWorkout(meal) && (at < schedule.endHour - 0.5 || at > schedule.endHour + POST_WORKOUT_MAX_LAG_HOURS)) {
+      issues.push({
+        mealIndex,
+        mealName,
+        kind: 'training_window',
+        message: `"${mealName}" está marcada para ${hhmm(at)}, mas este usuário termina de treinar por volta das ${hhmm(schedule.endHour)}. Ponha o pós-treino logo depois do treino.`,
+      })
+    }
+
+    if (isPreWorkout(meal)) {
+      if (schedule.fasted) {
+        issues.push({
+          mealIndex,
+          mealName,
+          kind: 'training_window',
+          message: `Remova "${mealName}": este usuário treina em jejum, sem refeição antes do treino.`,
+        })
+      } else if (at > schedule.startHour + 0.25 || at < schedule.startHour - PRE_WORKOUT_MAX_LEAD_HOURS) {
+        issues.push({
+          mealIndex,
+          mealName,
+          kind: 'training_window',
+          message: `"${mealName}" está marcada para ${hhmm(at)}, mas o treino começa por volta das ${hhmm(schedule.startHour)}. O pré-treino vem pouco antes disso.`,
+        })
+      }
+    }
+  })
 
   return issues
 }

@@ -48,15 +48,30 @@ const mealRows = [
   },
 ]
 
-/** Client mínimo: só a cadeia que o `buildFoodProfile` usa. */
-function fakeSupabase(rows: unknown[]): SupabaseClient {
-  const chain: Record<string, unknown> = {}
-  for (const method of ['select', 'eq', 'gte', 'not', 'order']) {
-    chain[method] = () => chain
+/**
+ * Client mínimo, por TABELA: `buildFoodProfile` lê `nutrition_meal_entries` e
+ * `buildTrainingSchedule` lê `workouts` — devolver a mesma lista para as duas
+ * faria o horário de treino sair de linhas de refeição.
+ */
+function fakeSupabase(rows: unknown[], workouts: unknown[] = []): SupabaseClient {
+  const chainFor = (data: unknown[]) => {
+    const chain: Record<string, unknown> = {}
+    for (const method of ['select', 'eq', 'gte', 'not', 'order']) chain[method] = () => chain
+    chain.limit = async () => ({ data, error: null })
+    chain.then = (resolve: (v: unknown) => unknown) => resolve({ data, error: null })
+    return chain
   }
-  chain.limit = async () => ({ data: rows, error: null })
-  return { from: () => chain } as unknown as SupabaseClient
+  return { from: (table: string) => chainFor(table === 'workouts' ? workouts : rows) } as unknown as SupabaseClient
 }
+
+/** Treinos reais do dono: mediana de término 07:39 em São Paulo (10:39Z). */
+const TREINOS_MANHA = [
+  { completed_at: '2026-08-03T10:59:00Z' },
+  { completed_at: '2026-07-31T10:36:00Z' },
+  { completed_at: '2026-07-30T10:39:00Z' },
+  { completed_at: '2026-07-29T11:07:00Z' },
+  { completed_at: '2026-07-28T10:34:00Z' },
+]
 
 /** O café da manhã real: whey e aveia SECOS, sem uma gota de líquido. */
 const planoIncoerente = {
@@ -222,5 +237,48 @@ describe('rede de segurança: o modelo insistiu no erro, o servidor conserta', (
 
     expect(out.plan.meals[1]!.items).toHaveLength(2)
     expect(out.plan.meals[2]!.items).toHaveLength(1)
+  })
+})
+
+
+describe('o horário de treino sai do histórico e chega ao modelo', () => {
+  it('o prompt diz a que horas ele treina e proíbe pós-treino à noite', async () => {
+    generateContent.mockResolvedValue(respondWith(planoCoerente))
+    await generateDietPlan(fakeSupabase(mealRows, TREINOS_MANHA), { sourceUserId: 'u1', targets })
+
+    const prompt = String(generateContent.mock.calls[0]![0])
+    expect(prompt).toContain('ROTINA DE TREINO')
+    expect(prompt).toContain('07:39')
+    expect(prompt).toContain('EM JEJUM')
+  })
+
+  it('sem histórico de treino o prompt não inventa horário', async () => {
+    generateContent.mockResolvedValue(respondWith(planoCoerente))
+    await generateDietPlan(fakeSupabase(mealRows, []), { sourceUserId: 'u1', targets })
+    expect(String(generateContent.mock.calls[0]![0])).not.toContain('ROTINA DE TREINO')
+  })
+
+  it('"Pós-Treino 18:30" para quem treina de manhã volta pro modelo — o caso reportado', async () => {
+    const comPosTreinoNoite = {
+      planName: 'Plano',
+      meals: [
+        ...planoCoerente.meals,
+        {
+          name: 'Pós-Treino',
+          time: '18:30',
+          items: [{ food: 'Peito de frango grelhado', grams: 150, calories: 240, protein: 45, carbs: 0, fat: 5 }],
+        },
+      ],
+    }
+    generateContent
+      .mockResolvedValueOnce(respondWith(comPosTreinoNoite))
+      .mockResolvedValueOnce(respondWith(planoCoerente))
+
+    await generateDietPlan(fakeSupabase(mealRows, TREINOS_MANHA), { sourceUserId: 'u1', targets })
+
+    expect(generateContent).toHaveBeenCalledTimes(2)
+    const retry = String(generateContent.mock.calls[1]![0])
+    expect(retry).toContain('REPROVADO')
+    expect(retry).toMatch(/"Pós-Treino" está marcada para 18:30/)
   })
 })
