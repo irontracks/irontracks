@@ -221,7 +221,10 @@ describe('candidatos — a base curada é a rede de segurança de quem não tem 
   })
 
   it('o macro medido do usuário ganha do valor da tabela curada', () => {
-    const learned = cand('arroz cozido', 999, 1, 2, 3, 'learned')
+    // 150 kcal/100 g, não 999: desde `foodItemSanity`, densidade acima de 900 é
+    // considerada dado errado (total de refeição no campo per_100g) e o candidato
+    // some antes de chegar aqui.
+    const learned = cand('arroz cozido', 150, 3, 30, 1, 'learned')
     const merged = mergeCandidates([learned], databaseCandidates())
     const arroz = merged.filter((c) => c.name.toLowerCase().includes('arroz cozido'))
     expect(arroz).toHaveLength(1)

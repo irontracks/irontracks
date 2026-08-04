@@ -16,6 +16,7 @@
  */
 
 import { normalizeFoodKey } from './learned-foods'
+import { fitsMealGroup, isPreferredForMealGroup, type FoodMealMap, type MealGroup } from './mealContext'
 
 /** Macros por 100 g — denominador comum das três fontes. */
 export interface FoodMacros {
@@ -175,6 +176,13 @@ export interface SwapResult {
 export interface SwapOptions {
   /** Nomes que NÃO podem voltar: o próprio item, o resto da refeição, e o que já foi recusado. */
   exclude?: string[]
+  /**
+   * Em que tipo de refeição a troca está acontecendo, e o que o usuário já comeu em
+   * cada tipo. Sem isso, macro certo aceita refeição errada — "Macarrão" no ALMOÇO
+   * virou "Pão Francês com Doce de Leite" em 03/08/2026. Ver `mealContext`.
+   */
+  mealGroup?: MealGroup
+  foodMealMap?: FoodMealMap
 }
 
 /**
@@ -196,6 +204,8 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
       .filter(Boolean),
   )
 
+  const mealGroup: MealGroup = options.mealGroup ?? 'unknown'
+  const mealMap = options.foodMealMap
   const blockedList = [...blocked]
   const pool = (Array.isArray(candidates) ? candidates : [])
     .filter((c) => c && String(c.name ?? '').trim())
@@ -206,6 +216,10 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
       return !blockedList.some((b) => isSameBaseFood(key, b))
     })
     .filter((c) => classifyFood(c) === cls)
+    // Adequação à refeição: o histórico do usuário decide. Alimento sem histórico
+    // passa (não bloqueia o desconhecido, só não ganha preferência) — bloquear
+    // esvaziaria a troca de quem tem pouco lançamento.
+    .filter((c) => !mealMap || fitsMealGroup(c.name, mealGroup, mealMap))
 
   if (!pool.length) return null
 
@@ -230,6 +244,14 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
     // Acima disso não é substituto, é outra refeição.
     .filter((x) => x.drift <= MAX_KCAL_DRIFT)
     .sort((a, b) => {
+      // Confirmado pelo histórico NAQUELA refeição vem primeiro, antes até da fonte:
+      // um alimento que ele comprovadamente come no almoço ganha de um da base curada
+      // que só não foi reprovado por falta de histórico.
+      if (mealMap) {
+        const prefA = isPreferredForMealGroup(a.c.name, mealGroup, mealMap) ? 0 : 1
+        const prefB = isPreferredForMealGroup(b.c.name, mealGroup, mealMap) ? 0 : 1
+        if (prefA !== prefB) return prefA - prefB
+      }
       const bySource = SOURCE_RANK[a.c.source] - SOURCE_RANK[b.c.source]
       if (bySource !== 0) return bySource
       if (a.drift !== b.drift) return a.drift - b.drift

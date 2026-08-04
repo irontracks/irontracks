@@ -17,6 +17,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { foodDatabase } from './food-database'
 import { normalizeFoodKey } from './learned-foods'
+import { isUsableAsSwapCandidate } from './foodItemSanity'
+import { buildMealItemFoods } from './mealItemFoods'
 import type { SwapCandidate } from './foodSwap'
 
 const num = (v: unknown): number => {
@@ -27,8 +29,13 @@ const num = (v: unknown): number => {
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
 
-/** Alimento sem caloria nenhuma não serve de substituto — não dá pra dimensionar porção. */
-const usable = (c: SwapCandidate): boolean => c.kcal > 0 || c.protein > 0 || c.carbs > 0 || c.fat > 0
+/**
+ * Quem pode ser oferecido como substituto. Ver `foodItemSanity`: o repertório
+ * aprendido é cheio de REFEIÇÃO inteira ("Refeição de Arroz, Strogonoff e Batata
+ * Palha", 1070 kcal/100 g), de composto ("Pão Francês com Doce de Leite" — 125 g
+ * de quê?) e de quantidade no nome ("50g de Whey Protein"). Nada disso serve.
+ */
+const usable = (c: SwapCandidate): boolean => isUsableAsSwapCandidate(c)
 
 /** A base curada como candidatos. Pura — dá pra testar sem banco. */
 export function databaseCandidates(): SwapCandidate[] {
@@ -66,6 +73,12 @@ export function mergeCandidates(...groups: SwapCandidate[][]): SwapCandidate[] {
 export async function buildSwapCandidates(supabase: SupabaseClient, userId: string): Promise<SwapCandidate[]> {
   const uid = String(userId || '').trim()
   if (!uid) return databaseCandidates()
+
+  // FONTE PRIMÁRIA do repertório: os ITENS das refeições lançadas, não a tabela de
+  // "alimentos aprendidos". Medido em 03/08/2026: dos 42 aprendidos da conta do dono,
+  // 1 servia como substituto — o resto era refeição inteira, composto ou trazia a
+  // quantidade no nome. Ver mealItemFoods.
+  const mealFoods = await buildMealItemFoods(supabase, uid)
 
   let learned: SwapCandidate[] = []
   try {
@@ -112,5 +125,8 @@ export async function buildSwapCandidates(supabase: SupabaseClient, userId: stri
     // idem
   }
 
-  return mergeCandidates(learned, custom, databaseCandidates())
+  // Ordem = precedência: item de refeição real primeiro (nome limpo e macros
+  // derivados de gramas de verdade), depois o cadastrado à mão, depois o aprendido
+  // (quase sempre vazio após o crivo), e a base curada como rede de segurança.
+  return mergeCandidates(mealFoods, custom, learned, databaseCandidates())
 }

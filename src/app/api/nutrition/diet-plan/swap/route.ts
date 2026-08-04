@@ -6,6 +6,8 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError } from '@/lib/logger'
 import { buildSwapCandidates } from '@/lib/nutrition/swapCandidates'
+import { buildUserFoodMealMap } from '@/lib/nutrition/mealItemFoods'
+import { mealGroupOf } from '@/lib/nutrition/mealContext'
 import { swapFood } from '@/lib/nutrition/foodSwap'
 import { planDays, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
 
@@ -70,11 +72,17 @@ export async function POST(req: Request) {
     const item = meal?.items?.[itemIndex]
     if (!item) return NextResponse.json({ ok: false, error: 'item_not_found' }, { status: 404 })
 
-    const candidates = await buildSwapCandidates(auth.supabase, userId)
+    const [candidates, foodMealMap] = await Promise.all([
+      buildSwapCandidates(auth.supabase, userId),
+      buildUserFoodMealMap(auth.supabase, userId),
+    ])
     const swapped = swapFood(item, candidates, {
       // O resto da refeição entra no exclude: trocar arroz por feijão quando já tem
       // feijão no prato deixaria o mesmo alimento duas vezes.
       exclude: [...meal.items.map((i) => i.food), ...(reject ?? [])],
+      // Nome da refeição ("Almoço", "Café da Manhã") decide o que cabe ali.
+      mealGroup: mealGroupOf(meal.name),
+      foodMealMap,
     })
     if (!swapped) {
       return NextResponse.json({ ok: false, error: 'no_alternative' }, { status: 409 })
