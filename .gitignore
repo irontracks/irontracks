@@ -22,6 +22,10 @@
 
 # dev/debug screenshots soltos na raiz (não versionar)
 /test_*.png
+# `test-` com HÍFEN: 52 screenshots (test-01-login.png … test-50-criar-conta.png)
+# ficaram de fora por UM caractere — o padrão acima só casa underscore. Mesma
+# intenção, mesma natureza de lixo de execução.
+/test-*.png
 /prod_*.png
 /paywall_*.png
 /review_screenshot.png
