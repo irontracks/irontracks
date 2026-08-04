@@ -10,7 +10,7 @@ import {
 import { candidatesFromMealRows, stripQuantityPrefix } from '../mealItemFoods'
 import { mergeCandidates } from '../swapCandidates'
 import { buildFoodMealMap, fitsMealGroup, isPreferredForMealGroup, mealGroupOf } from '../mealContext'
-import { swapFood, type SwapCandidate } from '../foodSwap'
+import { classifyFood, macrosPer100g, swapFood, type SwapCandidate } from '../foodSwap'
 
 /**
  * Correção do relato do dono (03/08/2026), que apontou DOIS erros numa troca só —
@@ -237,5 +237,70 @@ describe('source-guard: o crivo está ligado onde importa', () => {
   it('a geração da SEMANA também — senão a variação recria o problema', () => {
     expect(weekRoute).toMatch(/buildUserFoodMealMap/)
     expect(weekRoute).toMatch(/buildWeekFromDay\(baseMeals, candidates, foodMealMap\)/)
+  })
+})
+
+/**
+ * Refinamentos vindos da AUDITORIA contra o histórico real (04/08/2026): rodei o
+ * motor em 132 itens de 60 refeições reais e li as sugestões uma a uma. Os filtros
+ * mecânicos diziam "0 problemas"; a leitura mostrou trocas que ninguém faria.
+ */
+describe('auditoria contra dados reais — o que macro dominante sozinho errava', () => {
+  it('bife é PROTEÍNA, não gordura — senão vira ovo, azeite ou maionese', () => {
+    // Bife 26 P / 15 G: a gordura domina as calorias, mas o papel no prato é proteína.
+    expect(classifyFood({ kcal: 250, protein: 26, carbs: 0, fat: 15 })).toBe('protein')
+    expect(classifyFood({ kcal: 155, protein: 13, carbs: 1.1, fat: 11 })).toBe('protein') // ovo
+  })
+
+  it('condimento e óleo continuam gordura — a regra da proteína não os captura', () => {
+    expect(classifyFood({ kcal: 884, protein: 0, carbs: 0, fat: 100 })).toBe('fat')
+    expect(classifyFood({ kcal: 300, protein: 1, carbs: 3, fat: 32 })).toBe('fat') // maionese
+  })
+
+  it('leite desnatado NÃO é fruta/verdura — virava substituto de mamão e feijão', () => {
+    expect(classifyFood({ kcal: 35, protein: 3.4, carbs: 5, fat: 0.1 })).not.toBe('produce')
+  })
+
+  it('alface e brócolis seguem sendo produce — o corte separa os dois casos', () => {
+    expect(classifyFood({ kcal: 15, protein: 1.4, carbs: 2.9, fat: 0.2 })).toBe('produce')
+    expect(classifyFood({ kcal: 34, protein: 2.8, carbs: 7, fat: 0.4 })).toBe('produce')
+  })
+
+  it('item sem papel claro (`mixed`) NÃO é trocado — recusar é melhor que chutar', () => {
+    // "arroz" com macros mal parseados (16 P e 11 G em 150 g) caiu em mixed e foi
+    // trocado por "orange chicken". Sem saber o papel, não há substituto seguro.
+    // Calibrado pra cair mesmo em `mixed`: nenhum macro atinge o limiar da sua
+    // classe (P 25%, C 43%, G 32% das calorias) e a proteína fica abaixo do piso.
+    const confuso = { food: 'prato misto', grams: 150, calories: 211, protein: 13.5, carbs: 22.5, fat: 7.5 }
+    expect(classifyFood(macrosPer100g(confuso))).toBe('mixed')
+    // Candidato TAMBÉM mixed: sem a regra, a troca aconteceria (o pool não estaria
+    // vazio). Com candidatos de outra classe o teste passaria pelos dois caminhos e
+    // não provaria nada — foi assim que este guard nasceu falso.
+    const outroMisto = cand('feijoada leve', 141, 9, 15, 5)
+    expect(classifyFood(outroMisto)).toBe('mixed')
+    expect(swapFood(confuso, [outroMisto])).toBeNull()
+  })
+
+  it('gordura não troca por doce: maionese não vira bolo de chocolate', () => {
+    const maionese = { food: 'maionese light', grams: 30, calories: 90, protein: 0.3, carbs: 1, fat: 9.6 }
+    // Doce cremoso calibrado pra ENTRAR no pool: classifica como `fat` (73% das
+    // kcal) e tem desvio calórico dentro do teto (31%), então só a regra do
+    // carboidrato o barra. Com um requeijão junto, o teste não provaria nada — o
+    // requeijão venceria pelo desvio menor e a regra ficaria sem exercício (foi
+    // assim que este guard nasceu falso).
+    const doceCremoso = cand('doce cremoso', 370, 0, 25, 30)
+    expect(classifyFood(doceCremoso)).toBe('fat')
+    expect(swapFood(maionese, [doceCremoso])).toBeNull()
+
+    // E o substituto legítimo de gordura continua passando.
+    const requeijao = cand('requeijao', 257, 7, 3, 25)
+    expect(swapFood(maionese, [doceCremoso, requeijao])?.food).toBe('requeijao')
+  })
+
+  it('porção que encosta no limite é recusada — sinal de casamento ruim', () => {
+    // "Choco Biscuit → 1000 g de leite" saía do clamp, não de uma conta que fechou.
+    const biscoito = { food: 'choco biscuit', grams: 78, calories: 390, protein: 5, carbs: 60, fat: 14 }
+    const leiteRalo = cand('leite desnatado', 35, 3.4, 5, 0.1)
+    expect(swapFood(biscoito, [leiteRalo])).toBeNull()
   })
 })

@@ -58,6 +58,13 @@ const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const
  */
 const PRODUCE_MAX_KCAL_100G = 80
 
+/**
+ * Proteína suficiente para o alimento ser "fonte de proteína" no prato, mesmo que a
+ * gordura domine as calorias. 10 g/100 g separa carne, ovo, peixe e laticínio
+ * proteico de creme, óleo e condimento.
+ */
+const PROTEIN_FLOOR_G_100G = 10
+
 const num = (v: unknown): number => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
@@ -84,10 +91,20 @@ export function classifyFood(macros: FoodMacros): FoodClass {
   const pPct = p / total
   const cPct = c / total
   const fPct = f / total
+  const proteinG = num(macros.protein)
 
-  // Fruta/verdura antes de tudo: são carbo dominante, mas trocar alface por arroz
-  // seria absurdo — a porção explodiria e o prato mudaria de natureza.
-  if (kcal > 0 && kcal < PRODUCE_MAX_KCAL_100G && cPct >= 0.5 && pPct < 0.4) return 'produce'
+  // PROTEÍNA MANDA quando há proteína de verdade, mesmo com muita gordura junto.
+  // Sem esta regra, bife (26 P / 15 G) caía em `fat` e era trocado por ovo, azeite
+  // ou maionese — auditoria de 04/08/2026 contra o histórico real. O papel do bife
+  // no prato é proteína; a gordura vem junto.
+  if (proteinG >= PROTEIN_FLOOR_G_100G && pPct >= 0.25) return 'protein'
+
+  // Fruta/verdura: carbo dominante E pouca proteína E pouca densidade. O corte de
+  // proteína (35% das calorias) separa leite desnatado — 3,4 P em 35 kcal, 39% —
+  // de alface e brócolis, que ficam em 26–29%. Sem ele, leite virava substituto de
+  // mamão, batata e feijão na auditoria de 04/08/2026; com ele apertado demais
+  // (25%), a alface caía em `carb` e passava a competir com arroz.
+  if (kcal > 0 && kcal < PRODUCE_MAX_KCAL_100G && cPct >= 0.5 && pPct < 0.35) return 'produce'
 
   if (pPct >= 0.4) return 'protein'
   if (fPct >= 0.45) return 'fat'
@@ -196,6 +213,13 @@ export interface SwapOptions {
 export function swapFood(item: SwappableItem, candidates: SwapCandidate[], options: SwapOptions = {}): SwapResult | null {
   const per100 = macrosPer100g(item)
   const cls = classifyFood(per100)
+
+  // `mixed` = não deu pra dizer qual é o papel do alimento no prato. Trocar aqui é
+  // chute: na auditoria de 04/08/2026, "arroz" com macros mal parseados (16 P e 11 G
+  // em 150 g) caiu em mixed e foi trocado por "orange chicken". Recusar é melhor —
+  // o usuário mantém o que tem e a feature não perde a credibilidade.
+  if (cls === 'mixed') return null
+
   const anchor = anchorMacroOf(cls)
 
   const blocked = new Set(
@@ -238,8 +262,20 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
   }
 
   const ranked = pool
+    // Dentro de `fat`, gordura casa com gordura: sem isto, maionese e azeite eram
+    // trocados por bolo de chocolate — os dois "são gordura" pelo macro dominante,
+    // mas um é condimento e o outro é sobremesa (auditoria de 04/08/2026).
+    .filter((c) => {
+      if (cls !== 'fat') return true
+      const carbKcal = num(c.carbs) * KCAL_PER_G.carbs
+      const totalKcal = carbKcal + num(c.protein) * KCAL_PER_G.protein + num(c.fat) * KCAL_PER_G.fat
+      return totalKcal <= 0 || carbKcal / totalKcal < 0.25
+    })
     .map((c) => ({ c, portion: portionFor(c, targetAmount, anchor) }))
     .filter((x) => x.portion > 0)
+    // Porção que ENCOSTOU no limite é sinal de casamento ruim, não de porção certa:
+    // "Choco Biscuit → 1000 g de leite" saía do clamp, não de uma conta que fechou.
+    .filter((x) => x.portion > PORTION_MIN_G && x.portion < PORTION_MAX_G)
     .map((x) => ({ ...x, drift: kcalDrift(x.c, x.portion) }))
     // Acima disso não é substituto, é outra refeição.
     .filter((x) => x.drift <= MAX_KCAL_DRIFT)
