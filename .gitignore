@@ -32,6 +32,18 @@
 /vercel_*.png
 /tmp_screenshot_*.txt
 
+# Artefatos pesados gerados fora do build — ~23 MB que não são fonte de nada.
+# Binário grande no git nunca mais sai do histórico, e estes são todos
+# regeneráveis (capturas de loja, saídas de teste, peças de post).
+# Os SNAPSHOTS do Playwright (e2e/*-snapshots/) NÃO entram aqui: são a baseline
+# do visual regression, e sem eles o teste não tem com o que comparar.
+/screenshots-appstore/
+/tests/
+/instagram-carousel/
+/Relatorio/
+/Relatorio-*.pdf
+/checkout-web.png
+
 # next.js
 /.next/
 /out/
