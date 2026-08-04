@@ -14,6 +14,7 @@
  */
 
 import { swapFood, type SwapCandidate } from './foodSwap'
+import { mealGroupOf, type FoodMealMap } from './mealContext'
 import type { PlanDay, PlanItem, PlanMeal } from './dietPlanShape'
 import { sumTotals } from './dietPlanShape'
 
@@ -31,7 +32,12 @@ const rotateIndex = (dayOffset: number, length: number): number =>
  * Quando não há substituto para um item (repertório curto), o item FICA como está:
  * um dia parecido é melhor que um dia sem aquele alimento.
  */
-export function buildWeekFromDay(baseMeals: PlanMeal[], candidates: SwapCandidate[]): PlanDay[] {
+export function buildWeekFromDay(
+  baseMeals: PlanMeal[],
+  candidates: SwapCandidate[],
+  /** Adequação por refeição: a variação da semana também não pode pôr café da manhã no almoço. */
+  foodMealMap?: FoodMealMap,
+): PlanDay[] {
   const meals = Array.isArray(baseMeals) ? baseMeals : []
   if (!meals.length) return []
 
@@ -56,6 +62,8 @@ export function buildWeekFromDay(baseMeals: PlanMeal[], candidates: SwapCandidat
         const already = seen.get(key) ?? []
         const swapped = swapFood(item, candidates, {
           exclude: [...meal.items.map((i) => i.food), ...already],
+          mealGroup: mealGroupOf(meal.name),
+          foodMealMap,
         })
         if (!swapped) return item
 

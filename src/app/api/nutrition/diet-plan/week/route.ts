@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError } from '@/lib/logger'
 import { buildSwapCandidates } from '@/lib/nutrition/swapCandidates'
 import { buildWeekFromDay } from '@/lib/nutrition/weekPlan'
+import { buildUserFoodMealMap } from '@/lib/nutrition/mealItemFoods'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,8 +81,11 @@ export async function POST(req: Request) {
       ),
     }))
 
-    const candidates = await buildSwapCandidates(auth.supabase, userId)
-    const days = buildWeekFromDay(baseMeals, candidates)
+    const [candidates, foodMealMap] = await Promise.all([
+      buildSwapCandidates(auth.supabase, userId),
+      buildUserFoodMealMap(auth.supabase, userId),
+    ])
+    const days = buildWeekFromDay(baseMeals, candidates, foodMealMap)
     if (!days.length) return NextResponse.json({ ok: false, error: 'empty_plan' }, { status: 400 })
 
     const { error: archiveError } = await auth.supabase
