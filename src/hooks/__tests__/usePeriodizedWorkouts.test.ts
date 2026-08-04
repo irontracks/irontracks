@@ -94,6 +94,29 @@ describe('usePeriodizedWorkouts', () => {
     expect(result.current.periodizedWorkouts).toEqual([])
   })
 
+  it('usuário SEM programa não vê erro nenhum — o caso mais comum', async () => {
+    /*
+     * A rota responde 200 com `{ ok: true, program: null, workouts: [] }` para
+     * quem nunca criou um programa. O schema declarava `program` como
+     * `z.object().optional()`, que aceita `undefined` e RECUSA `null`: o
+     * safeParse falhava, o hook tratava como falha de rede e a tela mostrava
+     * "Falha ao carregar periodização." com um "Tentar novamente" que ia falhar
+     * para sempre — em cima de uma resposta perfeita.
+     *
+     * Pego no simulador; os logs da Vercel mostravam 200 no mesmo minuto.
+     */
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ json: async () => ({ ok: true, program: null, workouts: [] }) })),
+    )
+
+    const { result } = renderHook(() => usePeriodizedWorkouts({ view: 'dashboard', workoutsTab: 'periodized' }))
+
+    await waitFor(() => expect(result.current.periodizedLoaded).toBe(true))
+    expect(result.current.periodizedError).toBe('')
+    expect(result.current.periodizedWorkouts).toEqual([])
+  })
+
   it('quem não tem VIP não vê bloco de erro — o vazio já mostra o CTA de planos', async () => {
     // Antes o CÓDIGO CRU `vip_required` aparecia na tela, com um "Tentar
     // novamente" que jamais funcionaria: sem VIP, a rota nega sempre.
