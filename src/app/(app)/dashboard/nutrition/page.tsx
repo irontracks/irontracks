@@ -6,40 +6,15 @@ import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildUserSnapshot } from '@/lib/user/snapshot'
-import type { NutritionTargets } from '@/lib/nutrition/phase'
+import { DEFAULT_GOALS, resolveDisplayGoals } from '@/lib/nutrition/displayGoals'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_GOALS = {
-  calories: 2000,
-  protein: 150,
-  carbs: 200,
-  fat: 60,
-}
-
 function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
-}
-
-/**
- * Piso de exibição: macro zerado ou ausente na meta cai no default, para a tela não
- * mostrar "0 g de proteína" como se fosse alvo. Política desta página — o snapshot
- * entrega o número que existe, sem inventar piso.
- *
- * Os aliases (`cals`/`kcal`/`prot`/`p`/…) que esta função aceitava eram defensiva
- * morta: o `select` nunca trouxe essas colunas, e agora a entrada é sempre a meta já
- * normalizada pelo leitor único.
- */
-function applyGoalFloor(target: NutritionTargets) {
-  return {
-    calories: target.calories > 0 ? target.calories : DEFAULT_GOALS.calories,
-    protein: target.protein > 0 ? target.protein : DEFAULT_GOALS.protein,
-    carbs: target.carbs > 0 ? target.carbs : DEFAULT_GOALS.carbs,
-    fat: target.fat > 0 ? target.fat : DEFAULT_GOALS.fat,
-  }
 }
 
 function isSchemaMissingError(e: unknown) {
@@ -115,12 +90,11 @@ export default async function NutritionPage() {
   const snapshot = await buildUserSnapshot(supabase, authUserId, ['profile', 'nutrition'])
   schemaMissing = schemaMissing || isSchemaMissingError(snapshot.nutrition?.savedGoalsError)
 
-  let goals = DEFAULT_GOALS
-  let goalsSource: 'saved' | 'profile' | 'default' = 'default'
-  if (snapshot.nutrition?.targets) {
-    goals = applyGoalFloor(snapshot.nutrition.targets)
-    goalsSource = snapshot.nutrition.targetsSource === 'saved' ? 'saved' : 'profile'
-  }
+  // Política de exibição (piso + rótulo da origem) compartilhada com o overlay.
+  // `goals` é reatribuído adiante quando o modo dia de descanso reduz a meta.
+  const display = resolveDisplayGoals(snapshot.nutrition)
+  let goals = display.goals
+  const goalsSource = display.source
 
   // Dados do perfil para o seletor de fase recalcular a meta no client sem
   // round-trip. Null quando o perfil está incompleto — aí o seletor se explica em

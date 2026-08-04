@@ -30,10 +30,10 @@ repagar a varredura: antes de criar mais um leitor de perfil/meta, comece por aq
    mesmas 5 chaves, cada um por conta. **Resolvido** pelo `userSnapshot`.
 2. **Fiação da meta refeita 3×** — a sequência "busca prefs → busca `nutrition_goals`
    → decide fallback" estava em `dashboard/nutrition/page.tsx`,
-   `NutritionOverlay.tsx` e `userContext.ts`. **Resolvido em dois** (contexto de IA no
-   PR 1, página no PR 2). O overlay segue pendente — ver abaixo.
-3. **23 arquivos leem `user_settings` direto**; `bodyWeightKg` aparece em 25. Cada um
-   com o seu próprio fallback quando o campo falta.
+   `NutritionOverlay.tsx` e `userContext.ts`. **Resolvido nos três** (PRs 1–3).
+3. ~~**23 arquivos leem `user_settings` direto**~~ → hoje **20**, travados por ratchet
+   em `lib/user/__tests__/userSettingsReadRatchet.test.ts`: arquivo novo lendo direto
+   reprova, e entrada que já migrou precisa sair da lista (ela só encolhe).
 4. **Prontidão derivada em ≥3 caminhos** — `utils/checkin/metrics.ts`,
    `utils/autoload/suggestWeight.ts` e `api/ai/post-workout-insights`.
 
@@ -74,10 +74,23 @@ O `useUserSnapshot` (hook client) **não foi feito**, e o motivo vale registro:
   exibe decide o que fazer com eles. Foi por isso que `savedGoalsError` nasceu — sem
   ele, migrar a página teria apagado, em silêncio, um aviso que já existia na tela.
 
-- **PR 3 — overlay + ratchet.** Migrar o `NutritionOverlay` (fiação nº 2, último
-  pendente) e travar com source-guard de allowlist os arquivos que ainda leem
-  `user_settings` direto, com a lista só encolhendo.
-- **Depois:** o setor `readiness` (duplicação nº 4). Continua sem consumidor que não
-  seja o autoload, que está fora de escopo por decisão — criar o setor antes disso
-  seria código morto.
+- **PR 3 — overlay + ratchet + política de exibição.** ✅ Feito. O `NutritionOverlay`
+  passou a chamar o snapshot DENTRO do `Promise.all` que ele já tinha — nenhum
+  round-trip novo. E nasceu `lib/nutrition/displayGoals.ts`: o piso `DEFAULT_GOALS` e
+  o rótulo da origem (`saved`/`profile`/`default`) eram a última política escrita duas
+  vezes, uma em cada superfície.
+
+### Próximos candidatos (por ordem de dor)
+
+- **`readiness`** (duplicação nº 4). Segue sem consumidor que não seja o autoload,
+  que está fora de escopo por decisão — criar o setor antes disso seria código morto.
+- **Rotas de IA e cálculo** (`vip-coach`, `workout-wizard`, `calories/estimate`,
+  `actions/nutrition-actions`): já existe setor no snapshot para o que elas leem;
+  são as próximas saídas naturais do ratchet.
+- **Notificações/push** (5 arquivos) leem preferências de canal e horário, não o
+  perfil físico. Precisam de um setor `notifications` antes de migrar.
+- **Administrativo** (LGPD, painel de professor/admin) lê a linha inteira de
+  propósito — exportar/apagar/inspecionar não é "resolver um fato do usuário". Pode
+  ficar fora do snapshot para sempre.
+
 Fora de escopo por decisão: `workouts.notes`, autoload e VIP.
