@@ -29,6 +29,9 @@ import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodize
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
 
+// Só carrega quando o usuário abre o criador: o formulário não pesa a lista de
+// treinos de quem nunca vai tocar nele.
+const PeriodizationCreateModal = dynamic(() => import('@/components/vip/PeriodizationCreateModal'), { ssr: false })
 const RecoveryScore = dynamic(() => import('./RecoveryScore'), { ssr: false })
 const StudentSubscriptionCard = dynamic(() => import('@/components/student/StudentSubscriptionCard'), { ssr: false })
 
@@ -135,6 +138,7 @@ export default function StudentDashboard(props: Props) {
   const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
   const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
+  const [periodizationCreateOpen, setPeriodizationCreateOpen] = useState(false)
   const [normalizingAiTitles, setNormalizingAiTitles] = useState(false)
   const [normalizingExercises, setNormalizingExercises] = useState(false)
   const [applyingTitleRule, setApplyingTitleRule] = useState(false)
@@ -315,6 +319,20 @@ export default function StudentDashboard(props: Props) {
           {props.view === 'dashboard' && (
             <>
               <WorkoutCalendarModal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} userId={props.currentUserId} />
+
+              {periodizationCreateOpen ? (
+                <PeriodizationCreateModal
+                  open
+                  onClose={() => setPeriodizationCreateOpen(false)}
+                  onCreated={() => {
+                    // Força o hook a reler: os treinos recém-criados têm que
+                    // aparecer sem o usuário sair da tela e voltar.
+                    setPeriodizedLoaded(false)
+                    setPeriodizedWorkouts([])
+                    setPeriodizedError('')
+                  }}
+                />
+              ) : null}
 
               <CheckinsModal
                 isOpen={checkinsOpen}
@@ -606,12 +624,33 @@ export default function StudentDashboard(props: Props) {
                     {periodizedLoading ? (
                       <div className="py-8 text-neutral-400 text-sm animate-pulse">Carregando treinos periodizados...</div>
                     ) : (
-                      <EmptyState
-                        variant="workouts"
-                        title={workoutsTab === 'periodized' ? 'Nenhum treino periodizado' : 'Nenhum treino criado'}
-                        description={workoutsTab === 'periodized' ? 'Crie sua periodização na aba VIP para ela aparecer aqui.' : 'Peça ao seu professor para criar seu primeiro treino.'}
-                        compact
-                      />
+                      <>
+                        <EmptyState
+                          variant="workouts"
+                          title={workoutsTab === 'periodized' ? 'Nenhum treino periodizado' : 'Nenhum treino criado'}
+                          description={
+                            workoutsTab === 'periodized'
+                              ? (vipLocked
+                                ? 'Programas estruturados de 4, 6 ou 8 semanas fazem parte do VIP.'
+                                : 'Monte um programa de 4, 6 ou 8 semanas aqui mesmo.')
+                              : 'Peça ao seu professor para criar seu primeiro treino.'
+                          }
+                          compact
+                        />
+                        {/* A ação mora ONDE a falta é percebida. Antes esta tela dizia
+                            "crie na aba VIP" e o usuário tinha de sair daqui, achar a
+                            aba, rolar até o painel e voltar. */}
+                        {workoutsTab === 'periodized' ? (
+                          <button
+                            type="button"
+                            onClick={() => (vipLocked ? props.onChangeView('vip') : setPeriodizationCreateOpen(true))}
+                            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-3 font-black text-black hover:bg-yellow-400 active:scale-95 transition-all"
+                          >
+                            {vipLocked ? <Crown size={16} /> : <Sparkles size={16} />}
+                            {vipLocked ? 'Ver planos VIP' : 'Criar periodização'}
+                          </button>
+                        ) : null}
+                      </>
                     )}
                     {workoutsTab === 'periodized' && periodizedError ? (
                       <div className="mt-3 inline-flex items-center justify-center">

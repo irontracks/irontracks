@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
@@ -70,14 +70,34 @@ export default function MyDietPlan({
   const days = useMemo(() => planDays(row), [row])
   const isWeek = days.length > 1
 
-  // Abre no dia de HOJE quando é plano de semana — é o que o usuário quer ver ao
-  // abrir o app, não a segunda-feira toda vez.
+  /*
+   * Abre no dia de HOJE quando é plano de semana — é o que o usuário quer ver ao
+   * abrir o app, não a segunda-feira toda vez. UMA VEZ por plano carregado.
+   *
+   * A dependência `days` muda de identidade a cada atualização de `row`, e trocar
+   * um alimento atualiza `row`: sem a trava, o usuário ia para quarta, trocava o
+   * pão — e a tela o chutava de volta para hoje, com a troca aplicada num dia que
+   * ele não estava mais vendo. Posicionamento automático é para a ABERTURA; depois
+   * dela, quem manda no dia é o usuário.
+   */
+  const positionedRef = useRef(false)
   useEffect(() => {
-    if (!isWeek) { setDayIndex(0); return }
+    if (!isWeek) {
+      setDayIndex(0)
+      positionedRef.current = false
+      return
+    }
+    if (positionedRef.current) return
     const today = new Date().getDay()
     const idx = days.findIndex((d) => d.weekday === today)
     setDayIndex(idx >= 0 ? idx : 0)
+    positionedRef.current = true
   }, [isWeek, days])
+
+  // Data diferente = abertura nova: volta a valer o posicionamento automático.
+  useEffect(() => {
+    positionedRef.current = false
+  }, [dateKey])
 
   // "Lançado" é por dia: sem zerar, o ✓ vaza pro dia seguinte (o componente não
   // remonta quando a data muda). Mesmo cuidado do card do plano prescrito.

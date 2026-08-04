@@ -135,6 +135,52 @@ describe('MyDietPlan', () => {
     })
   })
 
+  it('depois de trocar um alimento, o usuário CONTINUA no dia que escolheu', async () => {
+    /*
+     * O reposicionamento "abre no dia de hoje" dependia de `days`, que muda de
+     * identidade a cada atualização do plano — e trocar um alimento atualiza o
+     * plano. Resultado: o usuário ia para sexta, trocava o pão, e a tela voltava
+     * para hoje com a troca aplicada num dia que ele não estava mais vendo.
+     *
+     * O caso precisa esperar o EFEITO do swap (o alimento novo na tela), não só a
+     * chamada: assertar logo após o clique passa verde com o bug presente, porque
+     * a resposta ainda não foi processada.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.setSystemTime(new Date('2026-08-04T12:00:00')) // terça
+
+      // O plano que volta do swap tem o item trocado NA SEXTA (índice 4).
+      const trocado = JSON.parse(JSON.stringify(weekPlan))
+      trocado.days[4].meals = [
+        { name: 'Café da Manhã', time: '07:00', items: [item('Atum', 120, 130, 28), item('Clara de Ovo', 150, 78, 17)] },
+        { name: 'Almoço', items: [item('Frango', 200, 330, 62)] },
+      ]
+      mockFetch(weekPlan, (url) =>
+        url.includes('/swap')
+          ? { ok: true, status: 200, json: async () => ({ ok: true, plan: trocado, swapped: { food: 'Atum' } }) }
+          : null,
+      )
+      render(<MyDietPlan dateKey="2026-08-04" canApply />)
+
+      // Abre em terça (hoje) e o usuário navega para sexta.
+      await vi.waitFor(() => {
+        expect(screen.getByRole('button', { name: /Ter/ }).getAttribute('aria-pressed')).toBe('true')
+      })
+      fireEvent.click(screen.getByRole('button', { name: /Sex/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Café da Manhã/ }))
+      fireEvent.click(await screen.findByRole('button', { name: /Trocar Pão Francês/ }))
+
+      // O Atum só existe na SEXTA: vê-lo prova que o swap foi processado E que a
+      // tela continua na sexta. Se o dia tivesse voltado para terça, some.
+      expect(await screen.findByText(/Atum/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Sex/ }).getAttribute('aria-pressed')).toBe('true')
+      expect(screen.getByRole('button', { name: /Ter/ }).getAttribute('aria-pressed')).toBe('false')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('o alimento recusado não volta na próxima troca do mesmo item', async () => {
     const fetchMock = mockFetch(dayPlan, (url) =>
       url.includes('/swap')
