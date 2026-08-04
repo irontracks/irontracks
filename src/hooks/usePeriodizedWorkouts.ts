@@ -17,12 +17,22 @@ const PeriodizationActiveWorkoutSchema = z.object({
   exercise_count: z.number().nullable().optional(),
 })
 
+/*
+ * ⚠️ `nullable()` nos dois, não só `optional()`.
+ *
+ * A rota responde `{ ok: true, program: null, workouts: [] }` para quem NÃO tem
+ * programa ativo — o caso mais comum de todos. `z.object().optional()` aceita
+ * `undefined` e recusa `null`: o safeParse falhava, `json` virava null, e o hook
+ * caía no ramo de erro com "Falha ao carregar periodização." + um "Tentar
+ * novamente" que ia falhar para sempre, sobre uma resposta HTTP 200 perfeita.
+ * Visto no simulador em 04/08/2026; os logs da Vercel mostravam 200 na mesma hora.
+ */
 const PeriodizationActiveResponseSchema = z
   .object({
     ok: z.boolean().optional(),
     error: z.unknown().optional(),
-    workouts: z.array(PeriodizationActiveWorkoutSchema).optional(),
-    program: z.object({ id: z.unknown().optional() }).optional(),
+    workouts: z.array(PeriodizationActiveWorkoutSchema).nullable().optional(),
+    program: z.object({ id: z.unknown().optional() }).nullable().optional(),
   })
   .passthrough()
 
