@@ -231,14 +231,21 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Comunidade</div>
               <div className="text-lg font-black text-white">Módulo desativado</div>
               <div className="text-sm text-neutral-400 mt-1">Ligue aqui para ver o feed, os stories e os desafios.</div>
-              {/* O botão que resolve é o MESMO que já existe nas preferências de
-                  comunidade, logo abaixo nesta tela. Mandar o usuário procurar em
-                  Configurações → Módulos opcionais era pedir quatro passos para
-                  um toque. */}
+              {/* Mandar o usuário procurar em Configurações → Módulos opcionais era
+                  pedir quatro passos para um toque.
+
+                  ⚠️ `updateSetting` é OTIMISTA: mexe só no estado local. Sozinho, ele
+                  libera a tela e o módulo volta desativado no próximo boot — foi o que
+                  aconteceu no primeiro teste no simulador. O painel de preferências
+                  daqui esconde isso porque tem um botão "Salvar" separado; aqui não
+                  há, então o `save` explícito é obrigatório. */}
               <div className="mt-3">
                 <button
                   type="button"
-                  onClick={() => userSettingsApi.updateSetting('moduleCommunity', true)}
+                  onClick={() => {
+                    userSettingsApi.updateSetting('moduleCommunity', true)
+                    void userSettingsApi.save({ moduleCommunity: true })
+                  }}
                   disabled={!!userSettingsApi?.saving}
                   className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 font-black text-black hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-60"
                 >
