@@ -26,7 +26,7 @@ const PlatformBillingTab = dynamic(
 
 type FinanceMode = 'student_billing' | 'platform_billing'
 
-export function FinanceTabUnified() {
+export function FinanceTabUnified({ onGoToStudents }: { onGoToStudents?: () => void } = {}) {
   const { isAdmin } = useAdminPanel()
   // Default mode: 'student_billing' (cobranças) pra todos. Admin pode
   // alternar pra ver a cobrança da plataforma.
@@ -34,7 +34,7 @@ export function FinanceTabUnified() {
 
   // Teacher (não admin) só vê cobranças dos alunos — sem toggle.
   if (!isAdmin) {
-    return <TeacherBillingTab />
+    return <TeacherBillingTab onGoToStudents={onGoToStudents} />
   }
 
   return (

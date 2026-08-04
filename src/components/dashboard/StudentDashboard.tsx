@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
 import { Plus, Loader2, Sparkles, Crown, Zap, Activity, Archive, ListOrdered, Wrench } from 'lucide-react'
@@ -275,6 +275,41 @@ export default function StudentDashboard(props: Props) {
   }, [checkinsOpen, checkinsRange, props.currentUserId])
 
   const showCommunityTab = !!props.communityContent
+  /**
+   * Abrir o wizard de treino — usado pelo botão principal E pelo vazio da lista.
+   * Estava inline no onClick; o estado vazio precisava da MESMA ação (com o mesmo
+   * fallback de loading), e copiar o bloco significaria duas versões do reset.
+   */
+  const handleCreateWorkout = useCallback(() => {
+    setCreatingWorkout(true)
+    // Fallback de segurança: garante que o botão não fique travado em loading caso
+    // a Promise nunca resolva (rede lenta/navegação que não retorna). O reset
+    // primário é no finally do await.
+    let fallbackId: number | null = null
+    try {
+      fallbackId = window.setTimeout(() => {
+        if (isMountedRef.current) setCreatingWorkout(false)
+      }, CREATE_WORKOUT_LOADING_TIMEOUT_MS)
+    } catch { }
+    const clearFallback = () => {
+      if (fallbackId != null) {
+        try { window.clearTimeout(fallbackId) } catch { }
+        fallbackId = null
+      }
+    }
+    ;(async () => {
+      try {
+        try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
+        // Aguarda a ação real concluir (suporta retorno sync ou Promise).
+        await props.onCreateWorkout()
+      } finally {
+        // Reseta o loading ao FIM real da ação, não por timer fixo.
+        clearFallback()
+        if (isMountedRef.current) setCreatingWorkout(false)
+      }
+    })()
+  }, [props])
+
   const showVipTab = props.vipEnabled !== false
   const vipLocked = !!props.vipLocked
   const vipLabel = String(props.vipLabel || 'VIP')
@@ -389,35 +424,7 @@ export default function StudentDashboard(props: Props) {
               <MuscleMapCard onOpenWizard={props.onCreateWorkout} gender={(props.settings?.biologicalSex === 'female' ? 'female' : props.settings?.biologicalSex === 'male' ? 'male' : 'not_informed')} />
 
               <button
-                onClick={() => {
-                  setCreatingWorkout(true)
-                  // Fallback de segurança: garante que o botão não fique travado
-                  // em loading caso a Promise nunca resolva (rede lenta/navegação
-                  // que não retorna). O reset primário é no finally do await.
-                  let fallbackId: number | null = null
-                  try {
-                    fallbackId = window.setTimeout(() => {
-                      if (isMountedRef.current) setCreatingWorkout(false)
-                    }, CREATE_WORKOUT_LOADING_TIMEOUT_MS)
-                  } catch { }
-                  const clearFallback = () => {
-                    if (fallbackId != null) {
-                      try { window.clearTimeout(fallbackId) } catch { }
-                      fallbackId = null
-                    }
-                  }
-                  ;(async () => {
-                    try {
-                      try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
-                      // Aguarda a ação real concluir (suporta retorno sync ou Promise).
-                      await props.onCreateWorkout()
-                    } finally {
-                      // Reseta o loading ao FIM real da ação, não por timer fixo.
-                      clearFallback()
-                      if (isMountedRef.current) setCreatingWorkout(false)
-                    }
-                  })()
-                }}
+                onClick={handleCreateWorkout}
                 disabled={creatingWorkout}
                 className={`btn-shimmer-sweep group relative w-full rounded-2xl p-[1px] transition-all duration-300 active:scale-[0.97] disabled:opacity-70 ${
                   workouts.length === 0 ? 'animate-pulse' : ''
@@ -633,13 +640,14 @@ export default function StudentDashboard(props: Props) {
                               ? (vipLocked
                                 ? 'Programas estruturados de 4, 6 ou 8 semanas fazem parte do VIP.'
                                 : 'Monte um programa de 4, 6 ou 8 semanas aqui mesmo.')
-                              : 'Peça ao seu professor para criar seu primeiro treino.'
+                              : 'Monte o seu com a IA, ou espere o treino do seu professor.'
                           }
                           compact
                         />
                         {/* A ação mora ONDE a falta é percebida. Antes esta tela dizia
-                            "crie na aba VIP" e o usuário tinha de sair daqui, achar a
-                            aba, rolar até o painel e voltar. */}
+                            "crie na aba VIP" (periodizados) e "peça ao seu professor"
+                            (normais) — nas duas o usuário tinha de sair daqui, e no
+                            segundo caso a criação já existia nesta mesma tela, sem uso. */}
                         {workoutsTab === 'periodized' ? (
                           <button
                             type="button"
@@ -649,7 +657,17 @@ export default function StudentDashboard(props: Props) {
                             {vipLocked ? <Crown size={16} /> : <Sparkles size={16} />}
                             {vipLocked ? 'Ver planos VIP' : 'Criar periodização'}
                           </button>
-                        ) : null}
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleCreateWorkout}
+                            disabled={creatingWorkout}
+                            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 px-5 py-3 font-black text-black hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-60"
+                          >
+                            {creatingWorkout ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                            {creatingWorkout ? 'Abrindo...' : 'Criar meu primeiro treino'}
+                          </button>
+                        )}
                       </>
                     )}
                     {workoutsTab === 'periodized' && periodizedError ? (

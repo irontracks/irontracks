@@ -30,7 +30,7 @@ function formatWhen(iso: string | null): string {
  * Inbox do professor: uma linha por aluno, com última mensagem e não-lidas. Clicar abre o
  * chat 1:1 via o mesmo evento global (TeacherChatHost monta o ChatDirectScreen).
  */
-export const TeacherConversationsInbox: React.FC = () => {
+export const TeacherConversationsInbox: React.FC<{ onGoToStudents?: () => void }> = ({ onGoToStudents }) => {
     const [items, setItems] = useState<Conversation[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -81,8 +81,21 @@ export const TeacherConversationsInbox: React.FC = () => {
                     <div className="w-14 h-14 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-3">
                         <MessageSquare size={26} className="text-neutral-600" />
                     </div>
-                    <p className="text-white font-bold">Nenhuma conversa ainda</p>
-                    <p className="text-neutral-500 text-sm mt-1">Abra um aluno e toque em &ldquo;Conversar&rdquo; para começar.</p>
+                    {/* A rota devolve TODOS os alunos do professor, com ou sem
+                        mensagem — a lista só chega vazia quando ele não tem aluno
+                        nenhum. O texto antigo ("abra um aluno e toque em Conversar")
+                        mandava procurar um aluno que não existe. */}
+                    <p className="text-white font-bold">Nenhum aluno vinculado</p>
+                    <p className="text-neutral-500 text-sm mt-1">Cadastre um aluno para começar a conversar.</p>
+                    {onGoToStudents ? (
+                        <button
+                            type="button"
+                            onClick={onGoToStudents}
+                            className="mt-4 inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 text-sm font-black text-black hover:bg-yellow-400 active:scale-95 transition-all"
+                        >
+                            Cadastrar aluno
+                        </button>
+                    ) : null}
                 </div>
             ) : (
                 <div className="space-y-1">

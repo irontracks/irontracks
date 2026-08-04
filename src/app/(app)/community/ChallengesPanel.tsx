@@ -44,11 +44,14 @@ export default function ChallengesPanel({
   targetUserId,
   targetName,
   onClose,
+  onFindFriends,
 }: {
   userId: string
   targetUserId?: string
   targetName?: string
   onClose?: () => void
+  /** Leva o usuário a escolher alguém para desafiar, sem ele ter de descobrir onde. */
+  onFindFriends?: () => void
 }) {
   const { toast } = useToast()
   const [challenges, setChallenges] = useState<Challenge[]>([])
@@ -338,7 +341,20 @@ export default function ChallengesPanel({
             <div className="p-6 text-center">
               <Swords size={24} className="text-neutral-400 mx-auto mb-2" />
               <div className="text-xs text-neutral-400">Nenhum desafio ativo.</div>
-              <div className="text-[10px] text-neutral-400 mt-1">Desafie amigos pelo perfil deles!</div>
+              {/* "Desafie amigos pelo perfil deles!" mandava o usuário adivinhar o
+                  caminho: trocar de aba, achar o amigo, abrir o perfil. O mesmo
+                  arquivo vizinho já resolve assim o vazio do feed. */}
+              {onFindFriends ? (
+                <button
+                  type="button"
+                  onClick={onFindFriends}
+                  className="mt-3 inline-flex items-center justify-center rounded-xl bg-yellow-500 px-4 py-2.5 text-xs font-black text-black hover:bg-yellow-400 active:scale-95 transition-all"
+                >
+                  Escolher quem desafiar
+                </button>
+              ) : (
+                <div className="text-[10px] text-neutral-400 mt-1">Desafie amigos pelo perfil deles!</div>
+              )}
             </div>
           )}
         </div>

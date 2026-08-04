@@ -135,8 +135,8 @@ const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
                     )}
                     {tab === 'students' && !selectedStudent && <SectionBoundary name="Alunos"><StudentsTab /></SectionBoundary>}
                     {tab === 'templates' && !selectedStudent && <SectionBoundary name="Treinos"><TemplatesTab /></SectionBoundary>}
-                    {tab === 'billing' && !selectedStudent && <SectionBoundary name="Financeiro"><FinanceTabUnified /></SectionBoundary>}
-                    {tab === 'conversas' && !selectedStudent && <SectionBoundary name="Conversas"><TeacherConversationsInbox /></SectionBoundary>}
+                    {tab === 'billing' && !selectedStudent && <SectionBoundary name="Financeiro"><FinanceTabUnified onGoToStudents={() => setTab('students')} /></SectionBoundary>}
+                    {tab === 'conversas' && !selectedStudent && <SectionBoundary name="Conversas"><TeacherConversationsInbox onGoToStudents={() => setTab('students')} /></SectionBoundary>}
                     {tab === 'priorities' && !selectedStudent && <SectionBoundary name="Prioridades"><PrioritiesTab /></SectionBoundary>}
                     {tab === 'guide' && !selectedStudent && <SectionBoundary name="Guia"><TeacherManualTab /></SectionBoundary>}
                     <StudentDetailPanel />

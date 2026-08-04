@@ -230,7 +230,21 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             <div className="p-5">
               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Comunidade</div>
               <div className="text-lg font-black text-white">Módulo desativado</div>
-              <div className="text-sm text-neutral-400 mt-1">Ative em Configurações → Módulos opcionais.</div>
+              <div className="text-sm text-neutral-400 mt-1">Ligue aqui para ver o feed, os stories e os desafios.</div>
+              {/* O botão que resolve é o MESMO que já existe nas preferências de
+                  comunidade, logo abaixo nesta tela. Mandar o usuário procurar em
+                  Configurações → Módulos opcionais era pedir quatro passos para
+                  um toque. */}
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => userSettingsApi.updateSetting('moduleCommunity', true)}
+                  disabled={!!userSettingsApi?.saving}
+                  className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 font-black text-black hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-60"
+                >
+                  {userSettingsApi?.saving ? 'Ativando...' : 'Ativar comunidade'}
+                </button>
+              </div>
             </div>
           </GoldGradientBorder>
         </div>
@@ -686,7 +700,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             {/* ── CHALLENGES TAB ── */}
             {activeTab === 'challenges' && (
               <GoldGradientBorder>
-                <ChallengesPanel userId={userId} />
+                <ChallengesPanel userId={userId} onFindFriends={() => setActiveTab('follow')} />
               </GoldGradientBorder>
             )}
 
