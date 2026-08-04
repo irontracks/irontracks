@@ -31,7 +31,7 @@ repagar a varredura: antes de criar mais um leitor de perfil/meta, comece por aq
 2. **Fiação da meta refeita 3×** — a sequência "busca prefs → busca `nutrition_goals`
    → decide fallback" estava em `dashboard/nutrition/page.tsx`,
    `NutritionOverlay.tsx` e `userContext.ts`. **Resolvido nos três** (PRs 1–3).
-3. ~~**23 arquivos leem `user_settings` direto**~~ → hoje **20**, travados por ratchet
+3. ~~**23 arquivos leem `user_settings` direto**~~ → hoje **18**, travados por ratchet
    em `lib/user/__tests__/userSettingsReadRatchet.test.ts`: arquivo novo lendo direto
    reprova, e entrada que já migrou precisa sair da lista (ela só encolhe).
 4. **Prontidão derivada em ≥3 caminhos** — `utils/checkin/metrics.ts`,
@@ -84,9 +84,20 @@ O `useUserSnapshot` (hook client) **não foi feito**, e o motivo vale registro:
 
 - **`readiness`** (duplicação nº 4). Segue sem consumidor que não seja o autoload,
   que está fora de escopo por decisão — criar o setor antes disso seria código morto.
-- **Rotas de IA e cálculo** (`vip-coach`, `workout-wizard`, `calories/estimate`,
-  `actions/nutrition-actions`): já existe setor no snapshot para o que elas leem;
-  são as próximas saídas naturais do ratchet.
+- ~~**Rotas de IA e cálculo**~~ ✅ Feito — mas só DUAS das quatro que pareciam
+  candidatas, e a investigação vale registro:
+  - `calories/estimate` lia só `biologicalSex` → migrou limpo.
+  - `vip-coach` **já** recebia o perfil pelo `buildUserContextBlock` e ainda montava
+    um bloco próprio lendo `preferences`: mandava o sexo DUAS vezes e rotulava
+    `uiMode` (modo da INTERFACE) como "Nível", competindo com o `fitnessLevel`
+    (nível de TREINO) do outro bloco. Mesmos valores possíveis nos dois enums, e
+    **divergem em 23 das 37 contas** — o coach recebia dois "Nível" contraditórios.
+    Bloco removido; `units` passou a viver no snapshot e a entrar pelo caminho único.
+  - `workout-wizard` e `actions/nutrition-actions` **não devem migrar**: o primeiro
+    lê/grava `preferences.aiProgression` (estado da própria feature) e o segundo faz
+    read-modify-write da linha inteira. O snapshot resolve fatos para LEITURA;
+    trocar o objeto cru pelos fatos apagaria o resto no upsert. Reclassificados no
+    ratchet como escrita/estado, não como débito.
 - **Notificações/push** (5 arquivos) leem preferências de canal e horário, não o
   perfil físico. Precisam de um setor `notifications` antes de migrar.
 - **Administrativo** (LGPD, painel de professor/admin) lê a linha inteira de

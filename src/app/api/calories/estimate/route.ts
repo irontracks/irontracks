@@ -9,6 +9,7 @@
  * exercise complexity, RPE, EPOC.
  */
 import { NextResponse } from 'next/server'
+import { buildUserSnapshot } from '@/lib/user/snapshot'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
@@ -160,19 +161,10 @@ export async function POST(request: Request) {
       : 'default'
 
     // ── Biological sex from user settings ───────────────────────────────────
-    const biologicalSex = await (async () => {
-      try {
-        const { data: row } = await supabase
-          .from('user_settings')
-          .select('preferences')
-          .eq('user_id', targetUserId)
-          .maybeSingle()
-        const prefs = row?.preferences && typeof row.preferences === 'object'
-          ? (row.preferences as Record<string, unknown>) : null
-        const sex = safeString(prefs?.biologicalSex)
-        return sex === 'male' || sex === 'female' ? sex : null
-      } catch { return null }
-    })()
+    // Pelo leitor único: ele já normaliza "not_informed" para null, que é
+    // exatamente o que o modelo MET espera quando o sexo é desconhecido.
+    const { profile } = await buildUserSnapshot(supabase, targetUserId, ['profile'])
+    const biologicalSex = profile?.biologicalSex ?? null
 
     // ── Timing ──────────────────────────────────────────────────────────────
     const totalTimeSeconds = Number(session?.totalTime) || 0

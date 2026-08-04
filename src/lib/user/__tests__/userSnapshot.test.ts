@@ -113,6 +113,17 @@ describe('userSnapshot — setor profile', () => {
     expect(snap.profile?.stats).toBeNull()
   })
 
+  it('unidade preferida vem resolvida — o coach responde em kg ou lb', async () => {
+    const semUnidade = makeSupabase({ user_settings: { preferences: PERFIL_COMPLETO } })
+    const libras = makeSupabase({ user_settings: { preferences: { ...PERFIL_COMPLETO, units: 'lb' } } })
+    const lixo = makeSupabase({ user_settings: { preferences: { ...PERFIL_COMPLETO, units: 'stones' } } })
+
+    expect((await buildUserSnapshot(semUnidade.client, 'u1', ['profile'])).profile?.units).toBeNull()
+    expect((await buildUserSnapshot(libras.client, 'u1', ['profile'])).profile?.units).toBe('lb')
+    // Valor fora do enum não vaza como se fosse escolha do usuário.
+    expect((await buildUserSnapshot(lixo.client, 'u1', ['profile'])).profile?.units).toBeNull()
+  })
+
   it('sem perfil salvo, o setor é null (e não um objeto de campos vazios)', async () => {
     const { client } = makeSupabase({ user_settings: null })
     const snap = await buildUserSnapshot(client, 'u1', ['profile'])
