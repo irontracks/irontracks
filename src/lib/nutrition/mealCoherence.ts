@@ -112,6 +112,33 @@ export function isConcentratedSweet(foodName: unknown): boolean {
 /** Máximo de doces concentrados no dia inteiro. Um é tempero; dois viram a dieta. */
 export const MAX_SWEETS_PER_DAY = 1
 
+/* ── Papel do alimento na troca ───────────────────────────────────────────── */
+
+/**
+ * O candidato pode assumir o PAPEL do alimento que sai?
+ *
+ * A classe de macro diz que dois alimentos são intercambiáveis; ela não diz que um
+ * pode ocupar o lugar do outro no prato. Dois casos vistos no plano real de
+ * 04/08/2026, ambos com a classe certa:
+ *
+ *   pão francês 100 g  →  doce de leite 105 g   (carbo por carbo, no café da manhã)
+ *   patinho moído 200 g →  whey growth 95 g     (proteína por proteína, no jantar)
+ *
+ * Ninguém come 105 g de doce de leite como base do café, nem janta um scoop de whey.
+ * As duas regras abaixo são estreitas de propósito: doce continua trocando por doce,
+ * e o whey continua trocando por outro suplemento no lanche.
+ */
+export function isRoleCompatible(originalFood: unknown, candidateFood: unknown, isMainMeal: boolean): boolean {
+  // 1. Doce concentrado só entra no lugar de outro doce concentrado.
+  if (isConcentratedSweet(candidateFood) && !isConcentratedSweet(originalFood)) return false
+
+  // 2. Suplemento em pó não vira o prato do almoço/jantar. Se o alimento que sai já
+  //    era um pó, a troca segue liberada (whey → proteína de soja).
+  if (isMainMeal && requiredVehicle(candidateFood) !== null && requiredVehicle(originalFood) === null) return false
+
+  return true
+}
+
 /* ── Modelo mínimo do que se valida ───────────────────────────────────────── */
 
 export type CoherenceItem = {

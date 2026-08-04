@@ -17,6 +17,7 @@
 
 import { normalizeFoodKey } from './learned-foods'
 import { fitsMealGroup, isPreferredForMealGroup, type FoodMealMap, type MealGroup } from './mealContext'
+import { isRoleCompatible } from './mealCoherence'
 
 /** Macros por 100 g — denominador comum das três fontes. */
 export interface FoodMacros {
@@ -244,6 +245,10 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
     // passa (não bloqueia o desconhecido, só não ganha preferência) — bloquear
     // esvaziaria a troca de quem tem pouco lançamento.
     .filter((c) => !mealMap || fitsMealGroup(c.name, mealGroup, mealMap))
+    // A classe de macro autoriza a troca; o PAPEL no prato é outra pergunta. Ver
+    // `isRoleCompatible`: doce de leite não vira a base do café, whey não vira o
+    // prato do jantar — mesmo com o macro batendo.
+    .filter((c) => isRoleCompatible(item.food, c.name, mealGroup === 'main'))
 
   if (!pool.length) return null
 
