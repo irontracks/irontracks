@@ -50,6 +50,30 @@ const QUANTITY_PATTERNS: RegExp[] = [
   /\b\d+\s*(lata|latas|unidade|unidades|fatia|fatias|colher|colheres|copo|copos|porcao|porcoes)\b/,
 ]
 
+/**
+ * CONDIMENTO — tempera, não alimenta. A troca escolhe pela classe de macro, e
+ * maionese e abacate são os dois `fat`: em 04/08/2026 a variação da semana pôs
+ * "maionese light 80 g" no lugar do abacate como item de lanche. Ninguém come 80 g
+ * de maionese. Isto NÃO impede o gerador de usar azeite ou ketchup como
+ * acompanhamento — só proíbe que eles ENTREM no lugar de um alimento.
+ */
+const CONDIMENT_PATTERNS: RegExp[] = [
+  /\bmaionese\b/, /\bketchup\b/, /\bcatchup\b/, /\bmostarda\b/, /\bshoyu\b/,
+  /\bbarbecue\b/, /molho ingles/, /\bvinagre\b/, /\bazeite\b/, /\boleo de\b/,
+  /\bmanteiga\b/, /\bmargarina\b/, /\btempero\b/, /\bsal\b/, /\bpimenta\b/,
+]
+
+/**
+ * PRATO PRONTO — é uma refeição montada, não um ingrediente. Mesmo defeito do
+ * composto (não dá pra dizer quanto é de quê), mas o nome não traz "com"/"e" que o
+ * denuncie: "pedaços de pizza de alcatra acebolada" passou limpo e virou substituto
+ * do patinho moído no jantar.
+ */
+const PLATE_PATTERNS: RegExp[] = [
+  /^pedacos? de /, /^porcao de /, /^prato de /, /^marmita/,
+  /\bpizza\b/, /\blasanha\b/, /\bstrogonoff\b/, /\bfeijoada\b/, /\bescondidinho\b/,
+]
+
 const normalize = (name: string): string =>
   String(name ?? '')
     .normalize('NFD')
@@ -69,6 +93,20 @@ export function hasEmbeddedQuantity(name: string): boolean {
   const n = normalize(name)
   if (!n) return false
   return QUANTITY_PATTERNS.some((re) => re.test(n))
+}
+
+/** Tempero/gordura de panela — nunca substitui um alimento. */
+export function isCondiment(name: string): boolean {
+  const n = normalize(name)
+  if (!n) return false
+  return CONDIMENT_PATTERNS.some((re) => re.test(n))
+}
+
+/** Refeição montada servida como prato — não é ingrediente. */
+export function isPreparedPlate(name: string): boolean {
+  const n = normalize(name)
+  if (!n) return false
+  return PLATE_PATTERNS.some((re) => re.test(n))
 }
 
 /** Macros por 100 g fisicamente possíveis? */
@@ -101,6 +139,8 @@ export function isUsableAsSwapCandidate(candidate: {
   if (name.length < 2 || name.length > 60) return false
   if (isCompositeFoodName(name)) return false
   if (hasEmbeddedQuantity(name)) return false
+  if (isCondiment(name)) return false
+  if (isPreparedPlate(name)) return false
   if (!hasPlausibleDensity(candidate)) return false
   // Sem nenhum macro não dá pra dimensionar porção.
   return Number(candidate.kcal) > 0 || Number(candidate.protein) > 0 || Number(candidate.carbs) > 0 || Number(candidate.fat) > 0

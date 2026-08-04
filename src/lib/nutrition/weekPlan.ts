@@ -15,6 +15,7 @@
 
 import { swapFood, type SwapCandidate } from './foodSwap'
 import { mealGroupOf, type FoodMealMap } from './mealContext'
+import { isVehicleLoadBearing, repairMissingVehicles } from './mealCoherence'
 import type { PlanDay, PlanItem, PlanMeal } from './dietPlanShape'
 import { sumTotals } from './dietPlanShape'
 
@@ -58,6 +59,10 @@ export function buildWeekFromDay(
       const items: PlanItem[] = meal.items.map((item, itemIdx) => {
         if (itemIdx !== targetIdx) return item
 
+        // O leite do café da manhã não é "mais um carboidrato": é o que dissolve o
+        // whey. Trocá-lo devolve ao usuário o prato seco que a geração consertou.
+        if (isVehicleLoadBearing(meal, itemIdx)) return item
+
         const key = `${mealIdx}-${itemIdx}`
         const already = seen.get(key) ?? []
         const swapped = swapFood(item, candidates, {
@@ -81,7 +86,15 @@ export function buildWeekFromDay(
       return { ...meal, items, totals: sumTotals(items) }
     })
 
-    days.push({ weekday, meals: dayMeals, totals: sumTotals(dayMeals.map((m) => m.totals)) })
+    /*
+     * Rede de segurança: a troca pode INTRODUZIR um pó onde não havia (sucrilhos no
+     * lugar do abacate, num lanche cujo único líquido era água). Preservar o veículo
+     * existente não cobre esse caso — só reavaliar a refeição inteira cobre.
+     */
+    const { meals: coherent } = repairMissingVehicles(dayMeals)
+    const finalMeals = coherent.map((m) => ({ ...m, totals: sumTotals(m.items) }))
+
+    days.push({ weekday, meals: finalMeals, totals: sumTotals(finalMeals.map((m) => m.totals)) })
   }
 
   return days
