@@ -30,10 +30,24 @@ describe('TeacherConversationsInbox', () => {
         expect(screen.getByText(/Toque para conversar/i)).toBeTruthy()
     })
 
-    it('lista vazia mostra o empty state', async () => {
+    it('lista vazia oferece cadastrar aluno — nao manda "abrir um aluno"', async () => {
+        // A rota devolve TODOS os alunos do professor, com ou sem mensagem: a lista
+        // so chega vazia quando ele nao tem aluno nenhum. O texto antigo ("Nenhuma
+        // conversa ainda / abra um aluno e toque em Conversar") mandava procurar um
+        // aluno que nao existe.
+        const onGoToStudents = vi.fn()
+        mockFetchOnce({ ok: true, conversations: [] })
+        render(<TeacherConversationsInbox onGoToStudents={onGoToStudents} />)
+        await waitFor(() => expect(screen.getByText(/Nenhum aluno vinculado/i)).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /Cadastrar aluno/i }))
+        expect(onGoToStudents).toHaveBeenCalledTimes(1)
+    })
+
+    it('sem a acao de navegacao, nao renderiza botao quebrado', async () => {
         mockFetchOnce({ ok: true, conversations: [] })
         render(<TeacherConversationsInbox />)
-        await waitFor(() => expect(screen.getByText(/Nenhuma conversa ainda/i)).toBeTruthy())
+        await waitFor(() => expect(screen.getByText(/Nenhum aluno vinculado/i)).toBeTruthy())
+        expect(screen.queryByRole('button', { name: /Cadastrar aluno/i })).toBeNull()
     })
 
     it('erro do servidor mostra estado de erro', async () => {

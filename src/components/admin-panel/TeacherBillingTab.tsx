@@ -201,7 +201,7 @@ function SubscriptionRow({
 
 // ─── main component ───────────────────────────────────────────────────────────
 
-export default function TeacherBillingTab() {
+export default function TeacherBillingTab({ onGoToStudents }: { onGoToStudents?: () => void } = {}) {
   const { usersList } = useAdminPanel()
 
   // Plans state
@@ -388,7 +388,16 @@ export default function TeacherBillingTab() {
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-8 text-center">
             <Users size={32} className="text-neutral-400 mx-auto mb-3" />
             <p className="text-neutral-400 font-semibold text-sm">Nenhum aluno vinculado</p>
-            <p className="text-neutral-400 text-xs mt-1">Adicione alunos na aba de Alunos primeiro.</p>
+            <p className="text-neutral-400 text-xs mt-1">Cadastre um aluno para começar a cobrar.</p>
+            {onGoToStudents ? (
+              <button
+                type="button"
+                onClick={onGoToStudents}
+                className="mt-4 inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 text-sm font-black text-black hover:bg-yellow-400 active:scale-95 transition-all"
+              >
+                Cadastrar aluno
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-2">
