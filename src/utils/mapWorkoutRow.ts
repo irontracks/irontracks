@@ -118,7 +118,17 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
         is_template: !!workout.is_template,
         userId: workout.user_id != null ? String(workout.user_id) : undefined,
         createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
+        /*
+         * As DUAS grafias de propósito. O tipo `Workout` (types/workout) usa
+         * `archivedAt`; a UI da lista (`StudentDashboard`, `WorkoutCard`) e o tipo
+         * `DashboardWorkout` usam `archived_at`. Emitindo só a camelCase, tudo que
+         * depende de arquivamento virava letra morta — o filtro
+         * `filter((w) => !w?.archived_at)` lia `undefined` e o treino arquivado
+         * continuava na lista, junto com o badge "Arquivado" e o botão de restaurar
+         * que nunca apareciam. Verificado no simulador em 04/08/2026.
+         */
         archivedAt: workout.archived_at ?? null,
+        archived_at: workout.archived_at ?? null,
         sortOrder:
             typeof workout.sort_order === 'number'
                 ? workout.sort_order

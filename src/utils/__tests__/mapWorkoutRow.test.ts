@@ -267,3 +267,35 @@ describe('mapWorkoutRow', () => {
     })
   })
 })
+
+describe('arquivamento — a lista lê `archived_at`, não `archivedAt`', () => {
+  /*
+   * O mapeamento emitia só a camelCase e a UI inteira de arquivamento era letra
+   * morta: `StudentDashboard` filtra com `!w?.archived_at`, `WorkoutCard` decide
+   * o badge "Arquivado" e o botão de restaurar pela mesma chave. Resultado visto
+   * no simulador (04/08/2026): treino arquivado continuava na lista como se nada
+   * tivesse acontecido.
+   */
+  it('emite as duas grafias com a data', () => {
+    const r = mapWorkoutRow({ id: 'w1', name: 'A', archived_at: '2026-08-04T12:00:00Z', exercises: [] }) as Record<string, unknown>
+    expect(r.archived_at).toBe('2026-08-04T12:00:00Z')
+    expect(r.archivedAt).toBe('2026-08-04T12:00:00Z')
+  })
+
+  it('treino ativo continua com null nas duas', () => {
+    const r = mapWorkoutRow({ id: 'w1', name: 'A', archived_at: null, exercises: [] }) as Record<string, unknown>
+    expect(r.archived_at).toBeNull()
+    expect(r.archivedAt).toBeNull()
+  })
+
+  it('o filtro da lista esconde o arquivado e mantém o ativo', () => {
+    // Reproduz o filtro real do StudentDashboard sobre a saída do mapeamento.
+    const rows = [
+      mapWorkoutRow({ id: 'a', name: 'Ativo', archived_at: null, exercises: [] }),
+      mapWorkoutRow({ id: 'b', name: 'Arquivado', archived_at: '2026-08-04T12:00:00Z', exercises: [] }),
+    ] as Array<Record<string, unknown>>
+    const visiveis = rows.filter((w) => !w?.archived_at)
+    expect(visiveis).toHaveLength(1)
+    expect(visiveis[0]!.title).toBe('Ativo')
+  })
+})
