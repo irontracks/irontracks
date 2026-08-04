@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { NUTRITION_PHASES, computeGoalsFromPrefs, normalizeNutritionPhase } from '@/lib/nutrition/phase'
+import { NUTRITION_PHASES } from '@/lib/nutrition/phase'
+import {
+  buildUserSnapshot,
+  type NutritionFacts,
+  type ProfileFacts,
+  type SnapshotSector,
+  type UserSnapshot,
+} from '@/lib/user/snapshot'
 
 /**
  * Unified user context for AI routes.
@@ -15,6 +22,12 @@ import { NUTRITION_PHASES, computeGoalsFromPrefs, normalizeNutritionPhase } from
  * Modular by design: each route requests only the sectors it needs (token cost).
  * Every section is resilient — a failed read degrades to omitting that section
  * instead of throwing.
+ *
+ * Os fatos do usuário (perfil e meta nutricional) vêm prontos do `userSnapshot` —
+ * este arquivo só FORMATA para o prompt. Ele já extraiu `bodyWeightKg`/`heightCm`/
+ * `age`/`biologicalSex` por conta própria, em paralelo com `extractProfileStats`:
+ * duas leituras independentes das mesmas chaves, que um dia divergiriam sem erro
+ * nenhum. Campo novo do perfil entra no snapshot, não aqui.
  */
 
 export type ContextSector = 'profile' | 'assessment' | 'training' | 'nutrition' | 'labs'
@@ -43,20 +56,6 @@ const FITNESS_LEVEL_LABELS: Record<string, string> = {
   advanced: 'avançado',
 }
 
-/** Lê `user_settings.preferences` — onde mora o perfil que o usuário preenche no app. */
-async function readPreferences(supabase: SupabaseClient, userId: string): Promise<Record<string, unknown> | null> {
-  try {
-    const { data } = await supabase
-      .from('user_settings')
-      .select('preferences')
-      .eq('user_id', userId)
-      .maybeSingle()
-    return data?.preferences && typeof data.preferences === 'object'
-      ? (data.preferences as Record<string, unknown>)
-      : null
-  } catch { return null }
-}
-
 /**
  * Perfil e intenção do usuário — DUAS fontes, porque elas cobrem populações
  * diferentes.
@@ -75,9 +74,10 @@ async function readPreferences(supabase: SupabaseClient, userId: string): Promis
 async function profileSection(
   supabase: SupabaseClient,
   userId: string,
-  prefs: Record<string, unknown> | null,
+  snapshot: UserSnapshot,
 ): Promise<string | null> {
   try {
+    const p: ProfileFacts | null = snapshot.profile
     // try aninhado: `vip_profile` existe para poucos usuários e sua falha não pode
     // derrubar o perfil que vem de `user_settings` — que é o caso da maioria.
     let vipRes: Record<string, unknown> | null = null
@@ -94,7 +94,7 @@ async function profileSection(
 
     // ── Objetivo: o texto livre do VIP quando existe; senão o enum do perfil ──
     const vipGoal = vipRes?.goal ? String(vipRes.goal).trim() : ''
-    const settingsGoal = TRAINING_GOAL_LABELS[String(prefs?.fitnessGoal ?? '')] ?? ''
+    const settingsGoal = TRAINING_GOAL_LABELS[p?.fitnessGoal ?? ''] ?? ''
     if (vipGoal) bits.push(`Objetivo de treino: ${vipGoal}`)
     else if (settingsGoal) bits.push(`Objetivo de treino: ${settingsGoal}`)
 
@@ -102,27 +102,29 @@ async function profileSection(
     // Fica aqui (e não em [NUTRIÇÃO]) de propósito: toda rota de IA pede `profile`,
     // e a fase muda a resposta tanto de dieta quanto de treino — um aluno em
     // cutting tolera menos volume e precisa de outra orientação de recuperação.
-    const phase = normalizeNutritionPhase(prefs?.nutritionPhase)
+    // É a fase EXPLÍCITA: o fallback pelo objetivo de treino não pode ser
+    // apresentado ao coach como "escolhida pelo usuário".
+    const phase = p?.nutritionPhaseExplicit ?? null
     if (phase) {
-      const opt = NUTRITION_PHASES.find(p => p.value === phase)
+      const opt = NUTRITION_PHASES.find(o => o.value === phase)
       if (opt) bits.push(`Fase da dieta: ${opt.label} (${opt.hint}) — escolhida pelo usuário`)
     }
 
     // ── Antropometria declarada no perfil ─────────────────────────────────────
     const anthro = [
-      num(prefs?.bodyWeightKg) != null && `peso ${num(prefs?.bodyWeightKg)}kg`,
-      num(prefs?.heightCm) != null && `altura ${num(prefs?.heightCm)}cm`,
-      num(prefs?.age) != null && `${num(prefs?.age)} anos`,
-      prefs?.biologicalSex && prefs.biologicalSex !== 'not_informed' && `sexo ${prefs.biologicalSex === 'male' ? 'masculino' : 'feminino'}`,
+      p?.bodyWeightKg != null && `peso ${p.bodyWeightKg}kg`,
+      p?.heightCm != null && `altura ${p.heightCm}cm`,
+      p?.age != null && `${p.age} anos`,
+      p?.biologicalSex && `sexo ${p.biologicalSex === 'male' ? 'masculino' : 'feminino'}`,
     ].filter(Boolean).join(' · ')
     if (anthro) bits.push(`Declarado no perfil: ${anthro}`)
 
     // ── Experiência e rotina ──────────────────────────────────────────────────
-    const level = FITNESS_LEVEL_LABELS[String(prefs?.fitnessLevel ?? '')] ?? ''
+    const level = FITNESS_LEVEL_LABELS[p?.fitnessLevel ?? ''] ?? ''
     const routine = [
       level && `nível ${level}`,
-      num(prefs?.trainingExperienceYears) != null && `${num(prefs?.trainingExperienceYears)} ano(s) de treino`,
-      num(prefs?.trainingFrequencyPerWeek) != null && `pretende treinar ${num(prefs?.trainingFrequencyPerWeek)}x/semana`,
+      p?.trainingExperienceYears != null && `${p.trainingExperienceYears} ano(s) de treino`,
+      p?.trainingFrequencyPerWeek != null && `pretende treinar ${p.trainingFrequencyPerWeek}x/semana`,
     ].filter(Boolean).join(' · ')
     if (routine) bits.push(routine)
 
@@ -207,19 +209,10 @@ async function trainingSection(supabase: SupabaseClient, userId: string): Promis
 async function nutritionSection(
   supabase: SupabaseClient,
   userId: string,
-  prefs: Record<string, unknown> | null,
+  snapshot: UserSnapshot,
 ): Promise<string | null> {
   try {
-    const { data: goals } = await supabase
-      .from('nutrition_goals')
-      .select('calories, protein, carbs, fat')
-      // `order` + `limit(1)`: mesmo padrão da página e do overlay. Sem eles, um
-      // usuário com duas linhas faria o `maybeSingle` LANÇAR (PGRST116) e derrubaria
-      // a seção inteira em silêncio, via catch.
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .eq('user_id', userId)
-      .maybeSingle()
+    const n: NutritionFacts | null = snapshot.nutrition
     const { data: logs } = await supabase
       .from('daily_nutrition_logs')
       .select('calories, protein, carbs, fat')
@@ -229,17 +222,16 @@ async function nutritionSection(
       .limit(14)
 
     const bits: string[] = []
-    if (goals) {
-      bits.push(`Meta: ${num(goals.calories) ?? '?'} kcal · P${num(goals.protein) ?? '?'} C${num(goals.carbs) ?? '?'} G${num(goals.fat) ?? '?'}`)
-    } else {
-      // Sem meta salva, a meta que o app EXIBE vem do TDEE do perfil — a mesma
-      // conta da página e do overlay. Sem isto o coach ficava sem meta nenhuma
-      // para a maioria (3 das 57 contas tinham `nutrition_goals` em ago/2026) e
-      // recomendava no escuro, ou pior: contradizia o número que está na tela.
-      const derived = computeGoalsFromPrefs(prefs)
-      if (derived) {
-        bits.push(`Meta (calculada do TDEE do perfil, não salva pelo usuário): ${derived.calories} kcal · P${derived.protein} C${derived.carbs} G${derived.fat}`)
-      }
+    // A meta e a sua PROCEDÊNCIA vêm resolvidas do snapshot. Sem meta salva, o
+    // número que o app EXIBE vem do TDEE do perfil (3 das 57 contas tinham
+    // `nutrition_goals` em ago/2026) — o coach precisa dele para não recomendar no
+    // escuro nem contradizer o que está na tela, e precisa saber que é calculado.
+    if (n?.targets) {
+      const t = n.targets
+      const origem = n.targetsSource === 'derived'
+        ? 'Meta (calculada do TDEE do perfil, não salva pelo usuário)'
+        : 'Meta'
+      bits.push(`${origem}: ${t.calories} kcal · P${t.protein} C${t.carbs} G${t.fat}`)
     }
 
     const arr = Array.isArray(logs) ? logs : []
@@ -275,7 +267,7 @@ async function labsSection(supabase: SupabaseClient, userId: string): Promise<st
 type SectionBuilder = (
   supabase: SupabaseClient,
   userId: string,
-  prefs: Record<string, unknown> | null,
+  snapshot: UserSnapshot,
 ) => Promise<string | null>
 
 const BUILDERS: Record<ContextSector, SectionBuilder> = {
@@ -286,8 +278,14 @@ const BUILDERS: Record<ContextSector, SectionBuilder> = {
   labs: labsSection,
 }
 
-/** Setores que dependem de `user_settings.preferences` — só eles disparam a leitura. */
-const SECTORS_NEEDING_PREFS: ReadonlySet<ContextSector> = new Set<ContextSector>(['profile', 'nutrition'])
+/**
+ * Setores desta camada que se servem do snapshot, e de qual setor DELE. Os demais
+ * (avaliação, treino, exames) leem suas próprias tabelas e não passam por aqui.
+ */
+const SNAPSHOT_SECTOR_BY_CONTEXT: Partial<Record<ContextSector, SnapshotSector>> = {
+  profile: 'profile',
+  nutrition: 'nutrition',
+}
 
 /**
  * Builds a compact, prompt-ready context block for the given user and sectors.
@@ -301,13 +299,20 @@ export async function buildUserContextBlock(
   const uid = String(userId || '').trim()
   if (!uid || !sectors?.length) return ''
 
-  // `preferences` alimenta DUAS seções (perfil e nutrição) — lido uma vez e
-  // repassado, para não fazer a mesma query duas vezes na mesma chamada.
-  const prefs = sectors.some((s) => SECTORS_NEEDING_PREFS.has(s))
-    ? await readPreferences(supabase, uid)
-    : null
+  // Um snapshot por chamada, só com os setores que as seções pedidas usam —
+  // `preferences` é lido uma vez e serve perfil e nutrição juntos.
+  const snapshotSectors = [
+    ...new Set(
+      sectors
+        .map((s) => SNAPSHOT_SECTOR_BY_CONTEXT[s])
+        .filter((s): s is SnapshotSector => Boolean(s)),
+    ),
+  ]
+  const snapshot = snapshotSectors.length
+    ? await buildUserSnapshot(supabase, uid, snapshotSectors)
+    : { profile: null, nutrition: null }
 
-  const results = await Promise.all(sectors.map((s) => BUILDERS[s]?.(supabase, uid, prefs) ?? Promise.resolve(null)))
+  const results = await Promise.all(sectors.map((s) => BUILDERS[s]?.(supabase, uid, snapshot) ?? Promise.resolve(null)))
   const parts = results.filter((p): p is string => Boolean(p))
   if (!parts.length) return ''
   return [
