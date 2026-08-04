@@ -5,11 +5,8 @@ import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionCon
 import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
-import {
-  computeGoalsFromPrefs,
-  extractProfileStats,
-  resolveNutritionPhase,
-} from '@/lib/nutrition/phase'
+import { buildUserSnapshot } from '@/lib/user/snapshot'
+import type { NutritionTargets } from '@/lib/nutrition/phase'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 
@@ -27,17 +24,21 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function normalizeGoalRow(row: Record<string, unknown>) {
-  const calories = safeNumber(row?.calories ?? row?.cals ?? row?.kcal)
-  const protein = safeNumber(row?.protein ?? row?.prot ?? row?.p)
-  const carbs = safeNumber(row?.carbs ?? row?.carb ?? row?.c)
-  const fat = safeNumber(row?.fat ?? row?.f)
-
+/**
+ * Piso de exibição: macro zerado ou ausente na meta cai no default, para a tela não
+ * mostrar "0 g de proteína" como se fosse alvo. Política desta página — o snapshot
+ * entrega o número que existe, sem inventar piso.
+ *
+ * Os aliases (`cals`/`kcal`/`prot`/`p`/…) que esta função aceitava eram defensiva
+ * morta: o `select` nunca trouxe essas colunas, e agora a entrada é sempre a meta já
+ * normalizada pelo leitor único.
+ */
+function applyGoalFloor(target: NutritionTargets) {
   return {
-    calories: calories > 0 ? calories : DEFAULT_GOALS.calories,
-    protein: protein > 0 ? protein : DEFAULT_GOALS.protein,
-    carbs: carbs > 0 ? carbs : DEFAULT_GOALS.carbs,
-    fat: fat > 0 ? fat : DEFAULT_GOALS.fat,
+    calories: target.calories > 0 ? target.calories : DEFAULT_GOALS.calories,
+    protein: target.protein > 0 ? target.protein : DEFAULT_GOALS.protein,
+    carbs: target.carbs > 0 ? target.carbs : DEFAULT_GOALS.carbs,
+    fat: target.fat > 0 ? target.fat : DEFAULT_GOALS.fat,
   }
 }
 
@@ -107,52 +108,25 @@ export default async function NutritionPage() {
     initialTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
   }
 
-  // Fetch user profile for personalized goal calculation
-  let userPrefs: Record<string, unknown> | null = null
-  try {
-    const { data: settingsRow } = await supabase
-      .from('user_settings')
-      .select('preferences')
-      .eq('user_id', authUserId)
-      .maybeSingle()
-    userPrefs = settingsRow?.preferences && typeof settingsRow.preferences === 'object'
-      ? (settingsRow.preferences as Record<string, unknown>) : null
-  } catch { /* silent */ }
+  // Perfil e meta vêm resolvidos do leitor único (`lib/user/snapshot`), que já
+  // aplica a ordem "meta salva > TDEE do perfil" — a MESMA sequência que estava
+  // copiada aqui, no NutritionOverlay e no contexto de IA. A política de exibição
+  // (o fallback DEFAULT_GOALS e o aviso de schema) continua sendo desta página.
+  const snapshot = await buildUserSnapshot(supabase, authUserId, ['profile', 'nutrition'])
+  schemaMissing = schemaMissing || isSchemaMissingError(snapshot.nutrition?.savedGoalsError)
 
   let goals = DEFAULT_GOALS
   let goalsSource: 'saved' | 'profile' | 'default' = 'default'
-  try {
-    const { data: row, error } = await supabase
-      .from('nutrition_goals')
-      .select('id, calories, protein, carbs, fat')
-      .eq('user_id', authUserId)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (error) throw error
-    if (row) {
-      goals = normalizeGoalRow(row)
-      goalsSource = 'saved'
-    }
-  } catch (e) {
-    schemaMissing = schemaMissing || isSchemaMissingError(e)
-  }
-
-  // When no saved goals exist, try computing from user profile (TDEE-based),
-  // usando a fase escolhida pelo usuário (ou, sem escolha, o objetivo de treino).
-  if (goalsSource === 'default' && userPrefs) {
-    const computed = computeGoalsFromPrefs(userPrefs)
-    if (computed) {
-      goals = computed
-      goalsSource = 'profile'
-    }
+  if (snapshot.nutrition?.targets) {
+    goals = applyGoalFloor(snapshot.nutrition.targets)
+    goalsSource = snapshot.nutrition.targetsSource === 'saved' ? 'saved' : 'profile'
   }
 
   // Dados do perfil para o seletor de fase recalcular a meta no client sem
   // round-trip. Null quando o perfil está incompleto — aí o seletor se explica em
   // vez de mostrar números inventados.
-  const profileStats = extractProfileStats(userPrefs)
-  const currentPhase = resolveNutritionPhase(userPrefs)
+  const profileStats = snapshot.profile?.stats ?? null
+  const currentPhase = snapshot.profile?.nutritionPhase ?? 'MAINTAIN'
 
   // Fetch today's workout calories from completed sessions.
   // Schema: workout_session_logs.finished_at + duration_seconds. A tabela
@@ -195,7 +169,7 @@ export default async function NutritionPage() {
   // déficit num dia treinado. Toggle: preferences.restDayAdjustEnabled (default on).
   let restDayReduction = 0
   try {
-    const restEnabled = userPrefs?.restDayAdjustEnabled !== false
+    const restEnabled = snapshot.nutrition?.restDayAdjustEnabled !== false
     if (restEnabled) {
       const { data: intent } = await supabase
         .from('rest_day_intents')
@@ -225,8 +199,8 @@ export default async function NutritionPage() {
         const trainedToday = rows.some((w) => toBrtKey((w as { date?: string }).date) === dateKey)
 
         if (!trainedToday) {
-          const bodyWeightKg = Number(userPrefs?.bodyWeightKg) || null
-          const biologicalSex = typeof userPrefs?.biologicalSex === 'string' ? (userPrefs.biologicalSex as string) : null
+          const bodyWeightKg = snapshot.profile?.bodyWeightKg ?? null
+          const biologicalSex = snapshot.profile?.biologicalSex ?? null
           const kcals: number[] = []
           for (const w of rows) {
             if (kcals.length >= 10) break
@@ -265,7 +239,7 @@ export default async function NutritionPage() {
 
   return (
     <NutritionConsoleShell title="Nutrition Console" subtitle={`Hoje · ${dateKey}`}>
-      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} restDayReduction={restDayReduction} profileStats={profileStats} currentPhase={currentPhase} phaseIsExplicit={!!userPrefs?.nutritionPhase} />
+      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} restDayReduction={restDayReduction} profileStats={profileStats} currentPhase={currentPhase} phaseIsExplicit={snapshot.profile?.nutritionPhaseExplicit != null} />
     </NutritionConsoleShell>
   )
 }
