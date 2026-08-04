@@ -140,13 +140,15 @@ O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**.
 
 `testTimeout` é **15s**, não o default de 5s: a suíte falhava de forma NÃO determinística porque o primeiro caso de um arquivo com `await import()` dinâmico levava 6s sob contenção (isolado roda em 1,3s). Timeout serve para pegar teste TRAVADO, não teste lento sob carga.
 
-## Guard falso — os três jeitos de errar que já aconteceram aqui
+## Guard falso — os cinco jeitos de errar que já aconteceram aqui
 
 Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padrões que passaram verdes COM o bug presente:
 
 1. **Tautológico** — assertar `toBe(MIN_MINI_SETS)` em vez do literal `2`: baixar a constante muda a expectativa junto.
 2. **Acusando o próprio comentário** — source-guard que procura o padrão proibido e casa com a documentação que explica por que ele é proibido. Reduza ao código executável (fora comentário, string, template, regex) antes de casar.
 3. **Cobrindo as pontas e não a fiação** — algoritmo e coletor corretos isoladamente, e ninguém ligando os dois. Foi assim que remover `knownWeights` da chamada no hook deixou 198 testes verdes.
+4. **Proibindo o consumo CORRETO** — source-guard mirando o NOME do campo (`bodyWeightKg`…) em vez da FONTE: `p.bodyWeightKg` vindo do leitor único é exatamente o certo, e o guard reprovava. Mire em quem LÊ a tabela, não em quem usa o dado (ago/2026, `userSnapshot`).
+5. **O teste que não existe** — declarar "provado por mutação" sem conferir que o caso foi mesmo inserido no arquivo. Um `replace` de script que não casa deixa o teste fora, e a mutação passa verde porque **nada** o exercita. Rode `vitest -t "<nome do caso>"` e confirme `1 passed`, não `0 passed | N skipped`.
 
 ## Checklist obrigatório antes de declarar qualquer tarefa concluída
 1. **TypeScript:** `npx tsc --noEmit` — zero erros, sem exceção.
@@ -181,6 +183,10 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 **Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
 
 **Caminho do editor de Story** (leva tempo achar às cegas): menu do avatar → **Histórico** → abrir um treino → botão **STORY** no topo. O ícone de compartilhar do card de treino é export PDF/JSON, não é o composer.
+
+**⚠️ A conta logada no simulador é `djmkapple@gmail.com` — NÃO é a do e-mail da sessão (`djmkbrasil@gmail.com`).** São perfis diferentes no banco: a do simulador tem perfil completo (93,9 kg · 172 cm · 40 anos · masculino · 5×/sem), fase CUT e meta salva em `nutrition_goals` (2676 kcal · P208 C295 G74); a outra tem perfil incompleto e ZERO metas salvas. Validar um número da tela contra a conta errada leva a conclusão invertida — quase aconteceu em ago/2026 ao conferir a migração da meta. **Confirme o usuário antes de comparar tela × banco** (o peso exibido no check-in pré-treino identifica rápido).
+
+**A página `/dashboard/nutrition` NÃO é alcançável dentro do app nativo.** A aba NUTRIÇÃO do dashboard abre o `NutritionOverlay`, que é outro componente; o `VipHub` até tem `router.push('/dashboard/nutrition')`, mas só quando `onOpenNutrition` não é passado — e no dashboard ele é. A página é a superfície WEB. Mexeu nela? A conferência visual pelo simulador não existe: valide pelo overlay (irmão que exibe os mesmos números) ou pelos dados, e **diga que a prova foi numérica, não visual**.
 
 **Teste de canvas NÃO prova rendering.** jsdom não implementa `canvas.getContext('2d')`, então `measureText`/matrizes caem em fallback e o teste passa verde com o desenho quebrado. Foi assim que a legenda do Story subiu com 23 guards verdes e o texto invisível no aparelho. Em qualquer coisa que DESENHE, o guard cobre o algoritmo e a fiação; o resultado na tela é conferência visual — declare o limite no próprio arquivo de teste.
 
