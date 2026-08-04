@@ -175,10 +175,20 @@ describe('fonte única dos mapeamentos de perfil', () => {
     'src/components/dashboard/nutrition/NutritionOverlay.tsx',
   ]
 
+  /**
+   * As superfícies passaram a consumir a fonte única INDIRETAMENTE, pelo leitor
+   * único (`lib/user/snapshot`) e pela política de exibição (`displayGoals`) — que
+   * por sua vez importam de `phase`. Exigir o import direto passou a reprovar
+   * justamente a arquitetura que este guard quer: fonte única, um caminho só.
+   *
+   * O que ele protege NÃO mudou: recriar os mapeamentos localmente segue vermelho.
+   */
+  const FONTE_UNICA = /from '@\/lib\/(nutrition\/phase|nutrition\/displayGoals|user\/snapshot)'/
+
   for (const file of CONSUMERS) {
-    it(`${file} importa de lib/nutrition/phase em vez de redefinir`, () => {
+    it(`${file} consome a fonte única em vez de redefinir`, () => {
       const src = readFileSync(file, 'utf8')
-      expect(src).toMatch(/from '@\/lib\/nutrition\/phase'/)
+      expect(src).toMatch(FONTE_UNICA)
       expect(src, 'redefiniu mapFitnessGoal localmente').not.toMatch(/function\s+mapFitnessGoal/)
       expect(src, 'redefiniu mapGender localmente').not.toMatch(/function\s+mapGender/)
       expect(src, 'redefiniu mapActivityLevel localmente').not.toMatch(/function\s+mapActivityLevel/)

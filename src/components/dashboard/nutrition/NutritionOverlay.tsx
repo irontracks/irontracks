@@ -7,28 +7,24 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
-import {
-  computeGoalsFromPrefs,
-  extractProfileStats,
-  resolveNutritionPhase,
-  type NutritionPhase,
-} from '@/lib/nutrition/phase'
+import { DEFAULT_GOALS, resolveDisplayGoals } from '@/lib/nutrition/displayGoals'
+import { buildUserSnapshot } from '@/lib/user/snapshot'
+import type { NutritionPhase } from '@/lib/nutrition/phase'
 import type { UserStats } from '@/lib/nutrition/goals'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
-
-const DEFAULT_GOALS: Totals = { calories: 2000, protein: 150, carbs: 200, fat: 60 }
 
 function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
 
-// O cálculo de metas (BMR + TDEE + macros) e os mapeamentos de perfil vivem numa
-// fonte ÚNICA (@/lib/nutrition/phase → computeGoalsFromPrefs). Este arquivo já teve
-// duas vezes a sua própria cópia divergente: primeiro do cálculo (Harris-Benedict +
-// proteína por %, contra o Mifflin-St Jeor do resto do app) e depois dos mapeamentos
-// de objetivo/sexo/atividade. Não recriar nenhum dos dois aqui.
+// Perfil e meta vêm do LEITOR ÚNICO (@/lib/user/snapshot); o piso de exibição e o
+// rótulo da origem, de @/lib/nutrition/displayGoals. Este arquivo já teve TRÊS vezes
+// a sua própria cópia divergente: o cálculo de metas (Harris-Benedict + proteína por
+// %, contra o Mifflin-St Jeor do resto do app), depois os mapeamentos de
+// objetivo/sexo/atividade, depois a fiação "meta salva > TDEE". Não recriar nada
+// disso aqui — inclusive a constante DEFAULT_GOALS, que é da política de exibição.
 
 interface NutritionOverlayProps {
   onClose: () => void
@@ -108,16 +104,19 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
       const uid = await getUid()
       if (!uid || cancelled) return
 
-      // Offline: serve do cache na hora, sem travar nas 4 queries de rede.
+      // Offline: serve do cache na hora, sem travar nas leituras de rede.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         if (await serveFromCache(uid)) return
       }
 
       try {
-        const [totalsRes, goalsRes, settingsRes, sessionsRes, intentRes, recentRes] = await Promise.all([
+        // O snapshot entra COMO UMA DAS PROMESSAS: ele substitui as leituras de
+        // `nutrition_goals` e `user_settings` sem serializar nada — internamente as
+        // duas também saem juntas. Trocá-lo por um await antes deste bloco custaria
+        // um round-trip a mais nesta tela.
+        const [totalsRes, snapshot, sessionsRes, intentRes, recentRes] = await Promise.all([
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
-          supabase.from('nutrition_goals').select('calories,protein,carbs,fat').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-          supabase.from('user_settings').select('preferences').eq('user_id', uid).maybeSingle(),
+          buildUserSnapshot(supabase, uid, ['profile', 'nutrition']),
           supabase.from('workouts').select('id, notes').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
           supabase.from('rest_day_intents').select('will_train').eq('user_id', uid).eq('date_key', dateKey).maybeSingle(),
           supabase.from('workouts').select('notes').eq('user_id', uid).eq('is_template', false).order('date', { ascending: false }).limit(30),
@@ -132,41 +131,20 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           fat: safeNumber(totalsRes.data?.fat),
         }
 
-        let goals = DEFAULT_GOALS
-        let goalsSource: 'saved' | 'profile' | 'default' = 'default'
-
-        if (goalsRes.data) {
-          goals = {
-            calories: safeNumber(goalsRes.data.calories) || DEFAULT_GOALS.calories,
-            protein: safeNumber(goalsRes.data.protein) || DEFAULT_GOALS.protein,
-            carbs: safeNumber(goalsRes.data.carbs) || DEFAULT_GOALS.carbs,
-            fat: safeNumber(goalsRes.data.fat) || DEFAULT_GOALS.fat,
-          }
-          goalsSource = 'saved'
-        } else {
-          const prefs = settingsRes.data?.preferences as Record<string, unknown> | null
-          // Perfil incompleto ou entradas inválidas → null, mantém DEFAULT_GOALS.
-          const computed = computeGoalsFromPrefs(prefs)
-          if (computed) {
-            goals = computed
-            goalsSource = 'profile'
-          }
-        }
+        const display = resolveDisplayGoals(snapshot.nutrition)
+        let goals: Totals = display.goals
+        const goalsSource = display.source
 
         // Real per-session kcal from the saved session JSON (`notes`), using the
         // SAME MET model as the workout report — so this matches the "~X kcal" the
         // report shows, instead of a flat 300/session estimate.
-        const kcalPrefs = settingsRes.data?.preferences as Record<string, unknown> | null
-        const kcalBodyWeight = Number(kcalPrefs?.bodyWeightKg)
-        const kcalSex = typeof kcalPrefs?.biologicalSex === 'string' ? (kcalPrefs.biologicalSex as string) : null
+        const kcalBodyWeight = snapshot.profile?.bodyWeightKg ?? null
+        const kcalSex = snapshot.profile?.biologicalSex ?? null
         let workoutCalories = 0
         for (const w of Array.isArray(sessionsRes.data) ? sessionsRes.data : []) {
           try {
             const notes = JSON.parse(String((w as { notes?: unknown }).notes ?? ''))
-            workoutCalories += estimateSessionKcal(notes, {
-              bodyWeightKg: Number.isFinite(kcalBodyWeight) ? kcalBodyWeight : null,
-              biologicalSex: kcalSex,
-            })
+            workoutCalories += estimateSessionKcal(notes, { bodyWeightKg: kcalBodyWeight, biologicalSex: kcalSex })
           } catch { /* sem JSON de sessão → ignora este treino */ }
         }
 
@@ -175,8 +153,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
         // treinou hoje (sessão concluída), segue a meta cheia.
         let restDayReduction = 0
         try {
-          const rdPrefs = settingsRes.data?.preferences as Record<string, unknown> | null
-          const restEnabled = rdPrefs?.restDayAdjustEnabled !== false
+          const restEnabled = snapshot.nutrition?.restDayAdjustEnabled !== false
           const willTrain = (intentRes.data as { will_train?: boolean } | null)?.will_train
           const trainedToday = Array.isArray(sessionsRes.data) && sessionsRes.data.length > 0
           if (restEnabled && intentRes.data && willTrain === false && !trainedToday) {
@@ -186,10 +163,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
               let session: unknown = (w as { notes?: unknown }).notes
               if (typeof session === 'string') { try { session = JSON.parse(session) } catch { session = null } }
               if (!session || typeof session !== 'object') continue
-              const k = estimateSessionKcal(session, {
-                bodyWeightKg: Number.isFinite(kcalBodyWeight) ? kcalBodyWeight : null,
-                biologicalSex: kcalSex,
-              })
+              const k = estimateSessionKcal(session, { bodyWeightKg: kcalBodyWeight, biologicalSex: kcalSex })
               if (k > 0) kcals.push(k)
             }
             const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
@@ -202,7 +176,6 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
         } catch { /* sem ajuste */ }
 
         if (!cancelled) {
-          const prefsForPhase = settingsRes.data?.preferences as Record<string, unknown> | null
           setData({
             dateKey,
             totals,
@@ -210,9 +183,9 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
             goalsSource,
             workoutCalories,
             restDayReduction,
-            profileStats: extractProfileStats(prefsForPhase),
-            currentPhase: resolveNutritionPhase(prefsForPhase),
-            phaseIsExplicit: !!prefsForPhase?.nutritionPhase,
+            profileStats: snapshot.profile?.stats ?? null,
+            currentPhase: snapshot.profile?.nutritionPhase ?? 'MAINTAIN',
+            phaseIsExplicit: snapshot.profile?.nutritionPhaseExplicit != null,
           })
           void setNutritionOverlayCache(uid, dateKey, { totals, goals, goalsSource, workoutCalories })
         }
