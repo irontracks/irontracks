@@ -31,6 +31,16 @@ describe('1. Comunidade desativada — liga na própria tela', () => {
   it('o botão liga o módulo ali mesmo', () => {
     expect(code(file)).toContain("updateSetting('moduleCommunity', true)")
   })
+
+  it('e PERSISTE — `updateSetting` sozinho é otimista', () => {
+    /*
+     * Pego no simulador: com só o `updateSetting`, a tela liberava e o banco
+     * continuava `false` — no boot seguinte o módulo voltava desativado. O painel
+     * de preferências desta mesma tela esconde o problema porque tem um "Salvar"
+     * separado; aqui não há, então o save explícito é parte da correção.
+     */
+    expect(code(file)).toContain("save({ moduleCommunity: true })")
+  })
 })
 
 describe('2. Sem treino — o aluno pode criar o dele', () => {
