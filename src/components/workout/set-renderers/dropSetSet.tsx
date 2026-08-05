@@ -14,6 +14,8 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight, AUTO_INPUT_CLASS } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { roundSuggestedWeight } from '@/utils/autoload/plateMath';
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 
@@ -30,6 +32,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
     openNotesKeys,
     toggleNotes,
     reportHistory,
+    settings,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -276,6 +279,13 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
       )}
 
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Anilhas por lado do peso da primeira etapa — é o que se monta no aparelho antes de descer. */}
+      <PlateHintLine
+        exerciseName={String(ex?.name ?? '')}
+        weight={stages[0]?.weight}
+        inventory={inventoryFromSettings(settings)}
+        className="pl-12"
+      />
 
       {isNotesOpen && (
         <div className="space-y-1.5">

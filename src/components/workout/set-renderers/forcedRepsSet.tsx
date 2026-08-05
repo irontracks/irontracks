@@ -11,9 +11,11 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 
 const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setForcedRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
+  const { getLog, updateLog, setForcedRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory , settings} = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
@@ -104,6 +106,15 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso, reps à falha e reps forçadas no modal.</div>}
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Anilhas do peso salvo no modal. Nestes métodos não há campo inline: o
+          peso é digitado no modal e o card mostra o resumo — a dica acompanha o
+          resumo, mesma informação do renderer normal. */}
+      <PlateHintLine
+        exerciseName={String(ex?.name ?? '')}
+        weight={savedWeight}
+        inventory={inventoryFromSettings(settings)}
+        className="pl-12"
+      />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (
