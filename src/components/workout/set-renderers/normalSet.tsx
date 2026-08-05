@@ -831,6 +831,16 @@ const NormalSetInner = ({
             ) : <span />}
             {failureToggle}
           </div>
+          {/* "Por lado: 6×20 + 1×10" para o peso QUE ESTÁ NO CAMPO — ramo BILATERAL
+              (leg press, supino com barra…). O ramo unilateral tem a sua própria
+              logo acima: são duas árvores de JSX diferentes, e pôr em uma só deixa
+              metade dos exercícios sem a dica. */}
+          <PlateHintLine
+            exerciseName={String(ex?.name ?? '')}
+            weight={weightField.value}
+            inventory={inventoryFromSettings(settings)}
+            className="px-0.5"
+          />
           {/* Per-set method picker */}
           {!done && (
             <div className="mt-1">
