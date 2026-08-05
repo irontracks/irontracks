@@ -246,7 +246,18 @@ Guarda em `useNativeTimerActions`: ação nativa não encerra descanso com menos
 **Rest-Pause:** piso de 2 minis (`helpers/restPauseRules.ts`) — com uma mini-série o método deixa de existir. `planned_mini_sets` guardava `miniReps.length`, ou seja, o PREENCHIDO sobrescrevia o PLANEJADO e um dia incompleto rebaixava o plano do exercício para sempre.
 
 ## ⚠️ Live Activity (Ilha Dinâmica + tela bloqueada) — ZONA DE NÃO MEXER
-**Esta área já quebrou 12+ vezes, sempre EM SILÊNCIO.** Antes de tocar em qualquer coisa aqui, rode `npx vitest run src/hooks/__tests__/liveActivityRegressionGuards.test.ts` e `.../liveActivityTelemetry.test.ts`. Se um guard falhar, você está reintroduzindo uma regressão conhecida — **corrija o código, não afrouxe o teste.**
+**Esta área já quebrou 12+ vezes, sempre EM SILÊNCIO.** Antes de tocar em qualquer coisa aqui, rode `npx vitest run src/hooks/__tests__/liveActivityRegressionGuards.test.ts` e `src/utils/native/__tests__/liveActivityDiag.test.ts`. Se um guard falhar, você está reintroduzindo uma regressão conhecida — **corrija o código, não afrouxe o teste.** (Esta linha citava um `liveActivityTelemetry.test.ts` que NUNCA existiu no repo — conferido em 04/08/2026.)
+
+**A telemetria daqui vai para DOIS lugares, e o segundo existe por um motivo prático.** `reportLiveActivityFailure` manda ao Sentry (tags `area:live-activity`, `activitiesEnabled`, `nativeError`) e `reportLiveActivityToAudit` grava em `audit_events` (`action = 'live_activity_start_failed'`). O Sentry sozinho não bastou: em 04/08/2026 a LA sumiu do iPhone do dono e o diagnóstico travou porque **o token do Sentry não existe no repo nem no ambiente local** — a pista estava lá e era ilegível de onde se investiga. Consulta:
+
+```sql
+select created_at, metadata->>'stage', metadata->>'nativeError',
+       metadata->>'activitiesEnabled', metadata->>'platform'
+from audit_events where action = 'live_activity_start_failed'
+order by created_at desc limit 20;
+```
+
+`stage` responde a pergunta inteira: `not_native` = o bridge do Capacitor não estava pronto (a LA nem foi tentada); `empty_activity_id` = o ActivityKit recusou — aí `activitiesEnabled: false` significa que o usuário desligou Atividades ao Vivo nos Ajustes do iOS; `threw` = exceção no caminho. Só o TREINO reporta (o descanso nasce a cada série e viraria spam) e só com `window.Capacitor` presente (senão todo usuário da web geraria evento).
 
 **Por que quebra sempre em silêncio:** os guards de plataforma (`if (!isIosNative()) return`) saem **sem reportar**. Aí nem Sentry nem teste veem nada — a feature morre e só o dono percebe, dias depois. Toda saída silenciosa nova nesse caminho é uma bomba-relógio.
 
