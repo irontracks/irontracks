@@ -141,6 +141,28 @@ describe('3. auditoria: curtidas, emojis e mensagens não podem falhar em silên
   })
 })
 
+describe('contagem de espectadores: só dos MEUS stories', () => {
+  /*
+   * O contador passou a vir da listagem (antes só existia depois de abrir a
+   * lista). Quem viu o story de OUTRA pessoa é dado do autor dela — a rota
+   * `views/` devolve 403 para terceiros, e trazer o número aqui abriria por fora
+   * exatamente o que ela fecha.
+   */
+  it('a query de contagem é filtrada pelos stories do próprio usuário', () => {
+    expect(code(listRoute)).toMatch(/const myStoryIds = stories\.filter\(\(s\) => s\.author_id === userId\)/)
+    expect(code(listRoute)).toMatch(/myStoryIds\.length \? admin\.from\('social_story_views'\)\.select\('story_id'\)\.in\('story_id', myStoryIds\)/)
+  })
+
+  it('a contagem NÃO é feita sobre todos os storyIds da listagem', () => {
+    const contagem = code(listRoute).slice(code(listRoute).indexOf('myViewsResult'))
+    expect(contagem).not.toMatch(/myViewsResult[\s\S]{0,200}\.in\('story_id', storyIds\)/)
+  })
+
+  it('o payload devolve `viewCount` por story', () => {
+    expect(code(listRoute)).toMatch(/viewCount: viewCountByStory\.get\(s\.id\) \|\| 0/)
+  })
+})
+
 describe('4. curtida e reação são independentes (migration split_story_reactions_from_likes)', () => {
   const listRoute2 = readFileSync('src/app/api/social/stories/list/route.ts', 'utf8')
   const reactRoute = readFileSync('src/app/api/social/stories/react/route.ts', 'utf8')
