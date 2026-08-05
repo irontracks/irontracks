@@ -114,9 +114,19 @@ export async function GET(req: Request) {
     const isAbsoluteUrl = (p: string) => /^https?:\/\//i.test(p)
     const mediaPaths = stories.map((s) => s.media_path).filter((p) => Boolean(p) && !isAbsoluteUrl(p))
 
+    /*
+     * Só os MEUS stories entram na contagem de espectadores. Quem viu o story de
+     * outra pessoa é informação do autor dela — a rota `views/` já devolve 403
+     * para terceiros, e trazer o número aqui abriria por fora o que ela fecha.
+     */
+    const myStoryIds = stories.filter((s) => s.author_id === userId).map((s) => s.id)
+
     const emptyResult = { data: [] as unknown[], error: null }
-    const [viewsResult, likesResult, reactionsResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
+    const [viewsResult, myViewsResult, likesResult, reactionsResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
       storyIds.length ? admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds) : emptyResult,
+      // Contagem de espectadores dos meus stories: o viewer mostrava 0 até o
+      // usuário ABRIR a lista, porque o número saía do array carregado sob demanda.
+      myStoryIds.length ? admin.from('social_story_views').select('story_id').in('story_id', myStoryIds) : emptyResult,
       // `emoji` sai do SELECT: a reação passou a viver em `social_story_reactions`.
       // A coluna continua na tabela só como rede de rollback da migration.
       storyIds.length ? admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds) : emptyResult,
@@ -131,6 +141,12 @@ export async function GET(req: Request) {
     for (const r of Array.isArray(viewsResult.data) ? viewsResult.data : []) {
       const sid = String(asRecord(r)?.story_id || '').trim()
       if (sid) viewedSet.add(sid)
+    }
+
+    const viewCountByStory = new Map<string, number>()
+    for (const r of Array.isArray(myViewsResult.data) ? myViewsResult.data : []) {
+      const sid = String(asRecord(r)?.story_id || '').trim()
+      if (sid) viewCountByStory.set(sid, (viewCountByStory.get(sid) || 0) + 1)
     }
 
     const likeCountByStory = new Map<string, number>()
@@ -208,6 +224,7 @@ export async function GET(req: Request) {
           : (signedUrlByPath.get(s.media_path) ?? `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`),
         mediaKind: mediaKindFromPath(s.media_path),
         viewed: viewedSet.has(s.id),
+        viewCount: viewCountByStory.get(s.id) || 0, // 0 em story alheio: não é dado meu
         likeCount: likeCountByStory.get(s.id) || 0,
         hasLiked: likedSet.has(s.id),
         myReaction: myReactionByStory.get(s.id) || null, // emoji com que EU reagi (pra fixar no viewer)

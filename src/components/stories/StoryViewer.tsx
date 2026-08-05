@@ -110,6 +110,33 @@ export default function StoryViewer({
   const [liking, setLiking] = useState(false)
   const [sendingComment, setSendingComment] = useState(false)
 
+  /*
+   * Puxar para baixo fecha (pedido do dono, 05/08/2026) — o gesto que todo mundo
+   * já tenta por reflexo, vindo do Instagram.
+   *
+   * O card é arrastado por REF, não por estado: um `setState` por `pointermove`
+   * re-renderizaria o viewer inteiro a ~60×/s, competindo com o RAF da barra de
+   * progresso justamente durante o gesto — o que daria de volta o travamento que
+   * acabamos de tirar.
+   */
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const dragStartRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const draggedRef = useRef(false)
+  /** Distância suficiente para fechar sem flick. */
+  const CLOSE_DISTANCE_PX = 110
+  /** Flick curto e rápido também fecha (px/ms). */
+  const CLOSE_VELOCITY = 0.5
+  /** Abaixo disto ainda é toque, não arrasto — senão o tap de navegação vira gesto. */
+  const DRAG_SLOP_PX = 8
+
+  const paintDrag = (dy: number) => {
+    const el = cardRef.current
+    if (!el) return
+    el.style.transition = dy === 0 ? 'transform 180ms ease-out, opacity 180ms ease-out' : 'none'
+    el.style.transform = dy === 0 ? '' : `translateY(${dy}px)`
+    el.style.opacity = dy === 0 ? '' : String(Math.max(0.35, 1 - dy / 420))
+  }
+
   // Use a single "paused" state that controls CSS animation-play-state
   // This avoids tearing down useEffect loops on every touch
   const isPaused = holding || commentsOpen || viewersOpen || hidden || deleting
@@ -542,7 +569,13 @@ export default function StoryViewer({
   }
 
   if (!story) return null
-  const viewCount = viewersStoryIdRef.current === story.id ? viewers.length : 0
+  /*
+     * A lista aberta é a fonte mais fresca (acabou de vir do servidor); fora dela
+     * vale o número que a própria listagem já traz. Antes o `else` era `0`, então
+     * o autor via "0 visualizações" até tocar no olho — e um story visto por 30
+     * pessoas parecia não ter alcançado ninguém.
+     */
+  const viewCount = viewersStoryIdRef.current === story.id ? viewers.length : (story.viewCount ?? 0)
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black flex items-center justify-center pt-safe pb-safe">
@@ -556,10 +589,58 @@ export default function StoryViewer({
       />
 
       <div
+        ref={cardRef}
         className="relative w-full max-w-md h-[92vh] bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl"
-        onPointerDown={() => setHolding(true)}
-        onPointerUp={() => setHolding(false)}
-        onPointerCancel={() => setHolding(false)}
+        onPointerDown={(e) => {
+          setHolding(true)
+          draggedRef.current = false
+          // Um gesto que NASCE dentro da folha de comentários/espectadores é
+          // rolagem da lista, não intenção de fechar o story.
+          if ((e.target as HTMLElement | null)?.closest?.('[data-story-sheet]')) {
+            dragStartRef.current = null
+            return
+          }
+          dragStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }
+        }}
+        onPointerMove={(e) => {
+          const start = dragStartRef.current
+          if (!start) return
+          const dy = e.clientY - start.y
+          const dx = e.clientX - start.x
+          // Só assume o gesto quando ele é claramente VERTICAL: navegar entre
+          // stories é toque lateral e não pode virar arrasto.
+          if (!draggedRef.current && Math.abs(dy) > DRAG_SLOP_PX && Math.abs(dy) > Math.abs(dx)) draggedRef.current = true
+          if (draggedRef.current) paintDrag(Math.max(0, dy))
+        }}
+        onPointerUp={(e) => {
+          setHolding(false)
+          const start = dragStartRef.current
+          dragStartRef.current = null
+          if (start && draggedRef.current) {
+            const dy = e.clientY - start.y
+            const dt = Math.max(1, Date.now() - start.t)
+            if (dy > CLOSE_DISTANCE_PX || (dy > 40 && dy / dt > CLOSE_VELOCITY)) {
+              onClose()
+              return
+            }
+          }
+          paintDrag(0) // não fechou: volta ao lugar
+        }}
+        onPointerCancel={() => {
+          setHolding(false)
+          dragStartRef.current = null
+          draggedRef.current = false
+          paintDrag(0)
+        }}
+        onClickCapture={(e) => {
+          // Sem isto, soltar o arrasto sobre a área de toque lateral também
+          // AVANÇAVA o story — o clique nasce do mesmo pointerup.
+          if (draggedRef.current) {
+            e.preventDefault()
+            e.stopPropagation()
+            draggedRef.current = false
+          }
+        }}
       >
         {/* Header / Barra de Progresso */}
         <div className="absolute top-0 left-0 right-0 p-3 z-20 bg-gradient-to-b from-black/80 to-transparent">
@@ -707,9 +788,20 @@ export default function StoryViewer({
               )}
 
               <div className="flex flex-col items-center">
-                <button onClick={toggleLike} disabled={liking} className={`w-12 h-12 rounded-2xl border flex items-center justify-center disabled:opacity-60 ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
-                  <Heart size={20} className={story.hasLiked ? 'fill-current' : ''} />
-                </button>
+                {/*
+                  * No story do próprio autor o coração é PLACAR, não botão: ele
+                  * clicava e curtia a si mesmo (a barra de emoji já era escondida
+                  * para ele, mas o coração não). O servidor também recusa agora.
+                  */}
+                {isMine ? (
+                  <div className="w-12 h-12 rounded-2xl border border-neutral-800 bg-neutral-900/80 text-neutral-400 flex items-center justify-center" aria-label={`${story.likeCount} curtidas`}>
+                    <Heart size={20} />
+                  </div>
+                ) : (
+                  <button onClick={toggleLike} disabled={liking} className={`w-12 h-12 rounded-2xl border flex items-center justify-center disabled:opacity-60 ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
+                    <Heart size={20} className={story.hasLiked ? 'fill-current' : ''} />
+                  </button>
+                )}
                 <span className="text-[10px] font-bold text-white drop-shadow">{story.likeCount}</span>
               </div>
 
@@ -781,7 +873,7 @@ export default function StoryViewer({
 
           {/* Modal de Comentários / Views */}
           {(commentsOpen || viewersOpen) && (
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-3 bg-neutral-900/95 border border-neutral-800 rounded-2xl overflow-hidden backdrop-blur-sm">
+            <motion.div data-story-sheet initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-3 bg-neutral-900/95 border border-neutral-800 rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="max-h-[30vh] overflow-y-auto custom-scrollbar p-3 space-y-3">
                 {viewersOpen && viewers.map((v) => (
                   <div key={String((v as Record<string, unknown>).viewerId ?? "")} className="flex items-center gap-3">

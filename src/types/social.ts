@@ -87,6 +87,8 @@ export type Story = {
   mediaUrl: string | null
   mediaKind?: 'image' | 'video'
   viewed: boolean
+  /** Quantos viram — só vem preenchido nos stories do PRÓPRIO usuário. */
+  viewCount?: number
   likeCount: number
   hasLiked: boolean
   myReaction?: string | null // emoji com que o próprio usuário reagiu (fixa o destaque no viewer)

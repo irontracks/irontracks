@@ -36,7 +36,26 @@ export async function POST(req: Request) {
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
 
     const shouldLike = typeof like === 'boolean' ? like : null
+
+    /*
+     * Ninguém curte o próprio story. A UI já escondia a barra de emoji para o
+     * autor mas deixava o coração clicável — ele curtia a si mesmo e o número
+     * subia. A checagem fica no SERVIDOR porque a UI é só a primeira porta.
+     *
+     * DESCURTIR continua liberado: existem curtidas próprias gravadas antes
+     * desta regra, e bloquear o DELETE prenderia o usuário nelas para sempre.
+     */
+    const isOwnStory = async () => {
+      const { data } = await createAdminClient()
+        .from('social_stories')
+        .select('author_id')
+        .eq('id', storyId)
+        .maybeSingle()
+      return String(data?.author_id || '').trim() === String(auth.user.id || '').trim()
+    }
+
     if (shouldLike === true) {
+      if (await isOwnStory()) return NextResponse.json({ ok: false, error: 'own_story' }, { status: 403 })
       const { error } = await auth.supabase.from('social_story_likes').insert({ story_id: storyId, user_id: auth.user.id })
       if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
         return respondDbError('social:stories:like:insert', error, 400)
@@ -86,6 +105,9 @@ export async function POST(req: Request) {
       if (error) return respondDbError('social:stories:like:toggle-delete', error, 400)
       return NextResponse.json({ ok: true, liked: false })
     }
+
+    // Mesmo bloqueio do caminho explícito: o toggle sem like existente vai INSERIR.
+    if (await isOwnStory()) return NextResponse.json({ ok: false, error: 'own_story' }, { status: 403 })
 
     const { error } = await auth.supabase.from('social_story_likes').insert({ story_id: storyId, user_id: auth.user.id })
     if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
