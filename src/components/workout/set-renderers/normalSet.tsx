@@ -18,6 +18,8 @@ import { logWarnRemote } from '@/lib/logger';
 import { decideExternalSync } from '../helpers/inputSyncDecision';
 import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { FailureToggle } from './FailureToggle';
 
 // ── Local-state input ─────────────────────────────────────────────────────
@@ -687,6 +689,15 @@ const NormalSetInner = ({
             rationale={autoSuggestion?.rationale ?? ''}
             plateHint={autoPlateHint}
             className="px-0.5"
+          />
+          {/* "Por lado: 6×20 + 1×10" para o peso QUE ESTÁ NO CAMPO. Independente do
+              autoload: vale para quem digita na mão, que é a maioria. Some sozinha
+              em exercício sem anilha. */}
+          <PlateHintLine
+            exerciseName={String(ex?.name ?? '')}
+            weight={weightField.value}
+            inventory={inventoryFromSettings(settings)}
+            className="px-0.5 -mt-0.5"
           />
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
           <div className="flex items-center justify-end gap-2 px-0.5 -mt-0.5">

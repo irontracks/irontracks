@@ -275,3 +275,27 @@ export function isCustomInventory(inv: PlateInventory | null | undefined): boole
   }
   return false
 }
+
+/**
+ * O inventário a partir das `settings` do usuário.
+ *
+ * Fonte ÚNICA da derivação: ela nasceu inline no `ExerciseCard` e passou a ser
+ * necessária também nos renderers de série (a dica "por lado" abaixo do campo de
+ * peso). Duas cópias divergiriam no dia em que o default mudasse — e o sintoma
+ * seria a calculadora e a dica discordando sobre as MESMAS anilhas.
+ *
+ * Inventário vazio = academia completa: ninguém é obrigado a cadastrar nada para
+ * a conta funcionar; só quem treina em casa ajusta.
+ */
+export function inventoryFromSettings(settings: unknown): PlateInventory {
+  const s = settings && typeof settings === 'object' ? (settings as Record<string, unknown>) : null
+  const raw = s?.plateInventory
+  const counts = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? (raw as Record<string, number>)
+    : null
+  const bar = Number(s?.barWeightKg)
+  return {
+    counts: counts && Object.keys(counts).length > 0 ? counts : DEFAULT_GYM_INVENTORY.counts,
+    barWeightKg: Number.isFinite(bar) && bar >= 0 ? bar : DEFAULT_GYM_INVENTORY.barWeightKg,
+  }
+}
