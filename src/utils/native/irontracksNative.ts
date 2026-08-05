@@ -16,6 +16,47 @@ import { isIosNative, isNativePlatform } from '@/utils/platform'
  * aparece. E como o app carrega o front do servidor, este aviso vale para todos
  * os builds já instalados, sem precisar de TestFlight.
  */
+/**
+ * Grava o motivo em `audit_events` — o Sentry sozinho não bastou.
+ *
+ * Em 04/08/2026 a Live Activity sumiu do iPhone do dono e o diagnóstico travou:
+ * o `reportLiveActivityFailure` estava reportando certinho, mas o token do
+ * Sentry não existe no repo nem no ambiente local, então a pista era ilegível de
+ * onde o problema é investigado. `audit_events` responde a um SELECT.
+ *
+ * Fire-and-forget e sempre silencioso: o usuário está no meio de um treino e
+ * telemetria jamais pode atrapalhar isso.
+ */
+const reportLiveActivityToAudit = (
+  stage: 'not_native' | 'empty_activity_id' | 'threw',
+  detail?: { nativeError?: unknown; activitiesEnabled?: unknown },
+) => {
+  try {
+    if (typeof fetch !== 'function') return
+    const nav = typeof navigator !== 'undefined' ? navigator : null
+    void fetch('/api/diag/live-activity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify({
+        stage,
+        nativeError: detail?.nativeError != null ? String(detail.nativeError).slice(0, 300) : undefined,
+        activitiesEnabled: typeof detail?.activitiesEnabled === 'boolean' ? detail.activitiesEnabled : undefined,
+        platform: (() => {
+          try {
+            const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } })?.Capacitor
+            return typeof cap?.getPlatform === 'function' ? String(cap.getPlatform()).slice(0, 40) : 'web'
+          } catch { return 'unknown' }
+        })(),
+        userAgent: nav?.userAgent ? String(nav.userAgent).slice(0, 300) : undefined,
+      }),
+    }).catch(() => { })
+  } catch {
+    // idem: telemetria nunca derruba o treino
+  }
+}
+
 const reportLiveActivityFailure = (
   kind: 'workout' | 'rest',
   reason: 'empty_activity_id' | 'threw',
@@ -33,6 +74,10 @@ const reportLiveActivityFailure = (
     const extra = { nativeError: nativeError || undefined }
     if (error !== undefined) Sentry.captureException(error, { tags, extra })
     else Sentry.captureMessage(`live_activity_start_failed:${kind}:${reason}`, { level: 'warning', tags, extra })
+    // Só o treino: o descanso nasce e morre a cada série e encheria a tabela.
+    if (kind === 'workout') {
+      reportLiveActivityToAudit(reason, { nativeError: native?.error, activitiesEnabled: native?.activitiesEnabled })
+    }
   } catch {
     // Telemetria nunca pode derrubar o treino.
   }
@@ -523,7 +568,25 @@ export interface WorkoutLiveActivityState {
 /** Start the workout Live Activity. Returns the activityId or empty string on failure. */
 export const startWorkoutLiveActivity = async (state: WorkoutLiveActivityState): Promise<string> => {
   try {
-    if (!isIosNative()) return ''
+    if (!isIosNative()) {
+      /*
+       * A saída que NINGUÉM via. `isIosNative()` falso aqui significa que o
+       * bridge do Capacitor não estava pronto: a Live Activity nunca nasce e não
+       * havia registro em lugar nenhum — nem Sentry, nem teste. É a
+       * "bomba-relógio" que o CLAUDE.md descreve para esta área.
+       *
+       * SÓ reporta quando `window.Capacitor` EXISTE: aí estamos dentro do app
+       * nativo e a detecção é que falhou — o caso que interessa. Sem essa
+       * condição, todo usuário da web geraria um evento por treino e a tabela de
+       * auditoria viraria lixo.
+       */
+      try {
+        if (typeof window !== 'undefined' && (window as unknown as { Capacitor?: unknown }).Capacitor) {
+          reportLiveActivityToAudit('not_native')
+        }
+      } catch { /* nunca atrapalha o treino */ }
+      return ''
+    }
     const safeName = String(state.workoutName || 'Treino').slice(0, 60)
     const startMs = Math.max(0, Math.round(Number(state.workoutStartMs) || Date.now()))
     const result = await Native.startWorkoutLiveActivity({
