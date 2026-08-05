@@ -14,6 +14,8 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { buildExerciseGroups } from '@/lib/workoutGroups';
 
 // --- Group Method Set (Bi-Set / Super-Set / Tri-Set / Giant-Set / Pré-exaustão / Pós-exaustão) ---
@@ -225,6 +227,13 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha o peso para concluir.</div>}
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Anilhas por lado do peso deste exercício do par/trio. */}
+      <PlateHintLine
+        exerciseName={String(ex?.name ?? '')}
+        weight={weightValue}
+        inventory={inventoryFromSettings(settings)}
+        className="pl-12"
+      />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

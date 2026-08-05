@@ -12,9 +12,11 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 
 const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setFst7Modal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
+  const { getLog, updateLog, setFst7Modal, openNotesKeys, toggleNotes, startTimer, reportHistory, settings } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
@@ -111,6 +113,13 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps em todos os 7 blocos no modal para concluir.</div>}
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Anilhas por lado do peso do primeiro bloco — os 7 usam a mesma carga. */}
+      <PlateHintLine
+        exerciseName={String(ex?.name ?? '')}
+        weight={firstWeight}
+        inventory={inventoryFromSettings(settings)}
+        className="pl-12"
+      />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

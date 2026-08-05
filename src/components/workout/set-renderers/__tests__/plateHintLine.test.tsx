@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { PlateHintLine } from '../PlateHintLine'
 import type { PlateInventory } from '@/utils/plates/plateInventory'
@@ -89,5 +89,50 @@ describe('fiação no renderer — o guard que o unitário não dá', () => {
 
   it('passa o inventário do usuário, não o kit fixo', () => {
     expect(code).toMatch(/<PlateHintLine[\s\S]*?inventory=\{inventoryFromSettings\(settings\)\}/)
+  })
+})
+
+describe('a família inteira — os 14 renderers, não só o normal', () => {
+  /*
+   * O CLAUDE.md abre a seção dos set-renderers dizendo que eles "divergem em
+   * SILÊNCIO": cada um reimplementa peso/reps/concluir por conta própria, e o que
+   * parece bug de um método quase sempre é a família fora de sincronia. A dica de
+   * anilhas entrou primeiro só no `normalSet` — este guard existe para que os
+   * outros 13 não fiquem para trás de novo, e para que um renderer NOVO não nasça
+   * sem ela.
+   */
+  const DIR = join(process.cwd(), 'src/components/workout/set-renderers')
+
+  /** Renderers que exibem carga. Cardio e prancha não têm peso — ficam fora. */
+  const COM_PESO = [
+    'normalSet', 'dropSetSet', 'restPauseSet', 'clusterSet', 'strippingSet',
+    'groupMethodSet', 'fST7Set', 'heavyDutySet', 'forcedRepsSet',
+    'negativeRepsSet', 'partialRepsSet', 'pontoZeroSet', 'sistema21Set', 'waveSet',
+  ]
+
+  it.each(COM_PESO)('%s mostra a dica de anilhas', (nome) => {
+    const src = readFileSync(join(DIR, `${nome}.tsx`), 'utf8')
+    expect(src).toContain('<PlateHintLine')
+  })
+
+  it.each(COM_PESO)('%s usa o inventário do usuário, não um kit fixo', (nome) => {
+    const src = readFileSync(join(DIR, `${nome}.tsx`), 'utf8')
+    expect(src).toContain('inventoryFromSettings(settings)')
+  })
+
+  it('a lista cobre TODO renderer com peso que existe no diretório', () => {
+    /*
+     * Sem isto, um renderer novo nasceria sem dica e sem ninguém notar — a lista
+     * acima viraria papel de parede. `readdirSync` é a fonte da verdade.
+     */
+    const arquivos = readdirSync(DIR)
+      .filter((f) => f.endsWith('.tsx') && !f.startsWith('_'))
+      .map((f) => f.replace(/\.tsx$/, ''))
+      .filter((n) => !['AutoloadNote', 'FailureToggle', 'PlateHintLine'].includes(n))
+
+    // Cardio e plank não têm carga; qualquer outro renderer precisa estar na lista.
+    const semPeso = ['cardioSet', 'plankSet']
+    const esperados = arquivos.filter((n) => !semPeso.includes(n))
+    expect([...esperados].sort()).toEqual([...COM_PESO].sort())
   })
 })

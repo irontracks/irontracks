@@ -17,6 +17,8 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
+import { PlateHintLine } from './PlateHintLine';
+import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 
 const RestPauseSetInner = ({
   ex, exIdx, setIdx, sstOverride,
@@ -38,6 +40,7 @@ const RestPauseSetInner = ({
     openNotesKeys,
     toggleNotes,
     reportHistory,
+    settings,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -290,6 +293,13 @@ const RestPauseSetInner = ({
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps de todos os mini-sets no modal para concluir.</div>}
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Anilhas por lado do peso do método, que é único para as mini-séries. */}
+      <PlateHintLine
+        exerciseName={String(ex?.name ?? '')}
+        weight={weightField.value}
+        inventory={inventoryFromSettings(settings)}
+        className="pl-12"
+      />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (
