@@ -35,7 +35,7 @@ import AIExerciseSwap from './AIExerciseSwap'
 import PlateCalculatorSheet from './PlateCalculatorSheet'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 import { resolveIncrement } from '@/utils/autoload/plateMath';
-import { DEFAULT_GYM_INVENTORY, type PlateInventory } from '@/utils/plates/plateInventory';
+import { inventoryFromSettings, type PlateInventory } from '@/utils/plates/plateInventory';
 
 type GroupPos = 'first' | 'middle' | 'last';
 
@@ -117,17 +117,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     () => resolveIncrement(inferEquipmentFromName(name)).equipmentClass === 'barbell',
     [name],
   );
-  const plateInventory: PlateInventory = useMemo(() => {
-    const raw = (settings as Record<string, unknown> | null | undefined)?.plateInventory;
-    const counts = isObject(raw) ? (raw as Record<string, number>) : null;
-    const bar = Number((settings as Record<string, unknown> | null | undefined)?.barWeightKg);
-    return {
-      // Inventário vazio = academia completa. Ninguém é obrigado a cadastrar nada
-      // para a calculadora funcionar; só quem treina em casa ajusta.
-      counts: counts && Object.keys(counts).length > 0 ? counts : DEFAULT_GYM_INVENTORY.counts,
-      barWeightKg: Number.isFinite(bar) && bar >= 0 ? bar : DEFAULT_GYM_INVENTORY.barWeightKg,
-    };
-  }, [settings]);
+  const plateInventory: PlateInventory = useMemo(() => inventoryFromSettings(settings), [settings]);
   /**
    * Série que receberá o peso: a primeira NÃO concluída (a que o usuário está fazendo).
    * Quando todas estão concluídas, cai na última — aplicar numa série já fechada é

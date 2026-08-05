@@ -101,6 +101,39 @@ const norm = (s: string): string =>
  * Dica pronta para a UI a partir do nome do exercício + peso sugerido.
  * `null` quando o exercício não é de anilha (ou não dá pra afirmar com segurança).
  */
+/**
+ * Este exercício se monta com anilha — e de que jeito?
+ *
+ * FONTE ÚNICA da regra de elegibilidade. Nasceu extraída de
+ * `plateHintForExercise` quando a dica passou a valer também para o peso
+ * DIGITADO (ver `utils/plates/plateHint`): duas cópias desta decisão
+ * divergiriam no primeiro aparelho novo, e o sintoma seria a dica aparecer num
+ * lugar e sumir no outro.
+ *
+ * `null` para: máquina de pino, cabo, halteres, elástico, peso corporal, Smith
+ * (barra guiada pesa de 7 a 20 kg conforme o aparelho — supor erraria) e
+ * T-bar/landmine (anilha numa ponta só, "por lado" não existe).
+ */
+export function plateKindOf(exerciseName: string | null | undefined): 'barbell' | 'plate_machine' | null {
+  const name = norm(exerciseName ?? '')
+  if (!name.trim()) return null
+  if (SINGLE_END_LOADED.test(name)) return null
+
+  const slugs = inferEquipmentFromName(exerciseName ?? '')
+  if (slugs.includes('smith')) return null
+
+  /*
+   * A MÁQUINA vem antes da barra de propósito. `inferEquipmentFromName` infere
+   * 'barra' de "agachamento", então "agachamento pendular" e "v-squat" caíam em
+   * `barbell` e a dica descontava 20 kg de uma barra que aquele aparelho não tem
+   * — em 200 kg, dizia 90/lado quando o certo é 100/lado. O nome específico do
+   * aparelho tem que ganhar do genérico.
+   */
+  if (PLATE_LOADED_MACHINE.test(name)) return 'plate_machine'
+  if (slugs.includes('barra')) return 'barbell'
+  return null
+}
+
 export function plateHintForExercise(
   exerciseName: string | null | undefined,
   weightKg: number | null | undefined,
@@ -109,18 +142,10 @@ export function plateHintForExercise(
   const kg = typeof weightKg === 'number' ? weightKg : Number(String(weightKg ?? '').replace(',', '.'))
   if (!Number.isFinite(kg) || kg <= 0) return null
 
-  const name = norm(exerciseName ?? '')
-  if (!name.trim()) return null
-  if (SINGLE_END_LOADED.test(name)) return null
-
-  const slugs = inferEquipmentFromName(exerciseName ?? '')
-  if (slugs.includes('smith')) return null
-
-  let barKg: number | null = null
-  if (slugs.includes('barra')) barKg = OLYMPIC_BAR_KG
-  else if (PLATE_LOADED_MACHINE.test(name)) barKg = 0 // peso digitado = só as anilhas
-
-  if (barKg === null) return null
+  const kind = plateKindOf(exerciseName)
+  if (!kind) return null
+  // Em máquina de anilha o número digitado é a SOMA das anilhas, sem o carro.
+  const barKg = kind === 'barbell' ? OLYMPIC_BAR_KG : 0
 
   return formatPlateLoadout(planPlatesPerSide(kg, { barKg, plates: opts?.plates })) || null
 }
