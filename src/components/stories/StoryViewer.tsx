@@ -477,20 +477,16 @@ export default function StoryViewer({
     if (!story?.id || liking) return
     setLiking(true)
     const nextLiked = !story.hasLiked
-    const previousReaction = myReaction
-    onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
     /*
-     * Descurtir APAGA a linha de `social_story_likes` — e o emoji da reação mora
-     * nessa mesma linha (`react` faz upsert nela). Ou seja: descurtir remove a
-     * reação no banco. A UI não sabia disso e seguia mostrando o emoji fixado até
-     * o próximo carregamento, quando ele sumia sem explicação.
+     * A reação NÃO é mais tocada aqui. Ela vive em `social_story_reactions` desde
+     * a migration `split_story_reactions_from_likes`; antes morava na mesma linha
+     * de `social_story_likes` e descurtir a apagava junto, sem aviso.
      */
-    if (!nextLiked && previousReaction) setMyReaction(null)
+    onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
     try {
       await apiSocial.likeStory(story.id, nextLiked)
     } catch {
       onStoryUpdated(story.id, { hasLiked: story.hasLiked, likeCount: story.likeCount })
-      if (!nextLiked && previousReaction) setMyReaction(previousReaction)
     } finally {
       setLiking(false)
     }

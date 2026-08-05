@@ -13,8 +13,14 @@ import { readFileSync, existsSync } from 'node:fs'
 describe('A — stories/react: visibilidade via RLS + dedup', () => {
   const src = readFileSync('src/app/api/social/stories/react/route.ts', 'utf8')
 
-  it('faz o upsert do like via auth.supabase e retorna 403 se a RLS barrar', () => {
-    expect(src).toMatch(/auth\.supabase[\s\S]*from\('social_story_likes'\)[\s\S]*upsert/)
+  it('faz o upsert da reação via auth.supabase e retorna 403 se a RLS barrar', () => {
+    /*
+     * A tabela mudou de `social_story_likes` para `social_story_reactions`
+     * (migration `split_story_reactions_from_likes`) — o que este caso protege é
+     * a passagem pela RLS via `auth.supabase`, não o nome da tabela. Reagir com o
+     * admin client pulava a checagem `can_view_story`.
+     */
+    expect(src).toMatch(/auth\.supabase[\s\S]*from\('social_story_reactions'\)[\s\S]*upsert/)
     expect(src).toMatch(/likeErr[\s\S]*status:\s*403/)
   })
 

@@ -120,14 +120,16 @@ describe('3. auditoria: curtidas, emojis e mensagens não podem falhar em silên
     expect(code(viewer)).toMatch(/!commentsLoading && !commentsError/)
   })
 
-  it('descurtir limpa a reação — as duas moram na MESMA linha do banco', () => {
+  it('descurtir NÃO mexe mais na reação — elas são independentes agora', () => {
     /*
-     * `react` faz upsert em `social_story_likes` com o emoji; `like:false` faz
-     * DELETE da linha inteira. Descurtir apaga a reação no servidor, e a tela
-     * seguia mostrando o emoji fixado até o próximo carregamento.
+     * Passo anterior: as duas moravam na mesma linha de `social_story_likes` e
+     * descurtir apagava a reação, então a tela tinha de limpar o emoji junto.
+     * Com `social_story_reactions` (migration `split_story_reactions_from_likes`)
+     * isso deixou de ser verdade — e manter a limpeza apagaria da tela uma
+     * reação que continua no banco.
      */
-    expect(code(viewer)).toMatch(/if \(!nextLiked && previousReaction\) setMyReaction\(null\)/)
-    expect(code(viewer)).toMatch(/setMyReaction\(previousReaction\)/)
+    const toggle = code(viewer).slice(code(viewer).indexOf('const toggleLike'), code(viewer).indexOf('const sendComment'))
+    expect(toggle).not.toContain('setMyReaction')
   })
 
   it('trocar de story limpa comentários e rascunho', () => {
@@ -136,5 +138,38 @@ describe('3. auditoria: curtidas, emojis e mensagens não podem falhar em silên
     const reset = code(viewer).slice(code(viewer).indexOf('setViewers([])'))
     expect(reset).toContain('setComments([])')
     expect(reset).toContain("setCommentText('')")
+  })
+})
+
+describe('4. curtida e reação são independentes (migration split_story_reactions_from_likes)', () => {
+  const listRoute2 = readFileSync('src/app/api/social/stories/list/route.ts', 'utf8')
+  const reactRoute = readFileSync('src/app/api/social/stories/react/route.ts', 'utf8')
+  const likeRoute = readFileSync('src/app/api/social/stories/like/route.ts', 'utf8')
+
+  it('a reação é gravada na tabela PRÓPRIA, não na de curtidas', () => {
+    /*
+     * Antes: upsert em `social_story_likes` com a coluna `emoji`. Três efeitos de
+     * uma vez — reagir marcava curtida, descurtir apagava a reação, e trocar de
+     * emoji batia na RLS (aquela tabela não tem policy de UPDATE) devolvendo 403
+     * que o cliente nem checava.
+     */
+    expect(code(reactRoute)).toContain("from('social_story_reactions')")
+    expect(code(reactRoute)).not.toContain("from('social_story_likes')")
+  })
+
+  it('a listagem lê a reação da tabela nova e o like da antiga', () => {
+    expect(code(listRoute2)).toContain("from('social_story_reactions')")
+    expect(code(listRoute2)).toMatch(/from\('social_story_likes'\)\s*\.select\('story_id, user_id'\)/)
+  })
+
+  it('a listagem NÃO lê mais `emoji` da tabela de curtidas', () => {
+    // A coluna segue no banco como rede de rollback; o código para de usá-la.
+    expect(code(listRoute2)).not.toMatch(/select\('story_id, user_id, emoji'\)/)
+  })
+
+  it('curtir continua sendo só curtir', () => {
+    expect(code(likeRoute)).toContain("from('social_story_likes')")
+    expect(code(likeRoute)).not.toContain('social_story_reactions')
+    expect(code(likeRoute)).not.toContain('emoji')
   })
 })
