@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { setTopWeightReps, setBestE1rm, setVolume } from '@/utils/report/setVolume'
+import { setTopWeightReps, setBestE1rm, setVolume, isNonWorkingSet, nonWorkingSetLabel } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
 import { isCardioExercise, getCardioSummary } from '@/utils/report/cardioSummary'
@@ -193,6 +193,9 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
             const key = `${exIdx}-${sIdx}`
             const log = sessionLogs[key]
             if (!log || typeof log !== 'object') continue
+            // Aquecimento/reconhecimento não disputam "melhor série" — o mesmo
+            // critério que `reportMetrics` já usa para os totais do exercício.
+            if (isNonWorkingSet(log)) continue
             const e1rm = setBestE1rm(log)
             if (e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
         }
@@ -304,7 +307,17 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         // Etapas do drop-set/stripping (null em série normal)
                         const stages = formatSetStages(logObj)
 
-                        const { text: progressionText, rowClass, isPr, e1rmText } = computeProgression(logObj, prevLog)
+                        const nonWorkingLabel = nonWorkingSetLabel(logObj)
+                        /*
+                         * Série de aquecimento/reconhecimento NÃO ganha coluna de
+                         * evolução: comparar um aquecimento de 160 kg com a série de
+                         * trabalho do treino anterior produzia "−33,3%" em vermelho,
+                         * como se o usuário tivesse regredido. `computeProgression`
+                         * segue sendo chamada só onde faz sentido.
+                         */
+                        const { text: progressionText, rowClass, isPr, e1rmText } = nonWorkingLabel
+                            ? { text: '—', rowClass: '', isPr: false, e1rmText: computeProgression(logObj, null).e1rmText }
+                            : computeProgression(logObj, prevLog)
 
                         return (
                             <React.Fragment key={`${exIdx}-${sIdx}`}>
@@ -319,6 +332,13 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                             {/* Série levada à falha muscular. O flag `failure` já era gravado
                                                 durante o treino mas NADA no relatório lia — a marca sumia do
                                                 histórico. Aceita boolean e "true" (log serializado em JSON). */}
+                                            {/* Aquecimento/reconhecimento: a marcação que o usuário
+                                                faz no modal do treino ativo já era gravada em
+                                                `set_type`, mas NADA no relatório em tela lia — a
+                                                informação sumia do histórico (o PDF já mostrava). */}
+                                            {nonWorkingLabel && (
+                                                <span className="text-[9px] bg-sky-500/15 text-sky-300 border border-sky-500/40 px-1 rounded font-black" title="Série de aquecimento/reconhecimento — não conta para volume nem para evolução">{nonWorkingLabel}</span>
+                                            )}
                                             {(logObj.failure === true || String(logObj.failure ?? '').toLowerCase() === 'true') && (
                                                 <span className="text-[9px] bg-red-500/15 text-red-300 border border-red-500/40 px-1 rounded font-black" title="Série levada à falha muscular">💥 Falha</span>
                                             )}
