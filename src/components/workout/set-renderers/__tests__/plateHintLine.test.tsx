@@ -64,8 +64,20 @@ describe('fiação no renderer — o guard que o unitário não dá', () => {
   )
   const code = normalSet.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
-  it('o renderer normal renderiza a dica', () => {
-    expect(code).toContain('<PlateHintLine')
+  it('o renderer normal renderiza a dica NOS DOIS ramos (unilateral e bilateral)', () => {
+    /*
+     * O `normalSet` tem duas árvores de JSX: `isUnilateral ? (...) : (...)`.
+     * Na primeira tentativa a dica entrou só na do unilateral — leg press é
+     * bilateral e ficou sem nada, com este guard VERDE porque ele só checava a
+     * existência do componente no arquivo. Achado na tela do simulador.
+     */
+    const ocorrencias = (code.match(/<PlateHintLine/g) ?? []).length
+    expect(ocorrencias).toBe(2)
+
+    const ramoUnilateral = code.slice(code.indexOf('isUnilateral ? ('), code.indexOf(') : ('))
+    const ramoBilateral = code.slice(code.indexOf(') : ('))
+    expect(ramoUnilateral).toContain('<PlateHintLine')
+    expect(ramoBilateral).toContain('<PlateHintLine')
   })
 
   it('passa o valor DO CAMPO, não a sugestão do autoload', () => {
