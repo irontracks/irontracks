@@ -115,9 +115,13 @@ export async function GET(req: Request) {
     const mediaPaths = stories.map((s) => s.media_path).filter((p) => Boolean(p) && !isAbsoluteUrl(p))
 
     const emptyResult = { data: [] as unknown[], error: null }
-    const [viewsResult, likesResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
+    const [viewsResult, likesResult, reactionsResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
       storyIds.length ? admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds) : emptyResult,
-      storyIds.length ? admin.from('social_story_likes').select('story_id, user_id, emoji').in('story_id', storyIds) : emptyResult,
+      // `emoji` sai do SELECT: a reação passou a viver em `social_story_reactions`.
+      // A coluna continua na tabela só como rede de rollback da migration.
+      storyIds.length ? admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds) : emptyResult,
+      // Só a MINHA reação — é o que o viewer precisa para fixar o emoji escolhido.
+      storyIds.length ? admin.from('social_story_reactions').select('story_id, emoji').eq('user_id', userId).in('story_id', storyIds) : emptyResult,
       storyIds.length ? admin.from('social_story_comments').select('story_id').in('story_id', storyIds) : emptyResult,
       admin.from('profiles').select('id, display_name, photo_url, role').in('id', authorIds),
       mediaPaths.length ? admin.storage.from('social-stories').createSignedUrls(mediaPaths, signedSeconds) : Promise.resolve({ data: [] as { path: string; signedUrl: string }[] | null, error: null }),
@@ -138,11 +142,20 @@ export async function GET(req: Request) {
       const uid = String(row?.user_id || '').trim()
       if (!sid) continue
       likeCountByStory.set(sid, (likeCountByStory.get(sid) || 0) + 1)
-      if (uid && uid === userId) {
-        likedSet.add(sid)
-        const emoji = String(row?.emoji || '').trim()
-        if (emoji) myReactionByStory.set(sid, emoji) // reação do PRÓPRIO usuário, pra fixar no viewer
-      }
+      if (uid && uid === userId) likedSet.add(sid)
+    }
+
+    /*
+     * Reação AGORA é independente da curtida. Antes as duas moravam na mesma linha
+     * de `social_story_likes` (coluna `emoji` opcional), e a consequência aparecia
+     * na tela: reagir com 🔥 acendia o coração e somava +1 no contador sem o
+     * usuário ter curtido — este laço conta QUALQUER linha da tabela como curtida.
+     */
+    for (const r of (Array.isArray(reactionsResult.data) ? reactionsResult.data : []) as unknown[]) {
+      const row = asRecord(r)
+      const sid = String(row?.story_id || '').trim()
+      const emoji = String(row?.emoji || '').trim()
+      if (sid && emoji) myReactionByStory.set(sid, emoji)
     }
 
     const commentCountByStory = new Map<string, number>()

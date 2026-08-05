@@ -20,12 +20,14 @@ const BodySchema = z
   .strip()
 
 /**
- * POST /api/social/stories/react — Add/toggle emoji reaction on a story.
- * Uses existing `social_story_likes` table with a naming convention:
- * Stores reaction as metadata in the likes row.
- * 
- * For now, we use notifications to deliver reactions (lightweight approach).
- * A dedicated reactions table can be added later.
+ * POST /api/social/stories/react — reação em emoji a um story.
+ *
+ * Persiste em `social_story_reactions` (uma linha por story+usuário; trocar de
+ * emoji é UPDATE). A tabela nasceu na migration `split_story_reactions_from_likes`
+ * — o cabeçalho antigo daqui dizia "A dedicated reactions table can be added
+ * later", e o "later" chegou junto com os três bugs que a gambiarra causava:
+ * reagir marcava curtida, descurtir apagava a reação, e trocar de emoji batia na
+ * RLS (a tabela de likes não tem policy de UPDATE) devolvendo 403.
  */
 export async function POST(req: Request) {
   try {
@@ -61,15 +63,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'story_not_found' }, { status: 404 })
     }
 
-    // Registra o like PRIMEIRO via auth.supabase — a RLS (can_view_story) só deixa
-    // passar se o usuário PODE VER o story. Antes a notificação era emitida via admin
-    // ANTES e INDEPENDENTE disto, então um não-seguidor com o storyId em mãos spammava
-    // o autor com "reagiu ao seu story" mesmo sem poder ver o story.
-    // Persiste o EMOJI escolhido (antes só gravava o like sem o emoji → a reação "não fixava").
-    // Trocar de emoji faz upsert no mesmo (story_id,user_id) e atualiza a reação.
+    /*
+     * Grava a reação PRIMEIRO via auth.supabase — a RLS (can_view_story) só deixa
+     * passar se o usuário PODE VER o story. Antes a notificação era emitida via
+     * admin ANTES e INDEPENDENTE disto, então um não-seguidor com o storyId em
+     * mãos spammava o autor com "reagiu ao seu story" sem poder ver o story.
+     *
+     * A reação mora em `social_story_reactions` desde a migration
+     * `split_story_reactions_from_likes`. Antes ela era um upsert em
+     * `social_story_likes`, e isso trazia três problemas de uma vez:
+     *   - reagir marcava o usuário como tendo CURTIDO (a listagem conta qualquer
+     *     linha daquela tabela) e somava +1 no contador de curtidas;
+     *   - descurtir fazia DELETE da linha e apagava a reação junto;
+     *   - `social_story_likes` NÃO tem policy de UPDATE, e upsert vira
+     *     `INSERT ... ON CONFLICT DO UPDATE` — então TROCAR de emoji, ou reagir
+     *     depois de já ter curtido, batia na RLS e voltava 403. A tabela nova
+     *     nasceu com a policy de UPDATE.
+     */
     const { error: likeErr } = await auth.supabase
-      .from('social_story_likes')
-      .upsert({ story_id: storyId, user_id: auth.user.id, emoji }, { onConflict: 'story_id,user_id' })
+      .from('social_story_reactions')
+      .upsert({ story_id: storyId, user_id: auth.user.id, emoji, updated_at: new Date().toISOString() }, { onConflict: 'story_id,user_id' })
     if (likeErr) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
     // Notifica o autor, com dedup de 5min por (usuário→story) — sem isto, trocar de
