@@ -238,3 +238,33 @@ export const setBestE1rm = (log: unknown): number => {
   bump(weight, reps)
   return best
 }
+
+/**
+ * A série NÃO conta como trabalho — aquecimento ou reconhecimento (feeler).
+ *
+ * Fonte ÚNICA da pergunta. `reportMetrics` já pulava essas séries nos totais e o
+ * PDF (`buildHtml.getSetTag`) já as rotulava, mas a TABELA do relatório em tela
+ * ignorava o campo: a série de aquecimento aparecia como série de trabalho e
+ * ganhava uma coluna de evolução comparando-a com a série do treino anterior.
+ * Resultado real (dono, 05/08/2026): aquecimento de 160 kg no leg press exibido
+ * como "−112 kg 1RM (−33,3%)" em vermelho, como se ele tivesse regredido.
+ *
+ * Aceita as duas grafias e o flag legado `is_warmup`, como o resto do repo.
+ */
+export function isNonWorkingSet(log: unknown): boolean {
+  if (!log || typeof log !== 'object' || Array.isArray(log)) return false
+  const l = log as Record<string, unknown>
+  const raw = String((l.set_type ?? l.setType) ?? '').trim().toLowerCase()
+  if (raw === 'warmup' || raw === 'feeler') return true
+  if (!raw && (l.is_warmup === true || l.isWarmup === true)) return true
+  return false
+}
+
+/** Rótulo curto para a tabela do relatório. `null` em série de trabalho. */
+export function nonWorkingSetLabel(log: unknown): string | null {
+  if (!isNonWorkingSet(log)) return null
+  if (!log || typeof log !== 'object') return null
+  const l = log as Record<string, unknown>
+  const raw = String((l.set_type ?? l.setType) ?? '').trim().toLowerCase()
+  return raw === 'feeler' ? 'Recon.' : 'Aquec.'
+}
