@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
 import type { StoryGroup } from '@/types/social'
 
 /**
@@ -154,6 +155,57 @@ describe('a régua de progresso segue o story atual', () => {
     fireEvent.click(container.querySelector('[aria-label="Anterior"]') as HTMLElement)
     expect(barras(container)[1]!.style.transform).toBe('scaleX(0)')
     expect(barras(container)[1]!.style.animation).not.toContain('story-bar-fill')
+  })
+})
+
+describe('a barra do story de VÍDEO também anda', () => {
+  /*
+   * "A primeira barrinha corre normal, quando passa pro segundo story a barra não
+   * aparece" (dono, 05/08/2026). O segundo era vídeo.
+   *
+   * A barra do vídeo é desenhada por um RAF que lê o elemento <video>. Com
+   * `AnimatePresence mode="wait"`, esse elemento só monta DEPOIS da animação de
+   * saída do story anterior: quando o efeito rodava, `videoRef.current` ainda era
+   * null, ele saía no `if (!v) return` e nunca mais tentava — as deps não
+   * mudavam. Por isso o elemento virou ESTADO (`videoEl`), que é o que reabre a
+   * janela do efeito quando o vídeo aparece.
+   */
+  const comVideo = (): StoryGroup => {
+    const g = grupo()
+    const [base] = g.stories
+    return {
+      ...g,
+      stories: [
+        { ...base!, id: 'v1', mediaUrl: 'https://cdn.example.com/a.mp4', mediaKind: 'video' },
+      ],
+    }
+  }
+
+  it('o efeito do vídeo reabre quando o elemento aparece (dep no ELEMENTO, não só no ref)', () => {
+    /*
+     * Source-guard assumido: jsdom monta o filho do AnimatePresence na hora, então
+     * o atraso do `mode="wait"` — a causa real — não se reproduz aqui. O que dá
+     * para travar é a fiação que conserta: o efeito precisa depender do elemento.
+     */
+    const src = readFileSync('src/components/stories/StoryViewer.tsx', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    expect(src).toMatch(/setVideoEl\(el\)/)
+    // Os efeitos de vídeo (RAF da barra, play/pause, anti-stall) todos dependem dele.
+    expect((src.match(/videoEl\]\)/g) ?? []).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('com o vídeo montado, a barra recebe o progresso', async () => {
+    Object.defineProperty(HTMLMediaElement.prototype, 'duration', { configurable: true, get: () => 10 })
+    Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', { configurable: true, get: () => 5, set: () => { } })
+    HTMLMediaElement.prototype.play = async () => { }
+    HTMLMediaElement.prototype.pause = () => { }
+
+    const { container } = render(<StoryViewer group={comVideo()} {...props} />)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+
+    const barra = container.querySelector('.will-change-transform') as HTMLElement
+    // metade do vídeo → metade da barra
+    expect(barra.style.transform).toBe('scaleX(0.5)')
   })
 })
 

@@ -146,6 +146,12 @@ export default function StoryViewer({
   const elapsedRef = useRef<number>(0)
   const closeRequestedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  /*
+   * O ELEMENTO de vídeo como estado (além do ref). Ver o comentário no `ref` do
+   * <video>: sem isto, os efeitos de vídeo perdiam a janela de montagem e o
+   * story de vídeo ficava sem barra de progresso.
+   */
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null)
   const preloadRef = useRef<{ aborts: AbortController[] }>({ aborts: [] })
   const stallRef = useRef<{ lastTime: number; lastTs: number; attempts: number }>({ lastTime: 0, lastTs: 0, attempts: 0 })
   const advanceLockRef = useRef<string>('')
@@ -432,7 +438,7 @@ export default function StoryViewer({
       cancelAnimationFrame(raf)
       v.removeEventListener('durationchange', update)
     }
-  }, [isVideo, storyId, idx, goNext, trimRange?.start, trimRange?.end])
+  }, [isVideo, storyId, idx, goNext, trimRange?.start, trimRange?.end, videoEl])
 
   // Controle de Video Play/Pause
   useEffect(() => {
@@ -442,7 +448,7 @@ export default function StoryViewer({
     const paused = holding || commentsOpen || viewersOpen || hidden || deleting
     if (paused) v.pause()
     else v.play().catch(() => { })
-  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen, videoEl])
 
   useEffect(() => {
     if (!storyId || !isVideo) return
@@ -495,7 +501,7 @@ export default function StoryViewer({
       mounted = false
       try { window.clearInterval(timer) } catch { }
     }
-  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen, videoEl])
 
   // Carregar Dados
   const loadComments = async (storyId: string) => {
@@ -734,7 +740,19 @@ export default function StoryViewer({
                   <>
                     {!((isIOS && isWebm) || videoError) ? (
                       <video
-                        ref={videoRef}
+                        ref={(el) => {
+                          /*
+                           * O ref vira ESTADO de propósito. Com `AnimatePresence
+                           * mode="wait"`, o <video> do story seguinte só monta
+                           * depois da animação de saída do anterior — quando os
+                           * efeitos de vídeo rodavam, `videoRef.current` ainda era
+                           * null, eles saíam com `if (!v) return` e nunca mais
+                           * tentavam (as deps não mudavam). Sintoma: no story de
+                           * vídeo a barra de progresso NÃO APARECIA.
+                           */
+                          videoRef.current = el
+                          setVideoEl(el)
+                        }}
                         src={videoSrc}
                         className="w-full h-full object-contain"
                         playsInline
