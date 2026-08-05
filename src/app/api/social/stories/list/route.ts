@@ -204,12 +204,22 @@ export async function GET(req: Request) {
 
     const groups = Array.from(byAuthor.values())
       .map((g) => {
-        const storiesArr = Array.isArray(g.stories) ? g.stories : []
+        /*
+         * Dentro do grupo, do MAIS ANTIGO para o mais novo — a ordem do Instagram.
+         * A query vem `created_at DESC` (necessário para o corte por limite pegar
+         * os stories recentes), então a inversão acontece aqui, na montagem.
+         *
+         * ⚠️ `latestAt` passa a ser o ÚLTIMO elemento. Ele ordena os GRUPOS na
+         * barra (mais recente primeiro) e ler `[0]` depois da inversão colocaria
+         * quem postou há 23 h à frente de quem postou agora.
+         */
+        const storiesArr = (Array.isArray(g.stories) ? g.stories : []).slice().reverse()
         return {
           ...g,
+          stories: storiesArr,
           hasStories: storiesArr.length > 0,
           hasUnseen: storiesArr.some((st: Record<string, unknown>) => st.viewed !== true),
-          latestAt: storiesArr.length ? String(storiesArr[0]?.createdAt || '') : '',
+          latestAt: storiesArr.length ? String(storiesArr[storiesArr.length - 1]?.createdAt || '') : '',
         }
       })
       .filter((g) => g.authorId === userId || g.hasStories)

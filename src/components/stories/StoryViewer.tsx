@@ -70,19 +70,31 @@ export default function StoryViewer({
 }: StoryViewerProps) {
   const { confirm, alert } = useDialog()
   const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
-  const [idx, setIdx] = useState(0)
+  /*
+   * Abre no primeiro NÃO VISTO, como o Instagram — não no começo da lista.
+   * Com a ordem cronológica (mais antigo primeiro), começar sempre em 0 obrigaria
+   * o usuário a reassistir tudo que já viu para chegar no story novo do amigo.
+   * Tudo visto (ou grupo vazio) → volta ao início, que é o comportamento certo
+   * para rever.
+   */
+  const [idx, setIdx] = useState(() => {
+    const first = stories.findIndex((s) => s?.viewed !== true)
+    return first >= 0 ? first : 0
+  })
   const story = stories[idx] || null
 
   // Estados de UI
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
-  const [_commentsError, setCommentsError] = useState('')
+  const [commentsError, setCommentsError] = useState('')
+  /** Falha ao reagir — antes a reação era otimista e NUNCA revertia. */
+  const [reactError, setReactError] = useState('')
   const [comments, setComments] = useState<unknown[]>([])
   const [commentText, setCommentText] = useState('')
 
   const [viewersOpen, setViewersOpen] = useState(false)
   const [viewersLoading, setViewersLoading] = useState(false)
-  const [_viewersError, setViewersError] = useState('')
+  const [viewersError, setViewersError] = useState('')
   const [viewers, setViewers] = useState<unknown[]>([])
   const viewersStoryIdRef = useRef<string>('')
 
@@ -211,6 +223,16 @@ export default function StoryViewer({
     setVideoError('')
     setViewersError('')
     setViewers([])
+    /*
+     * `comments` e `commentText` também são POR STORY. Sem limpar: ao avançar com
+     * o painel aberto, os comentários do story anterior ficavam na tela até o novo
+     * `loadComments` responder, e um rascunho não enviado seguia no campo do
+     * próximo story — pronto para ser enviado para o story errado.
+     */
+    setComments([])
+    setCommentText('')
+    setCommentsError('')
+    setReactError('')
     viewersStoryIdRef.current = ''
     stallRef.current = { lastTime: 0, lastTs: 0, attempts: 0 }
     advanceLockRef.current = ''
@@ -294,7 +316,17 @@ export default function StoryViewer({
     return () => el.removeEventListener('animationend', onEnd)
   }, [storyId, idx, durationMs, isVideo, needsVideoFallback, goNext])
 
-  // ===== VIDEO PROGRESS: RAF loop reads paused from ref (no state deps = never restarts) =====
+  /*
+   * ===== PROGRESSO DO VÍDEO — requestAnimationFrame de verdade =====
+   *
+   * Este bloco DIZIA "RAF loop" e não tinha um `requestAnimationFrame` sequer:
+   * atualizava a barra no evento `timeupdate`, que o navegador dispara a ~4× por
+   * segundo (o Safari/iOS fica perto de 250 ms). A barra andava aos saltos —
+   * "sensação de app amador", nas palavras do dono.
+   *
+   * Agora o loop roda a cada frame (~60 fps) e lê `paused` do ref, sem depender de
+   * estado: nenhuma dependência nova reinicia o efeito no meio do story.
+   */
   useEffect(() => {
     if (!storyId || !isVideo) return
     const v = videoRef.current
@@ -329,11 +361,22 @@ export default function StoryViewer({
         }
       }
     }
-    v.addEventListener('timeupdate', update)
+    let raf = 0
+    const tick = () => {
+      update()
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+
+    /*
+     * `durationchange` continua: a duração só chega depois dos metadados, e sem
+     * ela o `update` sai cedo (`d <= 0`) sem desenhar nada. O `timeupdate` saiu —
+     * era a fonte dos saltos e o RAF já cobre tudo que ele cobria.
+     */
     v.addEventListener('durationchange', update)
     update()
     return () => {
-      v.removeEventListener('timeupdate', update)
+      cancelAnimationFrame(raf)
       v.removeEventListener('durationchange', update)
     }
   }, [isVideo, storyId, idx, goNext, trimRange?.start, trimRange?.end])
@@ -434,11 +477,20 @@ export default function StoryViewer({
     if (!story?.id || liking) return
     setLiking(true)
     const nextLiked = !story.hasLiked
+    const previousReaction = myReaction
     onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
+    /*
+     * Descurtir APAGA a linha de `social_story_likes` — e o emoji da reação mora
+     * nessa mesma linha (`react` faz upsert nela). Ou seja: descurtir remove a
+     * reação no banco. A UI não sabia disso e seguia mostrando o emoji fixado até
+     * o próximo carregamento, quando ele sumia sem explicação.
+     */
+    if (!nextLiked && previousReaction) setMyReaction(null)
     try {
       await apiSocial.likeStory(story.id, nextLiked)
     } catch {
       onStoryUpdated(story.id, { hasLiked: story.hasLiked, likeCount: story.likeCount })
+      if (!nextLiked && previousReaction) setMyReaction(previousReaction)
     } finally {
       setLiking(false)
     }
@@ -449,13 +501,23 @@ export default function StoryViewer({
     setSendingComment(true)
     const text = commentText.trim()
     setCommentText('')
+    setCommentsError('')
     try {
       const json = await apiSocial.addStoryComment(story.id, text)
-      if ((json as Record<string, unknown>).ok) {
-        setComments((prev) => [...prev, (json as Record<string, unknown>).data])
-        onStoryUpdated(story.id, { commentCount: story.commentCount + 1 })
-      }
-    } catch { } finally {
+      if (!(json as Record<string, unknown>).ok) throw new Error('send_failed')
+      setComments((prev) => [...prev, (json as Record<string, unknown>).data])
+      onStoryUpdated(story.id, { commentCount: story.commentCount + 1 })
+    } catch (e: unknown) {
+      /*
+       * O texto é limpo do campo ANTES do envio (para a UI responder na hora).
+       * Sem devolvê-lo aqui, uma falha de rede fazia a mensagem do usuário
+       * simplesmente DESAPARECER: ele digitava, o campo esvaziava, nada era
+       * enviado e nada era dito. O `catch {}` vazio engolia tudo.
+       */
+      setCommentText(text)
+      setCommentsError(getErrorMessage(e) || 'Não consegui enviar. Tente de novo.')
+      logError('story:comment:send', e)
+    } finally {
       setSendingComment(false)
     }
   }
@@ -673,17 +735,34 @@ export default function StoryViewer({
                   type="button"
                   disabled={isReacting}
                   onClick={async () => {
+                    /*
+                     * Otimista COM reversão. Antes: `fetch` cru + `catch {}` vazio.
+                     * `fetch` não rejeita em 4xx/5xx, então 403 (a RLS barra quem não
+                     * pode ver o story), 429 (rate limit) e 500 passavam como
+                     * sucesso: o emoji ficava fixado com "Reação enviada!" e o
+                     * servidor não tinha nada. O usuário só descobria ao reabrir.
+                     */
+                    const previous = myReaction
                     setIsReacting(true)
                     setMyReaction(emoji)          // fixa a reação (persistente)
                     setReactedEmoji(emoji)        // "pop" de confirmação
                     setTimeout(() => setReactedEmoji(null), 1200)
+                    setReactError('')
                     try {
-                      await fetch('/api/social/stories/react', {
+                      const res = await fetch('/api/social/stories/react', {
                         method: 'POST',
                         headers: { 'content-type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify({ storyId: story.id, emoji }),
                       })
-                    } catch { } finally {
+                      const json = await res.json().catch((): null => null) as { ok?: boolean } | null
+                      if (!res.ok || !json?.ok) throw new Error(`react_failed_${res.status}`)
+                    } catch (e: unknown) {
+                      setMyReaction(previous)
+                      setReactedEmoji(null)
+                      setReactError('Não consegui enviar sua reação.')
+                      logError('story:react', e)
+                    } finally {
                       setIsReacting(false)
                     }
                   }}
@@ -699,6 +778,10 @@ export default function StoryViewer({
           {reactedEmoji && (
             <div className="text-center mt-1 text-[11px] text-yellow-500 font-bold animate-pulse">Reação enviada!</div>
           )}
+          {/* "Reação enviada!" era exibido mesmo quando o servidor recusava. */}
+          {reactError ? (
+            <div className="text-center mt-1 text-[11px] text-red-300 font-bold" role="alert">{reactError}</div>
+          ) : null}
 
           {/* Modal de Comentários / Views */}
           {(commentsOpen || viewersOpen) && (
@@ -724,15 +807,41 @@ export default function StoryViewer({
                     </div>
                   </div>
                 ))}
-                {((viewersOpen && !viewers.length && !viewersLoading) || (commentsOpen && !comments.length && !commentsLoading)) && (
+                {/* Sem isto, falha de rede/403/500 ao listar caía no mesmo "Nada por
+                    aqui ainda." de quando realmente não há nada — o usuário nunca
+                    sabia que tinha dado erro. */}
+                {viewersOpen && viewersError ? (
+                  <div className="text-center text-xs text-red-300 py-2" role="alert">{viewersError}</div>
+                ) : null}
+                {commentsOpen && commentsError && !comments.length ? (
+                  <div className="text-center text-xs text-red-300 py-2" role="alert">{commentsError}</div>
+                ) : null}
+                {((viewersOpen && !viewers.length && !viewersLoading && !viewersError) || (commentsOpen && !comments.length && !commentsLoading && !commentsError)) && (
                   <div className="text-center text-xs text-neutral-500 py-2">Nada por aqui ainda.</div>
                 )}
               </div>
 
               {commentsOpen && (
-                <div className="p-2 border-t border-neutral-800 flex gap-2">
-                  <input value={commentText} onChange={e => setCommentText(e.target.value)} className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white" placeholder="Escreva..." aria-label="Escrever comentário" />
-                  <button onClick={sendComment} disabled={sendingComment} className="px-3 py-2 bg-yellow-500 rounded-xl text-black text-xs font-black disabled:opacity-60">Enviar</button>
+                <div className="border-t border-neutral-800">
+                  {/* O erro existia no estado desde sempre e NUNCA era renderizado
+                      (a variável estava prefixada com `_`, marcada como não usada).
+                      Falha de envio ou de carregamento era invisível. */}
+                  {commentsError ? (
+                    <div className="px-3 pt-2 text-[11px] text-red-300" role="alert">{commentsError}</div>
+                  ) : null}
+                  <div className="p-2 flex gap-2">
+                    <input
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendComment() } }}
+                      className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white"
+                      placeholder="Escreva..."
+                      aria-label="Escrever comentário"
+                    />
+                    <button onClick={sendComment} disabled={sendingComment || !commentText.trim()} className="px-3 py-2 bg-yellow-500 rounded-xl text-black text-xs font-black disabled:opacity-60">
+                      {sendingComment ? '...' : 'Enviar'}
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>
