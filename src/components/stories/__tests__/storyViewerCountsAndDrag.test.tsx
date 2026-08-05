@@ -102,6 +102,61 @@ describe('2. o autor não curte o próprio story', () => {
   })
 })
 
+describe('a régua de progresso segue o story atual', () => {
+  /*
+   * Bug reportado com print (05/08/2026): ao passar para o story seguinte, a
+   * barra do PRIMEIRO continuava correndo — "como se ainda estivesse no
+   * primeiro". A barra da foto é uma animação CSS aplicada no elemento do
+   * índice atual e ninguém a removia ao sair dele; zerar o `transform` não
+   * adianta enquanto a animação existe, porque é ela quem manda no transform.
+   */
+  const doisStories = (): StoryGroup => {
+    const g = grupo()
+    const [primeiro] = g.stories
+    return {
+      ...g,
+      stories: [
+        { ...primeiro!, id: 's1' },
+        { ...primeiro!, id: 's2', createdAt: new Date(Date.now() - 60_000).toISOString() },
+      ],
+    }
+  }
+
+  const barras = (c: HTMLElement) => Array.from(c.querySelectorAll('.will-change-transform')) as HTMLElement[]
+
+  it('ao avançar, a barra do story anterior PARA de animar', () => {
+    const { container } = render(<StoryViewer group={doisStories()} {...props} />)
+    expect(barras(container)).toHaveLength(2)
+    // A primeira está animando (é o story em exibição).
+    expect(barras(container)[0]!.style.animation).toContain('story-bar-fill')
+
+    fireEvent.click(container.querySelector('[aria-label="Próximo"]') as HTMLElement)
+
+    expect(barras(container)[0]!.style.animation).not.toContain('story-bar-fill')
+  })
+
+  it('a barra do story já assistido fica CHEIA, não zerada', () => {
+    // Zerar tudo apagaria o histórico da régua a cada avanço.
+    const { container } = render(<StoryViewer group={doisStories()} {...props} />)
+    fireEvent.click(container.querySelector('[aria-label="Próximo"]') as HTMLElement)
+    expect(barras(container)[0]!.style.transform).toBe('scaleX(1)')
+  })
+
+  it('a barra do story ATUAL passa a animar', () => {
+    const { container } = render(<StoryViewer group={doisStories()} {...props} />)
+    fireEvent.click(container.querySelector('[aria-label="Próximo"]') as HTMLElement)
+    expect(barras(container)[1]!.style.animation).toContain('story-bar-fill')
+  })
+
+  it('voltando um story, a barra à frente volta a ficar vazia', () => {
+    const { container } = render(<StoryViewer group={doisStories()} {...props} />)
+    fireEvent.click(container.querySelector('[aria-label="Próximo"]') as HTMLElement)
+    fireEvent.click(container.querySelector('[aria-label="Anterior"]') as HTMLElement)
+    expect(barras(container)[1]!.style.transform).toBe('scaleX(0)')
+    expect(barras(container)[1]!.style.animation).not.toContain('story-bar-fill')
+  })
+})
+
 describe('3. puxar para baixo fecha', () => {
   /** O card é o container do gesto. */
   const card = (c: HTMLElement) => c.querySelector('.max-w-md') as HTMLElement

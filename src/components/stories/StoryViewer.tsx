@@ -263,11 +263,29 @@ export default function StoryViewer({
     viewersStoryIdRef.current = ''
     stallRef.current = { lastTime: 0, lastTs: 0, attempts: 0 }
     advanceLockRef.current = ''
-    // Reset all bars immediately when story changes
-    barRefsRef.current.forEach((el, _i) => {
-      if (el) el.style.transform = 'scaleX(0)'
+    /*
+     * Barras: cada troca de story REDESENHA a régua inteira.
+     *
+     * Bug reportado pelo dono (05/08/2026, com print): ao passar para o story
+     * seguinte, a barra do PRIMEIRO continuava correndo — "como se ainda
+     * estivesse no primeiro". Causa: a barra da foto é uma animação CSS
+     * (`story-bar-fill … forwards`) aplicada no elemento do índice atual, e
+     * ninguém a REMOVIA ao sair dele. Zerar só o `transform` não resolve:
+     * enquanto a animação existe, é ela quem manda no transform — o valor
+     * escrito aqui era descartado no frame seguinte. Se o story seguinte fosse
+     * vídeo, o efeito da foto nem rodava (sai cedo em `isVideo`), e a animação
+     * órfã do anterior seguia avançando na tela.
+     *
+     * Daí `animation = 'none'` em TODAS as barras. E o estado certo de cada uma
+     * não é "vazia": as já assistidas ficam CHEIAS, as futuras vazias — senão
+     * passar de story apagava o histórico da régua.
+     */
+    barRefsRef.current.forEach((el, i) => {
+      if (!el) return
+      el.style.animation = 'none'
+      el.style.transform = `scaleX(${i < idx ? 1 : 0})`
     })
-  }, [storyId])
+  }, [storyId, idx])
 
   const toggleMuted = useCallback(() => {
     setMuted((prev) => {
@@ -340,7 +358,15 @@ export default function StoryViewer({
       goNext()
     }
     el.addEventListener('animationend', onEnd)
-    return () => el.removeEventListener('animationend', onEnd)
+    return () => {
+      el.removeEventListener('animationend', onEnd)
+      /*
+       * Desliga a animação DESTA barra ao sair do story. Sem isto ela sobrevive
+       * ao próprio story: o cleanup só tirava o listener, e a animação seguia
+       * correndo no segmento antigo enquanto o usuário já estava no próximo.
+       */
+      el.style.animation = 'none'
+    }
   }, [storyId, idx, durationMs, isVideo, needsVideoFallback, goNext])
 
   /*
