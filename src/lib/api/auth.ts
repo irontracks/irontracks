@@ -73,6 +73,17 @@ export const apiAuth = {
       refresh_token: refreshToken,
     }),
 
+  /**
+   * POST registra a TENTATIVA de "esqueci a senha" (fire-and-forget).
+   *
+   * O `resetPasswordForEmail` responde sucesso mesmo para e-mail que não existe
+   * — proteção contra enumeração de contas. Sem este registro, "pedi e não
+   * chegou" fica sem resposta possível: nem o usuário nem o dono conseguem saber
+   * se o endereço digitado era o do cadastro.
+   */
+  logRecoveryAttempt: (email: string) =>
+    apiPost<{ ok: boolean }>('/api/auth/recovery-attempt', { email }),
+
   /** POST verify recovery code and set new password */
   verifyRecoveryCode: (email: string, code: string, password: string) =>
     apiPost<RecoveryCodeResult>('/api/auth/recovery-code', { email, code, password }),
