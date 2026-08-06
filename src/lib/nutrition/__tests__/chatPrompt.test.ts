@@ -15,6 +15,7 @@ const SNAP: NutritionSnapshot = {
   week: { days: 7, loggedDays: 5, sum: { calories: 14000, protein: 1000, carbs: 1500, fat: 350 }, avg: { calories: 2800, protein: 200, carbs: 300, fat: 70 } },
   month: { days: 30, loggedDays: 20, sum: { calories: 56000, protein: 4000, carbs: 6000, fat: 1400 }, avg: { calories: 2800, protein: 200, carbs: 300, fat: 70 } },
   trends: { kcalAvg7vs30: 0, proteinAvg7vs30: 0 },
+  library: [],
   repertoire: [{ name: 'ovos', count: 20, avgCalories: 80, avgProtein: 7 }],
 }
 

@@ -36,6 +36,8 @@ const RULES = [
   'REGRAS INEGOCIÁVEIS:',
   '- NUNCA calcule. Todo número que você citar tem que estar escrito no contexto acima, igual.',
   '- Se o número pedido não está no contexto, diga que não tem esse dado. NUNCA estime, NUNCA arredonde de cabeça.',
+  '- A BIBLIOTECA DELE é dado que VOCÊ TEM: se o alimento está lá, use a tabela e NUNCA diga',
+  '  que não conhece o produto ou que não tem a tabela nutricional dele.',
   '- Não invente alimento, meta nem histórico.',
   '- Não dê conselho médico nem fale de doença/remédio.',
   '- Português do Brasil, tom direto de treino. No máximo 3 frases.',

@@ -117,6 +117,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, reply: notFoodReply(intent.foodText), sim: null })
     }
 
+    /*
+     * ── "Quanto de X eu preciso?" — a conta é NOSSA, não do modelo ─────────────
+     *
+     * O dono perguntou "quanto de proteína de soja preciso para bater isso?" e a
+     * IA respondeu que não tinha a tabela do produto — que estava cadastrado na
+     * biblioteca dele havia semanas. A biblioteca agora vai no contexto, mas a
+     * CONTA continua fora do modelo: aqui o servidor resolve o alimento pela mesma
+     * cascata do simulate, calcula quanto fecha o macro que falta e devolve isso
+     * como uma simulação normal — com card, projeção e número auditável.
+     */
+    if (intent.kind === 'howMuch') {
+      const alvo = snapshot.remaining[intent.macro]
+      if (alvo === null || alvo <= 0) {
+        return NextResponse.json({
+          ok: true,
+          reply: alvo === null
+            ? 'Você ainda não definiu meta para esse macro, então não dá pra dizer quanto falta.'
+            : 'Esse macro já está batido hoje — não falta nada.',
+          sim: null,
+        })
+      }
+      const gramas = await gramsToClose(supabase, userId, intent.foodText, intent.macro, alvo)
+      if (gramas) {
+        const sim = await simulate(supabase, userId, `${gramas}g de ${intent.foodText}`, snapshot.today.totals, goals)
+        if (sim) {
+          const prose = await writeProse(cleanQuestion, `${gramas}g de ${intent.foodText}`, sim, snapshot)
+          return NextResponse.json({ ok: true, ...sim, reply: prose ?? sim.reply })
+        }
+      }
+      return NextResponse.json({ ok: true, reply: notFoodReply(intent.foodText), sim: null })
+    }
+
     // ── Fallback: o atalho não reconheceu → o modelo interpreta ─────────────────
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
@@ -156,6 +188,33 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     return handleGeminiError('nutrition-chat', e)
   }
+}
+
+/**
+ * Quantos gramas do alimento fecham `faltando` de um macro.
+ *
+ * Resolve 100 g do alimento pela MESMA cascata do simulate (biblioteca pessoal →
+ * TACO → OFF → IA), lê o macro por 100 g e faz a regra de três aqui, no servidor.
+ * Devolve `null` quando o alimento não resolve ou não tem aquele macro — pedir
+ * "quanto de alface pra bater 95 g de proteína" não tem resposta útil.
+ */
+async function gramsToClose(
+  supabase: SupabaseClient,
+  userId: string,
+  foodText: string,
+  macro: 'protein' | 'carbs' | 'fat' | 'calories',
+  faltando: number,
+): Promise<number | null> {
+  const base = await resolveFood(supabase, userId, `100g de ${foodText}`)
+  const per100 = Number(base?.meal?.[macro] ?? 0)
+  if (!Number.isFinite(per100) || per100 <= 0) return null
+
+  const gramas = Math.round((faltando * 100) / per100)
+  // Teto de sanidade: 2 kg de comida não é resposta, é sinal de que o alimento é
+  // pobre demais naquele macro (ou que a resolução errou).
+  if (!Number.isFinite(gramas) || gramas <= 0 || gramas > 2000) return null
+  // Arredonda pra 5 g: ninguém pesa 103 g de whey.
+  return Math.max(5, Math.round(gramas / 5) * 5)
 }
 
 function notFoodReply(foodText: string): string {

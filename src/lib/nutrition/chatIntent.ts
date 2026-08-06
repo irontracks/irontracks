@@ -48,6 +48,40 @@ const NOISE_PATTERNS: readonly RegExp[] = [
   /\be\s+os\s+(?:meus\s+)?(?:macros?|n[úu]meros?)\b.*$/i,
 ]
 
+/**
+ * "Quanto de X eu preciso pra bater a meta?" — o inverso do simulate.
+ *
+ * Reportado pelo dono (06/08/2026, com print): ele perguntou "quanto de proteína
+ * de soja preciso para bater isso?" e a IA respondeu que não tinha a tabela do
+ * produto — que estava cadastrado na biblioteca dele. Mesmo com a tabela no
+ * contexto, deixar a CONTA com o modelo violaria a regra da casa ("nenhum número
+ * vem do modelo"), então este atalho existe para o servidor fazê-la.
+ *
+ * Grupo 1 = o alimento. O macro alvo é lido à parte (`detectTargetMacro`).
+ */
+const HOW_MUCH_PATTERNS: readonly RegExp[] = [
+  // "quanto de proteína de soja preciso pra bater isso" / "quanto de whey falta"
+  /(?:^|\b)quant[oa]s?\s+(?:de\s+)?(.+?)\s+(?:eu\s+)?(?:preciso|precisaria|falta|faltam|tenho\s+que\s+(?:comer|tomar))\b/i,
+  // "quantos gramas de frango pra bater a meta"
+  /(?:^|\b)quant[oa]s?\s+(?:g|gramas?|ml)\s+de\s+(.+?)\s+(?:pra|para)\b/i,
+  // "preciso de quanto de whey pra fechar a proteína"
+  /(?:^|\b)preciso\s+de\s+quant[oa]s?\s+(?:de\s+)?(.+?)\s+(?:pra|para)\b/i,
+]
+
+/** Cauda que sobra depois da captura e não é comida. */
+const HOW_MUCH_TAIL: readonly RegExp[] = [
+  /\s*(?:pra|para)\s+(?:bater|fechar|completar|atingir|chegar).*$/i,
+  /\s*(?:pra|para)\s+(?:a\s+)?meta.*$/i,
+]
+
+export interface HowMuchIntent {
+  kind: 'howMuch'
+  /** Alimento, limpo, pronto pro resolveFood. */
+  foodText: string
+  /** Macro que ele quer fechar. Proteína é o caso dominante e o default. */
+  macro: 'protein' | 'carbs' | 'fat' | 'calories'
+}
+
 export interface SimulateIntent {
   kind: 'simulate'
   /** Texto do alimento, limpo, pronto pro resolveFood. */
@@ -58,7 +92,21 @@ export interface UnknownIntent {
   kind: 'unknown'
 }
 
-export type ChatIntent = SimulateIntent | UnknownIntent
+export type ChatIntent = SimulateIntent | HowMuchIntent | UnknownIntent
+
+/**
+ * Qual macro ele quer fechar. Cuidado com o caso do print: em "quanto de PROTEÍNA
+ * de soja", a palavra "proteína" é parte do NOME do alimento — por isso só conta o
+ * que aparece DEPOIS do "bater/fechar/meta", nunca a captura do alimento.
+ */
+export function detectTargetMacro(question: string): HowMuchIntent['macro'] {
+  const depois = /(?:bater|fechar|completar|atingir|chegar\s+n[ao]s?|meta\s+de)\s+(?:a\s+|o\s+|as\s+|os\s+|minha\s+|meu\s+)?(.*)$/i.exec(String(question ?? ''))
+  const alvo = (depois?.[1] ?? '').toLowerCase()
+  if (/carbo|carboidrato/.test(alvo)) return 'carbs'
+  if (/gordura|l[íi]pid/.test(alvo)) return 'fat'
+  if (/caloria|kcal/.test(alvo)) return 'calories'
+  return 'protein'
+}
 
 /**
  * Limpa a captura: tira ruído, pontuação de cauda e conectores soltos.
@@ -86,6 +134,17 @@ export function cleanFoodText(raw: string): string {
 export function detectIntent(question: string): ChatIntent {
   const text = String(question ?? '').trim()
   if (!text) return { kind: 'unknown' }
+
+  for (const re of HOW_MUCH_PATTERNS) {
+    const m = re.exec(text)
+    if (!m) continue
+    let capturado = String(m[1] ?? '')
+    for (const tail of HOW_MUCH_TAIL) capturado = capturado.replace(tail, ' ')
+    const foodText = cleanFoodText(capturado)
+    if (foodText.length < 2) continue
+    if (!/[a-zà-ú]{2}/i.test(foodText)) continue
+    return { kind: 'howMuch', foodText, macro: detectTargetMacro(text) }
+  }
 
   for (const re of SIMULATE_PATTERNS) {
     const m = re.exec(text)
