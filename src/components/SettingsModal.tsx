@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
-  HelpCircle, Database, Smartphone, Crown,
+  HelpCircle, Database, Smartphone, Crown, KeyRound,
 } from 'lucide-react'
 import { logError } from '@/lib/logger'
 import { useDialog } from '@/contexts/DialogContext'
@@ -62,7 +62,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal(props: SettingsModalProps) {
-  const { alert } = useDialog()
+  const { alert, confirm } = useDialog()
   const iosNative = useIsIosNative()
   const isOpen = !!props?.isOpen
   const saving = !!props?.saving
@@ -88,6 +88,15 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [healthKitBusy, setHealthKitBusy] = useState(false)
   const [exportingData, setExportingData] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  /*
+   * Códigos de recuperação: o app JÁ tinha a verificação (`/api/auth/recovery-code`)
+   * e o link "Tenho um código de recuperação" na tela de login — mas nenhuma tela
+   * chamava a RPC que GERA os códigos. A tabela `password_recovery_codes` estava
+   * vazia no projeto inteiro, então aquele link era um beco sem saída para todos.
+   * Descoberto em 06/08/2026, investigando o e-mail de recuperação que "não chegou".
+   */
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
+  const [recoveryCodesBusy, setRecoveryCodesBusy] = useState(false)
   const iapEnabled = useMemo(() => String(process.env.NEXT_PUBLIC_ENABLE_IAP || '').trim().toLowerCase() === 'true', [])
 
   const setValue = (key: string, value: unknown) => {
@@ -427,6 +436,75 @@ export default function SettingsModal(props: SettingsModalProps) {
               </button>
             </div>
             <div className="mt-3 text-[11px] text-neutral-400 text-center">Estamos aqui para ajudar! Resposta em até 24h por e-mail.</div>
+          </div>
+
+          {/* Códigos de recuperação */}
+          <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}><KeyRound size={13} className="text-yellow-500" /></div>
+              <div className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: '#f59e0b' }}>Códigos de recuperação</div>
+            </div>
+            <p className="text-[11px] text-neutral-400 leading-relaxed mb-3">
+              Entram no lugar do e-mail se você esquecer a senha e o link não chegar. Guarde num lugar seguro — cada código serve uma vez só, e gerar novos cancela os antigos.
+            </p>
+            <button
+              type="button"
+              disabled={recoveryCodesBusy}
+              onClick={async () => {
+                if (recoveryCodes) {
+                  const ok = await confirm('Gerar novos códigos cancela os que você já tem. Continuar?', 'Novos códigos', { confirmText: 'Gerar', cancelText: 'Cancelar' })
+                  if (!ok) return
+                }
+                setRecoveryCodesBusy(true)
+                try {
+                  let supa
+                  try { supa = createClient() } catch { await alert('Falha ao gerar: configuração ausente'); return }
+                  const { data, error } = await supa.rpc('create_recovery_codes', { p_count: 8 })
+                  if (error) throw error
+                  const codes = (Array.isArray(data) ? data : [])
+                    .map((r: unknown) => String((r as Record<string, unknown>)?.code || '').trim())
+                    .filter(Boolean)
+                  if (!codes.length) throw new Error('Nenhum código retornado.')
+                  setRecoveryCodes(codes)
+                } catch (e: unknown) {
+                  logError('settings:recovery-codes', e)
+                  await alert('Falha ao gerar códigos: ' + (getErrorMessage(e) ?? String(e)))
+                } finally {
+                  setRecoveryCodesBusy(false)
+                }
+              }}
+              className="w-full min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <KeyRound size={16} className="text-yellow-500" /> {recoveryCodesBusy ? 'Gerando…' : recoveryCodes ? 'Gerar novos códigos' : 'Gerar meus códigos'}
+            </button>
+
+            {recoveryCodes && (
+              <div className="mt-3">
+                {/* Aparecem UMA vez: o banco guarda só o hash — nem o servidor consegue mostrá-los de novo. */}
+                <div className="text-[11px] font-bold text-yellow-500 mb-2">Anote agora — eles não aparecem de novo.</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {recoveryCodes.map((c) => (
+                    <div key={c} className="px-2 py-2 rounded-lg text-[12px] font-mono text-white text-center tracking-wide" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)' }}>{c}</div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(recoveryCodes.join('\n'))
+                      await alert('Códigos copiados.')
+                    } catch (e: unknown) {
+                      await alert('Não consegui copiar: ' + (getErrorMessage(e) ?? String(e)))
+                    }
+                  }}
+                  className="mt-2 w-full min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2"
+                  style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
+                >
+                  <Download size={16} className="text-yellow-500" /> Copiar códigos
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dados e Dispositivo */}

@@ -440,9 +440,24 @@ export function useLoginScreen() {
             } else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth/recovery' })
                 if (error) throw error
+                // Registro server-side da tentativa. Fire-and-forget: telemetria não
+                // pode derrubar um fluxo de senha.
+                apiAuth.logRecoveryAttempt(email).catch(() => { })
                 setRecoverCooldownUntil(Date.now() + 60 * 1000)
-                alert('E-mail de recuperação enviado! Verifique sua caixa de entrada.')
-                setAuthMode('login')
+                /*
+                 * A mensagem NÃO afirma mais que o e-mail foi enviado.
+                 *
+                 * O `resetPasswordForEmail` responde sucesso mesmo quando o endereço
+                 * não existe — é proteção contra enumeração de contas, e está certo.
+                 * Errado era a tela transformar isso em "enviado! verifique sua caixa
+                 * de entrada": em 06/08/2026 um aluno ficou esperando um e-mail que
+                 * nunca foi disparado (ele digitou um endereço fora do cadastro) e não
+                 * tinha como desconfiar disso. O texto agora é condicional e diz o que
+                 * fazer quando não chega — sem revelar se a conta existe.
+                 */
+                setSuccessMsg('Se existir uma conta com esse e-mail, o link chega em alguns minutos. Não chegou? Confira se é o mesmo e-mail do cadastro e olhe o spam — ou use um código de recuperação abaixo.')
+                // Continua em 'recover': voltar para o login escondia a saída do código
+                // justamente de quem acabou de precisar dela.
             } else if (authMode === 'recover_code') {
                 const p2 = String(recoveryPassword2 || '').trim()
                 if (password.length < 6) throw new Error('A senha deve ter pelo menos 6 caracteres.')

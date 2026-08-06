@@ -563,7 +563,7 @@ const LoginScreen = () => {
                         {authMode === 'recover_code' && (
                             <div className="space-y-2">
                                 <p className="text-[11px] text-neutral-400 text-center leading-relaxed px-2">
-                                    Use um código de recuperação gerado nas configurações para redefinir sua senha sem e-mail.
+                                    Use um dos códigos que você gerou em Configurações → Códigos de recuperação. Sem tê-los gerado antes, este caminho não funciona — volte e peça o link por e-mail.
                                 </p>
                                 <button
                                     type="button"

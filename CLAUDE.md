@@ -370,6 +370,25 @@ Este projeto usa **Tailwind v4** (não v3). A sintaxe e configuração são dife
 - `any` implícito → tipar explicitamente sempre
 - `// @ts-ignore` → nunca usar, resolver o problema real
 
+## Recuperação de senha — o que já custou investigação (06/08/2026)
+"Pedi o e-mail e não chegou" quase virou caça a problema de entrega. Não era: o
+Supabase **nunca tinha sido acionado** para aquela conta (`auth.users.recovery_sent_at`
+nulo + zero `user_recovery_requested` em `auth.audit_log_entries`) — o endereço
+digitado não era o do cadastro. **`resetPasswordForEmail` responde sucesso mesmo
+para e-mail inexistente**, de propósito (anti-enumeração), e a tela transformava
+isso em "e-mail enviado!". Agora a mensagem é condicional e toda tentativa vira
+`password_recovery_requested` em `audit_events` com `metadata.matched` — é por
+aí que se responde "por que não chegou", por SQL. **A resposta da rota
+`/api/auth/recovery-attempt` é sempre `{ok:true}`: nunca devolva o `matched`,
+senão a proteção contra enumeração cai.**
+
+Os **códigos de recuperação** existiam pela metade: verificação
+(`/api/auth/recovery-code` + `verify_recovery_code_admin`) e link na tela de login,
+mas nenhuma tela chamava `create_recovery_codes` — `password_recovery_codes` estava
+**vazia no projeto inteiro** e o link era beco sem saída. A geração agora está em
+Configurações. A RPC roda como `auth.uid()` (só serve preventivamente, com o usuário
+logado) e o banco guarda **só o hash** — não há como reexibir um código depois.
+
 ## Segurança — crítico
 - **`.env.local` contém credenciais reais de produção** — nunca commitar, nunca logar, nunca expor
 - Rodar `npm run scan:secrets` antes de qualquer commit em arquivos de config
