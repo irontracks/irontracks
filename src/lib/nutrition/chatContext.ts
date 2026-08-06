@@ -58,6 +58,23 @@ export interface SnapshotRepertoireItem {
   avgProtein: number
 }
 
+/**
+ * Um alimento da BIBLIOTECA PESSOAL (`nutrition_custom_foods`) — cadastrado pelo
+ * próprio usuário, quase sempre lendo o rótulo do produto. É a tabela EXATA, por
+ * 100 g, e não uma média de refeições como o `repertoire`.
+ */
+export interface SnapshotLibraryItem {
+  name: string
+  /** Como ele também chama o produto. O modelo precisa reconhecer pelos dois. */
+  aliases: string[]
+  kcalPer100g: number
+  proteinPer100g: number
+  carbsPer100g: number
+  fatPer100g: number
+  /** Porção padrão que ele cadastrou (scoop, fatia, copo). 0 = não informou. */
+  servingSizeG: number
+}
+
 export interface NutritionSnapshot {
   today: {
     dateKey: string
@@ -76,10 +93,20 @@ export interface NutritionSnapshot {
     proteinAvg7vs30: number | null
   }
   repertoire: SnapshotRepertoireItem[]
+  /**
+   * A biblioteca pessoal do usuário. Sem ela, o modelo dizia "não tenho o dado
+   * exato da tabela nutricional da sua proteína de soja" com o produto cadastrado
+   * há semanas (reportado pelo dono, 06/08/2026). O `repertoire` NÃO cobre isso:
+   * ele é média por refeição dos últimos 30 dias e some quando o alimento fica um
+   * tempo sem ser lançado — a biblioteca é a tabela, e não expira.
+   */
+  library: SnapshotLibraryItem[]
 }
 
 const MAX_MEALS = 12
 const MAX_REPERTOIRE = 10
+/** Teto do que vai pro prompt. O dono tem ~20; 60 cobre com folga sem inchar. */
+const MAX_LIBRARY = 60
 const WEEK_DAYS = 7
 const MONTH_DAYS = 30
 const TZ = 'America/Sao_Paulo'
@@ -156,7 +183,7 @@ export async function buildNutritionSnapshot(
   const monthStart = shiftDateKey(dateKey, -(MONTH_DAYS - 1))
   const weekStart = shiftDateKey(dateKey, -(WEEK_DAYS - 1))
 
-  const [entriesRes, daysRes, repertoireRes] = await Promise.all([
+  const [entriesRes, daysRes, repertoireRes, libraryRes] = await Promise.all([
     // Entries CRUAS de hoje → totais com paridade exata com o diário.
     supabase
       .from('nutrition_meal_entries')
@@ -176,6 +203,13 @@ export async function buildNutritionSnapshot(
       .eq('user_id', userId)
       .gte('date', monthStart)
       .lte('date', dateKey),
+    // A biblioteca pessoal — a tabela nutricional que ELE cadastrou.
+    supabase
+      .from('nutrition_custom_foods')
+      .select('name, aliases, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g, serving_size_g')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(MAX_LIBRARY),
   ])
 
   // ── Hoje ────────────────────────────────────────────────────────────────────
@@ -241,6 +275,24 @@ export async function buildNutritionSnapshot(
     remaining[k] = goal > 0 ? goal - roundedTotals[k] : null
   }
 
+  const library: SnapshotLibraryItem[] = (Array.isArray(libraryRes.data) ? libraryRes.data : [])
+    .map((row: unknown) => {
+      const r = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>
+      return {
+        name: String(r.name ?? '').slice(0, 80),
+        aliases: (Array.isArray(r.aliases) ? r.aliases : [])
+          .map((a: unknown) => String(a ?? '').slice(0, 60))
+          .filter(Boolean)
+          .slice(0, 4),
+        kcalPer100g: Math.round(num(r.kcal_per100g)),
+        proteinPer100g: Math.round(num(r.protein_per100g) * 10) / 10,
+        carbsPer100g: Math.round(num(r.carbs_per100g) * 10) / 10,
+        fatPer100g: Math.round(num(r.fat_per100g) * 10) / 10,
+        servingSizeG: Math.round(num(r.serving_size_g)),
+      }
+    })
+    .filter((f) => Boolean(f.name))
+
   const hasBoth = week.loggedDays > 0 && month.loggedDays > 0
   return {
     today: { dateKey, totals: roundedTotals, waterMl, meals },
@@ -253,6 +305,7 @@ export async function buildNutritionSnapshot(
       proteinAvg7vs30: hasBoth ? week.avg.protein - month.avg.protein : null,
     },
     repertoire,
+    library,
   }
 }
 
@@ -300,6 +353,25 @@ export function formatSnapshotForPrompt(snap: NutritionSnapshot): string {
       '',
       'O QUE ELE MAIS COME (30 dias — use isto pra sugerir comida que ele realmente come)',
       ...snap.repertoire.map((f) => `- ${f.name} (${f.count}×, ~${f.avgCalories} kcal · P${f.avgProtein})`),
+    )
+  }
+
+  // `?.` de propósito: um snapshot montado por outro caminho (ou vindo de cache
+  // antigo) não pode derrubar a montagem do prompt inteiro por causa de uma seção.
+  if (snap.library?.length) {
+    /*
+     * A seção mais importante quando ele pergunta de um produto específico. O
+     * modelo dizia "não tenho o dado exato da tabela nutricional da sua proteína
+     * de soja" — o produto estava cadastrado, mas nunca chegava até aqui.
+     */
+    lines.push(
+      '',
+      'BIBLIOTECA DELE (tabelas que o próprio usuário cadastrou, valores por 100g — VOCÊ TEM ESTES DADOS)',
+      ...snap.library.map((f) => {
+        const apelidos = f.aliases.length ? ` [também: ${f.aliases.join(', ')}]` : ''
+        const porcao = f.servingSizeG > 0 ? ` · porção padrão ${f.servingSizeG}g` : ''
+        return `- ${f.name}${apelidos}: ${f.kcalPer100g} kcal · P${f.proteinPer100g} C${f.carbsPer100g} G${f.fatPer100g} (por 100g)${porcao}`
+      }),
     )
   }
 

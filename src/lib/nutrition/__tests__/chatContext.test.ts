@@ -11,29 +11,41 @@ const GOALS: SnapshotGoals = { calories: 2900, protein: 215, carbs: 350, fat: 70
 const TODAY = '2026-07-16'
 
 /**
- * Mock encadeável: `from(table)` decide o dataset. As três queries do snapshot são
- * distinguidas pela tabela e pelo select (entries de hoje vs. repertório de 30d).
+ * Mock encadeável: `from(table)` decide o dataset. As quatro queries do snapshot são
+ * distinguidas pela tabela e pelo select (entries de hoje vs. repertório de 30d vs.
+ * a biblioteca pessoal).
+ *
+ * `order()` devolve um elo que TAMBÉM é thenable: a query da biblioteca termina em
+ * `.limit()`, e um `order` que devolvia a Promise direto quebrava a cadeia.
  */
 function mockSupabase(opts: {
   todayEntries?: Record<string, unknown>[]
   days?: Record<string, unknown>[]
   repertoire?: Record<string, unknown>[]
+  customFoods?: Record<string, unknown>[]
 }) {
   return {
     from: (table: string) => ({
       select: (cols: string) => {
         const isRepertoire = table === 'nutrition_meal_entries' && !cols.includes('created_at')
-        const data = table === 'daily_nutrition_logs'
-          ? (opts.days ?? [])
-          : isRepertoire
-            ? (opts.repertoire ?? [])
-            : (opts.todayEntries ?? [])
+        const data = table === 'nutrition_custom_foods'
+          ? (opts.customFoods ?? [])
+          : table === 'daily_nutrition_logs'
+            ? (opts.days ?? [])
+            : isRepertoire
+              ? (opts.repertoire ?? [])
+              : (opts.todayEntries ?? [])
         const result = Promise.resolve({ data, error: null })
+        const thenable: Record<string, unknown> = {
+          limit: () => result,
+          then: (res: (v: unknown) => unknown) => result.then(res),
+        }
         const chain: Record<string, unknown> = {
           eq: () => chain,
           gte: () => chain,
           lte: () => chain,
-          order: () => result,
+          limit: () => result,
+          order: () => thenable,
           then: (res: (v: unknown) => unknown) => result.then(res),
         }
         return chain
