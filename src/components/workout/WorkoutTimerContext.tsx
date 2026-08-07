@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useWorkoutTicker } from './hooks/useWorkoutTicker'
 import { formatElapsed, computeRecoveryPauseMs } from './utils'
+import { useLiveActivityPauseSync } from '@/hooks/useLiveActivityPauseSync'
 
 // Gap de background/suspensão acima disto é tratado como PAUSA (não é treino):
 // app esquecido aberto ou morto e restaurado horas depois.
@@ -111,6 +112,12 @@ export function WorkoutTimerProvider({
     const effectiveTicker = isPaused ? (pauseStart ?? ticker) : ticker
     return Math.max(0, Math.floor((effectiveTicker - startedAtMs - pausedMs) / 1000))
   }, [startedAtMs, ticker, pausedMs, pauseStart, isPaused])
+
+  // A ilha dinâmica e a tela bloqueada contam tempo de PAREDE (o sistema desenha
+  // o relógio sozinho). Sem espelhar a pausa daqui, o app marcava "PAUSADO 56:07"
+  // e a ilha continuava subindo. O sync vive junto do dono do tempo de propósito:
+  // é aqui que `pausedMs` e o desconto de background existem.
+  useLiveActivityPauseSync({ isPaused, elapsedSeconds, startedAtMs })
 
   const value = useMemo<WorkoutTimerValue>(
     () => ({ ticker, elapsedSeconds, formatElapsed, timerMinimized, setTimerMinimized, isPaused, togglePause }),

@@ -128,6 +128,53 @@ struct RestTimerLiveActivity: Widget {
 // entire session; the rest timer LA appears briefly on top of it during rests.
 // iOS automatically handles displaying multiple activities simultaneously.
 
+/// Cronômetro do TREINO na ilha dinâmica / tela bloqueada.
+///
+/// Existe para não repetir a decisão "correndo ou pausado?" nos três lugares que
+/// mostram esse tempo (expandido, compactTrailing e tela bloqueada) — divergir
+/// entre eles seria o mesmo bug voltando pela metade.
+///
+/// • CORRENDO → `Text(timerInterval:)`, contado pelo sistema, sem update do app.
+///   A âncora é `elapsedAnchorDate` (agora − decorrido) e só cai para o
+///   `workoutStartDate` estático quando nunca houve pausa.
+/// • PAUSADO → texto ESTÁTICO. `timerInterval` não sabe congelar: era por isso que
+///   o app marcava "PAUSADO 56:07" e a ilha seguia subindo (07/08/2026).
+@available(iOS 16.1, *)
+struct WorkoutElapsedText: View {
+    let state: WorkoutLiveActivityAttributes.ContentState
+    /// Usado quando o treino nunca foi pausado (estados antigos, sem âncora).
+    let fallbackStart: Date
+    let font: Font
+    let color: Color
+
+    var body: some View {
+        if let pausedSeconds = state.pausedElapsedSeconds {
+            Text(Self.format(pausedSeconds))
+                .font(font)
+                .monospacedDigit()
+                .foregroundColor(color)
+        } else {
+            Text(timerInterval: (state.elapsedAnchorDate ?? fallbackStart)...Date.distantFuture,
+                 countsDown: false)
+                .font(font)
+                .monospacedDigit()
+                .foregroundColor(color)
+        }
+    }
+
+    /// Mesmo formato do `Text(timerInterval:)` do sistema (m:ss, h:mm:ss após 1 h),
+    /// pra pausar não mudar a cara do relógio.
+    static func format(_ totalSeconds: Int) -> String {
+        let s = max(0, totalSeconds)
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, sec)
+            : String(format: "%d:%02d", m, sec)
+    }
+}
+
 @available(iOS 16.1, *)
 struct WorkoutLiveActivity: Widget {
     var body: some WidgetConfiguration {
@@ -141,11 +188,13 @@ struct WorkoutLiveActivity: Widget {
                         .foregroundColor(.orange)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture, countsDown: false)
-                        .font(.title3.bold())
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .frame(minWidth: 64, alignment: .trailing)
+                    WorkoutElapsedText(
+                        state: context.state,
+                        fallbackStart: context.attributes.workoutStartDate,
+                        font: .title3.bold(),
+                        color: .white
+                    )
+                    .frame(minWidth: 64, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.state.currentExerciseName.isEmpty ? context.attributes.workoutName : context.state.currentExerciseName)
@@ -193,11 +242,13 @@ struct WorkoutLiveActivity: Widget {
                         .font(.caption.bold())
                 }
             } compactTrailing: {
-                Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture, countsDown: false)
-                    .font(.caption.bold())
-                    .monospacedDigit()
-                    .foregroundColor(.white)
-                    .frame(minWidth: 44)
+                WorkoutElapsedText(
+                    state: context.state,
+                    fallbackStart: context.attributes.workoutStartDate,
+                    font: .caption.bold(),
+                    color: .white
+                )
+                .frame(minWidth: 44)
             } minimal: {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .foregroundColor(.orange)
@@ -235,11 +286,12 @@ struct WorkoutLockScreenView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture,
-                     countsDown: false)
-                    .font(.system(.title2, design: .rounded).bold())
-                    .monospacedDigit()
-                    .foregroundColor(.primary)
+                WorkoutElapsedText(
+                    state: context.state,
+                    fallbackStart: context.attributes.workoutStartDate,
+                    font: .system(.title2, design: .rounded).bold(),
+                    color: .primary
+                )
             }
 
             HStack(spacing: 14) {

@@ -296,6 +296,22 @@ order by created_at desc limit 20;
 2. **Limpeza de órfãs** — em `IronTracksAppClientImpl.tsx`, encerrar a LA assim que as settings carregam matava a activity recém-criada (`activeSession` chega async). **O atraso antes de `endWorkoutLiveActivity()` é obrigatório.**
 3. **`load()` do plugin Swift** — ⛔ **INVESTIGADO E DESCARTADO. NÃO "CORRIJA".** Ele encerra todas as `Activity<RestTimerAttributes>`, e isso **está certo**: o `SceneDelegate` tem a trava `pluginRegistered`, então `load()` roda **uma vez por lançamento do app** (cold start) — NÃO a cada foreground nem em reload da WebView. No cold start o timer de descanso (JS) morreu junto com o app, então encerrar é o correto. Trocar por "só encerrar as vencidas" cria **Live Activities fantasma** contando sozinhas. Já foi analisado a fundo; não precisa de build.
 
+**O relógio da ilha é do SISTEMA — pausa precisa ser dita (07/08/2026).** O tempo de
+treino é desenhado por `Text(timerInterval:)`, que o iOS conta sozinho a partir de uma
+data: ele não sabe o que é pausa. O app mostrava "PAUSADO 56:07" e a ilha seguia
+subindo. Hoje o `ContentState` do treino carrega `pausedElapsedSeconds` (pausado →
+texto ESTÁTICO) e `elapsedAnchorDate` (correndo → âncora `agora − decorrido`; o
+`workoutStartDate` dos atributos é imutável e não consegue andar para frente depois de
+uma pausa). Quem avisa é `useLiveActivityPauseSync`, chamado de dentro do
+`WorkoutTimerProvider` — o dono do `pausedMs` e do desconto de background — e **só na
+troca de pausa**, nunca por tique (ActivityKit limita ~120 updates/h). **Todo update
+do estado do treino precisa PRESERVAR esses dois campos** (`updateWorkoutLiveActivity`,
+`updateWorkoutRestCountdown`): sobrescrever com nil descongela o relógio no meio da
+pausa. Limite conhecido: pausar DURANTE um descanso não congela o "Treino:" do banner
+do descanso — ele nasce com a âncora corrigida e segue contando até o descanso acabar
+(os atributos de uma activity não mudam depois de criada). Guards em
+`src/hooks/__tests__/liveActivityPauseSync.test.tsx`.
+
 **Arquitetura (o que exige build vs. o que não exige):** JS/hook/bridge = deploy web, vale na hora pra todos os apps instalados. Swift/widget/`pbxproj` = **só com build nova no TestFlight**. Por isso: **nunca** faça o JS chamar um método nativo que o build instalado não tem — vira `"IronTracksNative" plugin is not implemented on ios` (já gerou 6.833 eventos no Sentry).
 
 **Integridade do alvo iOS:** o widget `IronTracksWidgets` precisa existir no `pbxproj`, estar em *Embed App Extensions* e ter os 4 fontes. `scripts/add-watch-target.rb` **reescreve o pbxproj inteiro** — é vetor real de perda de target (por isso existem os backups). O guard cobre isso.
