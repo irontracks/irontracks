@@ -141,6 +141,36 @@ aqui: o trabalho já estava feito.
 - Confirmou que a lacuna é real? **Corrija a nota** que dizia o contrário, na mesma
   tarefa — senão o próximo agente cai no mesmo buraco.
 
+## Build da Vercel morrendo em "Running TypeScript" — é OOM (06/08/2026)
+**Sintoma:** o deploy de produção fica ~45 min em `Running TypeScript ...` depois
+de `✓ Compiled successfully`, e termina em `BUILD_EXCEEDED_MAXIMUM_TIME` ou
+`Command "npm run build" exited with SIGKILL`. O relatório do build diz
+`At least one "Out of Memory" ("OOM") event was detected`. Aconteceu duas vezes
+seguidas e deixou a produção **um dia inteiro sem atualizar** — e o app nativo
+carrega o front do servidor, então isso segura TODOS os usuários, não só a web.
+
+**Não é o código:** o preview do mesmo commit fica `READY` normalmente. Antes de
+investigar código, olhe o estado do deploy — `mcp__…vercel…__get_deployment` traz
+`errorCode`, e `get_deployment_build_logs` mostra o relatório de OOM. O status do
+GitHub só diz "pending" e engana.
+
+**Hipótese que JÁ foi testada e DESCARTADA — não repita:** "o `tsconfig.json`
+inclui `**/*.ts`, então o build está checando os ~457 arquivos de teste". Medido:
+`tsc` com testes = **1552 MB**, sem testes = **1537 MB**. Diferença de 1%. Um
+`tsconfig.build.json` excluindo testes não resolve nada.
+
+**Onde a memória vai:** build local completo = 47 s e pico de 2,6 GB — e local
+NÃO sobe sourcemaps, porque `SENTRY_AUTH_TOKEN` não existe fora da Vercel
+(`next.config` desabilita quando falta o token). Lá o upload de centenas de
+`.js.map` roda antes do `tsc`, e é a soma que estoura o container. Por isso o OOM
+não reproduz na máquina local.
+
+**O que fazer, nesta ordem** (tudo no painel da Vercel — nenhum é mudança de código):
+1. env var `NODE_OPTIONS=--max-old-space-size=6144` no projeto;
+2. subir a Build Machine (Settings → Build & Development);
+3. último recurso: desligar `sourcemaps` do Sentry — custa stack trace legível em produção.
+Depois, **Redeploy** no commit atual do `main`.
+
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
 
