@@ -44,6 +44,21 @@ struct WorkoutLiveActivityAttributes: ActivityAttributes {
         /// countdown decrescente no compact/expanded da ilha do treino. nil = sem
         /// descanso (mostra o ícone). Optional pra decodificar estados antigos.
         var restEndDate: Date?
+        /// PAUSA do cronômetro do treino: segundos decorridos congelados. nil =
+        /// treino correndo.
+        ///
+        /// O tempo na ilha/tela bloqueada é desenhado por `Text(timerInterval:)`,
+        /// que o SISTEMA conta sozinho a partir de uma data — ele não sabe o que é
+        /// pausa. Enquanto o app mostrava "PAUSADO 56:07", a ilha seguia subindo
+        /// (relatado pelo dono em 07/08/2026). Pausado, o widget passa a desenhar
+        /// texto ESTÁTICO com este valor.
+        var pausedElapsedSeconds: Int?
+        /// Âncora da contagem quando o treino está CORRENDO: `agora − decorrido`.
+        /// Substitui `attributes.workoutStartDate`, que é imutável (atributo
+        /// estático) e por isso não consegue "andar para frente" depois de uma
+        /// pausa — sem isso, retomar devolveria o tempo cheio de parede.
+        /// nil = nunca pausou (usa o `workoutStartDate` de sempre).
+        var elapsedAnchorDate: Date?
     }
 
     /// Static workout title (e.g. "Treino A — Peito + Tríceps")

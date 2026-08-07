@@ -194,6 +194,7 @@ type IronTracksNativePlugin = {
     totalVolumeKg?: number
   }) => Promise<void>
   updateWorkoutRestCountdown: (opts: { restEndMs: number }) => Promise<void>
+  setWorkoutLiveActivityPaused: (opts: { paused: boolean; elapsedSeconds: number }) => Promise<void>
   endWorkoutLiveActivity: () => Promise<void>
   // App Intents (Siri shortcuts) — pending action triggered by Siri/Shortcuts
   checkPendingIntentAction: () => Promise<{ action: string }>
@@ -310,6 +311,7 @@ const webFallback: IronTracksNativePlugin = {
   startWorkoutLiveActivity: async () => ({ activityId: '' }),
   updateWorkoutLiveActivity: async () => { },
   updateWorkoutRestCountdown: async () => { },
+  setWorkoutLiveActivityPaused: async () => { },
   endWorkoutLiveActivity: async () => { },
   checkPendingIntentAction: async () => ({ action: '' }),
   startGymGeofence: async () => ({ ok: false }),
@@ -631,6 +633,27 @@ export const updateWorkoutRestCountdown = async (restEndMs: number): Promise<voi
   try {
     if (!isIosNative()) return
     await Native.updateWorkoutRestCountdown({ restEndMs: Math.max(0, Number(restEndMs) || 0) })
+  } catch { /* swallow */ }
+}
+
+/**
+ * Congela / retoma o cronômetro do treino na ilha dinâmica e na tela bloqueada.
+ *
+ * `elapsedSeconds` é o tempo do APP (já sem as pausas anteriores e sem os gaps
+ * longos de background) — a Live Activity conta tempo de parede e não sabe nada
+ * disso sozinha.
+ *
+ * Método NOVO no plugin: em build antiga a chamada rejeita com "plugin is not
+ * implemented on ios" e o catch abaixo engole — lá a ilha segue com o
+ * comportamento antigo, sem quebrar nada.
+ */
+export const setWorkoutLiveActivityPaused = async (paused: boolean, elapsedSeconds: number): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.setWorkoutLiveActivityPaused({
+      paused: !!paused,
+      elapsedSeconds: Math.max(0, Math.round(Number(elapsedSeconds) || 0)),
+    })
   } catch { /* swallow */ }
 }
 

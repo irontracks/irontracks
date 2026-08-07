@@ -87,6 +87,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // Workout Live Activity (session-level — exercise / set / volume / elapsed)
         CAPPluginMethod(name: "startWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setWorkoutLiveActivityPaused", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateWorkoutRestCountdown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         // App Intents (Siri shortcuts) — read pending action triggered by intent
@@ -595,7 +596,16 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                 }
 
                 let endDate = Date().addingTimeInterval(Double(seconds))
-                let attrs = RestTimerAttributes(timerID: id, exerciseName: title, workoutStartDate: workoutStartDate)
+                // O banner do descanso também mostra "Treino: mm:ss". O JS manda o
+                // início CRU da sessão, que ignora as pausas — então os dois relógios
+                // divergiam. A Live Activity do treino já carrega a âncora corrigida
+                // (agora − decorrido): quando existe, ela é a referência boa.
+                // Limite conhecido: pausar DURANTE o descanso não congela este banner
+                // (os atributos são imutáveis depois de criados); ele nasce certo e
+                // segue contando até o descanso acabar.
+                let anchoredWorkoutStart = Activity<WorkoutLiveActivityAttributes>.activities
+                    .first?.content.state.elapsedAnchorDate ?? workoutStartDate
+                let attrs = RestTimerAttributes(timerID: id, exerciseName: title, workoutStartDate: anchoredWorkoutStart)
                 let state = RestTimerAttributes.ContentState(
                     endDate: endDate,
                     targetSeconds: seconds,
@@ -790,7 +800,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     totalSetsForExercise: setsForEx,
                     totalSetsCompleted: setsCompleted,
                     totalVolumeKg: totalVolumeKg,
-                    restEndDate: nil
+                    restEndDate: nil,
+                    pausedElapsedSeconds: nil,
+                    elapsedAnchorDate: nil
                 )
                 // staleDate = 12 h after start (safety cap; far longer than any workout)
                 let staleDate = startDate.addingTimeInterval(12 * 3600)
@@ -830,14 +842,21 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             // PRESERVA o restEndDate atual: o snapshot do treino (exercício/série/volume)
             // não pode apagar o countdown de descanso em andamento. Quem mexe no descanso
             // é o updateWorkoutRestCountdown.
-            let currentRestEnd = Activity<WorkoutLiveActivityAttributes>.activities.first?.content.state.restEndDate
+            //
+            // Mesma regra para a PAUSA: este update roda a cada série concluída e
+            // sobrescreveria `pausedElapsedSeconds`/`elapsedAnchorDate` com nil,
+            // fazendo o relógio da ilha voltar a correr no meio da pausa. Quem mexe
+            // na pausa é o setWorkoutLiveActivityPaused.
+            let current = Activity<WorkoutLiveActivityAttributes>.activities.first?.content.state
             let state = WorkoutLiveActivityAttributes.ContentState(
                 currentExerciseName: exerciseName,
                 currentSetIndex: setIndex,
                 totalSetsForExercise: setsForEx,
                 totalSetsCompleted: setsCompleted,
                 totalVolumeKg: totalVolumeKg,
-                restEndDate: currentRestEnd
+                restEndDate: current?.restEndDate,
+                pausedElapsedSeconds: current?.pausedElapsedSeconds,
+                elapsedAnchorDate: current?.elapsedAnchorDate
             )
             let staleDate = Date().addingTimeInterval(12 * 3600)
             let content = ActivityContent(state: state, staleDate: staleDate)
@@ -868,7 +887,48 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                         totalSetsForExercise: cur.totalSetsForExercise,
                         totalSetsCompleted: cur.totalSetsCompleted,
                         totalVolumeKg: cur.totalVolumeKg,
-                        restEndDate: restEnd
+                        restEndDate: restEnd,
+                        pausedElapsedSeconds: cur.pausedElapsedSeconds,
+                        elapsedAnchorDate: cur.elapsedAnchorDate
+                    )
+                    await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
+                }
+            }
+            call.resolve()
+        } else {
+            call.resolve()
+        }
+    }
+
+    /// Congela / retoma o cronômetro do TREINO na ilha dinâmica e na tela bloqueada.
+    ///
+    /// O relógio de lá é desenhado por `Text(timerInterval:)` — o sistema conta
+    /// sozinho a partir de uma data, sem saber o que é pausa. Enquanto o app mostrava
+    /// "PAUSADO 56:07", a ilha continuava subindo (relatado em 07/08/2026).
+    ///
+    /// `elapsedSeconds` é a VERDADE do app (já desconta pausas anteriores e gaps
+    /// longos de background). Pausado, guarda o número congelado; retomando, ancora a
+    /// contagem em `agora − decorrido` — o `workoutStartDate` dos atributos é imutável
+    /// e ficaria sempre no tempo de parede cheio.
+    ///
+    /// Só mexe nesses dois campos, preservando o resto do estado (mesmo desenho do
+    /// updateWorkoutRestCountdown).
+    @objc func setWorkoutLiveActivityPaused(_ call: CAPPluginCall) {
+        if #available(iOS 16.2, *) {
+            let paused = call.getBool("paused") ?? false
+            let elapsedSeconds = max(0, call.getInt("elapsedSeconds") ?? 0)
+            Task {
+                for activity in Activity<WorkoutLiveActivityAttributes>.activities {
+                    let cur = activity.content.state
+                    let next = WorkoutLiveActivityAttributes.ContentState(
+                        currentExerciseName: cur.currentExerciseName,
+                        currentSetIndex: cur.currentSetIndex,
+                        totalSetsForExercise: cur.totalSetsForExercise,
+                        totalSetsCompleted: cur.totalSetsCompleted,
+                        totalVolumeKg: cur.totalVolumeKg,
+                        restEndDate: cur.restEndDate,
+                        pausedElapsedSeconds: paused ? elapsedSeconds : nil,
+                        elapsedAnchorDate: paused ? cur.elapsedAnchorDate : Date().addingTimeInterval(-Double(elapsedSeconds))
                     )
                     await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
                 }
