@@ -12,7 +12,7 @@
  * AVALIADO (não de quem sobe), pra casar com o RLS de prefixo do storage e com
  * o signing de leitura.
  *
- * Rate limit: 30 req/min por usuário (3 fotos × algumas tentativas).
+ * Rate limit: 30 req/min por usuário (até 6 fotos × algumas tentativas).
  */
 import { NextResponse } from 'next/server'
 import { z } from 'zod'

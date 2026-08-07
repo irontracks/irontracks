@@ -2,12 +2,12 @@
 
 import React, { useCallback, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell, AlertTriangle } from 'lucide-react'
+import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell, AlertTriangle, ChevronDown } from 'lucide-react'
 import { createBodyPhotoAssessment } from '@/actions/bodyPhotoAssessment-actions'
 import { analyzeBodyPhoto, fetchBodyPhotoCorrelation } from '@/lib/api/bodyPhoto'
 import { translateAiError } from '@/utils/ai/clientErrors'
 import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/utils/storage/bodyPhotoUpload'
-import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import { BODY_PHOTO_FLEXED_POSES, BODY_PHOTO_POSES, BODY_PHOTO_RELAXED_POSES, POSE_INSTRUCTIONS_PT, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoRelaxedPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
 import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -23,17 +23,20 @@ type Stage = 'capture' | 'processing' | 'result' | 'error'
 const aiErrorText = (res: { message?: string; error?: string }): string =>
     res.message?.trim() || translateAiError(res.error)
 
-const POSE_HINT: Record<BodyPhotoPose, string> = {
-    front: 'Em pé, de frente, braços levemente afastados do corpo.',
-    side: 'De perfil, postura natural, olhando para frente.',
-    back: 'De costas, postura reta, braços relaxados.',
-}
-
 // Guia de pose: manequim 3D clay (mesmo estilo do mapa muscular), por pose e gênero.
 // Overlay translúcido com mixBlendMode 'lighten' pra o fundo preto sumir no card escuro.
+//
+// As poses contraídas reaproveitam o manequim da relaxada equivalente: o guia serve
+// para ENQUADRAMENTO (distância, ângulo, corpo inteiro), que é idêntico nas duas — e
+// não existem assets `*_flex-*.webp`. O que muda é a instrução escrita no card.
+const GUIDE_ASSET: Record<BodyPhotoPose, BodyPhotoRelaxedPose> = {
+    front: 'front', side: 'side', back: 'back',
+    front_flex: 'front', side_flex: 'side', back_flex: 'back',
+}
+
 const PoseGuide = ({ pose, gender }: { pose: BodyPhotoPose; gender: 'M' | 'F' }) => (
     <NextImage
-        src={`/poses/${pose}-${gender === 'F' ? 'f' : 'm'}.webp`}
+        src={`/poses/${GUIDE_ASSET[pose]}-${gender === 'F' ? 'f' : 'm'}.webp`}
         alt=""
         fill
         sizes="(max-width: 640px) 100vw, 200px"
@@ -65,7 +68,12 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
     const [correlation, setCorrelation] = useState<{ data: BodyPhotoCorrelation; window: TrainingWindowSummary } | null>(null)
     const [correlationLoading, setCorrelationLoading] = useState(false)
     const [correlationError, setCorrelationError] = useState('')
-    const inputRefs = useRef<Record<BodyPhotoPose, HTMLInputElement | null>>({ front: null, side: null, back: null })
+    const inputRefs = useRef<Record<BodyPhotoPose, HTMLInputElement | null>>({
+        front: null, side: null, back: null, front_flex: null, side_flex: null, back_flex: null,
+    })
+    // Contraídas começam recolhidas: elas são um extra, e abrir a tela com seis
+    // cartões faria a avaliação parecer mais trabalhosa do que é.
+    const [showFlexed, setShowFlexed] = useState(false)
 
     const reset = useCallback(() => {
         setStage('capture'); setPhotos({}); setProgress(''); setLaudo(null); setErrorMsg(''); setBusyPose(null)
@@ -107,7 +115,57 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
     }, [])
 
     const capturedCount = (Object.keys(photos) as BodyPhotoPose[]).filter((p) => photos[p]).length
+    const flexedCount = BODY_PHOTO_FLEXED_POSES.filter((p) => photos[p]).length
     const canAnalyze = !!photos.front && capturedCount >= 1
+
+    // Um cartão só, usado pelas duas seções (relaxadas e contraídas): duplicar o
+    // markup faria as duas divergirem na primeira mudança de layout.
+    const renderPoseCard = (pose: BodyPhotoPose) => {
+        const photo = photos[pose]
+        const isBusy = busyPose === pose
+        return (
+            <div key={pose} className="rounded-2xl border border-neutral-800 bg-neutral-900/50 overflow-hidden">
+                <div className="relative aspect-[3/4] bg-neutral-900 text-yellow-500/70 flex items-center justify-center">
+                    {photo ? (
+                        <NextImage src={photo.previewDataUrl} alt={POSE_LABELS_PT[pose]} fill className="object-cover" unoptimized />
+                    ) : (
+                        <PoseGuide pose={pose} gender={gender} />
+                    )}
+                    {photo ? (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center">
+                            <Check className="w-4 h-4" />
+                        </div>
+                    ) : null}
+                    {isBusy ? (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-yellow-500 animate-spin" />
+                        </div>
+                    ) : null}
+                </div>
+                <div className="p-2.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-white">{POSE_LABELS_PT[pose]}</span>
+                        {pose === 'front' ? <span className="text-[9px] uppercase font-black text-yellow-500">Obrigatória</span> : null}
+                    </div>
+                    <p className="text-[11px] text-neutral-500 leading-snug mt-0.5 min-h-[28px]">{POSE_INSTRUCTIONS_PT[pose]}</p>
+                    <button
+                        onClick={() => inputRefs.current[pose]?.click()}
+                        className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border"
+                        style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.3)', color: '#fde047' }}
+                    >
+                        <Camera className="w-3.5 h-3.5" />
+                        {photo ? 'Trocar' : 'Adicionar'}
+                    </button>
+                    <input
+                        ref={(el) => { inputRefs.current[pose] = el }}
+                        type="file" accept="image/*" className="hidden"
+                        aria-label={`Foto ${POSE_LABELS_PT[pose]}`}
+                        onChange={(e) => handleFile(pose, e.target.files)}
+                    />
+                </div>
+            </div>
+        )
+    }
 
     const handleAnalyze = useCallback(async () => {
         if (!canAnalyze) return
@@ -167,55 +225,42 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                     {stage === 'capture' && (
                         <div className="space-y-4">
                             <p className="text-sm text-neutral-400">
-                                Tire ou escolha as 3 fotos. A de <span className="text-yellow-400 font-bold">frente</span> é obrigatória; perfil e costas deixam o laudo mais preciso. Use roupa justa, boa luz e corpo inteiro no quadro.
+                                Tire ou escolha as fotos <span className="text-yellow-400 font-bold">relaxadas</span>. A de frente é obrigatória; perfil e costas deixam o laudo mais preciso. Use roupa justa, boa luz e corpo inteiro no quadro.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {BODY_PHOTO_POSES.map((pose) => {
-                                    const photo = photos[pose]
-                                    const isBusy = busyPose === pose
-                                    return (
-                                        <div key={pose} className="rounded-2xl border border-neutral-800 bg-neutral-900/50 overflow-hidden">
-                                            <div className="relative aspect-[3/4] bg-neutral-900 text-yellow-500/70 flex items-center justify-center">
-                                                {photo ? (
-                                                    <NextImage src={photo.previewDataUrl} alt={POSE_LABELS_PT[pose]} fill className="object-cover" unoptimized />
-                                                ) : (
-                                                    <PoseGuide pose={pose} gender={gender} />
-                                                )}
-                                                {photo ? (
-                                                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center">
-                                                        <Check className="w-4 h-4" />
-                                                    </div>
-                                                ) : null}
-                                                {isBusy ? (
-                                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                        <Loader2 className="w-6 h-6 text-yellow-500 animate-spin" />
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                            <div className="p-2.5">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-bold text-white">{POSE_LABELS_PT[pose]}</span>
-                                                    {pose === 'front' ? <span className="text-[9px] uppercase font-black text-yellow-500">Obrigatória</span> : null}
-                                                </div>
-                                                <p className="text-[11px] text-neutral-500 leading-snug mt-0.5 min-h-[28px]">{POSE_HINT[pose]}</p>
-                                                <button
-                                                    onClick={() => inputRefs.current[pose]?.click()}
-                                                    className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border"
-                                                    style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.3)', color: '#fde047' }}
-                                                >
-                                                    <Camera className="w-3.5 h-3.5" />
-                                                    {photo ? 'Trocar' : 'Adicionar'}
-                                                </button>
-                                                <input
-                                                    ref={(el) => { inputRefs.current[pose] = el }}
-                                                    type="file" accept="image/*" className="hidden"
-                                                    aria-label={`Foto ${POSE_LABELS_PT[pose]}`}
-                                                    onChange={(e) => handleFile(pose, e.target.files)}
-                                                />
-                                            </div>
+                                {BODY_PHOTO_RELAXED_POSES.map((pose) => renderPoseCard(pose))}
+                            </div>
+
+                            {/* Contraídas — opcionais. Relaxado, o desenvolvimento de cada
+                                grupo é inferido por silhueta; sob tensão dá pra ver separação,
+                                densidade e a assimetria real. A gordura continua saindo das
+                                relaxadas (regra no prompt do laudo). */}
+                            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowFlexed((v) => !v)}
+                                    aria-expanded={showFlexed}
+                                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left active:scale-[0.995] transition"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-white">Fotos contraídas</span>
+                                            <span className="text-[9px] uppercase font-black text-neutral-500 border border-neutral-700 rounded px-1.5 py-0.5">Opcional</span>
+                                            {flexedCount > 0 ? (
+                                                <span className="text-[10px] font-black text-emerald-400">{flexedCount}/3</span>
+                                            ) : null}
                                         </div>
-                                    )
-                                })}
+                                        <p className="text-[11px] text-neutral-500 leading-snug mt-0.5">
+                                            Mesmas posições, músculo contraído. Deixam a análise de desenvolvimento e simetria bem mais precisa.
+                                        </p>
+                                    </div>
+                                    <ChevronDown className={`w-5 h-5 shrink-0 text-neutral-400 transition-transform ${showFlexed ? 'rotate-180' : ''}`} />
+                                </button>
+                                {showFlexed ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 pb-4">
+                                        {BODY_PHOTO_FLEXED_POSES.map((pose) => renderPoseCard(pose))}
+                                    </div>
+                                ) : null}
                             </div>
                             {errorMsg ? <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{errorMsg}</p> : null}
                             <p className="text-[11px] text-neutral-600">Suas fotos ficam privadas (bucket criptografado, só você e seu personal acessam) e podem ser apagadas a qualquer momento.</p>
