@@ -330,6 +330,25 @@ Aconteceu em 31/07/2026 (1.18 → 1.19). Se for subir build e a versão atual j�
 
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
+## Badge do ícone (o "32" no app) — duas metades, e nenhuma marca como lido
+O número no ícone é **recalculado pelo servidor a cada push** (`sendPushToUsers`
+conta as notificações não lidas). Por isso zerar só no device não bastava: o 32
+que o usuário acabou de ver voltava como 33 na notificação seguinte, e até
+07/08/2026 ele só sumia quando o usuário abria o sino dentro do app.
+
+- **Device:** `SceneDelegate.clearIconBadge()` zera a cada `sceneDidBecomeActive`
+  (cold start E volta do background). Fica **antes** do `guard !pluginRegistered`
+  — atrás dele só zeraria no primeiro launch. Muda Swift ⇒ **exige build nova**.
+- **Servidor:** `user_settings.badge_cleared_at`, gravado por
+  `POST /api/push/badge-seen` (hook `useBadgeSeen`, no boot e no `appStateChange`
+  ativo). `countUnreadSinceCleared` (`lib/push/badgeCount.ts`) conta só o que
+  chegou DEPOIS dessa marca.
+
+**Abrir o app NÃO marca notificação como lida** — decisão do dono: o sino
+continua com o indicador de não lidas até ele abrir a central. Não colapse as
+duas coisas. Guards (incluindo source-guard do Swift e da fiação do `apns.ts`)
+em `src/lib/push/__tests__/badgeCount.test.ts`.
+
 ## E-mail transacional (Resend) — "aceito" ≠ "chegou"
 
 Provedor **Resend**, domínio `irontracks.com.br` verificado (região São Paulo).

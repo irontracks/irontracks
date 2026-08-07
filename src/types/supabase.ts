@@ -3092,6 +3092,7 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          badge_cleared_at: string | null
           created_at: string
           preferences: Json
           tour_completed_at: string | null
@@ -3101,6 +3102,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          badge_cleared_at?: string | null
           created_at?: string
           preferences?: Json
           tour_completed_at?: string | null
@@ -3110,6 +3112,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          badge_cleared_at?: string | null
           created_at?: string
           preferences?: Json
           tour_completed_at?: string | null
@@ -3130,6 +3133,7 @@ export type Database = {
       }
       user_update_views: {
         Row: {
+          badge_cleared_at: string | null
           created_at: string
           id: string
           prompted_at: string | null
