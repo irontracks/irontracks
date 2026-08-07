@@ -60,6 +60,7 @@ import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useSeasonalCampaign } from '@/hooks/useSeasonalCampaign'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
+import { useBadgeSeen } from '@/hooks/useBadgeSeen'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
 import { reportGeofenceArrival } from '@/lib/gps/reportGeofenceArrival'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
@@ -448,6 +449,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             : null,
         onInAppNotify: inAppNotify,
     })
+
+    // Badge do ícone do app (iOS): abrir o app zera o número, sem marcar as
+    // notificações como lidas. O nativo zera no device; este hook avisa o
+    // servidor pra a contagem não voltar cheia no push seguinte.
+    useBadgeSeen(user?.id)
 
     // View + activeSession local persistence — extracted to useLocalPersistence hook
     useLocalPersistence({ userId: user?.id, view, setView, activeSession })

@@ -17,6 +17,7 @@ import { logInfo, logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
 import { isSilentApnsPush, buildApnsAps } from '@/lib/push/helpers/apnsPayload'
 import { getApnsConfig, getJwt } from '@/lib/push/apnsJwt'
+import { countUnreadSinceCleared } from '@/lib/push/badgeCount'
 
 // ─── Conversation/Sender stable defaults ────────────────────────────────────
 // iOS Communication Notifications use a heuristic to decide whether to grant
@@ -245,18 +246,32 @@ export async function sendPushToUsers(
         // ── Dynamic badge count per user ────────────────────────────────────
         // Fetch unread notification counts for all users in a single query.
         // Falls back to badge=1 if the query fails.
+        // `badge_cleared_at` = última vez que o usuário ABRIU o app (o nativo
+        // zera o ícone nessa hora). Notificação anterior a essa marca não conta
+        // de novo — senão o 32 que ele acabou de ver voltava como 33 no push
+        // seguinte, e o badge nunca esvaziava sem abrir o sino.
         const badgeByUserId = new Map<string, number>()
         try {
-            const { data: unreadRows } = await admin
-                .from('notifications')
-                .select('user_id')
-                .in('user_id', ids)
-                .eq('is_read', false)
-            if (Array.isArray(unreadRows)) {
-                for (const r of unreadRows) {
+            const [{ data: unreadRows }, { data: settingsRows }] = await Promise.all([
+                admin
+                    .from('notifications')
+                    .select('user_id, created_at')
+                    .in('user_id', ids)
+                    .eq('is_read', false),
+                admin
+                    .from('user_settings')
+                    .select('user_id, badge_cleared_at')
+                    .in('user_id', ids),
+            ])
+            const clearedAt = new Map<string, string | null>()
+            if (Array.isArray(settingsRows)) {
+                for (const r of settingsRows) {
                     const uid = String(r?.user_id || '')
-                    if (uid) badgeByUserId.set(uid, (badgeByUserId.get(uid) ?? 0) + 1)
+                    if (uid) clearedAt.set(uid, r?.badge_cleared_at ?? null)
                 }
+            }
+            for (const [uid, count] of countUnreadSinceCleared(unreadRows, clearedAt)) {
+                badgeByUserId.set(uid, count)
             }
         } catch { /* badge fallback to 1 */ }
 

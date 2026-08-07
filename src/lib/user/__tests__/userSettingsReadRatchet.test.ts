@@ -43,6 +43,11 @@ const DEBITO: readonly string[] = [
   'app/api/notifications/workout-assigned/route.ts',
   'app/api/social/follow/route.ts',
   'lib/push/sender.ts',
+  // Badge do ícone iOS: `apns.ts` lê a COLUNA `badge_cleared_at` (estado de push,
+  // não perfil) para não recontar notificação que o usuário já viu; a rota
+  // `badge-seen` grava essa mesma coluna. Nenhum dos dois toca `preferences`.
+  'app/api/push/badge-seen/route.ts',
+  'lib/push/apns.ts',
   'lib/social/notifyFollowers.ts',
   'lib/social/workoutNotifications.ts',
   // Administrativo (LGPD, painel do professor/admin): leem a linha inteira de
