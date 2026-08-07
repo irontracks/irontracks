@@ -26,12 +26,14 @@ import { extractJsonFromModelText } from '@/utils/ai/extractJson'
 import { respondDbError } from '@/utils/api/dbError'
 import { logError, logWarnRemote } from '@/lib/logger'
 import { LAUDO_RESPONSE_SCHEMA, bodyPhotoGenerationConfig, normalizeLaudo } from '@/utils/bodyPhoto/aiContract'
-import { BodyPhotoLaudoSchema, POSE_LABELS_PT, type BodyPhotoLaudo, type BodyPhotoPose } from '@/types/bodyPhotoAssessment'
+import { BODY_PHOTO_POSES, BodyPhotoLaudoSchema, isFlexedPose, POSE_INSTRUCTIONS_PT, POSE_LABELS_PT, type BodyPhotoLaudo, type BodyPhotoPose } from '@/types/bodyPhotoAssessment'
 
 export const dynamic = 'force-dynamic'
 
 const BUCKET = 'body-photos'
-const POSE_ORDER: BodyPhotoPose[] = ['front', 'side', 'back']
+/** Relaxadas primeiro: o modelo lê na ordem em que as partes chegam, e a
+ *  composição corporal (que sai das relaxadas) deve ser vista antes. */
+const POSE_ORDER: BodyPhotoPose[] = [...BODY_PHOTO_POSES]
 const MAX_OUTPUT_TOKENS = 8192
 /** 1 tentativa + 1 reforço. A análise de imagem é cara — não vale um 3º disparo. */
 const MAX_MODEL_ATTEMPTS = 2
@@ -40,8 +42,24 @@ const BodySchema = z.object({ assessmentId: z.string().uuid() }).strip()
 
 const PROMPT = [
     'Você é um educador físico especialista em avaliação física e biomecânica.',
-    'Recebe de 1 a 3 fotos padronizadas do MESMO indivíduo (frente, perfil, costas).',
+    'Recebe de 1 a 6 fotos padronizadas do MESMO indivíduo. Até três RELAXADAS',
+    '(frente, perfil, costas) e até três CONTRAÍDAS, opcionais, nas mesmas posições:',
+    'frente em front double biceps (abdômen e braços contraídos), perfil em side chest',
+    '(peitoral e quadríceps) e costas em rear lat spread (dorsal aberto).',
+    'Cada foto vem rotulada logo antes da imagem.',
     'Produza uma análise visual profissional de composição corporal e estrutura.',
+    '',
+    'COMO USAR CADA TIPO DE FOTO — regra que muda o resultado:',
+    '- bodyFatRange, somatotype e apparentPhase: use APENAS as fotos RELAXADAS.',
+    '  A contração aumenta a definição aparente e faria você subestimar a gordura.',
+    '  Se só houver fotos contraídas, seja conservador e baixe a confiança.',
+    '- muscleGroups (development), symmetry e scores.symmetry: prefira as CONTRAÍDAS',
+    '  quando existirem — é sob tensão que separação de feixes, densidade e a',
+    '  assimetria esquerda/direita ficam realmente visíveis.',
+    '- posture e proportions: use as RELAXADAS (a pose contraída distorce ombros e',
+    '  coluna de propósito e não representa a postura habitual).',
+    '- confidence: sem as contraídas, o desenvolvimento muscular é inferido por',
+    '  silhueta — reconheça esse limite na nota do grupo e não suba a confiança.',
     '',
     'IMPORTANTE — limites e ética:',
     '- É uma ESTIMATIVA visual, não diagnóstico médico nem laboratorial.',
@@ -124,7 +142,12 @@ export async function POST(req: Request) {
             const { data: blob, error: dErr } = await admin.storage.from(BUCKET).download(ph.storage_path)
             if (dErr || !blob) continue
             const base64 = Buffer.from(await blob.arrayBuffer()).toString('base64')
-            parts.push({ text: `\nFOTO ${POSE_LABELS_PT[ph.pose].toUpperCase()}:` })
+            // O rótulo carrega RELAXADA/CONTRAÍDA porque é ele que ativa a regra do
+            // prompt: gordura só das relaxadas, desenvolvimento muscular das contraídas.
+            const tipo = isFlexedPose(ph.pose) ? 'CONTRAÍDA' : 'RELAXADA'
+            parts.push({
+                text: `\nFOTO ${POSE_LABELS_PT[ph.pose].toUpperCase()} (${tipo}) — ${POSE_INSTRUCTIONS_PT[ph.pose]}`,
+            })
             parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64 } })
         }
         if (parts.length <= 1) {

@@ -115,6 +115,19 @@ Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a *
 
 **Contexto do coach (`utils/ai/userContext.ts`) — as 12 rotas de IA bebem daqui.** O setor `profile` lia SÓ de `vip_profile`, tabela do fluxo VIP com 3 linhas para 57 contas: o bloco `[PERFIL E OBJETIVO]` chegava VAZIO para ~95% dos usuários, e o coach respondia sem saber objetivo, nível nem antropometria. Agora lê também `user_settings.preferences` (objetivo de treino, fase da dieta, nível, antropometria rotulada como "declarado" para não competir com a AVALIAÇÃO medida). Sem `nutrition_goals` salvo, a meta é derivada do TDEE e rotulada — antes o coach ficava sem meta nenhuma e podia contradizer o número na tela do usuário. **Hoje este arquivo só FORMATA o prompt:** perfil e meta chegam prontos do `userSnapshot` (uma leitura por chamada, setores sob demanda). Campo novo do perfil entra no snapshot, não aqui — e um guard reprova se ele voltar a ler `user_settings`/`nutrition_goals` direto.
 
+**Avaliação por Foto — poses contraídas não valem para tudo (ago/2026).** São seis
+poses: três RELAXADAS (`front`/`side`/`back`) e três CONTRAÍDAS opcionais
+(`*_flex`). A separação existe porque contração **aumenta a definição aparente**:
+usar as contraídas na estimativa de gordura faria o laudo subestimar o BF. Regra,
+escrita no prompt de `api/ai/body-composition-photo`: `bodyFatRange`/somatotipo/fase
+e também postura e proporções saem das RELAXADAS; `muscleGroups[].development` e
+simetria preferem as CONTRAÍDAS. O gatilho é o rótulo que a rota escreve antes de
+cada imagem (`FOTO ... (RELAXADA|CONTRAÍDA)`) — mexer nele desliga a regra sem erro
+nenhum. A série histórica também é das relaxadas: pose contraída varia com o quanto
+a pessoa contraiu no dia e produziria "evolução" que é só esforço de pose. Catálogo
+único em `types/bodyPhotoAssessment.ts` (labels + instruções com os nomes de posing
+de palco, que o modelo conhece); guards em `utils/bodyPhoto/__tests__/flexedPoses.test.ts`.
+
 **Saída de IA: structured output + "normalize, depois valide".** Pedir JSON só no TEXTO do prompt e validar com Zod `.max()` NÃO funciona — medido em jul/2026 na Avaliação por Foto: 8 de 12 chamadas ao `gemini-2.5-flash` reprovavam no `safeParse` (JSON com `}` faltando; strings acima do teto, ex. `action` de 343 num limite de 300) e o usuário via "Não consegui gerar a correlação". Padrão correto, implementado em `utils/bodyPhoto/aiContract.ts`: (1) `responseMimeType: 'application/json'` + `responseSchema` na CHAMADA (derruba o JSON inválido a zero); (2) normalizador que TRUNCA (`utils/ai/coerce.ts`) — structured output não garante `maxLength`; (3) só então o schema estrito, como juiz. `utils/ai/extractJson.ts` ainda REPARA JSON quebrado (fonte única, beneficia todas as rotas). Os limites moram num só lugar (`LAUDO_LIMITS`/`CORRELATION_LIMITS` em `types/bodyPhotoAssessment.ts`) e alimentam Zod + responseSchema + normalizador. **As outras rotas de `api/ai/` ainda usam o padrão antigo** — mesma classe de falha, ainda não migradas.
 
 **Feature flags:** `utils/featureFlags.ts` (`isFeatureEnabled(settings, FEATURE_KEYS.x)`), guardadas em `user_settings.preferences` (default = desligado, salvo override explícito).

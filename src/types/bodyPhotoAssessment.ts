@@ -8,8 +8,31 @@ import { z } from 'zod'
 
 // ─── Enums de domínio ────────────────────────────────────────────────────────
 
-export const BODY_PHOTO_POSES = ['front', 'side', 'back'] as const
+/**
+ * As três poses RELAXADAS. São a espinha dorsal da avaliação e a série histórica:
+ * a estimativa de gordura e a comparação entre avaliações saem daqui, porque a
+ * pose relaxada é reproduzível — a contraída depende de quanto a pessoa contraiu
+ * naquele dia, e usá-la na série produziria "evolução" que é só esforço de pose.
+ */
+export const BODY_PHOTO_RELAXED_POSES = ['front', 'side', 'back'] as const
+
+/**
+ * As três poses CONTRAÍDAS, opcionais (ago/2026). Relaxado, o contorno muscular
+ * fica encoberto e o desenvolvimento por grupo é inferido por silhueta; sob
+ * tensão aparecem separação de feixes, densidade e a assimetria L/R real.
+ *
+ * ⚠️ Elas NÃO entram na estimativa de gordura: contração aumenta a definição
+ * aparente e puxaria a faixa para baixo. A regra vive no prompt da rota de laudo
+ * e tem guard (`bodyPhotoFlexPoses.test.ts`).
+ */
+export const BODY_PHOTO_FLEXED_POSES = ['front_flex', 'side_flex', 'back_flex'] as const
+
+export const BODY_PHOTO_POSES = [...BODY_PHOTO_RELAXED_POSES, ...BODY_PHOTO_FLEXED_POSES] as const
 export type BodyPhotoPose = (typeof BODY_PHOTO_POSES)[number]
+export type BodyPhotoRelaxedPose = (typeof BODY_PHOTO_RELAXED_POSES)[number]
+
+export const isFlexedPose = (pose: BodyPhotoPose): boolean =>
+    (BODY_PHOTO_FLEXED_POSES as readonly string[]).includes(pose)
 
 export const BODY_PHOTO_STATUSES = ['pending', 'uploading', 'analyzing', 'done', 'failed'] as const
 export type BodyPhotoAssessmentStatus = (typeof BODY_PHOTO_STATUSES)[number]
@@ -18,6 +41,25 @@ export const POSE_LABELS_PT: Record<BodyPhotoPose, string> = {
     front: 'Frente',
     side: 'Perfil',
     back: 'Costas',
+    front_flex: 'Frente contraído',
+    side_flex: 'Perfil contraído',
+    back_flex: 'Costas contraído',
+}
+
+/**
+ * Instrução de pose para o usuário na captura E para o modelo no prompt.
+ *
+ * Os nomes de posing de palco (front double biceps, side chest, rear lat spread)
+ * estão aí de propósito: o modelo os conhece e rende mais que "contraindo as
+ * costas". Na tela do usuário eles aparecem traduzidos para linguagem de treino.
+ */
+export const POSE_INSTRUCTIONS_PT: Record<BodyPhotoPose, string> = {
+    front: 'De frente, braços relaxados ao lado do corpo, pés na largura dos ombros.',
+    side: 'De lado, braços soltos, olhando para frente — perfil completo.',
+    back: 'De costas, braços relaxados, mesma distância da câmera.',
+    front_flex: 'De frente, contraindo abdômen e braços (front double biceps).',
+    side_flex: 'De lado, contraindo peitoral e coxa da frente (side chest).',
+    back_flex: 'De costas, abrindo o dorsal (rear lat spread).',
 }
 
 // ─── Limites (fonte única) ───────────────────────────────────────────────────
