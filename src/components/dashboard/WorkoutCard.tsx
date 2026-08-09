@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
-import { Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
+import { Share2, Pencil, Trash2, Loader2, Undo2, MoreHorizontal, ChevronLeft } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
 import { pluralize } from '@/utils/format/plural'
@@ -68,6 +68,8 @@ function WorkoutCardInner({
   onPeriodizedWorkoutLoaded,
 }: WorkoutCardProps) {
   const [pendingAction, setPendingAction] = useState<{ type: PendingActionType } | null>(null)
+  /** Segundo nível das ações do card — guarda a exclusão atrás de um toque. */
+  const [maisAberto, setMaisAberto] = useState(false)
   const isMountedRef = useRef(true)
   React.useEffect(() => {
     isMountedRef.current = true
@@ -241,28 +243,61 @@ function WorkoutCardInner({
         </div>
       </div>
 
+      {/* Ações do card.
+          A EXCLUSÃO não fica mais lado a lado com compartilhar e editar: era um
+          alvo de 44pt, do mesmo tamanho e da mesma cor das ações reversíveis, a
+          um polegar de distância — com a mão suada, na academia, apagar o treino
+          errado custava caro. Agora exige tocar "⋯" primeiro; um toque a mais é
+          barato quando a ação não tem volta. */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/90 rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
-        <button
-          onClick={async (e) => { e.stopPropagation(); await runAction('share', () => onShareWorkout(w)) }}
-          disabled={isBusy}
-          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-        >
-          {isActionBusy('share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
-        </button>
-        <button
-          onClick={async (e) => { e.stopPropagation(); await runAction('edit', () => onEditWorkout(w)) }}
-          disabled={isBusy}
-          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-        >
-          {isActionBusy('edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
-        </button>
-        <button
-          onClick={async (e) => { e.stopPropagation(); await runAction('delete', () => onDeleteWorkout(w?.id, w?.title)) }}
-          disabled={isBusy}
-          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
-        >
-          {isActionBusy('delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
-        </button>
+        {!maisAberto ? (
+          <>
+            <button
+              onClick={async (e) => { e.stopPropagation(); await runAction('share', () => onShareWorkout(w)) }}
+              disabled={isBusy}
+              aria-label="Compartilhar treino"
+              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+            >
+              {isActionBusy('share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
+            </button>
+            <button
+              onClick={async (e) => { e.stopPropagation(); await runAction('edit', () => onEditWorkout(w)) }}
+              disabled={isBusy}
+              aria-label="Editar treino"
+              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+            >
+              {isActionBusy('edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMaisAberto(true) }}
+              disabled={isBusy}
+              aria-label="Mais ações"
+              aria-expanded={false}
+              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+            >
+              <MoreHorizontal size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMaisAberto(false) }}
+              aria-label="Voltar"
+              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              onClick={async (e) => { e.stopPropagation(); setMaisAberto(false); await runAction('delete', () => onDeleteWorkout(w?.id, w?.title)) }}
+              disabled={isBusy}
+              aria-label="Excluir treino"
+              className="h-11 px-3 flex items-center gap-1.5 shrink-0 rounded bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+            >
+              {isActionBusy('delete') ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              <span className="text-[11px] font-black uppercase tracking-wider">Excluir</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

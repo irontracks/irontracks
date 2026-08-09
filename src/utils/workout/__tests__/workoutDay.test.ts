@@ -17,6 +17,29 @@ describe('parseWorkoutDay', () => {
     expect(parseWorkoutDay('SEX')).toBe(5)
   })
 
+  it('lê o dia no FIM do título, entre parênteses — o padrão real do dono', () => {
+    // A convenção do app documentava só o prefixo ("SEG · …"), mas os treinos em
+    // produção se chamam "A - empurrar a (segunda)". Enquanto o parser olhava só
+    // o primeiro token, o selo HOJE nunca aparecia para quem nomeia assim — a
+    // feature existia e não disparava nunca (auditoria de design, ago/2026).
+    expect(parseWorkoutDay('A - empurrar a (segunda)')).toBe(1)
+    expect(parseWorkoutDay('B - puxar a (terça)')).toBe(2)
+    expect(parseWorkoutDay('C - pernas a (quarta)')).toBe(3)
+    expect(parseWorkoutDay('D - EMPURRAR B (QUINTA)')).toBe(4)
+    expect(parseWorkoutDay('E - puxar b (sexta)')).toBe(5)
+    expect(parseWorkoutDay('F - PERNAS B (SÁBADO)')).toBe(6)
+  })
+
+  it('NÃO casa prefixo solto de 3 letras dentro de outra palavra', () => {
+    // A armadilha de aceitar dia em qualquer posição: casar por prefixo faria
+    // "QUAdríceps" virar quarta e "TERra" virar terça — e o treino errado
+    // receberia o selo HOJE. A comparação é exata por token.
+    expect(parseWorkoutDay('Quadríceps e posterior')).toBeNull()
+    expect(parseWorkoutDay('Terra e barra')).toBeNull()
+    expect(parseWorkoutDay('Sexto treino')).toBeNull()
+    expect(parseWorkoutDay('Dominada e remada')).toBeNull()
+  })
+
   it('sem prefixo de dia → null', () => {
     expect(parseWorkoutDay('Treino A')).toBeNull()
     expect(parseWorkoutDay('Push day')).toBeNull()
