@@ -3,6 +3,16 @@
 interface ConfirmOptions {
     confirmText?: string
     cancelText?: string
+    /**
+     * Marca a confirmação como DESTRUTIVA: o botão de ação fica vermelho e o
+     * ícone vira alerta, em vez do "?" amarelo que o app usa para tudo.
+     *
+     * Existe porque o diálogo de cancelar treino era literalmente
+     * "Cancelar / [Cancelar] [Confirmar]" — a mesma palavra significando
+     * abandonar o treino no título e desistir de abandonar no botão, com o
+     * gold (cor de ação positiva) na opção que APAGA a sessão.
+     */
+    destructive?: boolean
     [key: string]: unknown
 }
 
@@ -12,6 +22,7 @@ interface DialogState {
     message: string
     confirmText?: string | null
     cancelText?: string | null
+    destructive?: boolean
     defaultValue?: string
     onConfirm?: (value?: string) => void
     onCancel?: () => void
@@ -54,6 +65,7 @@ export const DialogProvider = ({ children }: { children: React.ReactNode }) => {
                 message,
                 confirmText: typeof opts.confirmText === 'string' ? opts.confirmText : null,
                 cancelText: typeof opts.cancelText === 'string' ? opts.cancelText : null,
+                destructive: opts.destructive === true,
                 onConfirm: () => {
                     closeDialog();
                     resolve(true);

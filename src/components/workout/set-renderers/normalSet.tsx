@@ -562,7 +562,8 @@ const NormalSetInner = ({
         ? 'bg-emerald-600 text-white border border-emerald-500/50'
         : side === 'R' && lDone
           ? 'bg-amber-500 text-black border border-amber-500/50 shadow-sm shadow-amber-900/30'
-          : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
+          // Mesma ênfase gold do unilateral: ver comentário no botão bilateral.
+          : 'bg-yellow-500/10 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20';
 
     // #autoload: destaca o input do lado quando o valor ainda é a sugestão do motor.
     const sideIsAuto = Boolean(
@@ -812,7 +813,11 @@ const NormalSetInner = ({
                 'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
-                  : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
+                  // Pendente em gold: este é o botão mais tocado do app (18×
+                  // por sessão) e era cinza-em-cinza, enquanto "Finalizar" —
+                  // tocado uma vez — dominava o rodapé em amarelo sólido. A
+                  // ênfase pertence à ação repetida.
+                  : 'bg-yellow-500/10 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20',
               ].join(' ')}
             >
               <Check size={13} />
