@@ -10,6 +10,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import crypto from 'crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   parseSignature,
   verifyWebhook,
@@ -213,5 +215,63 @@ describe('assessPaymentAmount', () => {
   it('detalhe traz os números para o log de auditoria', () => {
     expect(assessPaymentAmount(1000, 9990, 'BRL', 'BRL').detail).toContain('paid=1000')
     expect(assessPaymentAmount(1000, 9990, 'BRL', 'BRL').detail).toContain('expected=9990')
+  })
+})
+
+/**
+ * Comparação do HMAC em tempo constante — ago/2026 (era o PR #355, aberto em
+ * 12/07 e parado desde então; o problema seguia de pé em `main`).
+ *
+ * `===` em string sai no primeiro byte diferente, então o tempo de resposta
+ * revela quantos caracteres o atacante acertou e a assinatura pode ser
+ * reconstruída byte a byte, sem nunca conhecer o segredo. O webhook do
+ * RevenueCat já comparava assim; este ficou para trás.
+ *
+ * Timing não é testável de forma determinística (a medição oscila com a carga
+ * da máquina e produziria teste flaky). Então o guard tem duas metades: o
+ * COMPORTAMENTO nas bordas que a troca poderia quebrar, e um source-guard de
+ * que a comparação frouxa não voltou.
+ */
+describe('verifyWebhook — comparação em tempo constante', () => {
+  const agora = 1_800_000_000_000
+
+  it('continua aceitando a assinatura correta', () => {
+    // `timingSafeEqual` lança com tamanhos diferentes: se a checagem de
+    // comprimento estivesse errada, o caminho feliz quebraria aqui.
+    expect(verifyWebhook({
+      secret: SECRET, xSignature: sign(agora), xRequestId: REQ_ID, dataId: DATA_ID, nowMs: agora,
+    })).toBe(true)
+  })
+
+  it('v1 mais curto que o hash devolve false, não exceção', () => {
+    expect(() => verifyWebhook({
+      secret: SECRET, xSignature: `ts=${Math.floor(agora / 1000)},v1=abc`,
+      xRequestId: REQ_ID, dataId: DATA_ID, nowMs: agora,
+    })).not.toThrow()
+    expect(verifyWebhook({
+      secret: SECRET, xSignature: `ts=${Math.floor(agora / 1000)},v1=abc`,
+      xRequestId: REQ_ID, dataId: DATA_ID, nowMs: agora,
+    })).toBe(false)
+  })
+
+  it('v1 mais longo que o hash devolve false, não exceção', () => {
+    const longo = 'a'.repeat(200)
+    expect(verifyWebhook({
+      secret: SECRET, xSignature: `ts=${Math.floor(agora / 1000)},v1=${longo}`,
+      xRequestId: REQ_ID, dataId: DATA_ID, nowMs: agora,
+    })).toBe(false)
+  })
+
+  it('a comparação frouxa não voltou ao módulo', () => {
+    const src = readFileSync(
+      join(__dirname, '..', 'mercadopagoWebhookRules.ts'), 'utf8',
+    )
+    const codigo = src
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^\s*\/\/.*$/gm, '')
+    expect(codigo, 'comparar HMAC com === vaza o prefixo acertado pelo tempo')
+      .not.toMatch(/hashed\s*(\.toLowerCase\(\))?\s*===/)
+    expect(codigo, 'a comparação precisa ser a de tempo constante')
+      .toContain('timingSafeEqual')
   })
 })

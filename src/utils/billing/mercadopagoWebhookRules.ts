@@ -47,7 +47,27 @@ export function verifyWebhook(opts: {
 
   const manifest = `id:${opts.dataId};request-id:${opts.xRequestId};ts:${ts};`
   const hashed = crypto.createHmac('sha256', opts.secret).update(manifest).digest('hex')
-  return hashed.toLowerCase() === v1.toLowerCase()
+  return hmacIgual(hashed, v1)
+}
+
+/**
+ * Comparação em tempo constante do HMAC.
+ *
+ * `===` em string sai no primeiro byte diferente, então o tempo de resposta
+ * vaza quantos caracteres o atacante acertou — e a assinatura pode ser
+ * reconstruída byte a byte, sem nunca conhecer o segredo. O webhook do
+ * RevenueCat já compara assim (`safeEqual`); este ficou para trás.
+ *
+ * `timingSafeEqual` EXIGE buffers do mesmo tamanho — com tamanhos diferentes
+ * ele lança, e um try/catch devolvendo `false` reintroduziria o vazamento
+ * (agora pelo custo da exceção). Por isso o comprimento é checado antes: ele
+ * não é segredo, o hash tem tamanho fixo conhecido.
+ */
+function hmacIgual(esperado: string, recebido: string): boolean {
+    const a = Buffer.from(esperado.toLowerCase(), 'utf8')
+    const b = Buffer.from(String(recebido || '').toLowerCase(), 'utf8')
+    if (a.length !== b.length) return false
+    return crypto.timingSafeEqual(a, b)
 }
 
 export function mapSubscriptionStatus(status: string): 'active' | 'past_due' | 'cancelled' | 'pending' {
