@@ -24,6 +24,45 @@ import { getBiaSignedUrl } from '@/utils/storage/biaAttachmentUpload'
 const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
 const BodyMeasurementMap = dynamic(() => import('@/components/assessment/BodyMeasurementMap'), { ssr: false })
 
+/**
+ * Blocos de número da avaliação. Vivem no MÓDULO, não dentro do componente:
+ * declarados lá dentro, o React os trata como um tipo NOVO a cada render e
+ * remonta a subárvore inteira em vez de atualizá-la — perde estado e anima de
+ * novo à toa. É o que a regra `react-hooks/static-components` acusa.
+ */
+const tomCor = (d: MetricDelta | null) =>
+  d?.tone === 'good' ? '#4ade80' : d?.tone === 'bad' ? '#f87171' : '#a3a3a3'
+
+const Delta = ({ d, unidade }: { d: MetricDelta | null; unidade: string }) =>
+  d ? (
+    <span
+      className="inline-flex items-center gap-0.5 text-[12px] font-bold"
+      style={{ color: tomCor(d) }}
+    >
+      {d.diff > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+      {d.label}{unidade}
+    </span>
+  ) : null
+
+const Destaque = ({ rotulo, valor, d, unidade }: {
+  rotulo: string; valor: string; d: MetricDelta | null; unidade: string
+}) => (
+  <div className="flex-1 min-w-0 rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900/80 to-neutral-900/30 px-4 py-3">
+    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{rotulo}</div>
+    <div className="mt-1 flex items-baseline gap-2">
+      <span className="text-[26px] font-black leading-none text-white tabular-nums">{valor}</span>
+      <Delta d={d} unidade={unidade} />
+    </div>
+  </div>
+)
+
+const Secundario = ({ rotulo, valor }: { rotulo: string; valor: string }) => (
+  <div className="min-w-0 flex-1">
+    <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-600">{rotulo}</div>
+    <div className="mt-0.5 truncate text-[13px] font-bold text-neutral-200 tabular-nums">{valor}</div>
+  </div>
+)
+
 // ────────────────────────────────────────────────────────────────
 // Shared field definitions
 // ────────────────────────────────────────────────────────────────
@@ -321,38 +360,6 @@ export function AssessmentListItem({
                             previousAssessment?.date ?? previousAssessment?.assessment_date)
               : null
 
-            const tomCor = (d: MetricDelta | null) =>
-              d?.tone === 'good' ? '#4ade80' : d?.tone === 'bad' ? '#f87171' : '#a3a3a3'
-
-            const Delta = ({ d, unidade }: { d: MetricDelta | null; unidade: string }) =>
-              d ? (
-                <span
-                  className="inline-flex items-center gap-0.5 text-[12px] font-bold"
-                  style={{ color: tomCor(d) }}
-                >
-                  {d.diff > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {d.label}{unidade}
-                </span>
-              ) : null
-
-            const Destaque = ({ rotulo, valor, d, unidade }: {
-              rotulo: string; valor: string; d: MetricDelta | null; unidade: string
-            }) => (
-              <div className="flex-1 min-w-0 rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900/80 to-neutral-900/30 px-4 py-3">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{rotulo}</div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-[26px] font-black leading-none text-white tabular-nums">{valor}</span>
-                  <Delta d={d} unidade={unidade} />
-                </div>
-              </div>
-            )
-
-            const Secundario = ({ rotulo, valor }: { rotulo: string; valor: string }) => (
-              <div className="min-w-0 flex-1">
-                <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-600">{rotulo}</div>
-                <div className="mt-0.5 truncate text-[13px] font-bold text-neutral-200 tabular-nums">{valor}</div>
-              </div>
-            )
 
             return (
               <div className="mt-4">

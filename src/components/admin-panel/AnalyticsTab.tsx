@@ -53,6 +53,53 @@ const PUSH_TYPE_LABELS: Record<string, string> = {
 const labelForPushType = (t: string): string =>
   PUSH_TYPE_LABELS[t] ?? t.replace(/_/g, ' ')
 
+/**
+ * KPI card auxiliar — mantém o estilo dos outros painéis.
+ *
+ * No MÓDULO, não dentro do AnalyticsTab: declarado lá dentro, vira um tipo novo
+ * a cada render e o React remonta os cinco cards em vez de atualizá-los
+ * (`react-hooks/static-components`).
+ */
+const KpiCard = ({
+  icon: Icon,
+  iconColor,
+  iconBg,
+  label,
+  value,
+  suffix,
+  sub,
+}: {
+  icon: React.ElementType
+  iconColor: string
+  iconBg: string
+  label: string
+  value: string | number
+  suffix?: string
+  sub?: string
+}) => (
+  <div
+    className="rounded-2xl p-4"
+    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+  >
+    <div className="flex items-center gap-2 mb-2">
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: iconBg }}
+      >
+        <Icon size={16} className={iconColor} />
+      </div>
+      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+        {label}
+      </span>
+    </div>
+    <div className="text-2xl font-black text-white">
+      {value}
+      {suffix ? <span className="text-sm text-neutral-400 ml-1 font-bold">{suffix}</span> : null}
+    </div>
+    {sub ? <div className="text-[11px] text-neutral-400 mt-0.5">{sub}</div> : null}
+  </div>
+)
+
 export function AnalyticsTab() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,47 +127,6 @@ export function AnalyticsTab() {
   }, [])
 
   useEffect(() => { void fetchSummary() }, [fetchSummary])
-
-  // KPI card auxiliar — mantém o estilo dos outros painéis.
-  const KpiCard = ({
-    icon: Icon,
-    iconColor,
-    iconBg,
-    label,
-    value,
-    suffix,
-    sub,
-  }: {
-    icon: React.ElementType
-    iconColor: string
-    iconBg: string
-    label: string
-    value: string | number
-    suffix?: string
-    sub?: string
-  }) => (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: iconBg }}
-        >
-          <Icon size={16} className={iconColor} />
-        </div>
-        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-          {label}
-        </span>
-      </div>
-      <div className="text-2xl font-black text-white">
-        {value}
-        {suffix ? <span className="text-sm text-neutral-400 ml-1 font-bold">{suffix}</span> : null}
-      </div>
-      {sub ? <div className="text-[11px] text-neutral-400 mt-0.5">{sub}</div> : null}
-    </div>
-  )
 
   return (
     <div className="space-y-5 animate-in fade-in duration-500">

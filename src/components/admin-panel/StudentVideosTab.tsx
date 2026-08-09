@@ -88,7 +88,7 @@ export const StudentVideosTab: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {executionVideos.map((it) => {
+                    {executionVideos.map((it, idx) => {
                         const id = it?.id ? String(it.id) : '';
                         const when = it?.created_at ? new Date(String(it.created_at)) : null;
                         const title = String(it?.exercise_name || 'Execução').trim();
@@ -101,7 +101,7 @@ export const StudentVideosTab: React.FC = () => {
                                 ? 'border-red-500/30 text-red-300'
                                 : 'border-yellow-500/30 text-yellow-300';
                         return (
-                            <div key={id || Math.random().toString(36).slice(2)} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                            <div key={id || `video-${idx}`} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
                                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
