@@ -1,5 +1,7 @@
 'use client';
 
+import { Flame } from 'lucide-react';
+
 import React from 'react';
 import { useWorkoutContext } from '../WorkoutContext';
 
@@ -57,8 +59,12 @@ export function FailureToggle({ exIdx, setIdx, compact = false, extraPatch }: {
           : 'text-neutral-500 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',
       ].join(' ')}
     >
-      <span aria-hidden>💥</span>
-      {!compact && (failed ? 'Falha' : 'Falha?')}
+      <Flame size={compact ? 14 : 11} aria-hidden="true" />
+      {/* Rótulo fixo "Falha": o botão é um ESTADO (marcado/não marcado), não uma
+          pergunta. "Falha?" com interrogação lia como se o app estivesse
+          perguntando algo, e mudar o texto ao alternar fazia o alvo dançar de
+          largura debaixo do polegar. Quem comunica o estado é a cor + aria-pressed. */}
+      {!compact && 'Falha'}
     </button>
   );
 }

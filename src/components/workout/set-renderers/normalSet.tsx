@@ -840,7 +840,24 @@ const NormalSetInner = ({
                  caixa vazia igualzinha à de quem está com o autoload desligado. */
               <AutoloadNote show muted rationale={autoSuggestion.rationale} />
             ) : <span />}
-            {failureToggle}
+            {/* MÉTODO e FALHA na mesma linha. O seletor morava numa terceira
+                faixa própria: cada série ocupava três linhas (campos, falha,
+                método) para dois metadados que raramente se toca. Com 18 séries
+                por sessão, era o dobro de rolagem entre uma carga e a seguinte. */}
+            <div className="flex items-center gap-2 shrink-0">
+              {!done && (
+                <button
+                  type="button"
+                  onClick={() => setIsPickerOpen(p => !p)}
+                  aria-expanded={isPickerOpen}
+                  className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-widest text-neutral-500 hover:text-neutral-300 transition-colors"
+                >
+                  {String(log.per_set_method || '').trim() || 'Normal'}
+                  <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+              {failureToggle}
+            </div>
           </div>
           {/* "Por lado: 6×20 + 1×10" para o peso QUE ESTÁ NO CAMPO — ramo BILATERAL
               (leg press, supino com barra…). O ramo unilateral tem a sua própria
@@ -852,17 +869,10 @@ const NormalSetInner = ({
             inventory={inventoryFromSettings(settings)}
             className="px-0.5"
           />
-          {/* Per-set method picker */}
+          {/* Lista de métodos — abre ABAIXO da linha (dentro do flex ela empurraria
+              o chip de falha ao expandir). O botão que a abre está no rodapé. */}
           {!done && (
             <div className="mt-1">
-              <button
-                type="button"
-                onClick={() => setIsPickerOpen(p => !p)}
-                className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-neutral-400 transition-colors"
-              >
-                {String(log.per_set_method || '').trim() || 'Normal'}
-                <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
-              </button>
               {isPickerOpen && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'].map(opt => {
