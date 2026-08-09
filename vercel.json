@@ -1,6 +1,5 @@
 {
     "framework": "nextjs",
-    "_comment_buildCommand": "NODE_OPTIONS aqui e nao no painel: o build de producao morreu de OOM tres vezes em 06-07/08/2026 e deixou a producao um dia sem atualizar — e o app nativo carrega o front do servidor, entao isso segura TODOS os usuarios. O estouro e a soma do upload de sourcemaps do Sentry com o `tsc` no mesmo container (por isso nao reproduz local, onde SENTRY_AUTH_TOKEN nao existe). Versionado para o ajuste sobreviver a quem recriar o projeto na Vercel.",
     "buildCommand": "NODE_OPTIONS=--max-old-space-size=6144 npm run build",
     "headers": [
         {
