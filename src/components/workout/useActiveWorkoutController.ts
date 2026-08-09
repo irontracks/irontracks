@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { logError } from '@/lib/logger';
+import { triggerHaptic } from '@/utils/native/irontracksNative';
 // Note: useWorkoutTicker is no longer called here — it lives in WorkoutTimerProvider.
 // The controller no longer re-renders every second, only on user interaction.
 import { useWorkoutModals } from './hooks/useWorkoutModals';
@@ -159,7 +160,19 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const exIdx = parseInt(exIdxStr, 10);
       const sIdx = parseInt(sIdxStr, 10);
 
-      // Haptic feedback when completing a set
+      /**
+       * Retorno tátil ao concluir a série.
+       *
+       * Este bloco existia desde antes, mas era MUDO no iPhone: `navigator.vibrate`
+       * é a Web Vibration API, que o iOS não implementa — nem no Safari, nem na
+       * WKWebView do Capacitor. Ou seja, a única confirmação de "concluí a série"
+       * no aparelho da maior parte da base era visual, justamente no momento em
+       * que o usuário não está olhando a tela (celular apoiado, fone, entre séries).
+       *
+       * Agora sai pelos DOIS caminhos: `triggerHaptic` (nativo, via Capacitor, é
+       * quem faz o Taptic Engine responder) e `navigator.vibrate` (Android e web).
+       * Cada um é no-op onde não se aplica, então não há risco de vibração dupla.
+       */
       if (patchObj.done === true) {
         // Check if this is the last set of the exercise (exercise completion)
         const ex = exercises[exIdx];
@@ -169,10 +182,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         const doneBefore = Array.from({ length: setsCount }).filter((_, i) => i !== sIdx && getLog(`${exIdx}-${i}`)?.done).length;
         const isExerciseComplete = setsCount > 0 && doneBefore === setsCount - 1;
         if (isExerciseComplete) {
-          // Exercise complete — double tap pattern
+          // Exercício inteiro fechado: batida mais forte, para se distinguir da
+          // série avulsa sem o usuário precisar olhar.
+          triggerHaptic('medium').catch(() => { })
           try { navigator?.vibrate?.([15, 30, 15]) } catch { /* not supported */ }
         } else {
-          // Single set done — short tap
+          triggerHaptic('light').catch(() => { })
           try { navigator?.vibrate?.(10) } catch { /* not supported */ }
         }
       }
