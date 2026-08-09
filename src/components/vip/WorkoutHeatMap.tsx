@@ -1,5 +1,8 @@
 'use client'
 
+// Alias obrigatório: `Map` do lucide sombrearia o `new Map()` nativo usado abaixo.
+import { Map as MapIcon, MapPin } from 'lucide-react'
+
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -125,7 +128,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🗺️</span>
+          <MapIcon size={18} className="text-yellow-500" aria-hidden="true" />
           <h3 className="text-sm font-bold text-white">Mapa de Treinos</h3>
           <span
             className="rounded-md px-1.5 py-0.5 text-[10px] font-bold"
@@ -166,10 +169,10 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
               <button
                 type="button"
                 onClick={() => router.push('/dashboard/profile')}
-                className="mt-1 rounded-xl px-4 py-2 text-xs font-black text-black transition-transform active:scale-95"
+                className="mt-1 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black text-black transition-transform active:scale-95"
                 style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
               >
-                📍 Cadastrar academia
+                <MapPin size={13} aria-hidden="true" /> Cadastrar academia
               </button>
             </>
           ) : emptyReason === 'error' ? (

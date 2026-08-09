@@ -1156,6 +1156,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
+                                    hasActiveSession={Boolean(activeSession?.workout)}
                                     profileIncomplete={Boolean(profileIncomplete)}
                                     onOpenCompleteProfile={() => setView('profile')}
                                     view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}

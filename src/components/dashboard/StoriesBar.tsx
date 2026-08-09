@@ -1,4 +1,6 @@
 'use client'
+
+import { Camera } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -402,9 +404,27 @@ export default function StoriesBar({
         })}
       </div>
 
+      {/* Estado vazio no padrão da Comunidade — o melhor componente do app:
+          ícone, título, explicação e AÇÃO. Aqui era uma frase cinza ensinando um
+          gesto invisível ("segure seu avatar"), que é a pior affordance
+          possível: instrução sobre algo que não se vê. Agora tem botão. */}
       {ordered.length === 0 && !loading && !error ? (
-        <div className="mt-2 px-1 text-[11px] text-neutral-400 font-bold">
-          Nenhum story de amigos ainda. Segure seu avatar no topo para publicar.
+        <div className="mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 px-4 py-5 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/10 border border-yellow-500/20">
+            <Camera className="h-5 w-5 text-yellow-500" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-black text-white">Nenhum story ainda</p>
+          <p className="mt-0.5 text-xs text-neutral-400 leading-snug">
+            Publique o seu e apareça para quem te segue.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsCreatorOpen(true)}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-yellow-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-black active:scale-95 transition-transform hover:bg-yellow-400"
+          >
+            <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+            Publicar story
+          </button>
         </div>
       ) : null}
 

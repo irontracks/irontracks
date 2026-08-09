@@ -24,6 +24,7 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { EditWorkoutListModal, type EditWorkoutListItem } from './EditWorkoutListModal'
 import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 import { WorkoutCard } from './WorkoutCard'
+import { QuickStartCard } from './QuickStartCard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
@@ -98,6 +99,8 @@ type Props = {
   onStartCardio?: () => void
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
+  /** Há treino em andamento? O card "Treinar agora" some nesse caso. */
+  hasActiveSession?: boolean
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
   onShareWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
@@ -324,6 +327,17 @@ export default function StudentDashboard(props: Props) {
           do DashboardTabs empurram a barra pra baixo do offset fixo que o
           NutritionOverlay assume, fazendo a barra "flutuar" por cima do
           conteúdo de nutrição). */}
+      {/* AÇÃO PRIMÁRIA PRIMEIRO. O app é de treinar; até aqui, a primeira dobra
+          era ocupada por pergunta de intenção, aviso de perfil e stories, e o
+          botão de começar ficava fora da tela. */}
+      {props.view === 'dashboard' && !props.nutritionActive && (
+        <QuickStartCard
+          workouts={workouts}
+          onStartSession={props.onStartSession}
+          hasActiveSession={props.hasActiveSession}
+        />
+      )}
+
       {/* Só no dashboard: o aviso aparecia nas quatro abas (Treinos, Comunidade,
           Nutrição e VIP) e sem forma de dispensar — perseguia o usuário pelo app
           inteiro. Lugar de lembrete é a tela inicial. */}
@@ -412,24 +426,6 @@ export default function StudentDashboard(props: Props) {
 
               <StudentSubscriptionCard />
 
-              {(showIronRank || showBadges || showNewRecordsCard) && (
-              <IronRankCard
-                  badges={props.streakStats?.badges ?? []}
-                  currentStreak={props.streakStats?.currentStreak ?? 0}
-                  totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
-                  currentUserId={props.currentUserId}
-                  showIronRank={showIronRank}
-                  showBadges={showBadges}
-                  showRecords={showNewRecordsCard}
-                  reloadKey={props.newRecordsReloadKey}
-                />
-              )}
-
-              <MuscleBalanceCard />
-
-              <RecoveryScore />
-
-              <MuscleMapCard onOpenWizard={props.onCreateWorkout} gender={(props.settings?.biologicalSex === 'female' ? 'female' : props.settings?.biologicalSex === 'male' ? 'male' : 'not_informed')} />
 
               <button
                 onClick={handleCreateWorkout}
@@ -722,6 +718,32 @@ export default function StudentDashboard(props: Props) {
                   />
                 ))}
               </div>
+
+              {/* PAINÉIS DE DADOS — depois da lista, não antes.
+                  Eles ocupavam a faixa entre as abas e os treinos, e empurravam
+                  a lista (a razão do app existir) para fora da primeira dobra:
+                  quem abria o app para treinar precisava rolar por Iron Rank,
+                  Equilíbrio Muscular, Recuperação e Mapa Muscular antes de
+                  chegar no botão. Progresso é o que se olha DEPOIS de decidir
+                  treinar — Whoop e Oura organizam na mesma ordem. */}
+              {(showIronRank || showBadges || showNewRecordsCard) && (
+              <IronRankCard
+                  badges={props.streakStats?.badges ?? []}
+                  currentStreak={props.streakStats?.currentStreak ?? 0}
+                  totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
+                  currentUserId={props.currentUserId}
+                  showIronRank={showIronRank}
+                  showBadges={showBadges}
+                  showRecords={showNewRecordsCard}
+                  reloadKey={props.newRecordsReloadKey}
+                />
+              )}
+
+              <MuscleBalanceCard />
+
+              <RecoveryScore />
+
+              <MuscleMapCard onOpenWizard={props.onCreateWorkout} gender={(props.settings?.biologicalSex === 'female' ? 'female' : props.settings?.biologicalSex === 'male' ? 'male' : 'not_informed')} />
           </>
         )}
       </>
