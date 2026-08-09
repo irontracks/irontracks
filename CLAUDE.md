@@ -237,7 +237,28 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 
 **Caminho do editor de Story** (leva tempo achar às cegas): menu do avatar → **Histórico** → abrir um treino → botão **STORY** no topo. O ícone de compartilhar do card de treino é export PDF/JSON, não é o composer.
 
-**⚠️ A conta logada no simulador é `djmkapple@gmail.com` — NÃO é a do e-mail da sessão (`djmkbrasil@gmail.com`).** São perfis diferentes no banco: a do simulador tem perfil completo (93,9 kg · 172 cm · 40 anos · masculino · 5×/sem), fase CUT e meta salva em `nutrition_goals` (2676 kcal · P208 C295 G74); a outra tem perfil incompleto e ZERO metas salvas. Validar um número da tela contra a conta errada leva a conclusão invertida — quase aconteceu em ago/2026 ao conferir a migração da meta. **Confirme o usuário antes de comparar tela × banco** (o peso exibido no check-in pré-treino identifica rápido).
+**⚠️ DUAS CONTAS, E CONFUNDI-LAS JÁ PRODUZIU UM BUG INEXISTENTE.** Confirmado com o
+dono em 09/08/2026 — **o simulador está logado em `djmkbrasil@gmail.com`, a conta de
+TESTE**. (Esta linha já afirmou o contrário; a conta do simulador MUDA, então trate
+como pista datada e **confirme antes de comparar tela × banco**.)
+
+| | `djmkbrasil` (TESTE, no simulador) | `djmkapple` (OFICIAL, o dono treina nela) |
+|---|---|---|
+| `user_id` | `6cb619ba-1484-41f2-b60c-b67aaea06307` | `d04bfcef-54ea-4360-9e3d-e174a9ace503` |
+| Templates | 6 (A–F) | 5 |
+| Sessões concluídas | **1** (`D - e teste`, notes vazio) | **127** |
+| Meta em `nutrition_goals` | **nenhuma** | 2676 kcal · P208 C295 G74 |
+| Fase / perfil | sem fase, perfil ~20% | CUT, perfil completo |
+
+**Como identificar rápido:** a de teste mostra 6 treinos (A–F) e o aviso "Complete seu
+perfil"; a oficial tem 5 e não mostra. O peso do check-in NÃO serve — aparece nas duas.
+
+**O erro concreto, para não se repetir:** em 09/08/2026 um agente leu "0kg levantados"
+e "Meta: 2000 kcal" na tela do simulador, consultou o banco de `djmkapple` (2,4 M kg,
+2676 kcal) e concluiu que havia dois bugs graves. **Não havia nenhum**: a conta de teste
+tem 1 sessão vazia e zero metas salvas, então os dois números estavam CERTOS. Custou uma
+investigação inteira de RLS, RPC e policies atrás de fantasma. Ler a tela de uma conta
+contra o banco de outra não é imprecisão — inverte a conclusão.
 
 **A página `/dashboard/nutrition` NÃO é alcançável dentro do app nativo.** A aba NUTRIÇÃO do dashboard abre o `NutritionOverlay`, que é outro componente; o `VipHub` até tem `router.push('/dashboard/nutrition')`, mas só quando `onOpenNutrition` não é passado — e no dashboard ele é. A página é a superfície WEB. Mexeu nela? A conferência visual pelo simulador não existe: valide pelo overlay (irmão que exibe os mesmos números) ou pelos dados, e **diga que a prova foi numérica, não visual**.
 
@@ -503,25 +524,38 @@ Não é preciso pedir confirmação a cada PR — esta regra é a confirmação 
 - CI vermelho ou flaky — investigar primeiro, não tentar contornar com `--no-verify` ou retry cego
 - PR com revisões humanas pendentes não resolvidas
 
-## Iron Rank zerado — o caso ainda ABERTO (ago/2026)
+## Iron Rank — o "bug" que NÃO existia (ago/2026)
 
-O card mostrava **"0kg levantados · Iniciante do Ferro"** para uma conta com
-**2.427.394 kg** e 127 treinos. Conferido por SQL: o RPC calcula certo, os
-grants estão corretos, a action devolve o campo e o hook o lê. **A causa raiz
-ainda não foi provada** — o que existe é instrumentação.
+**Não há bug conhecido aqui.** Esta seção existe para impedir que a mesma
+investigação recomece do zero.
 
-Duas saídas silenciosas somadas explicam por que ninguém viu: `if (!vErr)` sem
-ramo de erro (o supabase-js entrega a falha no RETORNO, não como exceção, então
-o `catch` nunca via nada) e `logWarn`, que é **NO-OP em produção**. O sintoma na
-tela é idêntico ao de um usuário novo.
+Em 09/08/2026 um agente viu **"0kg levantados · Iniciante do Ferro"** no
+simulador, cruzou com o banco de `djmkapple` (2.427.394 kg, 127 treinos) e
+concluiu que o volume estava se perdendo. **A tela era de `djmkbrasil`**, a conta
+de teste, que tem UMA sessão com o `notes` vazio — ou seja, **0 kg era o valor
+correto**. Ver a tabela das duas contas na seção do simulador antes de suspeitar
+de qualquer número.
 
-**Causa provável, com nome:** `iron_rank_my_total_volume` faz
+O que sobrou daquela investigação, e vale por si:
+
+1. **`if (!vErr)` sem ramo de erro** era real, e é bug de código independente da
+   conta: o supabase-js entrega a falha no RETORNO, não como exceção, então o
+   `catch` nunca via nada e o volume virava 0 em silêncio.
+2. **`logWarn` é NO-OP em produção** — o único log do caminho não existia
+   justamente onde importaria.
+3. **Cachear um volume 0 contraditório** estendia qualquer falha momentânea por
+   30 minutos, porque a chave só muda quando um treino entra ou sai do histórico.
+
+Os três foram corrigidos (#716, #717, #721). A instrumentação abaixo está no ar e
+**nunca disparou** — o que é coerente com não haver falha.
+
+**Armadilha que continua valendo:** `iron_rank_my_total_volume` faz
 `RAISE EXCEPTION 'not_authenticated'` quando `auth.uid()` vem NULL e o chamador
-não é service_role. Cuidado com a armadilha que quase inverteu o diagnóstico:
-testar o RPC por SQL com **service-role pula essa checagem** — aquele teste
-prova a matemática, não o caminho do cliente.
+não é service_role. Testar o RPC por SQL **como service-role pula essa checagem**
+— prova a matemática, não o caminho do cliente.
 
-Onde ver o que aconteceu (o Sentry recebe, mas o token não existe no repo):
+Onde olhar SE algum dia aparecer sintoma real (o Sentry recebe, mas o token não
+existe no repo):
 
 ```sql
 select created_at, metadata->>'stage', metadata->>'code',
