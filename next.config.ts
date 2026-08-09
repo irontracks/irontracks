@@ -1,5 +1,16 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import withBundleAnalyzer from '@next/bundle-analyzer'
 import type { NextConfig } from 'next'
+
+/**
+ * `npm run analyze` era um script MORTO: setava ANALYZE=true e rodava o build,
+ * mas ninguém lia a variável — o comando prometia análise e entregava um build
+ * comum (achado da auditoria de 07/08/2026). Agora ele abre o treemap de fato.
+ */
+const comAnalisador = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+  openAnalyzer: false,
+})
 
 const nextConfig: NextConfig = {
   // ─── App version injected at build time (used by ServiceWorkerRegister) ───
@@ -183,7 +194,7 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSentryConfig(nextConfig, {
+export default comAnalisador(withSentryConfig(nextConfig, {
   org: "irontracks-company",
   project: "javascript-nextjs",
   silent: !process.env.CI,
@@ -201,5 +212,5 @@ export default withSentryConfig(nextConfig, {
     // Apaga os .map do output após o upload pro Sentry — nunca servidos publicamente.
     deleteSourcemapsAfterUpload: true,
   },
-})
+}))
 
