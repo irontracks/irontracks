@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/client'
-import { logWarn } from '@/lib/logger'
+import { logWarnRemote } from '@/lib/logger'
 import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
 import type { ActionResult } from '@/types/actions'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -258,15 +258,35 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
         } else {
             try {
                 const { data: vol, error: vErr } = await supabase.rpc('iron_rank_my_total_volume')
-                if (!vErr) {
+                if (vErr) {
+                    // Saída silenciosa nº1: o `if (!vErr)` original não fazia NADA
+                    // aqui — nem caía no catch (erro do supabase-js vem no
+                    // retorno, não como exceção). O volume ficava 0, o card
+                    // mostrava "Iniciante do Ferro" para quem tem milhões de kg,
+                    // e nenhum sinal era emitido em lugar nenhum.
+                    logWarnRemote('workout-analytics', 'iron-rank-volume-rpc-error', {
+                        code: vErr.code, message: vErr.message, totalWorkouts,
+                    })
+                } else {
                     totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
+                    // Volume 0 com histórico é contradição: ou o RPC regrediu, ou
+                    // o parse acima comeu o número. Sem isto, o sintoma na tela
+                    // é idêntico ao de um usuário novo — indistinguível.
+                    if (totalVolumeKg === 0 && totalWorkouts > 0) {
+                        logWarnRemote('workout-analytics', 'iron-rank-volume-zero-com-historico', {
+                            totalWorkouts, raw: String(vol ?? ''),
+                        })
+                    }
                     try {
                         if (typeof localStorage !== 'undefined') {
                             localStorage.setItem(volCacheKey, JSON.stringify({ v: totalVolumeKg, exp: Date.now() + VOL_CACHE_TTL_MS }))
                         }
                     } catch { /* storage cheio/indisponível: segue sem cache */ }
                 }
-            } catch (e) { logWarn("workout-analytics", "silenced", e) }
+                // Saída silenciosa nº2: era `logWarn`, que é NO-OP em produção
+                // (`if (IS_PROD) return`) — ou seja, o único log do caminho não
+                // existia justamente onde o bug acontece.
+            } catch (e) { logWarnRemote('workout-analytics', 'iron-rank-volume-threw', e) }
         }
 
         const badges: Array<Record<string, unknown>> = []
