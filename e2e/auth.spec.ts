@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
  */
 
 test.describe('Authentication Guards', () => {
-    test('unauthenticated user is redirected away from /dashboard', async ({ page }) => {
+    test('unauthenticated user is redirected away from /dashboard', async ({ page, baseURL }) => {
         const response = await page.goto('/dashboard')
         // Should either redirect to login or return non-500
         expect(response?.status()).not.toBe(500)
@@ -16,7 +16,10 @@ test.describe('Authentication Guards', () => {
         })
         const url = page.url()
         // Either redirected OR showing the login screen (login-gate renders on /dashboard)
-        const isLoginPage = url.includes('/login') || url.includes('/?') || url === 'http://localhost:3000/'
+        // Raiz = baseURL com barra. Cravar 'http://localhost:3000/' amarrava o
+        // teste a um único ambiente (ver pages-smoke-protected).
+        const raiz = new URL('/', baseURL ?? 'http://localhost:3000').toString()
+        const isLoginPage = url.includes('/login') || url.includes('/?') || url === raiz
         const isDashboardWithLoginGate = url.includes('/dashboard')
         expect(isLoginPage || isDashboardWithLoginGate).toBe(true)
     })
