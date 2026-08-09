@@ -103,7 +103,10 @@ describe('SessionDeloadBanner', () => {
     fireEvent.click(screen.getByText('Supino reto'))
     expect(screen.getByRole('button', { name: /Aplicar em 1/i })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Aplicar em 1/i }))
-    await waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([2]))
+    // A porcentagem viaja junto desde ago/2026: a redução é recalculada por
+    // exercício lá dentro, então a chamada sem ela aplicaria o diagnóstico e
+    // ignoraria a escolha do usuário.
+    await waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([2], 0.15))
   })
 
   it('não deixa aplicar com nenhum exercício marcado', () => {
@@ -121,7 +124,25 @@ describe('SessionDeloadBanner', () => {
     renderBanner()
     fireEvent.click(screen.getByRole('button', { name: /Reduzir 15%/i }))
     fireEvent.click(screen.getByRole('button', { name: /Aplicar em 2/i }))
-    await waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([0, 2]))
+    await waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([0, 2], 0.15))
+  })
+
+  it('o atalho escolhido substitui o sugerido — no botão E na aplicação', () => {
+    // O caso que motivou a mudança: o motor sugere, o atleta discorda. Se a
+    // escolha ficasse só na aparência do botão, o peso cairia o do diagnóstico.
+    renderBanner()
+    fireEvent.click(screen.getByRole('button', { name: /^30%/ }))
+    expect(screen.getByRole('button', { name: /Reduzir 30%/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Reduzir 30%/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar em 2/i }))
+    return waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([0, 2], 0.3))
+  })
+
+  it('o sugerido pelo motor continua acessível entre os atalhos', () => {
+    renderBanner()
+    fireEvent.click(screen.getByRole('button', { name: /^30%/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^15%/ }))
+    expect(screen.getByRole('button', { name: /Reduzir 15%/i })).toBeTruthy()
   })
 
   it('dispensar esconde o banner sem aplicar nada', () => {
