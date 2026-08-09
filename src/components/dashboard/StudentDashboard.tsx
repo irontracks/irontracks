@@ -101,6 +101,8 @@ type Props = {
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   /** Há treino em andamento? O card "Treinar agora" some nesse caso. */
   hasActiveSession?: boolean
+  /** Id do treino em andamento — o card dele diz "continuar", não "iniciar". */
+  activeWorkoutId?: string | null
   /** Pergunta "vai treinar hoje?" — entra ABAIXO do card de ação primária. */
   restDayPrompt?: React.ReactNode
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -340,7 +342,13 @@ export default function StudentDashboard(props: Props) {
         />
       )}
 
-      {props.view === 'dashboard' && !props.nutritionActive ? props.restDayPrompt ?? null : null}
+      {/* Some com treino em andamento, pela mesma razão do QuickStartCard logo
+          acima: perguntar "vai treinar hoje?" a quem está no meio de uma série
+          é ruído — a resposta está acontecendo na tela. Visto no simulador em
+          09/08/2026, com o descanso correndo no rodapé e a pergunta no topo. */}
+      {props.view === 'dashboard' && !props.nutritionActive && !props.hasActiveSession
+        ? props.restDayPrompt ?? null
+        : null}
 
       {/* Só no dashboard: o aviso aparecia nas quatro abas (Treinos, Comunidade,
           Nutrição e VIP) e sem forma de dispensar — perseguia o usuário pelo app
@@ -708,6 +716,9 @@ export default function StudentDashboard(props: Props) {
                     isPeriodized={workoutsTab === 'periodized'}
                     isToday={workoutsTab !== 'periodized' && isWorkoutToday(w?.title)}
                     emphasizeCta={idx === emphasizedCtaIdx}
+                    isInProgress={Boolean(
+                      props.activeWorkoutId && String(w?.id ?? '') === props.activeWorkoutId,
+                    )}
                     onQuickView={props.onQuickView}
                     onStartSession={props.onStartSession}
                     onRestoreWorkout={props.onRestoreWorkout}

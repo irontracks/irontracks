@@ -1157,6 +1157,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     hasActiveSession={Boolean(activeSession?.workout)}
+                                    // Qual treino está rodando, para o card dele dizer
+                                    // "continuar" em vez de "iniciar" — visto no
+                                    // simulador em 09/08/2026: com a sessão ativa e o
+                                    // descanso no rodapé, o card ainda convidava a
+                                    // começar do zero, e o único aviso vinha depois,
+                                    // no diálogo de descarte.
+                                    activeWorkoutId={String(
+                                        (activeSession?.workout as { id?: unknown } | undefined)?.id ?? '',
+                                    ).trim() || null}
                                     // Renderizado DENTRO do dashboard, abaixo do "Treinar agora":
                                     // a pergunta de intenção ("vai treinar hoje?") é
                                     // administrativa e estava ocupando a primeira linha da
