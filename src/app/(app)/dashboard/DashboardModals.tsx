@@ -10,6 +10,7 @@ import type { AdminUser } from '@/types/admin'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 /** Peso em pt-BR (vírgula decimal): 96.85 → "96,85". */
 const formatKgPtBr = (kg: number): string =>
@@ -287,7 +288,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 return (
                     <div
                         className="fixed inset-0 z-[75] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center sm:p-4"
-                        onClick={() => setQuickViewWorkout(null)}
+                        {...backdropProps(() => setQuickViewWorkout(null), 'Fechar visualização do treino')}
                     >
                         {/* Modal card */}
                         <div

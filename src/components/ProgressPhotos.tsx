@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { NumericInput } from '@/components/ui/NumericInput'
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 interface ProgressPhoto {
   id: string
@@ -557,10 +558,9 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
 
       {/* Lightbox */}
       {lightbox && (
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <div
           className="fixed inset-0 z-[1700] bg-black/95 flex flex-col"
-          onClick={() => setLightbox(null)}
+          {...backdropProps(() => setLightbox(null), 'Fechar foto')}
         >
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3">
             <div>

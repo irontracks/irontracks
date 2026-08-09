@@ -1,5 +1,4 @@
 'use client'
-/* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
 /**
  * ServicePlanModal — editor completo de planos de serviço do professor.
  * Cria ou edita um student_service_plan.
@@ -9,6 +8,7 @@ import { X, Save, Loader2, DollarSign, Clock, Calendar, RefreshCw, FileText } fr
 import { apiTeacherServicePlans } from '@/lib/api/student-billing'
 import type { ServicePlan, BillingInterval, TrainingDay } from '@/lib/api/student-billing'
 import { NumericInput } from '@/components/ui/NumericInput'
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -132,7 +132,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
   return (
     <div
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      {...backdropProps(() => onClose(), 'Fechar plano de serviço')}
     >
       <div className="relative w-full max-w-lg bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}

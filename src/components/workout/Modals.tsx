@@ -25,6 +25,7 @@ import {
 import { UnknownRecord } from './types';
 import { ModalsSimpleMethods } from './ModalsSimpleMethods';
 import { ModalsComplexMethods } from './ModalsComplexMethods';
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 const ExerciseSortRow = ({
   item,
@@ -277,7 +278,7 @@ export default function Modals() {
       {deloadModal && (
         <div
           className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => setDeloadModal(null)}
+          {...backdropProps(() => setDeloadModal(null), 'Fechar deload')}
         >
           {(() => {
             const baseWeight = Number(deloadModal?.baseWeight || 0);
@@ -714,7 +715,7 @@ export default function Modals() {
       {clusterModal && (
         <div
           className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => setClusterModal(null)}
+          {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
         >
           <div
             className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"

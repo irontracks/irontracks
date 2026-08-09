@@ -1,5 +1,4 @@
 'use client'
-/* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
 /**
  * TeacherUpgradeModal
  * Full-screen modal for upgrading the teacher's plan.
@@ -16,6 +15,7 @@ import type {
   TeacherActiveSubscription,
 } from '@/lib/api/teacher-billing'
 import type { TeacherPlanState } from '@/hooks/useTeacherPlan'
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -236,7 +236,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      {...backdropProps(() => onClose(), 'Fechar upgrade')}
     >
       <div className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}
