@@ -24,6 +24,15 @@ interface WorkoutCardProps {
   isToday?: boolean
   /** Card com o CTA em destaque (sólido dourado). Os demais ficam outline. */
   emphasizeCta?: boolean
+  /**
+   * Este é o treino que está rodando agora.
+   *
+   * Sem isto o card dizia "INICIAR TREINO" mesmo com a sessão em andamento e o
+   * descanso correndo no rodapé (visto no simulador em 09/08/2026): quem voltava
+   * ao dashboard não tinha como saber onde retomar, e o único aviso vinha depois
+   * do toque, no diálogo que oferece DESCARTAR o treino.
+   */
+  isInProgress?: boolean
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -57,6 +66,7 @@ function WorkoutCardInner({
   isPeriodized,
   isToday = false,
   emphasizeCta = false,
+  isInProgress = false,
   onQuickView,
   onStartSession,
   onRestoreWorkout,
@@ -236,7 +246,7 @@ function WorkoutCardInner({
                     </linearGradient>
                   </defs>
                   <path d="M6 3.5L20 12L6 20.5V3.5Z" fill="url(#playGold)" stroke="#FFD700" strokeWidth="0.5" />
-                </svg> INICIAR TREINO
+                </svg> {isInProgress ? 'CONTINUAR TREINO' : 'INICIAR TREINO'}
               </>
             )}
           </button>
@@ -313,6 +323,9 @@ export const WorkoutCard = React.memo(WorkoutCardInner, (a, b) =>
   a.isPeriodized === b.isPeriodized &&
   a.isToday === b.isToday &&
   a.emphasizeCta === b.emphasizeCta &&
+  // Sem esta linha o memo segura o card no rótulo antigo: começar ou encerrar
+  // um treino não re-renderizaria a lista, e "continuar" nunca apareceria.
+  a.isInProgress === b.isInProgress &&
   a.onQuickView === b.onQuickView &&
   a.onStartSession === b.onStartSession &&
   a.onRestoreWorkout === b.onRestoreWorkout &&

@@ -114,8 +114,24 @@ export function useWorkoutCrud({
             return
         }
 
-        // Já treinando? Confirma antes de descartar — iniciar outro treino
-        // sobrescreveria a sessão em andamento sem aviso.
+        // MESMO treino já em andamento → RETOMAR, sem perguntar e sem recriar.
+        //
+        // Desde ago/2026 o card deste treino diz "CONTINUAR TREINO". Sem esta
+        // porta de saída, o toque caía no fluxo de baixo e oferecia DESCARTAR a
+        // sessão — o usuário clicava em continuar, confirmava o que parecia
+        // confirmação, e perdia as séries. `setActiveSession` abaixo recria a
+        // sessão com `logs: {}`, então a perda seria total e silenciosa.
+        const idClicado = String(workoutObj?.id ?? '').trim()
+        const idAtivo = String(
+            (activeSession?.workout as { id?: unknown } | undefined)?.id ?? '',
+        ).trim()
+        if (idClicado && idAtivo && idClicado === idAtivo) {
+            setView('active')
+            return
+        }
+
+        // Treino DIFERENTE com sessão aberta: aí sim há trabalho a perder, e a
+        // confirmação continua.
         if (activeSession?.workout) {
             const trocar = await confirm(
                 'Você já está treinando. Iniciar este treino vai descartar o treino atual em andamento. Continuar?',
