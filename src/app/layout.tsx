@@ -17,6 +17,13 @@ const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
+  // `opsz` = eixo ÓPTICO da Inter v4. Sem pedi-lo, o navegador usa o mesmo
+  // desenho de letra em 32px e em 9px — e o app tem ~800 pontos com peso 900
+  // em texto de 9–11px, onde os contraforms (os vazios do a, e, o) fecham e a
+  // palavra vira mancha. Com o eixo carregado, `font-optical-sizing: auto`
+  // (globals.css) abre esses vazios no tamanho pequeno e fecha o espacejamento
+  // no grande. É o único conserto que alcança todos os 800 de uma vez.
+  axes: ['opsz'],
 })
 
 export const metadata = {
