@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat, Dumbbell, Check, Plus, Loader2 } from 'lucide-react'
+import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat, Dumbbell, Check, Plus, Loader2, Bot, CalendarRange, Target, ClipboardList, Microscope } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 import dynamic from 'next/dynamic'
 import { createWorkout } from '@/actions/workout-crud-actions'
@@ -414,9 +414,17 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
             {/* Feature preview pills */}
             <div className="flex flex-wrap justify-center gap-2">
-              {['🤖 Coach IA', '📊 Analytics', '🍽️ Nutrição', '📅 Periodização'].map((f) => (
-                <span key={f} className="px-3 py-1 rounded-full text-[11px] font-bold text-neutral-400" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  {f}
+              {/* Ícones lucide, não emoji: emoji renderiza diferente em cada OS
+                  e traz cor própria, que briga com a paleta gold do app. */}
+              {[
+                { Icone: Bot, label: 'Coach IA' },
+                { Icone: BarChart3, label: 'Analytics' },
+                { Icone: ChefHat, label: 'Nutrição' },
+                { Icone: CalendarRange, label: 'Periodização' },
+              ].map(({ Icone, label }) => (
+                <span key={label} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold text-neutral-400" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <Icone size={12} aria-hidden="true" />
+                  {label}
                 </span>
               ))}
             </div>
@@ -565,9 +573,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         {/* Mode selector — segmented control */}
         <div className="px-4 py-2.5 flex items-center gap-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.3)' }}>
           {([
-            { key: 'coach', label: '🎯 Coach', desc: 'Treino e dúvidas' },
-            { key: 'planner', label: '📋 Planner', desc: 'Monte treinos' },
-            { key: 'diagnostic', label: '🔬 Diagnóstico', desc: 'Análise profunda' },
+            { key: 'coach', label: 'Coach', desc: 'Treino e dúvidas', Icone: Target },
+            { key: 'planner', label: 'Planner', desc: 'Monte treinos', Icone: ClipboardList },
+            { key: 'diagnostic', label: 'Diagnóstico', desc: 'Análise profunda', Icone: Microscope },
           ] as const).map((m) => (
             <button
               key={m.key}
@@ -579,7 +587,10 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                 : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }
               }
             >
-              <div className={`text-[10px] font-black whitespace-nowrap ${mode === m.key ? 'text-yellow-400' : 'text-neutral-400'}`}>{m.label}</div>
+              <div className={`inline-flex items-center justify-center gap-1 text-[10px] font-black whitespace-nowrap ${mode === m.key ? 'text-yellow-400' : 'text-neutral-400'}`}>
+                <m.Icone size={12} aria-hidden="true" />
+                {m.label}
+              </div>
             </button>
           ))}
         </div>
@@ -594,7 +605,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                   <Sparkles size={24} className="text-yellow-500" />
                 </div>
               </div>
-              <p className="text-sm font-bold text-neutral-300">Olá{name ? `, ${name.split(' ')[0]}` : ''}! 👋</p>
+              <p className="text-sm font-bold text-neutral-300">Olá{name ? `, ${name.split(' ')[0]}` : ''}!</p>
               <p className="text-xs mt-1.5 text-neutral-400 max-w-xs mx-auto">
                 Sou seu Iron Coach com acesso completo aos seus treinos, avaliação física e progressão. Como posso ajudar?
               </p>
