@@ -29,7 +29,7 @@ export function CheckinScale({ label, hint, values, value, onChange, gridCols }:
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
-        <div id={groupId} className="text-xs font-black uppercase tracking-widest text-neutral-400">
+        <div id={groupId} className="t-meta text-xs">
           {label}
         </div>
         {hasValue && (

@@ -40,7 +40,7 @@ export const ReportAiSection = ({
         <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
+                    <div className="t-meta text-xs">IA</div>
                     <div className="flex items-center gap-2">
                         <div className="text-lg font-black text-white">Insights pós-treino</div>
                         {credits?.insights && !isUnlimitedInsights(credits.insights.limit) && (
@@ -132,7 +132,7 @@ export const ReportAiSection = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="md:col-span-2 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
-                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Resumo</div>
+                            <div className="t-meta text-xs mb-2">Resumo</div>
                             <ul className="space-y-2">
                                 {(Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []).map((item: unknown, idx: number) => (
                                     <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
@@ -141,7 +141,7 @@ export const ReportAiSection = ({
 
                             {Array.isArray(ai.highlights) && (ai.highlights as unknown[]).length > 0 && (
                                 <div className="mt-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Destaques</div>
+                                    <div className="t-meta text-xs mb-2">Destaques</div>
                                     <ul className="space-y-2">
                                         {(ai.highlights as unknown[]).map((item: unknown, idx: number) => (
                                             <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
@@ -152,7 +152,7 @@ export const ReportAiSection = ({
 
                             {Array.isArray(ai.warnings) && (ai.warnings as unknown[]).length > 0 && (
                                 <div className="mt-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Atenção</div>
+                                    <div className="t-meta text-xs mb-2">Atenção</div>
                                     <ul className="space-y-2">
                                         {(ai.warnings as unknown[]).map((item: unknown, idx: number) => (
                                             <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
@@ -163,12 +163,12 @@ export const ReportAiSection = ({
                         </div>
 
                         <div className="bg-black rounded-xl p-4 text-white">
-                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Motivação</div>
+                            <div className="t-meta text-xs mb-2">Motivação</div>
                             <div className="text-sm font-semibold">{String(ai.motivation || '').trim() || '—'}</div>
 
                             {Array.isArray(ai.prs) && (ai.prs as unknown[]).length > 0 && (
                                 <div className="mt-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRs</div>
+                                    <div className="t-meta text-xs mb-2">PRs</div>
                                     <div className="space-y-2">
                                         {(ai.prs as unknown[]).map((p: unknown, idx: number) => {
                                             const pr = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
@@ -198,7 +198,7 @@ export const ReportAiSection = ({
                         {Array.isArray(ai.progression) && (ai.progression as unknown[]).length > 0 && (
                             <div className="md:col-span-3 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                                 <div className="flex items-center justify-between gap-3 mb-3">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Progressão sugerida (próximo treino)</div>
+                                    <div className="t-meta text-xs">Progressão sugerida (próximo treino)</div>
                                     <button
                                         type="button"
                                         onClick={onApplyProgression}

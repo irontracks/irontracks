@@ -542,7 +542,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
               <motion.div key={`details-${dataUpdatedAt}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="lg:col-span-2 space-y-3">
                 <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Detalhes</div>
+                    <div className="t-meta text-xs">Detalhes</div>
                     <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">
                       {state.status === 'loading' ? 'Carregando…' : state.data ? aiLabel : '—'}
                     </div>
@@ -573,7 +573,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
 
                       {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
                         <div className="mt-3 space-y-2">
-                          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top exercícios</div>
+                          <div className="t-meta text-xs">Top exercícios</div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {state.data.topExercisesByMuscle[selectedInfo.id].slice(0, 4).map((x, idx) => (
                               <div key={`${x.name}-${idx}`} className="rounded-xl border border-neutral-800 bg-black px-3 py-2">
@@ -657,7 +657,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 ) : null}
 
                 <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>
+                  <div className="t-meta text-xs">Top músculos</div>
                   {(() => {
                     const topItems = (isWeekPayload(state.data) ? state.data.topMuscles : [])
                       .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view && Number(x.sets || 0) > 0)

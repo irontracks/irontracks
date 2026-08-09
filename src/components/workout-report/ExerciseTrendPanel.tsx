@@ -10,7 +10,7 @@ export const ExerciseTrendPanel = ({ data, buildSparklinePoints }: ExerciseTrend
     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Evolução 4 semanas</div>
+          <div className="t-meta text-xs">Evolução 4 semanas</div>
           <div className="text-lg font-black text-white">Exercícios‑chave</div>
           <div className="text-xs text-neutral-300">Volume semanal por exercício‑chave.</div>
         </div>

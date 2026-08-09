@@ -234,7 +234,7 @@ export default function Modals() {
               />
 
               <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
+                <div className="t-meta text-xs">Observações (opcional)</div>
                 <textarea
                   aria-label="Observações do treino"
                   value={String(postCheckinDraft?.notes || '')}
@@ -774,7 +774,7 @@ export default function Modals() {
 
               {!Array.isArray(clusterModal?.blocks) || clusterModal.blocks.length === 0 ? (
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Configurar Cluster</div>
+                  <div className="t-meta text-xs">Configurar Cluster</div>
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <input
                       inputMode="decimal"
@@ -938,7 +938,7 @@ export default function Modals() {
                 })}
 
               <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE da série</div>
+                <div className="t-meta text-xs">RPE da série</div>
                 <input
                   inputMode="decimal"
                   value={String(clusterModal?.rpe ?? '')}

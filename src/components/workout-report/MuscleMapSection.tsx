@@ -48,7 +48,7 @@ export function MuscleMapSection({ data, status, gender = 'male' }: Props) {
         <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mapa muscular</div>
+                    <div className="t-meta text-xs">Mapa muscular</div>
                     <div className="text-lg font-black text-white">Sua semana até aqui</div>
                     <div className="text-xs text-neutral-300">Volume acumulado por grupo muscular nesta semana.</div>
                 </div>
