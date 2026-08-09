@@ -62,6 +62,51 @@ const extractLogsStatsByExercise = (session: unknown) => {
     }
 }
 
+/**
+ * Grava a falha do volume em `audit_events`, além do Sentry.
+ *
+ * Por que os DOIS: o Sentry recebe o sinal desde 09/08/2026, mas o token não
+ * existe no repo nem no ambiente local — a pista fica ilegível de onde o
+ * problema é investigado. Foi o mesmo impasse da Live Activity em 04/08, e a
+ * saída é a mesma: `audit_events` responde a um SELECT e não expira.
+ *
+ * Fire-and-forget e sempre silencioso: quem abriu o dashboard quer ver o rank,
+ * não saber que a telemetria falhou.
+ */
+const reportIronRankToAudit = (detail: {
+    stage: 'rpc_error' | 'zero_com_historico'
+    code?: unknown
+    message?: unknown
+    totalWorkouts?: unknown
+    raw?: unknown
+}) => {
+    try {
+        if (typeof fetch !== 'function') return
+        const n = Number(detail.totalWorkouts)
+        void fetch('/api/diag/iron-rank', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            keepalive: true,
+            body: JSON.stringify({
+                stage: detail.stage,
+                code: detail.code != null ? String(detail.code).slice(0, 60) : undefined,
+                message: detail.message != null ? String(detail.message).slice(0, 300) : undefined,
+                totalWorkouts: Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined,
+                raw: detail.raw != null ? String(detail.raw).slice(0, 120) : undefined,
+                platform: (() => {
+                    try {
+                        const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } })?.Capacitor
+                        return typeof cap?.getPlatform === 'function' ? String(cap.getPlatform()).slice(0, 40) : 'web'
+                    } catch { return 'unknown' }
+                })(),
+            }),
+        }).catch(() => { })
+    } catch {
+        // idem: telemetria nunca derruba a tela
+    }
+}
+
 // ─── Exported analytics actions ───────────────────────────────────────────────
 
 export async function getIronRankLeaderboard(limit = 100) {
@@ -267,6 +312,10 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
                     logWarnRemote('workout-analytics', 'iron-rank-volume-rpc-error', {
                         code: vErr.code, message: vErr.message, totalWorkouts,
                     })
+                    reportIronRankToAudit({
+                        stage: 'rpc_error',
+                        code: vErr.code, message: vErr.message, totalWorkouts,
+                    })
                 } else {
                     totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
                     // Volume 0 com histórico é contradição: ou o RPC regrediu, ou
@@ -275,6 +324,10 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
                     const contraditorio = totalVolumeKg === 0 && totalWorkouts > 0
                     if (contraditorio) {
                         logWarnRemote('workout-analytics', 'iron-rank-volume-zero-com-historico', {
+                            totalWorkouts, raw: String(vol ?? ''),
+                        })
+                        reportIronRankToAudit({
+                            stage: 'zero_com_historico',
                             totalWorkouts, raw: String(vol ?? ''),
                         })
                     }
