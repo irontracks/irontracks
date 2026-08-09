@@ -258,7 +258,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
                         <label className="block w-full cursor-pointer bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 rounded-xl transition-colors">
                             Selecionar Arquivo
-                            <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+                            <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" aria-label="Escolher arquivo JSON do treino" />
                         </label>
                         <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
                     </div>

@@ -194,6 +194,7 @@ export default function AssessmentButton({
             type="file"
             accept="application/json"
             className="hidden"
+            aria-label="Escolher arquivo JSON de avaliação"
             onChange={handleImportFileChange}
           />
         </div>
