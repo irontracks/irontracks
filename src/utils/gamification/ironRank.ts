@@ -6,7 +6,7 @@
 // muito tempo. Agora há marcos intermediários que mantêm o progresso vivo.
 
 export const IRON_RANK_NAMES = [
-  'Iniciante das Ferros',
+  'Iniciante do Ferro',
   'Soldado de Aço',
   'Guerreiro de Ferro',
   'Cavaleiro Blindado',

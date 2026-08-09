@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
-import { AlertCircle, HelpCircle, X, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, HelpCircle, X, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const GlobalDialog = () => {
 	const { dialog, closeDialog } = useDialog();
@@ -50,6 +50,16 @@ const GlobalDialog = () => {
 	const iconConfig = (() => {
 		switch (dialog.type) {
 			case 'confirm':
+				// Destrutivo em vermelho: a cor de ação positiva do app (gold) na
+				// opção que APAGA o trabalho do usuário é o caminho mais curto pro
+				// toque errado — ainda mais com a mão suada, no meio do treino.
+				if (dialog.destructive) {
+					return {
+						bg: 'bg-red-500/15 border border-red-500/30',
+						icon: <AlertTriangle className="text-red-400" size={32} />,
+						confirmCls: 'bg-red-500 hover:bg-red-400 shadow-lg shadow-red-900/30 text-white',
+					};
+				}
 				return {
 					bg: 'bg-yellow-500/15 border border-yellow-500/30',
 					icon: <HelpCircle className="text-yellow-400" size={32} />,

@@ -56,9 +56,22 @@ export default function VipWeeklySummaryCard() {
   }, [load])
 
   const dataUsed = useMemo(() => safeArray<string>(data?.dataUsed), [data?.dataUsed])
-  const summaryText = useMemo(() => String(data?.summaryText || '').trim(), [data?.summaryText])
   const trainedDays = data?.trainedDays ?? 0
   const prsCount = safeArray(data?.prs).length
+  const prsList = useMemo(
+    () =>
+      safeArray(data?.prs)
+        .map((raw) => {
+          const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+          return {
+            exercise: String(p.exercise || '').trim(),
+            weight: Number(p.weight) || 0,
+            reps: Number(p.reps) || 0,
+          }
+        })
+        .filter((p) => p.exercise),
+    [data?.prs],
+  )
   const checkins = data?.checkins
   const energyScale = data?.scales?.energy ?? 5
 
@@ -150,13 +163,28 @@ export default function VipWeeklySummaryCard() {
           </div>
         )}
 
-        {/* ── Summary text ──────────────────────────────────────────── */}
-        {summaryText ? (
-          <div className="mt-3 rounded-2xl p-4 whitespace-pre-wrap text-sm text-neutral-200 leading-relaxed" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            {summaryText}
+        {/* ── PRs da semana ─────────────────────────────────────────────
+            Aqui ficava o `summaryText` cru vindo da API: uma lista com hífen e
+            "0 dia(s) treinado(s)" — saída de log, na tela que o usuário PAGA
+            para ver. Pior: repetia em texto os mesmos números que os blocos
+            acima já mostram. Sobrou o que só existia lá: quais foram os PRs.
+            O texto continua no payload para quem consome a API. */}
+        {prsList.length ? (
+          <div className="mt-3 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-2">Recordes da semana</div>
+            <div className="space-y-1.5">
+              {prsList.slice(0, 3).map((pr, i) => (
+                <div key={`${pr.exercise}-${i}`} className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-neutral-200 truncate">{pr.exercise}</span>
+                  <span className="text-sm font-black text-white tabular-nums shrink-0">
+                    {pr.weight}<span className="text-neutral-500 font-bold"> kg × </span>{pr.reps}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        ) : !error && data ? (
-          <div className="mt-3 text-sm text-neutral-400">Sem dados suficientes ainda.</div>
+        ) : !error && data && !trainedDays ? (
+          <div className="mt-3 text-sm text-neutral-400">Nenhum treino nos últimos 7 dias.</div>
         ) : null}
 
         {dataUsed.length ? (

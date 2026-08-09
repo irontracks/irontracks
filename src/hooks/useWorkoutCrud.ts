@@ -14,11 +14,6 @@ import { logWarn } from '@/lib/logger'
 import {
     playStartSound,
 } from '@/lib/sounds'
-import {
-    estimateExerciseSeconds,
-    toMinutesRounded,
-    calculateExerciseDuration,
-} from '@/utils/pacing'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { parseCheckinWeightKg, shouldSyncProfileWeight } from '@/utils/checkin/bodyWeightSync'
 
@@ -129,22 +124,13 @@ export function useWorkoutCrud({
             if (!trocar) return
         }
 
-        const first = exercisesList[0] || {}
-        const exMin = toMinutesRounded(estimateExerciseSeconds(first))
-        const totalMin = toMinutesRounded(
-            exercisesList.reduce(
-                (acc: number, ex: Record<string, unknown>) => acc + calculateExerciseDuration(ex),
-                0
-            )
-        )
-        const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino')
-        {
-            const ok = await confirm(
-                `Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`,
-                'Iniciar Treino'
-            )
-            if (!ok) return
-        }
+        // Sem diálogo de confirmação para COMEÇAR. Iniciar treino é ação
+        // reversível — o X do rodapé desfaz — e a confirmação custava um toque a
+        // mais no caminho crítico de quem já está na academia, com o app aberto
+        // justamente para treinar. A estimativa de duração que este modal exibia
+        // já aparece no card do treino ("~32 min"), onde ajuda a DECIDIR em vez
+        // de interromper. Trocar de treino em andamento CONTINUA perguntando
+        // (logo acima): lá existe trabalho a perder.
 
         // Pre-workout check-in
         let preCheckin = null

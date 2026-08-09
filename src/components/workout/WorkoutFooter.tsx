@@ -80,7 +80,16 @@ export default function WorkoutFooter() {
             if (cancelBusyRef.current) return;
             cancelBusyRef.current = true;
             try {
-              const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
+              // O diálogo era: título "Cancelar", pergunta "Cancelar treino em
+              // andamento?", botões [Cancelar] [Confirmar]. A MESMA palavra
+              // significava abandonar o treino no título e desistir de abandonar
+              // no botão — e o gold (ação positiva) ficava justamente na opção
+              // que apaga a sessão. Agora o rótulo diz o que cada botão FAZ.
+              const ok = await confirm(
+                'Você perde as séries registradas nesta sessão. Isso não pode ser desfeito.',
+                'Descartar este treino?',
+                { confirmText: 'Descartar', cancelText: 'Continuar treinando', destructive: true },
+              );
               if (!ok) { cancelBusyRef.current = false; return; }
               // cancelWorkout bypasses the exit animation guard (exitTimerRef)
               // which can be permanently blocked after a failed Finalizar attempt.
@@ -182,12 +191,17 @@ export default function WorkoutFooter() {
               finishWorkout(elapsedSeconds);
             }}
             className={[
-              'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
+              'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm transition-all duration-300',
+              // O sólido é RESERVADO para o treino completo. Antes disso,
+              // "Finalizar" gritava mais que "Concluir" — o botão de sair com
+              // mais peso que o de trabalhar. Agora o rodapé fica discreto
+              // enquanto há série pendente e acende quando o treino fecha,
+              // virando também um sinal de progresso.
               finishing
-                ? 'bg-yellow-500/60 cursor-wait'
+                ? 'bg-yellow-500/60 text-black cursor-wait'
                 : allDone
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 shadow-lg shadow-yellow-500/40'
-                  : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-md shadow-yellow-900/30 hover:shadow-yellow-500/40 hover:from-yellow-400 hover:to-amber-300',
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 text-black shadow-lg shadow-yellow-500/40'
+                  : 'bg-neutral-900 border border-neutral-700 text-neutral-300 hover:border-yellow-500/40 hover:text-white',
             ].join(' ')}
           >
             <Save size={16} />

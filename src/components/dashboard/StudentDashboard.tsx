@@ -324,7 +324,10 @@ export default function StudentDashboard(props: Props) {
           do DashboardTabs empurram a barra pra baixo do offset fixo que o
           NutritionOverlay assume, fazendo a barra "flutuar" por cima do
           conteúdo de nutrição). */}
-      {props.profileIncomplete && !props.nutritionActive && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
+      {/* Só no dashboard: o aviso aparecia nas quatro abas (Treinos, Comunidade,
+          Nutrição e VIP) e sem forma de dispensar — perseguia o usuário pelo app
+          inteiro. Lugar de lembrete é a tela inicial. */}
+      {props.profileIncomplete && props.view === 'dashboard' && !props.nutritionActive && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       <>
           {props.view === 'dashboard' && showStoriesBar && !props.nutritionActive ? (
