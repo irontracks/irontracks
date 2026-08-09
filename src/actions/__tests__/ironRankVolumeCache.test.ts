@@ -57,9 +57,13 @@ describe('cache do iron_rank_my_total_volume', () => {
 describe('o volume não pode falhar em silêncio', () => {
     // O erro nº2 da lista de guards falsos do CLAUDE.md: o comentário que
     // EXPLICA o padrão proibido casa com a busca por ele. Reduzir ao código.
+    // A barra é escapada de propósito: escrever o literal de duas barras aqui
+    // faz o guard de ambientes (vitestDomProjectList) tratar o resto da linha
+    // como comentário, desalinhar o parser de strings do arquivo inteiro e
+    // acusar este source-guard de precisar de DOM. Custou um CI vermelho.
     const executavel = src
         .split('\n')
-        .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*'))
+        .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l.trim()))
         .join('\n')
 
     it('erro do RPC é reportado, não engolido', () => {
