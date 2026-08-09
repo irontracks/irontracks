@@ -624,7 +624,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   };
 
 
-  const buildDeloadSuggestion = (ex: WorkoutExercise, exIdx: number, aiSuggestion: AiRecommendation | null = null): DeloadSuggestion => {
+  const buildDeloadSuggestion = (
+    ex: WorkoutExercise,
+    exIdx: number,
+    aiSuggestion: AiRecommendation | null = null,
+    /** Fração (0.10 = 10%) escolhida pelo usuário; sem ela vale o diagnóstico. */
+    overridePct?: number,
+  ): DeloadSuggestion => {
     const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
     const key = normalizeExerciseKey(name);
     const history = loadDeloadHistory(userId);
@@ -645,12 +651,18 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       return { ok: false, error: 'Deload indisponível: sem carga no relatório nem no plano.' };
     }
     const analysis = analyzeDeloadHistory(preferredItems, currentWorkoutKey);
+    // `overridePct` é a escolha do usuário no banner (atalhos 10/15/22/30%).
+    // Sem ela vale o diagnóstico: overtraining alivia mais que estagnação.
+    // O clamp usa os MESMOS limites do ajuste manual por exercício (5–40%),
+    // para as duas superfícies nunca aceitarem coisas diferentes.
     const targetReduction =
-      analysis.status === 'overtraining'
-        ? DELOAD_REDUCTION_OVERTRAIN
-        : analysis.status === 'stagnation'
-          ? DELOAD_REDUCTION_STAGNATION
-          : DELOAD_REDUCTION_STABLE;
+      typeof overridePct === 'number' && Number.isFinite(overridePct)
+        ? clampNumber(overridePct, DELOAD_REDUCTION_MIN, DELOAD_REDUCTION_MAX)
+        : analysis.status === 'overtraining'
+          ? DELOAD_REDUCTION_OVERTRAIN
+          : analysis.status === 'stagnation'
+            ? DELOAD_REDUCTION_STAGNATION
+            : DELOAD_REDUCTION_STABLE;
     const estSourceSets = baseWeightFromHistory ? [] : baseWeightFromCurrent ? currentSets : baseWeightFromPlan ? plannedSets : [];
     const est1rm = estimate1RmFromSets(estSourceSets, preferredItems);
     const minWeight = est1rm ? est1rm * DELOAD_MIN_1RM_FACTOR : 0;
@@ -1024,7 +1036,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
    * que já custaram caro continuam valendo para todos: série concluída não é
    * reescrita (o peso dela é histórico, não plano) e o piso de 1RM é respeitado.
    */
-  const applyDeloadToSession = async (exIdxs: number[]): Promise<void> => {
+  const applyDeloadToSession = async (exIdxs: number[], overridePct?: number): Promise<void> => {
     const alvos = (Array.isArray(exIdxs) ? exIdxs : []).filter((i) => Number.isFinite(i) && i >= 0);
     if (!alvos.length) return;
     const appliedAt = new Date().toISOString();
@@ -1037,7 +1049,10 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const ex = exercises?.[exIdx];
       if (!ex || typeof ex !== 'object') continue;
       try {
-        const sug = buildDeloadSuggestion(ex as WorkoutExercise, exIdx);
+        // O `overridePct` PRECISA chegar aqui: a redução real é recalculada por
+        // exercício, então sem repassar, o banner mostraria 10% e o app
+        // aplicaria os 22% do diagnóstico — o botão mentindo para o usuário.
+        const sug = buildDeloadSuggestion(ex as WorkoutExercise, exIdx, null, overridePct);
         if (!sug.ok || !sug.baseWeight || !sug.suggestedWeight) {
           semBase.push(String((ex as UnknownRecord)?.name || `Exercício ${exIdx + 1}`));
           continue;

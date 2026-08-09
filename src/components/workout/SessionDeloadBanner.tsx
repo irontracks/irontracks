@@ -31,12 +31,20 @@ export default function SessionDeloadBanner() {
     sessionDeloadAlert: { exIdxs: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number } | null;
     sessionDeloadModal: { exIdxs: number[]; selected: number[]; status: string; suggestedPct: number } | null;
     setSessionDeloadModal: (v: { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null) => void;
-    applyDeloadToSession: (exIdxs: number[]) => Promise<void>;
+    applyDeloadToSession: (exIdxs: number[], overridePct?: number) => Promise<void>;
     workoutDeloadEnabled: boolean;
     toggleWorkoutDeload: () => void;
   };
 
   const [aplicando, setAplicando] = React.useState(false);
+  /**
+   * Porcentagem escolhida nos atalhos. `null` = seguir o diagnóstico do motor.
+   *
+   * Não persiste entre sessões de propósito: cada descarga é uma decisão do
+   * dia, e o motor volta a sugerir pelo histórico na próxima. Gravar como
+   * preferência fixa faria o diagnóstico (12/15/22%) virar decoração.
+   */
+  const [pctEscolhida, setPctEscolhida] = React.useState<number | null>(null);
   // Dispensar é só para esta montagem do treino — não persiste. Se o treino for
   // reaberto e o quadro continuar, o aviso volta (o dado não mudou).
   const [dispensado, setDispensado] = React.useState(false);
@@ -93,15 +101,21 @@ export default function SessionDeloadBanner() {
   }
   if (!sessionDeloadAlert || dispensado) return null;
 
-  const pct = Math.round(sessionDeloadAlert.suggestedPct * 100);
+  const pctSugerido = Math.round(sessionDeloadAlert.suggestedPct * 100);
+  const pct = pctEscolhida ?? pctSugerido;
   const qtd = sessionDeloadAlert.exIdxs.length;
+
+  // Atalhos toque-único: quem está na academia não mira slider de mão suada.
+  // O sugerido entra na lista mesmo fora dos fixos, para nunca sumir a opção
+  // que o motor recomenda. 5% e 40% são os limites que o app já valida.
+  const opcoes = Array.from(new Set([10, 15, 22, 30, pctSugerido])).sort((a, b) => a - b);
 
   const abrir = () => {
     setSessionDeloadModal({
       exIdxs: sessionDeloadAlert.exIdxs,
       selected: [...sessionDeloadAlert.exIdxs],
       status: sessionDeloadAlert.status,
-      suggestedPct: sessionDeloadAlert.suggestedPct,
+      suggestedPct: pct / 100,
     });
   };
 
@@ -119,7 +133,10 @@ export default function SessionDeloadBanner() {
     if (!sessionDeloadModal || aplicando) return;
     setAplicando(true);
     try {
-      await applyDeloadToSession(sessionDeloadModal.selected);
+      // A porcentagem PRECISA ir junto: a redução é recalculada por exercício
+      // lá dentro, então sem este argumento o app aplicaria o diagnóstico e
+      // ignoraria a escolha — o botão dizendo 10% e o peso caindo 22%.
+      await applyDeloadToSession(sessionDeloadModal.selected, sessionDeloadModal.suggestedPct);
       setDispensado(true);
     } finally {
       setAplicando(false);
@@ -157,6 +174,31 @@ export default function SessionDeloadBanner() {
         >
           Reduzir {pct}% no treino de hoje
         </button>
+
+        {/* O motor sugere, o atleta decide. Antes o número era pegar ou largar. */}
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="t-meta text-[10px] shrink-0 text-amber-200/50">Ajustar</span>
+          {opcoes.map((v) => {
+            const ativo = v === pct;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setPctEscolhida(v)}
+                aria-pressed={ativo}
+                className={[
+                  'min-h-[32px] flex-1 rounded-lg border px-1 text-[12px] font-bold transition-colors active:scale-95',
+                  ativo
+                    ? 'border-amber-400 bg-amber-500/25 text-amber-100'
+                    : 'border-amber-500/25 text-amber-200/70',
+                ].join(' ')}
+              >
+                {v}%
+                {v === pctSugerido ? <span className="ml-0.5 text-[9px] opacity-60">•</span> : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {sessionDeloadModal ? (
