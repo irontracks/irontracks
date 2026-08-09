@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test'
  */
 test.describe('Visual Regression — Public Pages', () => {
     test('landing page visual match', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         // Wait for animations to complete
         await page.waitForTimeout(1500)
         await expect(page).toHaveScreenshot('landing-page.png', {
@@ -21,7 +21,7 @@ test.describe('Visual Regression — Public Pages', () => {
     })
 
     test('login page visual match', async ({ page }) => {
-        await page.goto('/login', { waitUntil: 'networkidle' })
+        await page.goto('/login', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1500)
         await expect(page).toHaveScreenshot('login-page.png', {
             fullPage: false,
@@ -30,7 +30,7 @@ test.describe('Visual Regression — Public Pages', () => {
     })
 
     test('marketplace page visual match', async ({ page }) => {
-        await page.goto('/marketplace', { waitUntil: 'networkidle' })
+        await page.goto('/marketplace', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1500)
         await expect(page).toHaveScreenshot('marketplace-page.png', {
             fullPage: false,
@@ -42,7 +42,7 @@ test.describe('Visual Regression — Public Pages', () => {
 test.describe('Visual Regression — Responsive', () => {
     test('landing page mobile viewport', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 })
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1500)
         await expect(page).toHaveScreenshot('landing-page-mobile.png', {
             fullPage: false,
@@ -52,7 +52,7 @@ test.describe('Visual Regression — Responsive', () => {
 
     test('login page mobile viewport', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 })
-        await page.goto('/login', { waitUntil: 'networkidle' })
+        await page.goto('/login', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1500)
         await expect(page).toHaveScreenshot('login-page-mobile.png', {
             fullPage: false,

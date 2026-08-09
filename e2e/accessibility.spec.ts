@@ -5,10 +5,16 @@ import { test, expect } from '@playwright/test'
  *
  * Verifies that ARIA roles, labels, and landmarks are correctly set
  * across key pages. Acts as a screen reader compatibility baseline.
+ *
+ * ⚠️ NÃO volte para `waitUntil: 'networkidle'`. O app mantém conexão viva
+ * (Supabase Realtime, analytics), então a rede nunca fica ociosa e o `goto`
+ * estoura o timeout — os 7 testes deste arquivo falhavam em bloco contra
+ * produção, sem nada de errado com a página (auditoria de 07/08/2026).
+ * `domcontentloaded` + espera explícita do elemento é o padrão correto.
  */
 test.describe('Accessibility — Public Pages', () => {
     test('landing page has proper ARIA landmarks', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         // Should have a main landmark
@@ -24,7 +30,7 @@ test.describe('Accessibility — Public Pages', () => {
     })
 
     test('login page has accessible form', async ({ page }) => {
-        await page.goto('/login', { waitUntil: 'networkidle' })
+        await page.goto('/login', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         // Email input should have a label or aria-label
@@ -58,7 +64,7 @@ test.describe('Accessibility — Public Pages', () => {
     })
 
     test('all interactive elements have accessible names', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         // Buttons should have text content, aria-label, or aria-labelledby
@@ -83,7 +89,7 @@ test.describe('Accessibility — Public Pages', () => {
     })
 
     test('page has no duplicate IDs', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         const duplicateIds = await page.evaluate(() => {
@@ -102,7 +108,7 @@ test.describe('Accessibility — Public Pages', () => {
     })
 
     test('page has proper heading hierarchy', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         const headings = await page.evaluate(() => {
@@ -128,7 +134,7 @@ test.describe('Accessibility — Public Pages', () => {
     })
 
     test('color contrast — text is readable', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         // Check that body text is not invisible (same color as background)
@@ -144,7 +150,7 @@ test.describe('Accessibility — Public Pages', () => {
 
 test.describe('Accessibility — Dialog Roles', () => {
     test('dialogs have proper ARIA attributes', async ({ page }) => {
-        await page.goto('/', { waitUntil: 'networkidle' })
+        await page.goto('/', { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1000)
 
         // Check any visible dialogs have proper role
