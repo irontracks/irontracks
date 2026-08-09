@@ -100,6 +100,15 @@ describe('posição no dashboard', () => {
         expect(idxQuick, 'a ação primária vem antes do lembrete').toBeLessThan(idxAviso)
     })
 
+    it('a pergunta de intenção vem DEPOIS da ação primária', () => {
+        const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
+        const idxQuick = dash.indexOf('<QuickStartCard')
+        const idxPrompt = dash.indexOf('props.restDayPrompt')
+        expect(idxPrompt).toBeGreaterThan(-1)
+        expect(idxPrompt, '"vai treinar hoje?" é administrativo — não abre a tela')
+            .toBeGreaterThan(idxQuick)
+    })
+
     it('os painéis de dados ficam DEPOIS da lista de treinos', () => {
         const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
         const idxLista = dash.indexOf('<WorkoutCard')

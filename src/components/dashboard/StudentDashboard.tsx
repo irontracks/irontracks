@@ -101,6 +101,8 @@ type Props = {
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   /** Há treino em andamento? O card "Treinar agora" some nesse caso. */
   hasActiveSession?: boolean
+  /** Pergunta "vai treinar hoje?" — entra ABAIXO do card de ação primária. */
+  restDayPrompt?: React.ReactNode
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
   onShareWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
@@ -337,6 +339,8 @@ export default function StudentDashboard(props: Props) {
           hasActiveSession={props.hasActiveSession}
         />
       )}
+
+      {props.view === 'dashboard' && !props.nutritionActive ? props.restDayPrompt ?? null : null}
 
       {/* Só no dashboard: o aviso aparecia nas quatro abas (Treinos, Comunidade,
           Nutrição e VIP) e sem forma de dispensar — perseguia o usuário pelo app
