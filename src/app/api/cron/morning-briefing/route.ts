@@ -5,6 +5,7 @@ import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { getActivelyTrainingUsers } from '@/utils/cron/activeSessionFilter'
 import { brtDateKey } from '@/utils/cron/dateBrt'
 import { logError } from '@/lib/logger'
+import { buildBriefingMessage, statsDeDatas } from '@/lib/push/morningBriefingMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,17 +68,66 @@ export async function GET(req: Request) {
 
     if (!userIds.length) return NextResponse.json({ ok: true, sent: 0 })
 
+    // Títulos dos templates para nomear o treino de hoje. É a ÚNICA query nova
+    // do briefing: a sequência e o "há quantos dias" saem das linhas de
+    // `workouts` já carregadas acima para o filtro de quem treinou hoje.
+    const { data: templateRows } = await admin
+      .from('workouts')
+      .select('user_id, name, sort_order')
+      .eq('is_template', true)
+      .is('archived_at', null)
+      .in('user_id', userIds)
+      .limit(20000)
+
+    const titulosPorUsuario = new Map<string, Array<{ name: string; order: number }>>()
+    for (const r of Array.isArray(templateRows) ? templateRows : []) {
+      const row = r as { user_id?: string; name?: string; sort_order?: number | null }
+      const uid = String(row?.user_id || '').trim()
+      const name = String(row?.name || '').trim()
+      if (!uid || !name) continue
+      const lista = titulosPorUsuario.get(uid) || []
+      lista.push({ name, order: Number(row?.sort_order) || 0 })
+      titulosPorUsuario.set(uid, lista)
+    }
+
+    // Dias treinados por usuário, em chave BRT — a mesma régua do filtro de
+    // "treinou hoje", senão a sequência discordaria do que o app mostra.
+    const diasPorUsuario = new Map<string, string[]>()
+    for (const r of Array.isArray(recentWorkoutRows.data) ? recentWorkoutRows.data : []) {
+      const row = r as { user_id?: string; date?: string }
+      const uid = String(row?.user_id || '').trim()
+      if (!uid || !row?.date) continue
+      const key = brtDateKey(row.date)
+      if (!key) continue
+      const lista = diasPorUsuario.get(uid) || []
+      lista.push(key)
+      diasPorUsuario.set(uid, lista)
+    }
+
+    const agora = new Date()
     await insertNotifications(
-      userIds.map((uid) => ({
-        user_id: uid,
-        recipient_id: uid,
-        sender_id: uid,
-        type: 'morning_briefing',
-        title: 'Bom dia 🌅',
-        message: 'Vai treinar hoje? Abra o app e responda — se for descansar, ajusto suas calorias do dia.',
-        is_read: false,
-        metadata: {},
-      })),
+      userIds.map((uid) => {
+        const titulos = (titulosPorUsuario.get(uid) || [])
+          .sort((a, b) => (a.order !== b.order ? a.order - b.order : a.name.localeCompare(b.name)))
+          .map((t) => t.name)
+        const { currentStreak, daysSinceLastWorkout } = statsDeDatas(diasPorUsuario.get(uid) || [], todayKey)
+        const { title, message } = buildBriefingMessage({
+          workoutTitles: titulos,
+          daysSinceLastWorkout,
+          currentStreak,
+          now: agora,
+        })
+        return {
+          user_id: uid,
+          recipient_id: uid,
+          sender_id: uid,
+          type: 'morning_briefing',
+          title,
+          message,
+          is_read: false,
+          metadata: {},
+        }
+      }),
     )
     return NextResponse.json({ ok: true, sent: userIds.length, skippedAlreadyTrainedToday: trainedTodayBrt.size })
   } catch (e) {
