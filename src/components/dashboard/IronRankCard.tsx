@@ -167,10 +167,15 @@ const IronRankCard = memo(function IronRankCard({
 
     const bestPr = prs.length > 0 ? [...prs].sort((a, b) => countImprovements(b) - countImprovements(a))[0] : null
     const bestTier = bestPr ? getTier(bestPr) : null
+    // `agora` capturado uma vez por montagem, não a cada render: `Date.now()`
+    // no corpo do componente é impuro (o mesmo render podia dar resultados
+    // diferentes) e a janela aqui é de 7 DIAS — um valor congelado na montagem
+    // não muda nada na prática.
+    const [agoraMs] = useState(() => Date.now())
     const withinWeek = (() => {
         if (!prsDate) return false
         const d = new Date(prsDate)
-        return !Number.isNaN(d.getTime()) && (Date.now() - d.getTime()) / 36e5 < 168
+        return !Number.isNaN(d.getTime()) && (agoraMs - d.getTime()) / 36e5 < 168
     })()
 
     // Neither section to show

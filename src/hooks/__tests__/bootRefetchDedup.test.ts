@@ -29,7 +29,14 @@ describe('useWorkoutFetch: SSR não é refeito no client', () => {
     const src = read('../useWorkoutFetch.ts')
 
     it('initialDataUpdatedAt é condicional ao frescor (não é 0 fixo)', () => {
-        expect(src).toMatch(/initialDataUpdatedAt:\s*initialIsFreshRef\.current\s*\?\s*Date\.now\(\)\s*:\s*0/)
+        // O invariante é "o valor sai de initialIsFreshRef, com Date.now() no ramo
+        // fresco e 0 no outro" — não a FORMA como ele chega ao objeto do useQuery.
+        // Em 09/08/2026 o cálculo saiu de dentro do config e virou um lazy
+        // initializer de useState (o corpo do render precisava ficar puro para a
+        // regra react-hooks/purity), e este guard falhou por casar a linha inteira.
+        // Guard preso à forma vira atrito em refactor correto.
+        expect(src).toMatch(/initialIsFreshRef\.current\s*\?\s*Date\.now\(\)\s*:\s*0/)
+        expect(src, 'o valor precisa chegar ao useQuery').toMatch(/initialDataUpdatedAt:\s*\w+/)
         expect(src, 'o 0 fixo era o bug — marcava dado do SSR como velho')
             .not.toMatch(/initialDataUpdatedAt:\s*0\s*,/)
     })

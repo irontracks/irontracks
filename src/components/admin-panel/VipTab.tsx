@@ -198,6 +198,8 @@ export const VipTab: React.FC = () => {
     const [tierFilter, setTierFilter] = useState<TierFilter>('all')
     const [grantOpen, setGrantOpen] = useState(false)
     const [revoking, setRevoking] = useState<string | null>(null)
+    // Instante de referência do "expirando em 7 dias" — ver comentário no map.
+    const [agoraMs] = useState(() => Date.now())
 
     // ─── Fetch VIP list ──────────────────────────────────────────
     const fetchList = useCallback(async () => {
@@ -364,7 +366,10 @@ export const VipTab: React.FC = () => {
                 <div className="space-y-2">
                     {filtered.map(item => {
                         const cfg = TIER_CONFIG[item.tier]
-                        const isExpiring = item.valid_until ? (new Date(item.valid_until).getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000 : false
+                        // `agoraMs` (capturado na montagem) e não `Date.now()`: a janela
+                        // de "expirando" é de 7 DIAS, então congelar o instante não muda
+                        // o rótulo, e o render volta a ser puro.
+                        const isExpiring = item.valid_until ? (new Date(item.valid_until).getTime() - agoraMs) < 7 * 24 * 60 * 60 * 1000 : false
                         const isRevoking = revoking === item.id
 
                         return (

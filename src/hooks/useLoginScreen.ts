@@ -238,6 +238,10 @@ export function useLoginScreen() {
 
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0
+        // Contagem regressiva: precisa do relógio REAL a cada tick, e é para isso
+        // que `cooldownTick` existe como dependência. Congelar o instante aqui
+        // deixaria o contador parado — o oposto do que o campo faz.
+         
         const now = Date.now() + cooldownTick
         return Math.max(0, Math.ceil((recoverCooldownUntil - now) / 1000))
     }, [recoverCooldownUntil, cooldownTick])

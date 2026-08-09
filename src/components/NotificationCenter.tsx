@@ -261,10 +261,19 @@ const NotificationCenter = ({ user, initialOpen, embedded, open: externalOpen }:
     };
 
     // ─── Data assembly ────────────────────────────────────────────────────────
+    // Relógio em estado, avançado a cada 60s. Chamar `Date.now()` no render é
+    // impuro (`react-hooks/purity`) — e, de quebra, o rótulo "5m atrás" ficava
+    // congelado até o componente re-renderizar por outro motivo.
+    const [agoraMs, setAgoraMs] = useState(() => Date.now());
+    useEffect(() => {
+        const t = setInterval(() => setAgoraMs(Date.now()), 60_000);
+        return () => clearInterval(t);
+    }, []);
+
     const formatTime = (isoString?: string) => {
         if (!isoString) return 'Agora';
-         
-        const diff = (Date.now() - new Date(isoString).getTime()) / 1000;
+
+        const diff = (agoraMs - new Date(isoString).getTime()) / 1000;
         if (diff < 60) return 'Agora';
         if (diff < 3600) return `${Math.floor(diff / 60)}m atrás`;
         if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;

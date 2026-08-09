@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -542,6 +542,13 @@ export function useWorkoutFetch({
         return undefined
     }, [initialWorkouts, userId])
 
+    // Marca de frescor do cache do React Query. Vem de um lazy initializer (roda
+    // UMA vez, na montagem) e não de `Date.now()` no corpo do render, que é
+    // impuro. A semântica é a mesma: o dado do SSR precisa do instante real da
+    // montagem, senão é tratado como velho e dispara o refetch imediato que este
+    // campo existe para evitar.
+    const [initialDataUpdatedAtMs] = useState(() => (initialIsFreshRef.current ? Date.now() : 0))
+
     const query = useQuery<WorkoutFetchResult>({
         queryKey,
         enabled: !!userId,
@@ -551,7 +558,7 @@ export function useWorkoutFetch({
         // de fazer (com role admin/teacher isso eram ~8-10 round-trips ao
         // Supabase, em série, disparados do browser em toda abertura).
         // Cache de localStorage continua com 0 → refetch imediato, como antes.
-        initialDataUpdatedAt: initialIsFreshRef.current ? Date.now() : 0,
+        initialDataUpdatedAt: initialDataUpdatedAtMs,
         queryFn: async (): Promise<WorkoutFetchResult> => {
             if (!userId) return { workouts: [], stats: EMPTY_STATS, studentFolders: [] }
 

@@ -401,21 +401,27 @@ export function useHistoryData({
         return 'Tudo';
     }, [range]);
 
+    // Corte de janela do histórico. `Date.now()` dentro do useMemo ainda é
+    // render (a regra `react-hooks/purity` acusa): dois renders do mesmo estado
+    // podiam produzir listas diferentes. A janela é medida em DIAS, então
+    // congelar o "agora" na montagem não muda o que o usuário vê.
+    const [agoraMs] = useState(() => Date.now());
+
     const filteredHistory = useMemo(() => {
         if (range === 'all') return historyItems;
         const days = Number(range);
         if (!Number.isFinite(days) || days <= 0) return historyItems;
-        const cutoff = Date.now() - days * DAY_MS;
+        const cutoff = agoraMs - days * DAY_MS;
         return historyItems.filter((s) => {
             const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
             return Number.isFinite(t) && t !== null && t >= cutoff;
         });
-    }, [historyItems, range]);
+    }, [historyItems, range, agoraMs]);
 
     const { visibleHistory, blockedCount } = useMemo(() => {
         const days = vipLimits?.history_days;
         if (typeof days !== 'number') return { visibleHistory: filteredHistory, blockedCount: 0 };
-        const cutoff = Date.now() - days * DAY_MS;
+        const cutoff = agoraMs - days * DAY_MS;
         const visible: WorkoutSummary[] = [];
         let blocked = 0;
         filteredHistory.forEach(item => {
@@ -423,7 +429,7 @@ export function useHistoryData({
             if (Number.isFinite(t) && t !== null && t >= cutoff) { visible.push(item); } else { blocked++; }
         });
         return { visibleHistory: visible, blockedCount: blocked };
-    }, [filteredHistory, vipLimits]);
+    }, [filteredHistory, vipLimits, agoraMs]);
 
     const summary = useMemo(() => {
         const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);

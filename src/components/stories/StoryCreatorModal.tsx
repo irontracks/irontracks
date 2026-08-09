@@ -65,6 +65,11 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     // Editor State
     const [filter, setFilter] = useState<(typeof FILTERS)[number]>(FILTERS[0]);
     const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
+    // Id sequencial por ref. Era `Date.now()`, que é impuro no render e ainda
+    // COLIDE quando dois overlays nascem no mesmo milissegundo (colar texto e
+    // emoji em sequência) — duas chaves iguais na lista.
+    const overlayIdRef = useRef(0);
+    const proximoOverlayId = () => { overlayIdRef.current += 1; return overlayIdRef.current };
     const [activeTool, setActiveTool] = useState<StoryTool>(null);
 
     // Text Tool State
@@ -189,7 +194,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     const addText = () => {
         if (!textInput.trim()) return;
         setOverlays([...overlays, {
-            id: Date.now(),
+            id: proximoOverlayId(),
             type: 'text',
             content: textInput,
             x: 50, // %
@@ -203,7 +208,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
 
     const addEmoji = (emoji: string) => {
         setOverlays([...overlays, {
-            id: Date.now(),
+            id: proximoOverlayId(),
             type: 'emoji',
             content: emoji,
             x: 50,
