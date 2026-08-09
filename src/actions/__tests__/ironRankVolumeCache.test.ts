@@ -57,9 +57,13 @@ describe('cache do iron_rank_my_total_volume', () => {
 describe('o volume não pode falhar em silêncio', () => {
     // O erro nº2 da lista de guards falsos do CLAUDE.md: o comentário que
     // EXPLICA o padrão proibido casa com a busca por ele. Reduzir ao código.
+    // A barra é escapada de propósito: escrever o literal de duas barras aqui
+    // faz o guard de ambientes (vitestDomProjectList) tratar o resto da linha
+    // como comentário, desalinhar o parser de strings do arquivo inteiro e
+    // acusar este source-guard de precisar de DOM. Custou um CI vermelho.
     const executavel = src
         .split('\n')
-        .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*'))
+        .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l.trim()))
         .join('\n')
 
     it('erro do RPC é reportado, não engolido', () => {
@@ -73,6 +77,16 @@ describe('o volume não pode falhar em silêncio', () => {
 
     it('volume 0 com treinos no histórico é contradição e vira sinal', () => {
         expect(executavel).toMatch(/totalVolumeKg === 0 && totalWorkouts > 0/)
+    })
+
+    it('o valor contraditório NÃO é cacheado', () => {
+        // A chave é user.id+totalWorkouts e não muda até o próximo treino.
+        // Cachear o 0 estende uma falha momentânea de sessão para 30 minutos.
+        const idx = executavel.indexOf('localStorage.setItem(volCacheKey')
+        expect(idx).toBeGreaterThan(-1)
+        const guarda = executavel.slice(executavel.lastIndexOf('if (', idx), idx)
+        expect(guarda, 'gravar volume 0 com histórico congela o sintoma')
+            .toContain('!contraditorio')
     })
 
     it('não usa logWarn — é no-op em produção', () => {

@@ -272,13 +272,22 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
                     // Volume 0 com histórico é contradição: ou o RPC regrediu, ou
                     // o parse acima comeu o número. Sem isto, o sintoma na tela
                     // é idêntico ao de um usuário novo — indistinguível.
-                    if (totalVolumeKg === 0 && totalWorkouts > 0) {
+                    const contraditorio = totalVolumeKg === 0 && totalWorkouts > 0
+                    if (contraditorio) {
                         logWarnRemote('workout-analytics', 'iron-rank-volume-zero-com-historico', {
                             totalWorkouts, raw: String(vol ?? ''),
                         })
                     }
+                    // NÃO cachear o valor contraditório. A chave é
+                    // `user.id`+`totalWorkouts`, que não muda até o próximo
+                    // treino: gravar o 0 transformaria uma falha momentânea
+                    // (RPC lança `not_authenticated` quando `auth.uid()` vem
+                    // NULL) em 30 minutos de "Iniciante do Ferro" para quem
+                    // tem milhões de kg. Sem cache, a visita seguinte tenta de
+                    // novo — que é o comportamento correto para um valor no
+                    // qual não confiamos.
                     try {
-                        if (typeof localStorage !== 'undefined') {
+                        if (typeof localStorage !== 'undefined' && !contraditorio) {
                             localStorage.setItem(volCacheKey, JSON.stringify({ v: totalVolumeKg, exp: Date.now() + VOL_CACHE_TTL_MS }))
                         }
                     } catch { /* storage cheio/indisponível: segue sem cache */ }
