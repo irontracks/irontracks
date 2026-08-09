@@ -35,7 +35,7 @@
     "ios:submit": "node scripts/ios-submit.mjs",
     "android:release": "bash scripts/android-release.sh",
     "android:submit": "node scripts/android-submit.mjs",
-    "analyze": "ANALYZE=true npm run build",
+    "analyze": "ANALYZE=true NODE_OPTIONS=--max-old-space-size=8192 npm run build",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:ci": "playwright test --reporter=github",
@@ -104,6 +104,7 @@
   "devDependencies": {
     "@eslint-community/eslint-utils": "^4.9.1",
     "@eslint/config-array": "^0.23.3",
+    "@next/bundle-analyzer": "^16.3.0",
     "@playwright/test": "^1.61.0",
     "@tailwindcss/node": "^4.3.1",
     "@tailwindcss/postcss": "^4.3.1",
