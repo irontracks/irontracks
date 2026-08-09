@@ -26,8 +26,18 @@ import { describe, it, expect } from 'vitest'
 
 const SRC = join(__dirname, '..')
 
-/** Teto atual. Só pode DIMINUIR — nunca suba este número para fazer o CI passar. */
-const TETO_PESO_900_EM_TEXTO_MIUDO = 800
+/**
+ * Teto atual. Só pode DIMINUIR — nunca suba este número para fazer o CI passar.
+ *
+ * 800 → 723 (ago/2026): os 74 rótulos que usavam exatamente
+ * `text-xs font-black uppercase tracking-widest text-neutral-400` viraram
+ * `.t-meta text-xs`. A cor é a MESMA que o utilitário já define, então a troca
+ * não mexe em paleta — só desfaz o peso 900 e o tracking largo em texto de
+ * 12px, que era o problema. Os ~51 rótulos do mesmo formato com outra cor
+ * (amarelo, neutral-500) ficaram de fora de propósito: `.t-meta` embute
+ * `color`, e aplicá-lo ali apagaria a cor intencional.
+ */
+const TETO_PESO_900_EM_TEXTO_MIUDO = 723
 
 function arquivosTsx(dir: string, out: string[] = []): string[] {
     for (const entrada of readdirSync(dir)) {

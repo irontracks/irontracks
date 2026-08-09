@@ -107,7 +107,7 @@ export const ReportSummaryCards = memo(({
 
             {outdoorBike && (Number(outdoorBike?.distanceMeters) > 0 || Number(outdoorBike?.durationSeconds) > 0) && (
                 <div className="mb-8">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Bike Outdoor</div>
+                    <div className="t-meta text-xs mb-3">Bike Outdoor</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800">
                             <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Distância</p>

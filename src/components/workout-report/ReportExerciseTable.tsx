@@ -17,7 +17,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
+          <div className="t-meta text-xs">Ordem e execução</div>
           <div className="text-lg font-black text-white">Detalhe por exercício</div>
           <div className="text-xs text-neutral-300">Ordem, descanso, volume e calorias (estimativa ~; soma fecha com o total da sessão).</div>
         </div>

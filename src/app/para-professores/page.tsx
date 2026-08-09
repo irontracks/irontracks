@@ -635,7 +635,7 @@ export default function ParaProfessoresPage() {
                   </div>
                 )}
                 <div className="mb-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-neutral-400">{plan.name}</p>
+                  <p className="t-meta text-xs">{plan.name}</p>
                   <div className="flex items-end gap-1 mt-2">
                     {plan.price === 0 ? (
                       <span className="text-2xl font-black text-white">Grátis</span>

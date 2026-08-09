@@ -124,7 +124,7 @@ export const ReportTimePanel = ({ reportRest, reportCadence }: ReportTimePanelPr
   return (
     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
       <div className="mb-4">
-        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo &amp; Cadência</div>
+        <div className="t-meta text-xs">Tempo &amp; Cadência</div>
         <div className="text-lg font-black text-white">Análise temporal</div>
         <div className="text-xs text-neutral-300">Descanso planejado vs real e conformidade de cadência.</div>
       </div>

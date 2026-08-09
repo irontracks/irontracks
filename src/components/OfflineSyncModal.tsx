@@ -142,7 +142,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
 
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 overflow-hidden">
             <div className="p-3 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Jobs</div>
+              <div className="t-meta text-xs">Jobs</div>
               {state?.online === false ? (
                 <div className="text-[11px] font-black uppercase tracking-widest text-red-300 bg-red-500/10 border border-red-500/30 px-2.5 py-1 rounded-xl inline-flex items-center gap-2">
                   <AlertTriangle size={14} />

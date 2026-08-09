@@ -288,7 +288,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
           <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dia selecionado</div>
+                <div className="t-meta text-xs">Dia selecionado</div>
                 <div className="text-white font-black">{selectedDayIso}</div>
               </div>
               <div className="text-xs text-neutral-500">{loading ? 'Carregando…' : pluralize(selectedWorkouts.length, 'treino')}</div>

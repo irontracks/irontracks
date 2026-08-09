@@ -329,7 +329,7 @@ export default function SettingsModal(props: SettingsModalProps) {
             <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
-                  <div className="flex items-center gap-2"><Smartphone size={14} className="text-yellow-500" /><div className="text-xs font-black uppercase tracking-widest text-neutral-400">Diagnóstico iOS</div></div>
+                  <div className="flex items-center gap-2"><Smartphone size={14} className="text-yellow-500" /><div className="t-meta text-xs">Diagnóstico iOS</div></div>
                   <div className="text-xs text-neutral-400 mt-0.5">Capacitor, plugins e permissões no device.</div>
                 </div>
                 <button type="button" disabled={iosDiagBusy} onClick={loadIosDiag} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Atualizar</button>

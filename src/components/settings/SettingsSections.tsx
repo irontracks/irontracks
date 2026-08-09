@@ -626,7 +626,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Conversas e eventos diretos ──────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e avisos</div>
+                    <div className="t-meta text-xs">Mensagens e avisos</div>
                     <NotifRow
                         title="Notificar mensagem recebida"
                         description="Aviso quando chega uma mensagem direta."
@@ -666,7 +666,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Redes sociais ─────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Redes Sociais</div>
+                    <div className="t-meta text-xs">Redes Sociais</div>
                     <div className="flex items-center justify-between gap-3">
                         <div><div className="text-sm font-bold text-white">Permitir seguidores</div><div className="text-xs text-neutral-400">Outros usuários podem te seguir no app.</div></div>
                         <ToggleSwitch checked={allowSocialFollows} onChange={() => setValue('allowSocialFollows', !allowSocialFollows)} />
@@ -748,7 +748,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Pessoais ──────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Pessoais</div>
+                    <div className="t-meta text-xs">Pessoais</div>
                     <NotifRow
                         title="Quase bateu PR"
                         description="Quando você fica perto de um recorde pessoal sem bater."
@@ -809,7 +809,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Conta / VIP ────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Conta / VIP</div>
+                    <div className="t-meta text-xs">Conta / VIP</div>
                     <NotifRow
                         title="Assinatura expirando"
                         description="Quando seu VIP está pra expirar nas próximas 24h."
@@ -828,7 +828,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Stories ───────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Stories</div>
+                    <div className="t-meta text-xs">Stories</div>
                     <NotifRow
                         title="Amigo postou story"
                         description="Avisa quando seguidos publicam um story."
@@ -868,7 +868,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Desafios ──────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Desafios</div>
+                    <div className="t-meta text-xs">Desafios</div>
                     <NotifRow
                         title="Desafios"
                         description="Você foi desafiado, ou alguém aceitou / recusou seu desafio."
@@ -880,7 +880,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
                 {/* ── Lembretes ─────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Lembretes</div>
+                    <div className="t-meta text-xs">Lembretes</div>
                     {/* "Refeições" e "Refeição esquecida" removidos até religar o driver
                         (a rota nutrition/reminders/trigger precisa de cron a cada minuto —
                         Supabase pg_cron; a infra atual é diária). A rota fica dormente. */}

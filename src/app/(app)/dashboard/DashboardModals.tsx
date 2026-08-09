@@ -585,7 +585,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 valioso de um check-in) se perdia. Agora vem pré-preenchido com o do
                                 perfil: um toque pra confirmar, ou ajuste se pesou hoje. */}
                             <div>
-                                <label htmlFor="precheckin-weight" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                <label htmlFor="precheckin-weight" className="block t-meta text-xs mb-2">
                                     Peso de hoje (kg)
                                 </label>
                                 {/* Sem type="number": num WebView (locale != pt-BR) ele REJEITA a vírgula
@@ -611,7 +611,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Como se sente?</label>
+                                <label className="block t-meta text-xs mb-2">Como se sente?</label>
                                 <div className="flex gap-2">
                                     {[
                                         { value: 'great', label: '💪 Ótimo', color: 'bg-green-500/20 border-green-500/40 text-green-300' },
@@ -639,7 +639,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 onChange={(v) => setPreCheckinDraft({ ...(preCheckinDraft || {}), soreness: v })}
                             />
                             <div>
-                                <label htmlFor="precheckin-sleep" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                <label htmlFor="precheckin-sleep" className="block t-meta text-xs mb-2">
                                     Sono na última noite (h)
                                 </label>
                                 <input
@@ -653,7 +653,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">Dormir pouco reduz a carga sugerida no treino de hoje.</p>
                             </div>
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Notas (opcional)</label>
+                                <label className="block t-meta text-xs mb-2">Notas (opcional)</label>
                                 <textarea
                                     placeholder="Ex: Dor leve no ombro direito"
                                     value={String((preCheckinDraft as Record<string, unknown>)?.notes ?? '')}
