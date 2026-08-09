@@ -633,7 +633,7 @@ const NormalSetInner = ({
           <button
             type="button"
             onClick={onComplete}
-            className={`inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
+            className={`inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
             {/* Mesmo rótulo dos demais métodos (Concluir/Feito). O lado não precisa
@@ -649,7 +649,7 @@ const NormalSetInner = ({
   // what each input means. After the first set, header is hidden to save space.
   const renderUnilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
+      className="grid items-center gap-1.5 px-2.5 text-[9px] t-meta min-w-0"
       style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span>Peso (kg)</span>
@@ -660,7 +660,7 @@ const NormalSetInner = ({
   );
   const renderBilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
+      className="grid items-center gap-1.5 px-2.5 text-[9px] t-meta min-w-0"
       style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span className="text-center">Set</span>
@@ -816,7 +816,7 @@ const NormalSetInner = ({
               type="button"
               onClick={handleComplete}
               className={[
-                'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
                   // Pendente em gold: este é o botão mais tocado do app (18×
@@ -910,7 +910,7 @@ const NormalSetInner = ({
         <div className="px-1 space-y-1.5">
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
+              <span className="text-[9px] t-meta shrink-0 mt-0.5">Anterior</span>
               <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
