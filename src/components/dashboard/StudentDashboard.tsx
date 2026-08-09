@@ -330,14 +330,6 @@ export default function StudentDashboard(props: Props) {
       {props.profileIncomplete && props.view === 'dashboard' && !props.nutritionActive && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       <>
-          {props.view === 'dashboard' && showStoriesBar && !props.nutritionActive ? (
-            <StoriesBar
-              currentUserId={props.currentUserId}
-              onMyStoryStateChange={props.onMyStoryStateChange}
-              onAddStory={props.onAddStory}
-            />
-          ) : null}
-
           <DashboardTabs
             view={props.view}
             onChangeView={props.onChangeView}
@@ -349,6 +341,19 @@ export default function StudentDashboard(props: Props) {
             nutritionActive={!!props.nutritionActive}
             onOpenNutrition={props.onOpenNutrition}
           />
+
+          {/* STORIES abaixo das abas, não acima.
+              Na primeira dobra do iPhone cabiam: o card "Vai treinar hoje?", o
+              aviso de perfil e a barra de stories — e a lista de treinos, que é
+              a razão do app existir, começava fora da tela. Story de amigo é
+              conteúdo social: importa, mas não antes da ação primária. */}
+          {props.view === 'dashboard' && showStoriesBar && !props.nutritionActive ? (
+            <StoriesBar
+              currentUserId={props.currentUserId}
+              onMyStoryStateChange={props.onMyStoryStateChange}
+              onAddStory={props.onAddStory}
+            />
+          ) : null}
 
           {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
           {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}

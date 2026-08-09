@@ -350,16 +350,22 @@ const NormalSetInner = ({
   const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe');
 
   // Shared input style — weight column (3fr, roomy)
+  // O VALOR digitado é `font-black` branco; o PLACEHOLDER (meta do plano ou
+  // sugestão do motor) fica em neutral-600, sem peso. Antes ambos eram quase o
+  // mesmo cinza-claro e não dava para saber, batendo o olho, o que era seu e o
+  // que era sugestão — no dado mais importante do app, a carga que se vai
+  // levantar. `placeholder:font-normal` é necessário: sem ele o font-black do
+  // input vaza para o placeholder e o disfarce volta.
   const inputBase =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-[16px] text-white ' +
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-[16px] text-white font-black ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-600 placeholder:font-normal placeholder:text-xs focus:placeholder:opacity-0';
   // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
   // 5-char placeholders like "10-12" fit without truncation.
   const inputCompact =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1 py-2 text-[16px] text-white text-center ' +
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1 py-2 text-[16px] text-white font-black text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-600 placeholder:font-normal placeholder:text-xs focus:placeholder:opacity-0';
 
   const collapseAndScroll = (delay: number) => {
     setTimeout(() => {
@@ -620,7 +626,7 @@ const NormalSetInner = ({
             onFocus={rpeFld.handleFocus}
             onBlur={rpeFld.handleBlur}
             placeholder={rpeWatermark}
-            className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+            className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-700/45`}
           />
 
           {/* Complete side button */}
@@ -802,7 +808,7 @@ const NormalSetInner = ({
               onFocus={rpeField.handleFocus}
               onBlur={rpeField.handleBlur}
               placeholder={rpeWatermark}
-              className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+              className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-700/45`}
             />
 
             {/* OK button */}
