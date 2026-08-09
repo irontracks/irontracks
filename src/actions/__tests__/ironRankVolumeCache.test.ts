@@ -75,6 +75,16 @@ describe('o volume não pode falhar em silêncio', () => {
         expect(executavel).toMatch(/totalVolumeKg === 0 && totalWorkouts > 0/)
     })
 
+    it('o valor contraditório NÃO é cacheado', () => {
+        // A chave é user.id+totalWorkouts e não muda até o próximo treino.
+        // Cachear o 0 estende uma falha momentânea de sessão para 30 minutos.
+        const idx = executavel.indexOf('localStorage.setItem(volCacheKey')
+        expect(idx).toBeGreaterThan(-1)
+        const guarda = executavel.slice(executavel.lastIndexOf('if (', idx), idx)
+        expect(guarda, 'gravar volume 0 com histórico congela o sintoma')
+            .toContain('!contraditorio')
+    })
+
     it('não usa logWarn — é no-op em produção', () => {
         expect(executavel, 'logWarn não existe em prod; use logWarnRemote')
             .not.toMatch(/\blogWarn\s*\(/)
