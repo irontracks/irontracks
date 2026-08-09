@@ -20,7 +20,10 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, relative } from 'path'
 import { fileURLToPath } from 'url'
 
-const ROOT      = fileURLToPath(new URL('../src', import.meta.url))
+// Diretório varrido. O default é o `src/` deste repo; `A11Y_SCAN_ROOT` existe
+// para o guard do próprio scanner apontar para fixtures temporárias — sem isso
+// não há como provar que ele ainda ACUSA o que deve acusar.
+const ROOT      = process.env.A11Y_SCAN_ROOT || fileURLToPath(new URL('../src', import.meta.url))
 const ONLY_CRIT = process.argv.includes('--only-critical')
 
 // ─── Utilitários ──────────────────────────────────────────────────────────────
@@ -92,6 +95,38 @@ function maskComments(src) {
         i += 1
     }
     return out.join('')
+}
+
+/**
+ * Extrai as tags JSX de um nome, com os atributos COMPLETOS.
+ *
+ * Por que não dá pra usar `/<input\b([^>]*?)\/?>/`: um handler inline
+ * (`onChange={(e) => ...}`) tem `>` dentro das chaves, e o regex encerra a tag
+ * ali. Os atributos que vinham DEPOIS — `placeholder`, `aria-label` — ficavam
+ * invisíveis para o scanner, que acusava campo mudo em input já rotulado.
+ * Medido em 07/08/2026: 54 avisos viraram 7 reais depois desta correção.
+ * Scanner que grita lobo treina o dono a ignorar o relatório inteiro.
+ */
+function jsxTags(src, tagName) {
+    const out = []
+    const open = `<${tagName}`
+    let i = 0
+    while ((i = src.indexOf(open, i)) !== -1) {
+        // Evita casar <inputSomething>
+        const after = src[i + open.length]
+        if (after && /[A-Za-z0-9_-]/.test(after)) { i += open.length; continue }
+        let depth = 0
+        let j = i + open.length
+        for (; j < src.length; j++) {
+            const c = src[j]
+            if (c === '{') depth++
+            else if (c === '}') depth--
+            else if (c === '>' && depth === 0) break
+        }
+        out.push({ index: i, attrs: src.slice(i + open.length, j) })
+        i = j + 1
+    }
+    return out
 }
 
 const allFiles = walk(ROOT)
@@ -192,10 +227,8 @@ for (const filePath of allFiles) {
 
     // ── 3. <input> sem label associado ───────────────────────────────────────
     if (!ONLY_CRIT) {
-        const inputRe = /<input\b([^>]*?)(?:\/>|>)/gs
-        while ((m = inputRe.exec(scan)) !== null) {
-            const attrs   = m[1]
-            const lineNum = source.slice(0, m.index).split('\n').length
+        for (const { attrs, index } of jsxTags(scan, 'input')) {
+            const lineNum = source.slice(0, index).split('\n').length
 
             // Pula: hidden, checkbox/radio (geralmente embrulhados em label)
             if (/type=\{?['"`]hidden['"`]\}?/.test(attrs)) continue
@@ -203,15 +236,21 @@ for (const filePath of allFiles) {
 
             const hasLabel = /aria-label=|aria-labelledby=|id=/.test(attrs)
             const hasSpread = attrs.includes('{...')
-            if (!hasLabel && !hasSpread) {
-                findings.push({
-                    level: 'AVISO',
-                    id: 'input-no-label',
-                    label: '<input> sem aria-label nem id — leitores de tela não identificam o campo',
-                    file: relPath, line: lineNum,
-                    context: getContext(lines, lineNum),
-                })
-            }
+            if (hasLabel || hasSpread) continue
+
+            // `placeholder` VALE como nome acessível (accname usa como fallback),
+            // mas é frágil: some quando o campo tem valor, e leitor antigo ignora.
+            // Por isso vira INFO — sinal distinto de "campo totalmente mudo".
+            const hasPlaceholder = /placeholder=/.test(attrs)
+            findings.push({
+                level: hasPlaceholder ? 'INFO' : 'AVISO',
+                id: hasPlaceholder ? 'input-placeholder-only' : 'input-no-label',
+                label: hasPlaceholder
+                    ? '<input> só com placeholder — vira nome acessível, mas some ao digitar; prefira aria-label'
+                    : '<input> sem aria-label nem id — leitores de tela não identificam o campo',
+                file: relPath, line: lineNum,
+                context: getContext(lines, lineNum),
+            })
         }
     }
 
@@ -237,9 +276,11 @@ for (const filePath of allFiles) {
                 .replace(/\{[^}]+\}/g, '')
                 .trim()
 
-            // {label}, {title} — identifier simples conta como texto
-            const hasIdentifierChild = /\{\s*[a-zA-Z_$][\w$]*\s*\}/.test(inner) &&
-                !/<\w/.test(inner)
+            // {label}, {c.title}, {item.name} — identificador (inclusive acesso a
+            // propriedade) conta como texto. Antes exigia identificador SIMPLES e
+            // ausência de qualquer tag irmã, então o padrão comum
+            // `<a>{c.title}<ExternalLink/></a>` era acusado de "só ícone".
+            const hasIdentifierChild = /\{\s*[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*\s*\}/.test(inner)
 
             const hasOnlyIcon = !textOnly && !hasJsxText && !hasIdentifierChild &&
                 inner.includes('<')

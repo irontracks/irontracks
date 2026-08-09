@@ -107,6 +107,7 @@
         { "path": "/api/cron/admin-vip-expiring", "schedule": "30 12 * * *" },
         { "path": "/api/cron/muscle-weekly-insights", "schedule": "0 22 * * 0" },
         { "path": "/api/cron/clean-live-activity-tokens", "schedule": "0 5 * * *" },
-        { "path": "/api/cron/telemetry-retention", "schedule": "0 4 * * *" }
+        { "path": "/api/cron/telemetry-retention", "schedule": "0 4 * * *" },
+        { "path": "/api/cron/audit-trail-retention", "schedule": "30 4 * * 0" }
     ]
 }

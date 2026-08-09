@@ -1,0 +1,84 @@
+-- ⚠️ NÃO APLICADA. Aguarda aprovação do dono (contém DROP).
+--
+-- Higiene apontada pela auditoria de 07/08/2026. Renomeie para
+-- `20260807151500_higiene_pk_indices_policies.sql` e aplique via MCP
+-- (`apply_migration`) quando aprovado.
+--
+-- Por que está pendente: as três seções abaixo removem objetos (constraint,
+-- policies, índices). Nenhuma apaga DADO de usuário, mas mexer em RLS de uma
+-- tabela de produção sem o "sim" explícito é exatamente o tipo de atalho que
+-- este repositório proíbe.
+
+-- ── 1. device_push_tokens sem PRIMARY KEY ────────────────────────────────
+-- Já existe UNIQUE (token), sem nulo nem duplicata (37/37 conferido). A
+-- UNIQUE vira PK: mesma coluna, mesma garantia, e a tabela deixa de ser
+-- "sem identidade" para replicação e ferramentas.
+alter table public.device_push_tokens
+  drop constraint if exists device_push_tokens_token_unique;
+alter table public.device_push_tokens
+  add constraint device_push_tokens_pkey primary key (token);
+
+-- ── 2. student_diet_plans: policies permissivas duplicadas ───────────────
+-- A policy ALL (`own_write`) se sobrepunha às quatro de admin, então CADA
+-- query avaliava duas policies. Consolidado em uma por ação, com o mesmo OR
+-- que o Postgres já fazia entre permissivas — a semântica NÃO muda:
+--   admin → tudo;  dono → só as próprias linhas (user_id = created_by = uid).
+-- O SELECT já estava consolidado (`student_diet_plans_select__merged`) e não
+-- é tocado aqui.
+drop policy if exists student_diet_plans_own_write    on public.student_diet_plans;
+drop policy if exists student_diet_plans_insert_admin on public.student_diet_plans;
+drop policy if exists student_diet_plans_update_admin on public.student_diet_plans;
+drop policy if exists student_diet_plans_delete_admin on public.student_diet_plans;
+
+create policy student_diet_plans_insert on public.student_diet_plans
+  for insert to authenticated
+  with check (
+    (select is_admin())
+    or (user_id = (select auth.uid()) and created_by = (select auth.uid()))
+  );
+
+create policy student_diet_plans_update on public.student_diet_plans
+  for update to authenticated
+  using (
+    (select is_admin())
+    or (user_id = (select auth.uid()) and created_by = (select auth.uid()))
+  )
+  with check (
+    (select is_admin())
+    or (user_id = (select auth.uid()) and created_by = (select auth.uid()))
+  );
+
+create policy student_diet_plans_delete on public.student_diet_plans
+  for delete to authenticated
+  using (
+    (select is_admin())
+    or (user_id = (select auth.uid()) and created_by = (select auth.uid()))
+  );
+
+-- ── 3. Índices REDUNDANTES ───────────────────────────────────────────────
+-- Só os que são PREFIXO EXATO de outro índice da mesma tabela, com o mesmo
+-- predicado: o composto atende as mesmas consultas, então dropar não muda
+-- plano nenhum.
+--
+-- ⚠️ NÃO estão aqui os ~80 índices "nunca usados" que o advisor lista. O
+-- banco não tem `stats_reset`, então não dá para saber a idade das
+-- estatísticas — um índice que serve a um cron mensal aparece com
+-- `idx_scan = 0` sem estar morto. Dropar aquela lista seria chute.
+drop index if exists public.app_subscriptions_user_id_idx;
+drop index if exists public.idx_assessments_student_id;
+drop index if exists public.idx_body_photo_assessment_photos_assessment;
+drop index if exists public.idx_cardio_tracks_user;
+drop index if exists public.device_push_tokens_user_id_idx;
+drop index if exists public.idx_direct_channels_user1;
+drop index if exists public.idx_direct_channels_user2;
+drop index if exists public.idx_direct_messages_channel;
+drop index if exists public.idx_gym_checkins_user;
+drop index if exists public.idx_notifications_user;
+drop index if exists public.idx_learned_foods_user;
+drop index if exists public.idx_social_follows_follower;
+drop index if exists public.social_story_reactions_story_idx;
+drop index if exists public.user_achievements_user_id_idx;
+drop index if exists public.idx_user_gyms_user;
+drop index if exists public.vip_chat_threads_user_id_idx;
+drop index if exists public.workout_sync_mappings_subscription_id_idx;
+drop index if exists public.workout_sync_subscriptions_teacher_id_idx;
