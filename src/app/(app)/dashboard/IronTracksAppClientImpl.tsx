@@ -1152,11 +1152,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
                                 {view === 'dashboard' && !nutritionOpen && isCoach && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                                 {view === 'dashboard' && !nutritionOpen && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
-                                {view === 'dashboard' && !nutritionOpen && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
+
                                 {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     hasActiveSession={Boolean(activeSession?.workout)}
+                                    // Renderizado DENTRO do dashboard, abaixo do "Treinar agora":
+                                    // a pergunta de intenção ("vai treinar hoje?") é
+                                    // administrativa e estava ocupando a primeira linha da
+                                    // tela, acima da ação que ela mesma pergunta.
+                                    restDayPrompt={<RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
                                     profileIncomplete={Boolean(profileIncomplete)}
                                     onOpenCompleteProfile={() => setView('profile')}
                                     view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
