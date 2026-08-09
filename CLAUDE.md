@@ -128,7 +128,7 @@ a pessoa contraiu no dia e produziria "evolução" que é só esforço de pose. 
 único em `types/bodyPhotoAssessment.ts` (labels + instruções com os nomes de posing
 de palco, que o modelo conhece); guards em `utils/bodyPhoto/__tests__/flexedPoses.test.ts`.
 
-**Saída de IA: structured output + "normalize, depois valide".** Pedir JSON só no TEXTO do prompt e validar com Zod `.max()` NÃO funciona — medido em jul/2026 na Avaliação por Foto: 8 de 12 chamadas ao `gemini-2.5-flash` reprovavam no `safeParse` (JSON com `}` faltando; strings acima do teto, ex. `action` de 343 num limite de 300) e o usuário via "Não consegui gerar a correlação". Padrão correto, implementado em `utils/bodyPhoto/aiContract.ts`: (1) `responseMimeType: 'application/json'` + `responseSchema` na CHAMADA (derruba o JSON inválido a zero); (2) normalizador que TRUNCA (`utils/ai/coerce.ts`) — structured output não garante `maxLength`; (3) só então o schema estrito, como juiz. `utils/ai/extractJson.ts` ainda REPARA JSON quebrado (fonte única, beneficia todas as rotas). Os limites moram num só lugar (`LAUDO_LIMITS`/`CORRELATION_LIMITS` em `types/bodyPhotoAssessment.ts`) e alimentam Zod + responseSchema + normalizador. **As outras rotas de `api/ai/` ainda usam o padrão antigo** — mesma classe de falha, ainda não migradas.
+**Saída de IA: structured output + "normalize, depois valide".** Pedir JSON só no TEXTO do prompt e validar com Zod `.max()` NÃO funciona — medido em jul/2026 na Avaliação por Foto: 8 de 12 chamadas ao `gemini-2.5-flash` reprovavam no `safeParse` (JSON com `}` faltando; strings acima do teto, ex. `action` de 343 num limite de 300) e o usuário via "Não consegui gerar a correlação". Padrão correto, implementado em `utils/bodyPhoto/aiContract.ts`: (1) `responseMimeType: 'application/json'` + `responseSchema` na CHAMADA (derruba o JSON inválido a zero); (2) normalizador que TRUNCA (`utils/ai/coerce.ts`) — structured output não garante `maxLength`; (3) só então o schema estrito, como juiz. `utils/ai/extractJson.ts` ainda REPARA JSON quebrado (fonte única, beneficia todas as rotas). Os limites moram num só lugar (`LAUDO_LIMITS`/`CORRELATION_LIMITS` em `types/bodyPhotoAssessment.ts`) e alimentam Zod + responseSchema + normalizador. **Esta linha dizia que "as outras rotas de `api/ai/` ainda usam o padrão antigo" e estava OBSOLETA** (conferido em 09/08/2026): o débito foi zerado nos lotes 1–4 em 02/08 e hoje TODA rota que exige JSON passa o contrato na chamada. Quem guarda isso é `app/api/ai/__tests__/structuredOutputRatchet.test.ts`, com a lista de débito vazia — rota nova sem contrato reprova ali. Mais um caso da regra "nota que descreve o que NÃO temos é a que apodrece primeiro": a linha antiga sobreviveu uma semana à própria correção e fez um agente propor trabalho já feito.
 
 **Feature flags:** `utils/featureFlags.ts` (`isFeatureEnabled(settings, FEATURE_KEYS.x)`), guardadas em `user_settings.preferences` (default = desligado, salvo override explícito).
 
@@ -502,6 +502,41 @@ Não é preciso pedir confirmação a cada PR — esta regra é a confirmação 
 - Mudança em `middleware.ts`, fluxos de auth, schemas do banco com migration, ou pagamentos (RevenueCat/IAP)
 - CI vermelho ou flaky — investigar primeiro, não tentar contornar com `--no-verify` ou retry cego
 - PR com revisões humanas pendentes não resolvidas
+
+## Iron Rank zerado — o caso ainda ABERTO (ago/2026)
+
+O card mostrava **"0kg levantados · Iniciante do Ferro"** para uma conta com
+**2.427.394 kg** e 127 treinos. Conferido por SQL: o RPC calcula certo, os
+grants estão corretos, a action devolve o campo e o hook o lê. **A causa raiz
+ainda não foi provada** — o que existe é instrumentação.
+
+Duas saídas silenciosas somadas explicam por que ninguém viu: `if (!vErr)` sem
+ramo de erro (o supabase-js entrega a falha no RETORNO, não como exceção, então
+o `catch` nunca via nada) e `logWarn`, que é **NO-OP em produção**. O sintoma na
+tela é idêntico ao de um usuário novo.
+
+**Causa provável, com nome:** `iron_rank_my_total_volume` faz
+`RAISE EXCEPTION 'not_authenticated'` quando `auth.uid()` vem NULL e o chamador
+não é service_role. Cuidado com a armadilha que quase inverteu o diagnóstico:
+testar o RPC por SQL com **service-role pula essa checagem** — aquele teste
+prova a matemática, não o caminho do cliente.
+
+Onde ver o que aconteceu (o Sentry recebe, mas o token não existe no repo):
+
+```sql
+select created_at, metadata->>'stage', metadata->>'code',
+       metadata->>'message', metadata->>'totalWorkouts'
+from audit_events where action = 'iron_rank_volume_failed'
+order by created_at desc limit 20;
+```
+
+`stage` responde quase tudo: `rpc_error` com `code` traz o erro do Postgres
+(é aqui que `not_authenticated` aparece); `zero_com_historico` significa que o
+RPC respondeu 0 para quem tem treinos — aí o problema é o parse, não a auth.
+
+**O valor contraditório não é mais cacheado.** A chave é `user.id`+`totalWorkouts`
+e só muda quando um treino entra ou sai do histórico, então gravar o 0
+transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
 
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
