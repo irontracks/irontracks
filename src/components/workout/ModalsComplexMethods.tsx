@@ -9,6 +9,7 @@ import { useWorkoutTimer } from './WorkoutTimerContext';
 import { isObject, buildBlocksByCount, normalizeExerciseKey, getSuggestion, watermarkPlaceholder } from './utils';
 import { normalizeMiniSets } from './helpers/restPauseRules';
 import { UnknownRecord, WorkoutExercise } from './types';
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 /**
  * ModalsComplexMethods
@@ -54,7 +55,7 @@ export function ModalsComplexMethods() {
             {restPauseModal && (
                 <div
                     className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                    onClick={() => setRestPauseModal(null)}
+                    {...backdropProps(() => setRestPauseModal(null))}
                 >
                     <div
                         className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
@@ -70,7 +71,7 @@ export function ModalsComplexMethods() {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setRestPauseModal(null)}
+                                {...backdropProps(() => setRestPauseModal(null))}
                                 className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                 aria-label="Fechar"
                             >
@@ -241,7 +242,7 @@ export function ModalsComplexMethods() {
                         <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2 flex-shrink-0">
                             <button
                                 type="button"
-                                onClick={() => setRestPauseModal(null)}
+                                {...backdropProps(() => setRestPauseModal(null))}
                                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                             >
                                 Cancelar
@@ -302,7 +303,7 @@ export function ModalsComplexMethods() {
                 return (
                     <div
                         className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                        onClick={() => setDropSetModal(null)}
+                        {...backdropProps(() => setDropSetModal(null))}
                     >
                         <div
                             className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
@@ -316,7 +317,7 @@ export function ModalsComplexMethods() {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setDropSetModal(null)}
+                                    {...backdropProps(() => setDropSetModal(null))}
                                     className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                     aria-label="Fechar"
                                 >
@@ -408,7 +409,7 @@ export function ModalsComplexMethods() {
                             <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => setDropSetModal(null)}
+                                    {...backdropProps(() => setDropSetModal(null))}
                                     className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                                 >
                                     Cancelar
@@ -588,7 +589,7 @@ export function ModalsComplexMethods() {
             {clusterModal && (
                 <div
                     className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                    onClick={() => setClusterModal(null)}
+                    {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
                 >
                     <div
                         className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"

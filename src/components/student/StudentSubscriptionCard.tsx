@@ -1,5 +1,4 @@
 'use client'
-/* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */
 /**
  * StudentSubscriptionCard — shows the student's active plan from their teacher,
  * including a PIX payment flow when payment is due.
@@ -10,6 +9,7 @@ import { useStudentSubscription } from '@/hooks/useStudentSubscription'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { apiStudentBilling } from '@/lib/api/student-billing'
 import type { StudentCharge } from '@/lib/api/student-billing'
+import { backdropProps } from '@/utils/a11y/backdrop'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      {...backdropProps(() => onClose(), 'Fechar assinatura')}
     >
       <div className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}
