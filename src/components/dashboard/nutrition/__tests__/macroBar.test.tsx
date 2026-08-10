@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 
@@ -133,6 +135,41 @@ describe('MacroBar', () => {
     expect(bar.getAttribute('aria-valuenow')).toBe('60')
     expect(bar.getAttribute('aria-valuemax')).toBe('208')
     expect(bar.getAttribute('aria-valuetext')).toContain('60 de 208 gramas')
+  })
+
+  /**
+   * Proximidade: o par rótulo+barra tem que ler como UM bloco, mais junto do que
+   * dois macros vizinhos. Com a legenda ainda ao lado da barra isso se resolvia
+   * sozinho; depois que ela saiu, `space-y-3` (12px) entre macros deixou cada
+   * trilho parecendo pertencer ao macro de BAIXO.
+   *
+   * O limite é 16px, e ele NÃO sai de "maior que os 6px internos" — 12px também
+   * é maior e mesmo assim errou, porque o leading do texto do rótulo soma ao
+   * espaço interno e come a diferença. 16px foi o valor CONFERIDO na tela do
+   * simulador; este guard só impede que ele volte a encolher. A prova de que o
+   * agrupamento lê certo é visual, não deste arquivo.
+   */
+  it('macros vizinhos ficam a 16px — o par rótulo+barra tem que ler como um bloco', () => {
+    const mixer = readFileSync(join(__dirname, '..', 'NutritionMixer.tsx'), 'utf8')
+    const wrapper = mixer.match(/<div className="([^"]*space-y-[\d.]+[^"]*)">\s*<MacroBar/)
+    expect(wrapper, 'os três MacroBar precisam de um wrapper com espaçamento próprio').not.toBeNull()
+    const gap = wrapper![1].match(/space-y-([\d.]+)/)
+    expect(parseFloat(gap![1]) * 4, 'medido no simulador: abaixo de 16px o agrupamento inverte')
+      .toBeGreaterThanOrEqual(16)
+  })
+
+  /**
+   * O pill METAS tem 36px de altura e mora na MESMA coluna da direita que o
+   * "faltam X g" do primeiro macro. Com só os 12px do card entre eles, os dois
+   * elementos de peso alto encostavam e o cabeçalho lia como parte da linha da
+   * proteína — reportado pelo dono olhando o app.
+   */
+  it('o cabeçalho com o botão METAS tem ar próprio antes do primeiro macro', () => {
+    const mixer = readFileSync(join(__dirname, '..', 'NutritionMixer.tsx'), 'utf8')
+    const wrapper = mixer.match(/<div className="([^"]*)">\s*<MacroBar/)
+    const pt = wrapper![1].match(/\bpt-([\d.]+)/)
+    expect(pt, 'sem padding-top o pill METAS encosta no "faltam X g"').not.toBeNull()
+    expect(parseFloat(pt![1]) * 4).toBeGreaterThanOrEqual(8)
   })
 
   it('meta zerada não quebra nem gera NaN/Infinity na tela', () => {
