@@ -4,17 +4,25 @@
  * Returns the last 30 days with flags indicating:
  * - had_workout: user trained on that day
  * - had_nutrition: user logged nutrition on that day
- * - workout_calories: estimated kcal burned (from cardio/sessions)
  * - nutrition_calories: kcal logged in nutrition on that day
+ *
+ * O bucketing por dia vive em `lib/nutrition/correlationDays` (função pura): o
+ * dia é o calendário de São Paulo, nunca o UTC. Ver o cabeçalho de lá.
+ *
+ * `workout_calories` NÃO existe mais na resposta: era um literal de 300 kcal por
+ * sessão — a tabela `workouts` não guarda duração nem gasto — exibido no tooltip
+ * como se fosse medição. Número inventado com cara de fato é pior que campo
+ * ausente, e a estimativa real (`estimateSessionKcal`) exige ler `workouts.notes`,
+ * que é justamente a coluna que não pode entrar em rota quente.
  */
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { buildCorrelationDays, CORRELATION_WINDOW_DAYS } from '@/lib/nutrition/correlationDays'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 export const dynamic = 'force-dynamic'
-
-const isoDate = (d: Date) => d.toISOString().slice(0, 10)
 
 export async function GET(req: Request) {
   const auth = await requireUser()
@@ -24,9 +32,10 @@ export async function GET(req: Request) {
   if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const admin = createAdminClient()
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  const from = isoDate(thirtyDaysAgo)
-  const today = isoDate(new Date())
+  // Um dia a mais de folga na janela: o corte é por dia BRT e a consulta por
+  // instante UTC — sem a folga, o dia mais antigo da grade perderia as sessões
+  // da noite.
+  const windowStart = new Date(Date.now() - (CORRELATION_WINDOW_DAYS + 1) * 24 * 60 * 60 * 1000)
 
   // Workout days from `workouts` (the legacy `workout_sessions` table does not
   // exist — Postgrest returned 404, leaving the heatmap always at 0 workouts).
@@ -36,7 +45,7 @@ export async function GET(req: Request) {
     .select('date')
     .eq('user_id', auth.user.id)
     .eq('is_template', false)
-    .gte('date', thirtyDaysAgo.toISOString())
+    .gte('date', windowStart.toISOString())
     .order('date', { ascending: true })
 
   // Nutrition days from daily_nutrition_logs
@@ -44,55 +53,14 @@ export async function GET(req: Request) {
     .from('daily_nutrition_logs')
     .select('date, calories')
     .eq('user_id', auth.user.id)
-    .gte('date', from)
-    .lte('date', today)
+    .gte('date', brtDateKey(windowStart))
+    .lte('date', brtDateKey())
 
-  // Build lookup maps
-  // ~300 kcal estimate per logged workout (the workouts table has no
-  // duration/kcal field; the estimate is only used in the tooltip).
-  const workoutByDay = new Map<string, number>()
-  for (const s of Array.isArray(sessions) ? sessions : []) {
-    const ts = String((s as { date?: string }).date || '')
-    if (!ts) continue
-    const day = isoDate(new Date(ts))
-    workoutByDay.set(day, (workoutByDay.get(day) || 0) + 300)
-  }
+  const { days, stats } = buildCorrelationDays(
+    (Array.isArray(sessions) ? sessions : []).map((s) => String((s as { date?: string }).date || '')),
+    Array.isArray(nutLogs) ? nutLogs : [],
+    Date.now(),
+  )
 
-  const nutritionByDay = new Map<string, number>()
-  for (const n of Array.isArray(nutLogs) ? nutLogs : []) {
-    const day = String(n.date).slice(0, 10)
-    nutritionByDay.set(day, Number(n.calories) || 0)
-  }
-
-  // Build 30-day array
-  const days = []
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-    const key = isoDate(d)
-    days.push({
-      date: key,
-      weekday: d.getDay(), // 0=sun, 6=sat
-      had_workout: workoutByDay.has(key),
-      had_nutrition: nutritionByDay.has(key),
-      workout_calories: workoutByDay.get(key) || 0,
-      nutrition_calories: nutritionByDay.get(key) || 0,
-    })
-  }
-
-  const workoutDays = days.filter(d => d.had_workout).length
-  const nutritionDays = days.filter(d => d.had_nutrition).length
-  const bothDays = days.filter(d => d.had_workout && d.had_nutrition).length
-  const workoutWithoutNutrition = days.filter(d => d.had_workout && !d.had_nutrition).length
-
-  return NextResponse.json({
-    ok: true,
-    days,
-    stats: {
-      workoutDays,
-      nutritionDays,
-      bothDays,
-      workoutWithoutNutrition,
-      correlationPct: workoutDays > 0 ? Math.round((bothDays / workoutDays) * 100) : 0,
-    },
-  })
+  return NextResponse.json({ ok: true, days, stats })
 }
