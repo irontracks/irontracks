@@ -140,10 +140,15 @@ describe('redundância', () => {
 })
 
 describe('confirmação de remoção', () => {
-  /** "Sim"/"Não" não dizem a que respondem — confirmação destrutiva nomeia a ação. */
+  /**
+   * "Sim"/"Não" não dizem a que respondem — confirmação destrutiva nomeia a ação
+   * no BOTÃO. A pergunta fica curta de propósito: "Remover este lançamento?" não
+   * cabe ao lado de dois botões de 44px na largura de um iPhone e truncava na
+   * tela ("Remover este lançament…"), visto no simulador.
+   */
   it('a confirmação pergunta e nomeia a ação, sem "Sim"/"Não"', () => {
     render(<NutritionEntryCard {...props} confirmDeleteId="m1" />)
-    expect(screen.getByText(/Remover este lançamento\?/)).toBeInTheDocument()
+    expect(screen.getByText(/Tem certeza\?/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remover' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sim' })).toBeNull()
