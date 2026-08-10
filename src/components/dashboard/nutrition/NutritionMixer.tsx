@@ -343,6 +343,11 @@ export default function NutritionMixer({
   const canChat = !!canViewMacros && isToday && !chatOffline
   const canGenerateDiet = !!canViewMacros && isToday && safeGoals.calories > 0
 
+  // Nomeado porque agora decide DUAS coisas: o atributo `disabled` e a cor do
+  // botão. Como expressão inline repetida, as duas divergiriam no primeiro
+  // ajuste — um botão clicável com cara de inativo, ou o contrário.
+  const podeLancar = !!input.trim() && !isPending && !aiBusy && !schemaMissing
+
   // ── Panel toggles ────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'water'>('none')
   const togglePanel = useCallback((p: typeof activePanel) => setActivePanel(prev => prev === p ? 'none' : p), [])
@@ -1208,18 +1213,31 @@ export default function NutritionMixer({
 
           {/* Submit row — a ação primária da tela.
 
-              O botão era `bg-gradient-to-r from-yellow-400 to-amber-500`: o
-              app inteiro usa `bg-yellow-500` sólido no CTA (TREINAR AGORA,
-              VER PERFIL, Salvar), e o gradiente lia como um marrom-oliva bem
-              mais escuro que o amarelo da marca — a ação mais importante do
-              card parecendo desativada. Altura de 40 para 44px, o mínimo da HIG
-              para toque, que o card errava nos três botões. */}
+              O botão era `bg-gradient-to-r from-yellow-400 to-amber-500`, e o
+              app inteiro usa `bg-yellow-500` sólido no CTA (TREINAR AGORA, VER
+              PERFIL, Salvar): trocado por consistência. Altura de 40 para 44px,
+              o mínimo da HIG para toque, que o card errava nos três botões.
+
+              CORREÇÃO de diagnóstico: o tom "marrom" que o dono viu no aparelho
+              NÃO vinha do gradiente — vinha do estado desabilitado, tratado
+              logo abaixo. Verificado no simulador: com texto digitado, o botão
+              sempre foi amarelo. */}
           <div className="mt-3 flex items-center gap-2">
+            {/* Desabilitado é CINZA, não amarelo a 40%.
+                `disabled:opacity-40` sobre `bg-yellow-500` num fundo #0a0a0a
+                compõe um marrom-oliva — e foi exatamente assim que o dono
+                enxergou o botão no aparelho: não como "desativado", mas como
+                cor errada, um botão quebrado. Estado inativo tem que ler como
+                inativo. */}
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!input.trim() || isPending || aiBusy || !!schemaMissing}
-              className="flex-1 h-11 inline-flex items-center justify-center gap-1.5 rounded-xl bg-yellow-500 text-black font-black text-sm hover:bg-yellow-400 active:scale-[0.98] transition disabled:opacity-40"
+              disabled={!podeLancar}
+              className={`flex-1 h-11 inline-flex items-center justify-center gap-1.5 rounded-xl font-black text-sm transition ${
+                podeLancar
+                  ? 'bg-yellow-500 text-black hover:bg-yellow-400 active:scale-[0.98]'
+                  : 'bg-white/[0.06] text-neutral-500'
+              }`}
             >
               {aiBusy
                 ? <><Bot size={15} aria-hidden="true" />Calculando…</>

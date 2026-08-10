@@ -56,6 +56,21 @@ describe('ação primária', () => {
     expect(botao).toContain('bg-yellow-500')
     expect(botao, 'gradiente escurece o CTA e o afasta do resto do app').not.toMatch(/bg-gradient-to-\w+\s+from-yellow/)
   })
+
+  /**
+   * `disabled:opacity-40` sobre `bg-yellow-500` num fundo #0a0a0a compõe um
+   * marrom-oliva: o dono leu o botão como "cor errada", não como desativado.
+   * Estado inativo é CINZA — e a mesma condição decide o atributo `disabled` e a
+   * cor, senão as duas divergem no primeiro ajuste.
+   */
+  it('o estado desabilitado é neutro, não o amarelo apagado', () => {
+    const src = executavel()
+    const botao = src.slice(src.indexOf('onClick={handleSubmit}') - 200, src.indexOf('onClick={handleSubmit}') + 600)
+    expect(botao, 'amarelo a 40% vira marrom sobre o fundo do app').not.toMatch(/disabled:opacity-\d+/)
+    expect(botao, 'o ramo inativo precisa de fundo próprio').toMatch(/bg-white\/\[0\.06\]/)
+    expect(botao, 'uma condição só para `disabled` e para a cor').toMatch(/disabled=\{!podeLancar\}/)
+    expect(botao).toMatch(/podeLancar\s*\n?\s*\?/)
+  })
 })
 
 describe('alvos de toque', () => {
