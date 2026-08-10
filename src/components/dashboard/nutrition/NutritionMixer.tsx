@@ -9,7 +9,7 @@ import { saveNutritionPhase } from '@/actions/nutrition-actions'
 import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
-import { Sparkles, SlidersHorizontal, X } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard } from 'lucide-react'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -155,18 +155,31 @@ function Card({ children, className = '', glow }: { children: React.ReactNode; c
 }
 
 // ── Quick Action Button ────────────────────────────────────────────────────────
-function QuickAction({ icon, label, onClick, active }: { icon: string; label: string; onClick: () => void; active?: boolean }) {
+/**
+ * Atalho de painel (Scanner / Biblioteca / Água).
+ *
+ * O ícone é COMPONENTE lucide, não string de emoji: 📷 renderizava a câmera
+ * vintage marrom da Apple no meio de uma paleta gold/dark, com desenho e peso
+ * decididos pelo sistema operacional, não pelo app. Terceira reincidência do
+ * mesmo problema (já caíram o ⚙ do botão METAS e o ⚡ do heatmap) — por isso
+ * agora o TIPO proíbe a string.
+ *
+ * `min-h-11` porque 44pt é o alvo mínimo da HIG, e este app se usa com a mão
+ * suada no meio da série.
+ */
+function QuickAction({ icon: Icon, label, onClick, active }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; onClick: () => void; active?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl transition-all duration-200 active:scale-95
+      aria-pressed={active}
+      className={`w-full min-h-11 flex flex-col items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl transition-all duration-200 active:scale-95
         ${active
           ? 'bg-yellow-500/15 border border-yellow-500/30 shadow-[0_0_12px_rgba(250,204,21,0.1)]'
           : 'bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06]'
         }`}
     >
-      <span className="text-lg">{icon}</span>
+      <Icon size={18} className={active ? 'text-yellow-300' : 'text-neutral-300'} />
       <span className={`text-[9px] uppercase tracking-[0.15em] font-semibold ${active ? 'text-yellow-300' : 'text-neutral-400'}`}>{label}</span>
     </button>
   )
@@ -830,7 +843,7 @@ export default function NutritionMixer({
                 navegar para um dia passado (backdate) eles não se aplicam. */}
             {isToday && safeNumber(restDayReduction) > 0 && (
               <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-sky-500/15 bg-sky-500/[0.06] px-2 py-1">
-                <span className="text-[11px] leading-none">😴</span>
+                <Moon size={12} className="shrink-0 text-sky-300" aria-hidden="true" />
                 <span className="text-[10px] leading-tight text-sky-300">
                   Dia de descanso: meta ajustada <span className="font-semibold">−{Math.round(safeNumber(restDayReduction))} kcal</span>
                   <span className="text-neutral-500"> · proteína mantida</span>
@@ -842,7 +855,7 @@ export default function NutritionMixer({
                 "comer de volta" um gasto estimado sabota o déficit do cutting. */}
             {isToday && safeNumber(workoutCaloriesToday) > 0 && (
               <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-orange-500/15 bg-orange-500/[0.06] px-2 py-1">
-                <span className="text-[11px] leading-none">🔥</span>
+                <Flame size={12} className="shrink-0 text-orange-300" aria-hidden="true" />
                 <span className="text-[10px] leading-tight text-orange-300">
                   Treino hoje: <span className="font-semibold">~{Math.round(safeNumber(workoutCaloriesToday))} kcal</span>
                   <span className="text-neutral-500"> · estimativa, não muda a meta</span>
@@ -863,7 +876,8 @@ export default function NutritionMixer({
               onClick={() => setStory({ mode: 'day', content: dayToContent(totals, safeGoals, currentDateKey) })}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-200 text-xs font-bold uppercase tracking-wider hover:bg-yellow-500/25 active:scale-[0.98] transition"
             >
-              🎬 Compartilhar dia
+              <Clapperboard size={14} aria-hidden="true" />
+              Compartilhar dia
             </button>
           </div>
         )}
@@ -1007,9 +1021,9 @@ export default function NutritionMixer({
 
       {/* ══ QUICK ACTIONS ════════════════════════════════════════════════ */}
       <div className="grid grid-cols-3 gap-2">
-        <QuickAction icon="📷" label="Scanner" onClick={() => togglePanel('scanner')} active={activePanel === 'scanner'} />
-        <QuickAction icon="📚" label="Biblioteca" onClick={() => togglePanel('library')} active={activePanel === 'library'} />
-        <QuickAction icon="💧" label="Água" onClick={() => togglePanel('water')} active={activePanel === 'water'} />
+        <QuickAction icon={Camera} label="Scanner" onClick={() => togglePanel('scanner')} active={activePanel === 'scanner'} />
+        <QuickAction icon={Library} label="Biblioteca" onClick={() => togglePanel('library')} active={activePanel === 'library'} />
+        <QuickAction icon={Droplet} label="Água" onClick={() => togglePanel('water')} active={activePanel === 'water'} />
       </div>
 
       {/* ── Scanner Panel ─────────────────────────────────────────────── */}
@@ -1083,7 +1097,10 @@ export default function NutritionMixer({
           <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">
             Adicionar refeição{!isToday && ` — ${currentDateKey}`}
           </div>
-          <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + arroz branco + salada</div>
+          {/* O exemplo saiu daqui e virou o placeholder do campo: ele é a
+              instrução que ENSINA o parser ("150g frango + arroz + salada") e
+              estava a dois campos de distância de onde se digita, enquanto o
+              placeholder do textarea ("O que você comeu?") não ensinava nada. */}
           <input
             type="text"
             aria-label="Nome da refeição (opcional)"
@@ -1102,7 +1119,7 @@ export default function NutritionMixer({
             disabled={isPending || !!schemaMissing}
             rows={2}
             className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 resize-none transition"
-            placeholder={schemaMissing ? 'Nutrição não configurada.' : 'O que você comeu?'}
+            placeholder={schemaMissing ? 'Nutrição não configurada.' : 'Ex.: 150g frango + arroz branco + salada'}
           />
 
           {/* ══ Simulação ao vivo — macros parciais enquanto digita ═══════════ */}
@@ -1189,26 +1206,37 @@ export default function NutritionMixer({
             </div>
           )}
 
-          {/* Submit row */}
+          {/* Submit row — a ação primária da tela.
+
+              O botão era `bg-gradient-to-r from-yellow-400 to-amber-500`: o
+              app inteiro usa `bg-yellow-500` sólido no CTA (TREINAR AGORA,
+              VER PERFIL, Salvar), e o gradiente lia como um marrom-oliva bem
+              mais escuro que o amarelo da marca — a ação mais importante do
+              card parecendo desativada. Altura de 40 para 44px, o mínimo da HIG
+              para toque, que o card errava nos três botões. */}
           <div className="mt-3 flex items-center gap-2">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!input.trim() || isPending || aiBusy || !!schemaMissing}
-              className="flex-1 h-10 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-500/20 hover:from-yellow-300 hover:to-amber-400 active:scale-[0.98] transition disabled:opacity-40 disabled:shadow-none"
+              className="flex-1 h-11 inline-flex items-center justify-center gap-1.5 rounded-xl bg-yellow-500 text-black font-black text-sm hover:bg-yellow-400 active:scale-[0.98] transition disabled:opacity-40"
             >
-              {aiBusy ? '🤖 Calculando…' : isPending ? 'Processando…' : '✚ Lançar'}
+              {aiBusy
+                ? <><Bot size={15} aria-hidden="true" />Calculando…</>
+                : isPending
+                  ? 'Processando…'
+                  : <><Plus size={15} strokeWidth={3} aria-hidden="true" />Lançar</>}
             </button>
             {isNative && (
+              /* Ícone órfão de 36px num cinza mudo — agora com a mesma altura e
+                 a mesma linguagem de borda dos secundários, e alvo de 44px. */
               <button
                 type="button"
                 onClick={() => setShowBarcodeScanner(true)}
                 aria-label="Escanear código de barras"
-                className="flex size-9 items-center justify-center rounded-lg bg-white/10 text-white active:scale-95"
+                className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-95"
               >
-                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2v16H3V4zm4 0h1v16H7V4zm3 0h2v16h-2V4zm4 0h1v16h-1V4zm3 0h4v16h-4V4z" />
-                </svg>
+                <ScanBarcode size={18} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -1230,9 +1258,9 @@ export default function NutritionMixer({
                 <button
                   type="button"
                   onClick={() => setChatOpen(true)}
-                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-[0.98]"
+                  className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-[0.98]"
                 >
-                  <Sparkles size={13} className="text-yellow-500" />
+                  <Sparkles size={14} className="text-yellow-500" aria-hidden="true" />
                   Perguntar
                 </button>
               )}
@@ -1241,13 +1269,13 @@ export default function NutritionMixer({
                   type="button"
                   onClick={() => setDietOpen(v => !v)}
                   aria-expanded={dietOpen}
-                  className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.98] ${
+                  className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.98] ${
                     dietOpen
                       ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
                       : 'border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:border-yellow-500/30 hover:text-white'
                   }`}
                 >
-                  <span aria-hidden="true">🍱</span>
+                  <UtensilsCrossed size={14} className={dietOpen ? 'text-yellow-300' : 'text-yellow-500'} aria-hidden="true" />
                   {dietOpen ? 'Fechar dieta' : 'Gerar dieta'}
                 </button>
               )}
@@ -1283,8 +1311,8 @@ export default function NutritionMixer({
                 )}
               </div>
               {String(error).startsWith('Não reconheci') && !aiUpgrade && (
-                <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 h-11 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
-                  {aiBusy ? 'Estimando...' : '🤖 Estimar com IA'}
+                <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 inline-flex h-11 items-center gap-1.5 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
+                  {aiBusy ? 'Estimando...' : <><Bot size={14} aria-hidden="true" />Estimar com IA</>}
                 </button>
               )}
             </div>
@@ -1322,7 +1350,7 @@ export default function NutritionMixer({
             </div>
           ) : safeEntries.length === 0 ? (
             <div className="text-center py-8">
-              <div className="text-3xl mb-2">🍽️</div>
+              <UtensilsCrossed size={28} className="mx-auto mb-2 text-neutral-600" aria-hidden="true" />
               <div className="text-sm text-neutral-400 font-medium">Nenhuma refeição {isToday ? 'hoje' : 'neste dia'}</div>
               <div className="text-xs text-neutral-400 mt-1">Adicione um lançamento para começar</div>
             </div>
