@@ -1188,7 +1188,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         (user?.id || initialUserObj?.id) ? (
                                             <ErrorBoundary>
                                                 <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
-                                                    <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} onClose={() => setView('dashboard')} />
+                                                    <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} selfView onClose={() => setView('dashboard')} />
                                                 </Suspense>
                                             </ErrorBoundary>
                                         ) : null

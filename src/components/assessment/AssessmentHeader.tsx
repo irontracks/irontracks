@@ -27,6 +27,16 @@ type AssessmentHeaderProps = {
    * avaliações por foto já geradas (o laudo fica salvo no banco).
    */
   onPhotoHistory?: () => void
+  /**
+   * Nasce expandido.
+   *
+   * O menu é um acordeão FECHADO por padrão, e no estado vazio isso deixava a
+   * tela num beco: o card dizia "Nenhuma avaliação encontrada" enquanto o botão
+   * "+ Nova Avaliação" ficava escondido atrás de um título que não parece
+   * clicável. Quem nunca fez uma avaliação — exatamente quem vê essa tela — não
+   * tinha como fazer a primeira. Visto no simulador em 09/08/2026.
+   */
+  defaultOpen?: boolean
 }
 
 export const AssessmentHeader = ({
@@ -36,12 +46,13 @@ export const AssessmentHeader = ({
   onAddBia,
   onPhotoAssessment,
   onPhotoHistory,
+  defaultOpen = false,
 }: AssessmentHeaderProps) => {
   // Layout: nº de colunas = nº de botões (Nova + Histórico são fixos).
   const count = 2 + (onAddBia ? 1 : 0) + (onPhotoAssessment ? 1 : 0) + (onPhotoHistory ? 1 : 0)
   const cols = count >= 5 ? 'sm:grid-cols-5' : count === 4 ? 'sm:grid-cols-4' : count === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const toggleOpen = () => setOpen((v) => !v)
   return (
     <div
