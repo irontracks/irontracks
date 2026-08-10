@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMinutesLabel } from '@/utils/report/formatters';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HistorySummaryCard } from '@/components/history/HistorySummaryCard';
 import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/HistoryEmptyStates';
@@ -182,7 +183,10 @@ const HistoryList: React.FC<HistoryListProps> = ({
                         <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
                             {virtualItems.map((row) => {
                                 const session = visibleHistory[row.index];
-                                const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
+                                // Fonte unica de formatacao: o mesmo treino aparecia como
+                                // "1 min" aqui, "2 min" no resumo, "1.9 min" no relatorio e
+                                // "1min" no story — quatro formulas para o mesmo numero.
+                                const duracaoLabel = formatMinutesLabel(Number(session?.totalTime) || 0);
                                 const isSelected = selectedIds.has(session.id);
                                 const meta = getSessionMeta(session);
                                 const currentWeek = getWeekStart(session?.date ?? session?.dateMs);
@@ -245,7 +249,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                 </div>
                                                                 <div className="mt-1.5 flex items-center gap-2.5 text-xs text-neutral-400 flex-wrap">
                                                                     <span className={`inline-flex items-center gap-1`}><CalendarDays size={12} className={`${isCardio ? 'text-green-500/60' : 'text-yellow-500/60'}`} />{formatCompletedAt(session?.date)}</span>
-                                                                    <span className="inline-flex items-center gap-1"><Clock size={12} className={`${isCardio ? 'text-green-500/60' : 'text-yellow-500/60'}`} />{minutes} min</span>
+                                                                    <span className="inline-flex items-center gap-1"><Clock size={12} className={`${isCardio ? 'text-green-500/60' : 'text-yellow-500/60'}`} />{duracaoLabel}</span>
                                                                 </div>
                                                                 {/* Cardio badges */}
                                                                 {isCardio && (session.distanceMeters != null || session.avgPaceMinKm != null) && (
