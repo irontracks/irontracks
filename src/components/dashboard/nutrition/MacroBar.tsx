@@ -1,14 +1,13 @@
 'use client'
 
-/** Cores de CATEGORIA dos macros — todas da paleta do app, mutuamente distinguíveis. */
-export const MACRO_COLORS = {
-  protein: '#fbbf24', // âmbar — a cor de identidade do IronTracks
-  carbs: '#3b82f6',   // azul (status blue da paleta)
-  fat: '#f97316',     // laranja (status orange da paleta)
-} as const
-
-/** Vermelho de ALERTA — usado só quando a meta estoura, nunca como cor de macro. */
-export const MACRO_OVER_COLOR = '#ef4444'
+/**
+ * As cores mudaram de casa: agora vivem em `lib/nutrition/macroColors`, porque
+ * o card de Lançamentos tinha a SUA cópia divergente (carboidrato amarelo,
+ * gordura vermelha) na mesma tela. Re-exportado para não quebrar quem importa
+ * daqui.
+ */
+export { MACRO_COLORS, MACRO_OVER_COLOR } from '@/lib/nutrition/macroColors'
+import { MACRO_OVER_COLOR } from '@/lib/nutrition/macroColors'
 
 const safeNumber = (value: unknown): number => {
   const n = Number(value)
