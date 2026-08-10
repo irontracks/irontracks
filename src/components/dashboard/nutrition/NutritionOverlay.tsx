@@ -205,7 +205,12 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
       className="fixed inset-x-0 bottom-0 z-[25] bg-neutral-950 overflow-y-auto overscroll-none"
       style={{ top: 'calc(4rem + env(safe-area-inset-top) + 64px)' }}
     >
-      <div className="mx-auto w-full max-w-md px-4 pb-28 pt-4">
+      {/* `pt-7` (28px), não `pt-4`. O overlay começa EXATAMENTE onde a barra de
+          abas termina (`top: … + 64px`), e a barra projeta `shadow-2xl
+          shadow-black/60` por cima do conteúdo: os 16px anteriores viravam ~5pt
+          de ar visível, e o navegador de data parecia grudado no menu.
+          Reportado pelo dono olhando o app. */}
+      <div className="mx-auto w-full max-w-md px-4 pb-28 pt-7">
         {data ? (
           <NutritionMixer
             dateKey={data.dateKey}

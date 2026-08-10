@@ -826,52 +826,76 @@ export default function NutritionMixer({
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded-full border ${calorieOver ? 'text-red-300 bg-red-500/10 border-red-500/20' : 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20'}`}>
-                {calorieOver ? 'Acima da meta' : `${caloriePct}%`}
-              </span>
+          {/* Summary.
+              O badge de percentual SAIU: ele repetia, em selo dourado, o que o
+              anel ao lado já desenha — e ficava com mais destaque que o número
+              que o usuário realmente procura no meio do dia. Agora o dominante
+              é QUANTO AINDA CABE; o consumido continua no centro do anel e a
+              meta vira contexto, em cinza. Mesma inversão feita nos macros
+              ("faltam 97 g"). */}
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div>
+              {calorieOver ? (
+                <div className="text-2xl font-black tabular-nums leading-none text-red-400">
+                  +{Math.round(Math.abs(remaining))}
+                  <span className="ml-1 text-sm font-bold text-red-300/80">kcal acima</span>
+                </div>
+              ) : remaining > 0 ? (
+                <div className="text-2xl font-black tabular-nums leading-none text-white">
+                  {Math.round(remaining)}
+                  <span className="ml-1 text-sm font-bold text-neutral-400">kcal restantes</span>
+                </div>
+              ) : (
+                <div className="text-2xl font-black leading-none text-green-400">Meta batida</div>
+              )}
             </div>
-            <div className="text-xs text-neutral-400">
-              Meta: <span className="text-neutral-200 font-semibold">{Math.round(safeGoals.calories)} kcal</span>
+            <div className="text-xs text-neutral-500 tabular-nums">
+              de {Math.round(safeGoals.calories)} kcal
             </div>
-            {!calorieOver && remaining > 0 && (
-              <div className="text-xs text-neutral-400">
-                Restam <span className="text-emerald-400 font-semibold">{Math.round(remaining)}</span> kcal
-              </div>
-            )}
 
-            {/* Dia de descanso — meta reduzida por decisão do usuário na pergunta
-                matinal. Mostra o quanto foi descontado (transparência). Só em HOJE:
-                restDayReduction/workoutCaloriesToday são valores do dia corrente; ao
-                navegar para um dia passado (backdate) eles não se aplicam. */}
-            {isToday && safeNumber(restDayReduction) > 0 && (
-              <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-sky-500/15 bg-sky-500/[0.06] px-2 py-1">
-                <Moon size={12} className="shrink-0 text-sky-300" aria-hidden="true" />
-                <span className="text-[10px] leading-tight text-sky-300">
-                  Dia de descanso: meta ajustada <span className="font-semibold">−{Math.round(safeNumber(restDayReduction))} kcal</span>
-                  <span className="text-neutral-500"> · proteína mantida</span>
-                </span>
-              </div>
-            )}
-
-            {/* Gasto do treino — informativo apenas. NÃO entra na meta de propósito:
-                "comer de volta" um gasto estimado sabota o déficit do cutting. */}
-            {isToday && safeNumber(workoutCaloriesToday) > 0 && (
-              <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-orange-500/15 bg-orange-500/[0.06] px-2 py-1">
-                <Flame size={12} className="shrink-0 text-orange-300" aria-hidden="true" />
-                <span className="text-[10px] leading-tight text-orange-300">
-                  Treino hoje: <span className="font-semibold">~{Math.round(safeNumber(workoutCaloriesToday))} kcal</span>
-                  <span className="text-neutral-500"> · estimativa, não muda a meta</span>
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
+        {/* Notas do dia — descanso e treino.
+            Viviam DENTRO da coluna da direita, com ~200px de largura: doze
+            palavras de explicação num badge de 10px quebravam em duas linhas e
+            empurravam o resto. São notas de rodapé; ficam abaixo, na largura
+            inteira do card, onde cabem numa linha só. */}
+        {isToday && safeNumber(restDayReduction) > 0 && (
+          <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-sky-500/15 bg-sky-500/[0.06] px-2.5 py-1.5">
+            <Moon size={12} className="shrink-0 text-sky-300" aria-hidden="true" />
+            <span className="text-[10px] leading-tight text-sky-300">
+              Dia de descanso: meta ajustada <span className="font-semibold">−{Math.round(safeNumber(restDayReduction))} kcal</span>
+              <span className="text-neutral-500"> · proteína mantida</span>
+            </span>
+          </div>
+        )}
+
+        {/* Gasto do treino — informativo apenas. NÃO entra na meta de propósito:
+            "comer de volta" um gasto estimado sabota o déficit do cutting. */}
+        {isToday && safeNumber(workoutCaloriesToday) > 0 && (
+          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-orange-500/15 bg-orange-500/[0.06] px-2.5 py-1.5">
+            <Flame size={12} className="shrink-0 text-orange-300" aria-hidden="true" />
+            <span className="text-[10px] leading-tight text-orange-300">
+              Treino hoje: <span className="font-semibold">~{Math.round(safeNumber(workoutCaloriesToday))} kcal</span>
+              <span className="text-neutral-500"> · estimativa, não muda a meta</span>
+            </span>
+          </div>
+        )}
+
         {goalsSource === 'profile' && (
-          <div className="mt-3 text-[10px] text-neutral-400 text-center">Meta via TDEE do perfil • <button type="button" onClick={() => setGoalsOpen(true)} className="text-yellow-500 hover:text-yellow-400">Ajustar</button></div>
+          /* "Ajustar" é um link de 10px com ~14px de altura de alvo — o
+             `before:-inset-3` leva o toque a 44px sem inflar a linha. */
+          <div className="mt-3 text-[10px] text-neutral-400 text-center">
+            Meta via TDEE do perfil •{' '}
+            <button
+              type="button"
+              onClick={() => setGoalsOpen(true)}
+              className="relative font-semibold text-yellow-500 hover:text-yellow-400 before:absolute before:-inset-3 before:content-['']"
+            >
+              Ajustar
+            </button>
+          </div>
         )}
 
         {safeEntries.length > 0 && (
