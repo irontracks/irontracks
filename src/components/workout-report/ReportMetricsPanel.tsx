@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMinutesLabel } from '@/utils/report/formatters'
+
 type ReportMetricsPanelProps = {
   reportTotals: Record<string, unknown> | null
   reportRest: Record<string, unknown> | null
@@ -34,7 +36,7 @@ export const ReportMetricsPanel = ({
             {(() => {
               const v = formatNumber(reportTotals?.durationMinutes)
               if (v == null || v <= 0) return '—'
-              return `${v.toFixed(1)} min`
+              return formatMinutesLabel(v * 60)
             })()}
           </div>
         </div>
@@ -44,7 +46,7 @@ export const ReportMetricsPanel = ({
             {(() => {
               const v = formatNumber(reportTotals?.executionMinutes)
               if (v == null || v <= 0) return '—'
-              return `${v.toFixed(1)} min`
+              return formatMinutesLabel(v * 60)
             })()}
           </div>
         </div>
@@ -54,7 +56,7 @@ export const ReportMetricsPanel = ({
             {(() => {
               const v = formatNumber(reportTotals?.restMinutes)
               if (v == null || v <= 0) return '—'
-              return `${v.toFixed(1)} min`
+              return formatMinutesLabel(v * 60)
             })()}
           </div>
         </div>
@@ -64,7 +66,7 @@ export const ReportMetricsPanel = ({
             {(() => {
               const v = formatNumber(reportTotals?.densityKgPerMin)
               if (v == null || v <= 0) return '—'
-              return `${v.toFixed(1)} kg/min`
+              return `${v.toFixed(1).replace('.', ',')} kg/min`
             })()}
           </div>
         </div>
@@ -74,7 +76,7 @@ export const ReportMetricsPanel = ({
             {(() => {
               const v = formatNumber(reportTotals?.densityKgPerMinExec)
               if (v == null || v <= 0) return '—'
-              return `${v.toFixed(1)} kg/min`
+              return `${v.toFixed(1).replace('.', ',')} kg/min`
             })()}
           </div>
         </div>

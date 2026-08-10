@@ -47,6 +47,35 @@ export const formatDuration = (s: unknown): string => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`
 }
 
+/**
+ * Duração em minutos, para EXIBIÇÃO — fonte única.
+ *
+ * O mesmo treino de 114 s aparecia de quatro jeitos diferentes no app (visto no
+ * simulador em 09/08/2026): "1 min" no card do histórico (`Math.floor`), "2 min"
+ * no resumo (`Math.round`), "1.9 min" no relatório (`toFixed(1)`, com ponto) e
+ * "1min" no story (outro `Math.floor`). Quatro fórmulas para o mesmo número.
+ *
+ * Isso não é detalhe estético: quando a duração diverge entre telas, o usuário
+ * passa a duvidar do volume e das calorias também — e esses ele não tem como
+ * conferir.
+ *
+ * Regra única: **arredonda** (nem chão nem teto), decimal com VÍRGULA quando
+ * houver, e minutos abaixo de 1 viram segundos, porque "0 min" para um treino
+ * de 40 s é pior que impreciso — é errado.
+ */
+export const formatMinutesLabel = (seconds: unknown, opts?: { decimals?: 0 | 1 }): string => {
+    const safe = Number(seconds)
+    if (!Number.isFinite(safe) || safe <= 0) return '0 min'
+    if (safe < 60) return `${Math.round(safe)} s`
+
+    const mins = safe / 60
+    const casas = opts?.decimals ?? 0
+    // `toFixed` sempre devolve ponto; em pt-BR o separador é vírgula, e o app já
+    // usa vírgula em ~70 outros lugares.
+    const texto = mins.toFixed(casas).replace('.', ',')
+    return `${texto} min`
+}
+
 export const formatKm = (meters: unknown): string => {
     const m = Number(meters)
     if (!Number.isFinite(m) || m <= 0) return '-'

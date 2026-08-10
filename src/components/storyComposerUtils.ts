@@ -6,7 +6,7 @@
  */
 
 import { safeString } from '@/utils/guards'
-import { calculateTotalVolume as canonicalCalculateTotalVolume } from '@/utils/report/formatters'
+import { calculateTotalVolume as canonicalCalculateTotalVolume, formatMinutesLabel } from '@/utils/report/formatters'
 import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { type StoryTemplate, DEFAULT_STORY_TEMPLATE, storyFont } from '@/components/stories/storyTemplates'
 import { drawCustomTextLayer } from '@/components/stories/customText'
@@ -157,13 +157,26 @@ export const formatDatePt = (v: unknown): string => {
     }
 };
 
+/**
+ * Duração no card do story.
+ *
+ * Abaixo de 1 h DELEGA ao `formatMinutesLabel` (fonte única): este arquivo
+ * usava `Math.floor`, então um treino de 114 s saía como "1min" no story
+ * enquanto o resumo do histórico dizia "2 min" e o relatório, "1.9 min" — o
+ * mesmo treino com quatro números diferentes, visto no simulador em 09/08/2026.
+ *
+ * A faixa de horas fica aqui porque é específica deste card, onde "125 min"
+ * não cabe nem se lê: acima de 1 h vira "2h 5min".
+ */
 export const formatDuration = (totalSeconds: unknown): string => {
     const sec = Number(totalSeconds) || 0;
-    if (sec <= 0) return '0min';
+    if (sec <= 0) return '0 min';
     const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return `${h}h ${m}min`;
-    return `${m}min`;
+    if (h > 0) {
+        const m = Math.round((sec % 3600) / 60);
+        return `${h}h ${m}min`;
+    }
+    return formatMinutesLabel(sec);
 };
 
 /**
