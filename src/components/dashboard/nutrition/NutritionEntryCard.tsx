@@ -301,7 +301,11 @@ function NutritionEntryCard({
                     {/* "Sim"/"Não" não dizem a que respondem quando o usuário
                         volta ao card meio segundo depois. Confirmação destrutiva
                         nomeia a AÇÃO. */}
-                    <span className="mr-auto min-w-0 truncate text-xs text-neutral-300">Remover este lançamento?</span>
+                    {/* "Remover este lançamento?" não cabe ao lado de dois botões
+                        de 44px na largura de um iPhone: virava "Remover este
+                        lançament…" na tela. A ação já está nomeada no botão
+                        vermelho ao lado — aqui basta a pergunta. */}
+                    <span className="mr-auto min-w-0 truncate text-xs text-neutral-300">Tem certeza?</span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onCancelDelete() }}
