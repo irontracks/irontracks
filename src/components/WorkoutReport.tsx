@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
-import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react';
+import { Download, ArrowLeft, FileText, Code, Save } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
@@ -45,7 +45,6 @@ const MuscleMapSection = dynamic(() => import('@/components/workout-report/Muscl
 
 // Modals — loaded only when user opens them
 const StoryComposer = dynamic(() => import('@/components/StoryComposer'), { ssr: false, loading: () => null })
-const WorkoutShareCard = dynamic(() => import('@/components/WorkoutShareCard'), { ssr: false, loading: () => null })
 
 import {
     useReportData,
@@ -90,7 +89,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     const reportRef = useRef<HTMLDivElement | null>(null);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
-    const [showShareCard, setShowShareCard] = useState(false);
     const [sharing, setSharing] = useState(false);
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [templateSaved, setTemplateSaved] = useState(false);
@@ -646,14 +644,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         >
                             <span className="text-xs uppercase tracking-widest">Story</span>
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => { setShowExportMenu(false); setShowShareCard(true); }}
-                            className="min-h-[36px] bg-neutral-800 hover:bg-neutral-700 text-white px-3 rounded-xl font-black inline-flex items-center gap-1.5 border border-neutral-700"
-                        >
-                            <Share2 size={14} className="text-yellow-500" />
-                            <span className="text-xs uppercase tracking-widest">Card</span>
-                        </button>
                     </div>
 
                 </div>
@@ -844,20 +834,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 </div>
             )}
             {showStory ? <StoryComposer open={showStory} session={session} calories={calories} onClose={() => setShowStory(false)} /> : null}
-            {showShareCard ? (
-                <WorkoutShareCard
-                    session={safeSession}
-                    dateStr={formatDate(safeSession?.date)}
-                    workoutTitle={workoutTitleMain}
-                    calories={typeof calories === 'number' ? calories : 0}
-                    currentVolume={typeof currentVolume === 'number' ? currentVolume : 0}
-                    setsCompleted={typeof setsCompleted === 'number' ? setsCompleted : 0}
-                    totalTime={typeof safeSession?.totalTime === 'number' ? (safeSession.totalTime as number) : 0}
-                    prCount={typeof prCount === 'number' ? prCount : 0}
-                    detectedPrs={Array.isArray(detectedPrs) ? (detectedPrs as { exerciseName?: string; name?: string; e1rm?: number; weight?: number }[]) : []}
-                    onClose={() => setShowShareCard(false)}
-                />
-            ) : null}
 
         </div>
     );
