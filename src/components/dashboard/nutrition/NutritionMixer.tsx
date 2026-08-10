@@ -924,8 +924,14 @@ export default function NutritionMixer({
               vizinhos, senão a lei de proximidade agrupa errado. Visto no
               simulador em ago/2026 com `space-y-3` (12px), depois que a legenda
               lateral saiu da linha da barra: cada trilho parecia pertencer ao
-              macro de BAIXO. */}
-          <div className="space-y-4">
+              macro de BAIXO.
+
+              `pt-2` em cima dos 12px do card: o pill METAS tem 36px de altura e
+              termina praticamente encostado no "faltam X g" do primeiro macro —
+              dois elementos de peso alto, empilhados na MESMA coluna da direita,
+              a 11px um do outro. O cabeçalho precisa de ar próprio para não ler
+              como parte da linha da proteína. */}
+          <div className="pt-2 space-y-4">
             <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color={MACRO_COLORS.protein} />
             <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color={MACRO_COLORS.carbs} />
             <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color={MACRO_COLORS.fat} />

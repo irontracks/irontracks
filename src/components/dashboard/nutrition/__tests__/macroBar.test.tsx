@@ -151,10 +151,25 @@ describe('MacroBar', () => {
    */
   it('macros vizinhos ficam a 16px — o par rótulo+barra tem que ler como um bloco', () => {
     const mixer = readFileSync(join(__dirname, '..', 'NutritionMixer.tsx'), 'utf8')
-    const wrapper = mixer.match(/<div className="space-y-([\d.]+)">\s*<MacroBar/)
+    const wrapper = mixer.match(/<div className="([^"]*space-y-[\d.]+[^"]*)">\s*<MacroBar/)
     expect(wrapper, 'os três MacroBar precisam de um wrapper com espaçamento próprio').not.toBeNull()
-    expect(parseFloat(wrapper![1]) * 4, 'medido no simulador: abaixo de 16px o agrupamento inverte')
+    const gap = wrapper![1].match(/space-y-([\d.]+)/)
+    expect(parseFloat(gap![1]) * 4, 'medido no simulador: abaixo de 16px o agrupamento inverte')
       .toBeGreaterThanOrEqual(16)
+  })
+
+  /**
+   * O pill METAS tem 36px de altura e mora na MESMA coluna da direita que o
+   * "faltam X g" do primeiro macro. Com só os 12px do card entre eles, os dois
+   * elementos de peso alto encostavam e o cabeçalho lia como parte da linha da
+   * proteína — reportado pelo dono olhando o app.
+   */
+  it('o cabeçalho com o botão METAS tem ar próprio antes do primeiro macro', () => {
+    const mixer = readFileSync(join(__dirname, '..', 'NutritionMixer.tsx'), 'utf8')
+    const wrapper = mixer.match(/<div className="([^"]*)">\s*<MacroBar/)
+    const pt = wrapper![1].match(/\bpt-([\d.]+)/)
+    expect(pt, 'sem padding-top o pill METAS encosta no "faltam X g"').not.toBeNull()
+    expect(parseFloat(pt![1]) * 4).toBeGreaterThanOrEqual(8)
   })
 
   it('meta zerada não quebra nem gera NaN/Infinity na tela', () => {
