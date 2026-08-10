@@ -19,16 +19,69 @@ const rgb = (hex: string): string => {
 describe('MacroBar', () => {
   it('mostra consumido, meta e o quanto FALTA — sem exigir conta de cabeça', () => {
     render(<MacroBar label="Proteína" value={60} goal={208} color={MACRO_COLORS.protein} />)
-    expect(screen.getByText('60')).toBeDefined()
-    expect(screen.getByText(/\/ 208 g/)).toBeDefined()
+    expect(screen.getByText(/60 \/ 208 g/)).toBeDefined()
     expect(screen.getByText(/faltam 148 g/)).toBeDefined()
-    expect(screen.getByText('29%')).toBeDefined()
   })
 
   it('em zero, informa a meta inteira como pendente em vez de um vazio mudo', () => {
     render(<MacroBar label="Proteína" value={0} goal={208} color={MACRO_COLORS.protein} />)
-    expect(screen.getByText('0%')).toBeDefined()
+    expect(screen.getByText(/0 \/ 208 g/)).toBeDefined()
     expect(screen.getByText(/faltam 208 g/)).toBeDefined()
+  })
+
+  /**
+   * O percentual dizia na tela o que a barra já desenha — quarta codificação do
+   * mesmo fato na mesma linha. Saiu do visual e continua no `aria-valuetext`,
+   * então quem usa leitor de tela não perde nada.
+   */
+  it('não repete na tela o percentual que a barra já mostra', () => {
+    const { container } = render(
+      <MacroBar label="Proteína" value={60} goal={208} color={MACRO_COLORS.protein} />,
+    )
+    expect(container.textContent).not.toMatch(/%/)
+    expect(screen.getByRole('progressbar', { name: 'Proteína' }).getAttribute('aria-valuetext'))
+      .toContain('29%')
+  })
+
+  /**
+   * O trilho dividia a linha com a legenda (`flex-1` + `min-w`), então
+   * "faltam 122 g" encolhia a própria barra e as três do card ficavam com
+   * comprimentos diferentes — réguas de escalas distintas empilhadas num card
+   * que existe para comparar. Nada mais pode ocupar a linha da barra.
+   */
+  it('a barra ocupa a linha inteira — nenhum texto divide espaço com ela', () => {
+    const { container } = render(
+      <MacroBar label="Carboidratos" value={173} goal={295} color={MACRO_COLORS.carbs} />,
+    )
+    const trilho = screen.getByRole('progressbar', { name: 'Carboidratos' })
+    expect(trilho.className).toContain('w-full')
+    expect(trilho.className).not.toContain('flex-1')
+
+    // O trilho não pode estar dentro de uma linha horizontal: era o `flex` com
+    // a legenda ao lado que roubava largura dele.
+    expect((trilho.parentElement as HTMLElement).className).not.toContain('flex')
+    // E nenhuma reserva de largura para texto sobrou no componente.
+    expect(container.querySelector('[class*="min-w-["]')).toBeNull()
+  })
+
+  /**
+   * Cor de categoria é da BARRA (mínimo 3:1). Como TEXTO de 10px o azul do
+   * carboidrato dava ~3,7:1 sobre #0a0a0a — reprovado no WCAG AA, e lido de
+   * relance numa academia.
+   */
+  it('a cor da categoria não é usada em texto pequeno', () => {
+    const { container } = render(
+      <MacroBar label="Carboidratos" value={173} goal={295} color={MACRO_COLORS.carbs} />,
+    )
+    const pintados = Array.from(container.querySelectorAll<HTMLElement>('[style*="color"]'))
+      .filter((el) => el.style.color && !el.style.backgroundColor)
+    expect(pintados).toHaveLength(0)
+  })
+
+  it('meta batida exata não vira "faltam 0 g"', () => {
+    render(<MacroBar label="Gordura" value={74} goal={74} color={MACRO_COLORS.fat} />)
+    expect(screen.getByText(/meta batida/)).toBeDefined()
+    expect(screen.queryByText(/faltam/)).toBeNull()
   })
 
   it('VERMELHO só aparece quando estoura a meta — nunca como cor de macro', () => {
