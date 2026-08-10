@@ -70,6 +70,57 @@ describe('quando NÃO aparecer', () => {
         const { container } = render(<QuickStartCard workouts={[]} onStartSession={() => { }} />)
         expect(container).toBeEmptyDOMElement()
     })
+
+    /**
+     * Ago/2026: depois de finalizar, o dashboard continuava oferecendo "Treinar
+     * agora" como primeira coisa da tela. O convite é ruído para quem acabou de
+     * terminar — a tela do pós-treino deve ficar limpa.
+     */
+    it('some depois da sessão concluída hoje', () => {
+        const { container } = render(
+            <QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday />,
+        )
+        expect(container).toBeEmptyDOMElement()
+    })
+
+    it('continua aparecendo enquanto não treinou hoje', () => {
+        render(<QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday={false} />)
+        expect(screen.getByRole('button', { name: /Treinar agora/i })).toBeInTheDocument()
+    })
+})
+
+describe('tocar no card abre o treino', () => {
+    it('o corpo do card chama onQuickView com o treino escolhido', () => {
+        const verTreino = vi.fn()
+        render(
+            <QuickStartCard workouts={[treino('A - teste')]} onStartSession={() => { }} onQuickView={verTreino} />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: /Ver treino A - teste/i }))
+        expect(verTreino).toHaveBeenCalledTimes(1)
+        expect((verTreino.mock.calls[0][0] as DashboardWorkout).title).toBe('A - teste')
+    })
+
+    /**
+     * Os dois botões são IRMÃOS, não aninhados: aninhado é HTML inválido e o
+     * toque em "Treinar agora" borbulharia, abrindo a visualização por baixo do
+     * treino que acabou de começar.
+     */
+    it('tocar em "Treinar agora" não abre a visualização', () => {
+        const verTreino = vi.fn()
+        const iniciar = vi.fn()
+        render(
+            <QuickStartCard workouts={[treino('A - teste')]} onStartSession={iniciar} onQuickView={verTreino} />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: /Treinar agora/i }))
+        expect(iniciar).toHaveBeenCalledTimes(1)
+        expect(verTreino).not.toHaveBeenCalled()
+    })
+
+    it('sem onQuickView o corpo não vira botão morto', () => {
+        render(<QuickStartCard workouts={[treino('A - teste')]} onStartSession={() => { }} />)
+        expect(screen.queryByRole('button', { name: /Ver treino/i })).not.toBeInTheDocument()
+        expect(screen.getByText('A - teste')).toBeInTheDocument()
+    })
 })
 
 describe('ação', () => {
@@ -107,6 +158,24 @@ describe('posição no dashboard', () => {
         expect(idxPrompt).toBeGreaterThan(-1)
         expect(idxPrompt, '"vai treinar hoje?" é administrativo — não abre a tela')
             .toBeGreaterThan(idxQuick)
+    })
+
+    /**
+     * Fiação, não só as pontas: o card sabe abrir e sabe sumir, mas nada disso
+     * chega ao usuário se o dashboard não passar as duas props. Foi assim que
+     * uma correção de motor ficou verde em 198 testes sem estar ligada.
+     */
+    it('o dashboard liga o toque do card à visualização rápida', () => {
+        const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
+        const bloco = dash.slice(dash.indexOf('<QuickStartCard'), dash.indexOf('<QuickStartCard') + 400)
+        expect(bloco).toMatch(/onQuickView=\{props\.onQuickView\}/)
+    })
+
+    it('o dashboard alimenta o card com "já treinou hoje"', () => {
+        const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
+        const bloco = dash.slice(dash.indexOf('<QuickStartCard'), dash.indexOf('<QuickStartCard') + 400)
+        expect(bloco, 'sem esta prop o card nunca some depois do treino').toMatch(/trainedToday=\{/)
+        expect(dash).toMatch(/useTrainedToday\(props\.currentUserId, props\.hasActiveSession\)/)
     })
 
     it('os painéis de dados ficam DEPOIS da lista de treinos', () => {

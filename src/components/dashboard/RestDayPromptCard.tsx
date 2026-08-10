@@ -10,9 +10,9 @@
  */
 import { useEffect, useState } from 'react'
 import { Dumbbell, Moon } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
-import { getTodayRestDayIntent, setRestDayIntent, brtDateKey } from '@/lib/nutrition/restDayIntent'
+import { getTodayRestDayIntent, setRestDayIntent } from '@/lib/nutrition/restDayIntent'
+import { hasTrainedTodayBrt } from '@/lib/workout/trainedToday'
 
 type CardState = 'loading' | 'show' | 'hidden'
 
@@ -33,25 +33,10 @@ export default function RestDayPromptCard({ userId }: { userId?: string }) {
       if (intent) { setState('hidden'); return }
 
       // Já treinou hoje? Está claramente treinando — não faz sentido perguntar.
-      // Sessões ficam em `workouts` (date em BRT após conversão).
-      try {
-        const supabase = createClient()
-        const day = brtDateKey()
-        const { data } = await supabase
-          .from('workouts')
-          .select('date')
-          .eq('user_id', uid)
-          .eq('is_template', false)
-          .order('date', { ascending: false })
-          .limit(5)
-        if (cancelled) return
-        const trained = (Array.isArray(data) ? data : []).some((w) => {
-          try {
-            return new Date(String((w as { date?: string }).date)).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) === day
-          } catch { return false }
-        })
-        if (trained) { setState('hidden'); return }
-      } catch { /* sem dados / tabela ausente — segue mostrando */ }
+      // Mesma resposta que o QuickStartCard usa para sumir: um critério só.
+      const trained = await hasTrainedTodayBrt(uid)
+      if (cancelled) return
+      if (trained) { setState('hidden'); return }
 
       if (!cancelled) setState('show')
     })()

@@ -26,6 +26,7 @@ import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 import { WorkoutCard } from './WorkoutCard'
 import { QuickStartCard } from './QuickStartCard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
+import { useTrainedToday } from '@/hooks/useTrainedToday'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
@@ -317,6 +318,12 @@ export default function StudentDashboard(props: Props) {
     })()
   }, [props])
 
+  // Sessão concluída hoje esconde o atalho "Treinar agora". A releitura é
+  // amarrada em `hasActiveSession`: quando a sessão termina, a flag cai e a
+  // resposta é buscada de novo — sem isso o card voltaria a convidar para
+  // treinar logo depois de o usuário finalizar.
+  const trainedToday = useTrainedToday(props.currentUserId, props.hasActiveSession)
+
   const showVipTab = props.vipEnabled !== false
   const vipLocked = !!props.vipLocked
   const vipLabel = String(props.vipLabel || 'VIP')
@@ -339,6 +346,8 @@ export default function StudentDashboard(props: Props) {
           workouts={workouts}
           onStartSession={props.onStartSession}
           hasActiveSession={props.hasActiveSession}
+          onQuickView={props.onQuickView}
+          trainedToday={trainedToday === true}
         />
       )}
 
