@@ -1,7 +1,9 @@
 'use client'
 
 import { memo, useState } from 'react'
+import { X } from 'lucide-react'
 import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
+import { MACRO_COLORS, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -156,7 +158,7 @@ function NutritionEntryCard({
                 aria-label="Nome da refeição"
                 value={editDraft.food_name}
                 onChange={(e) => onEditDraftChange((d) => ({ ...d, food_name: e.target.value }))}
-                className="w-full h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/50 px-3 text-sm text-white placeholder:text-neutral-400 outline-none focus:border-yellow-500/40"
+                className="w-full h-11 rounded-xl bg-neutral-800/60 border border-neutral-700/50 px-3 text-sm text-white placeholder:text-neutral-400 outline-none focus:border-yellow-500/40"
                 placeholder="Nome da refeição"
               />
 
@@ -177,9 +179,12 @@ function NutritionEntryCard({
                           type="button"
                           aria-label={`Remover ${food.label}`}
                           onClick={() => onEditDraftChange((d) => ({ ...d, items: (Array.isArray(d.items) ? d.items : []).filter((_, idx) => idx !== i) }))}
-                          className="shrink-0 w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-700/50 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 flex items-center justify-center text-base leading-none transition"
+                          /* `before:-inset-2` leva a área de toque a ~44px sem
+                             engordar a linha da lista — mesmo recurso do botão
+                             METAS. O alvo visível continua discreto; o dedo, não. */
+                          className="relative shrink-0 w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-700/50 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 flex items-center justify-center transition before:absolute before:-inset-2 before:content-['']"
                         >
-                          ×
+                          <X size={13} strokeWidth={2.5} aria-hidden="true" />
                         </button>
                       </li>
                     ))}
@@ -196,14 +201,14 @@ function NutritionEntryCard({
                   disabled={adding}
                   onChange={(e) => { setAddText(e.target.value); if (addError) setAddError('') }}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAddFood() } }}
-                  className="flex-1 h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/50 px-3 text-sm text-white placeholder:text-neutral-400 outline-none focus:border-yellow-500/40 disabled:opacity-60"
+                  className="flex-1 h-11 rounded-xl bg-neutral-800/60 border border-neutral-700/50 px-3 text-sm text-white placeholder:text-neutral-400 outline-none focus:border-yellow-500/40 disabled:opacity-60"
                   placeholder="Adicionar alimento (ex.: 200g arroz)"
                 />
                 <button
                   type="button"
                   onClick={() => void handleAddFood()}
                   disabled={adding || !addText.trim()}
-                  className="h-9 px-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-xs font-bold text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-50 transition whitespace-nowrap"
+                  className="h-11 px-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-xs font-bold text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-50 transition whitespace-nowrap"
                 >
                   {adding ? '...' : '+ Add'}
                 </button>
@@ -224,7 +229,7 @@ function NutritionEntryCard({
                 <button
                   type="button"
                   onClick={() => { setAddText(''); setAddError(''); onCancelEdit() }}
-                  className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-neutral-300 hover:bg-neutral-900 transition"
+                  className="h-11 px-4 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-neutral-300 hover:bg-neutral-900 transition"
                 >
                   Cancelar
                 </button>
@@ -232,7 +237,7 @@ function NutritionEntryCard({
                   type="button"
                   disabled={editBusy || draftItems.length === 0}
                   onClick={onSaveEdit}
-                  className="h-8 px-4 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-xs font-semibold text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-60 transition"
+                  className="h-11 px-4 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-xs font-semibold text-yellow-200 hover:bg-yellow-500/30 disabled:opacity-60 transition"
                 >
                   {editBusy ? '...' : 'Salvar'}
                 </button>
@@ -240,30 +245,33 @@ function NutritionEntryCard({
             </div>
           ) : (
             <>
-              {/* Macro stacked bar */}
+              {/* Proporção da refeição. As cores saem da fonte única
+                  (`lib/nutrition/macroColors`): aqui a gordura era `#ef4444`, a
+                  cor de ERRO do app — 23g de gordura pintavam um bloco inteiro
+                  de vermelho —, e o carboidrato era amarelo, enquanto o card
+                  Macronutrientes logo acima o desenha em azul. Mesma tela,
+                  mesmas categorias, duas codificações. */}
               <div className="mt-3 h-2.5 rounded-full overflow-hidden flex bg-neutral-800">
-                {proteinPct > 0 && <div className="h-full" style={{ width: `${proteinPct}%`, backgroundColor: '#f59e0b' }} />}
-                {carbsPct > 0 && <div className="h-full" style={{ width: `${carbsPct}%`, backgroundColor: '#facc15' }} />}
-                {fatPct > 0 && <div className="h-full" style={{ width: `${fatPct}%`, backgroundColor: '#ef4444' }} />}
+                {proteinPct > 0 && <div className="h-full" style={{ width: `${proteinPct}%`, backgroundColor: MACRO_COLORS.protein }} />}
+                {carbsPct > 0 && <div className="h-full" style={{ width: `${carbsPct}%`, backgroundColor: MACRO_COLORS.carbs }} />}
+                {fatPct > 0 && <div className="h-full" style={{ width: `${fatPct}%`, backgroundColor: MACRO_COLORS.fat }} />}
               </div>
 
-              {/* Macro details */}
+              {/* Macro details — o percentual é de CALORIAS, e isso precisa estar
+                  escrito: "45%" sozinho é lido como percentual de gramas, que dá
+                  outro número (ver macroSplit.ts). */}
               <div className="mt-3 grid grid-cols-3 gap-3">
-                <div className="rounded-xl bg-amber-500/8 border border-amber-500/15 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-amber-400/70 font-bold">Proteína</div>
-                  <div className="mt-1 text-base font-bold text-white">{Math.round(item.protein)}g</div>
-                  <div className="text-[10px] text-neutral-400">{proteinPct}%</div>
-                </div>
-                <div className="rounded-xl bg-yellow-500/8 border border-yellow-500/15 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-yellow-400/70 font-bold">Carboidrato</div>
-                  <div className="mt-1 text-base font-bold text-white">{Math.round(item.carbs)}g</div>
-                  <div className="text-[10px] text-neutral-400">{carbsPct}%</div>
-                </div>
-                <div className="rounded-xl bg-red-500/8 border border-red-500/15 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-red-400/70 font-bold">Gordura</div>
-                  <div className="mt-1 text-base font-bold text-white">{Math.round(item.fat)}g</div>
-                  <div className="text-[10px] text-neutral-400">{fatPct}%</div>
-                </div>
+                {([
+                  { key: 'protein' as const, label: 'Proteína', valor: item.protein, pct: proteinPct },
+                  { key: 'carbs' as const, label: 'Carboidrato', valor: item.carbs, pct: carbsPct },
+                  { key: 'fat' as const, label: 'Gordura', valor: item.fat, pct: fatPct },
+                ]).map((m) => (
+                  <div key={m.key} className={`rounded-xl border p-3 ${MACRO_SURFACES[m.key].surface}`}>
+                    <div className={`text-[10px] uppercase tracking-wider font-bold ${MACRO_SURFACES[m.key].label}`}>{m.label}</div>
+                    <div className="mt-1 text-base font-bold text-white tabular-nums">{Math.round(m.valor)}g</div>
+                    <div className="text-[10px] text-neutral-400 tabular-nums">{m.pct}% das kcal</div>
+                  </div>
+                ))}
               </div>
 
               {/* Alimentos da refeição (breakdown por item) */}
@@ -284,61 +292,61 @@ function NutritionEntryCard({
                 </div>
               )}
 
-              {/* Calories row + Story / Edit / Remove */}
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <div className="min-w-0 truncate text-xs text-neutral-400">
-                  Total: <span className="text-white font-semibold">{Math.round(item.calories)} kcal</span>
-                  {' · '}{formatClock(item.created_at)}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {confirmDeleteId === item.id ? (
-                    <>
+              {/* Ações. O rodapé repetia "Total: 655 kcal · 17:00" — os DOIS
+                  números já estão no cabeçalho da mesma caixa, a poucos pixels
+                  daqui. Terceira aparição do mesmo dado no mesmo card. */}
+              <div className="mt-3 flex items-center justify-end gap-2">
+                {confirmDeleteId === item.id ? (
+                  <>
+                    {/* "Sim"/"Não" não dizem a que respondem quando o usuário
+                        volta ao card meio segundo depois. Confirmação destrutiva
+                        nomeia a AÇÃO. */}
+                    <span className="mr-auto min-w-0 truncate text-xs text-neutral-300">Remover este lançamento?</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onCancelDelete() }}
+                      className="h-11 px-4 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-neutral-300 hover:bg-neutral-900 transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={entryBusyId === item.id}
+                      onClick={(e) => { e.stopPropagation(); onDelete(item.id) }}
+                      className="h-11 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-xs font-semibold text-red-200 hover:bg-red-500/30 disabled:opacity-60 transition"
+                    >
+                      {entryBusyId === item.id ? '...' : 'Remover'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {onStory && (
                       <button
                         type="button"
-                        disabled={entryBusyId === item.id}
-                        onClick={(e) => { e.stopPropagation(); onDelete(item.id) }}
-                        className="h-8 px-3 rounded-xl bg-red-500/20 border border-red-500/30 text-xs font-semibold text-red-200 hover:bg-red-500/30 disabled:opacity-60 transition"
+                        onClick={(e) => { e.stopPropagation(); onStory(item) }}
+                        aria-label="Compartilhar refeição (Story)"
+                        className="h-11 px-4 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20 transition"
                       >
-                        {entryBusyId === item.id ? '...' : 'Sim'}
+                        Story
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onCancelDelete() }}
-                        className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-neutral-300 hover:bg-neutral-900 transition"
-                      >
-                        Não
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {onStory && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onStory(item) }}
-                          aria-label="Compartilhar refeição (Story)"
-                          className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20 transition"
-                        >
-                          Story
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onStartEdit(item) }}
-                        className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20 transition"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={entryBusyId === item.id}
-                        onClick={(e) => { e.stopPropagation(); onConfirmDelete(item.id) }}
-                        className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:border-red-500/20 disabled:opacity-60 transition"
-                      >
-                        {entryBusyId === item.id ? '...' : 'Remover'}
-                      </button>
-                    </>
-                  )}
-                </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onStartEdit(item) }}
+                      className="h-11 px-4 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20 transition"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={entryBusyId === item.id}
+                      onClick={(e) => { e.stopPropagation(); onConfirmDelete(item.id) }}
+                      className="h-11 px-4 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-red-400 hover:bg-red-500/10 hover:border-red-500/20 disabled:opacity-60 transition"
+                    >
+                      {entryBusyId === item.id ? '...' : 'Remover'}
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
