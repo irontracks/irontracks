@@ -59,10 +59,16 @@ ChartJS.register(
 
 interface AssessmentHistoryProps {
   studentId?: string;
+  /**
+   * O próprio aluno está vendo (aba Avaliações do app), não o professor
+   * consultando um aluno em `/assessments/[studentId]`. Muda a voz do texto:
+   * "você" em vez de "este aluno".
+   */
+  selfView?: boolean;
   onClose?: () => void;
 }
 
-export default function AssessmentHistory({ studentId: propStudentId, onClose }: AssessmentHistoryProps) {
+export default function AssessmentHistory({ studentId: propStudentId, selfView = false, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
@@ -154,6 +160,12 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
           onPhotoHistory={() => setPhotoHistoryOpen(true)}
+          // Sem nenhuma avaliação, o menu precisa nascer ABERTO: era o único
+          // caminho para "+ Nova Avaliação", e ficava escondido atrás de um
+          // título que não parece clicável — bem na tela de quem ainda não fez
+          // nenhuma. Com histórico, o acordeão continua fechado (a lista é o
+          // que importa ali).
+          defaultOpen
         />
 
         <div
@@ -167,7 +179,15 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             <TrendingUp className="w-8 h-8 text-yellow-500/60" />
           </div>
           <h2 className="text-xl font-black text-white mb-2">Nenhuma avaliação encontrada</h2>
-          <p className="text-neutral-500 text-sm">Este aluno ainda não possui avaliações físicas registradas.</p>
+          {/* Este texto dizia "Este aluno ainda não possui avaliações físicas
+              registradas" — voz de professor numa tela que o próprio aluno abre
+              pelo menu Avaliações. Ele lia sobre si mesmo na terceira pessoa.
+              O componente serve aos dois contextos, então quem chama informa. */}
+          <p className="text-neutral-500 text-sm">
+            {selfView
+              ? 'Registre sua primeira avaliação para acompanhar a evolução ao longo do tempo.'
+              : 'Este aluno ainda não possui avaliações físicas registradas.'}
+          </p>
         </div>
 
         {/* Exames Laboratoriais — acessível mesmo sem avaliação física prévia */}
