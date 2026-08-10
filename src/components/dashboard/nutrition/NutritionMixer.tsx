@@ -917,10 +917,19 @@ export default function NutritionMixer({
             </button>
           </div>
           {/* Cores de CATEGORIA, todas da paleta do app e mutuamente distinguíveis.
-              O vermelho não aparece aqui: ficou reservado para estouro de meta. */}
-          <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color={MACRO_COLORS.protein} />
-          <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color={MACRO_COLORS.carbs} />
-          <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color={MACRO_COLORS.fat} />
+              O vermelho não aparece aqui: ficou reservado para estouro de meta.
+
+              `space-y-4` (16px) entre macros contra os 6px que separam rótulo e
+              barra DENTRO de cada um: o par precisa estar mais junto que os
+              vizinhos, senão a lei de proximidade agrupa errado. Visto no
+              simulador em ago/2026 com `space-y-3` (12px), depois que a legenda
+              lateral saiu da linha da barra: cada trilho parecia pertencer ao
+              macro de BAIXO. */}
+          <div className="space-y-4">
+            <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color={MACRO_COLORS.protein} />
+            <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color={MACRO_COLORS.carbs} />
+            <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color={MACRO_COLORS.fat} />
+          </div>
 
           {/* Goals editor inline */}
           {goalsOpen && (
