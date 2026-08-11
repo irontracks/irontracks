@@ -184,7 +184,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
           <div className="text-[10px] uppercase tracking-widest text-neutral-400">Biblioteca de alimentos</div>
           <div className="mt-0.5 text-base font-semibold text-white">📷 Escanear rótulo nutricional</div>
         </div>
-        <button type="button" onClick={onClose} className="text-neutral-500 hover:text-white text-xl transition">✕</button>
+        <button type="button" onClick={onClose} className="text-neutral-400 hover:text-white text-xl transition">✕</button>
       </div>
 
       {initialBarcode && (
@@ -297,7 +297,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
                 📷 Ler código
               </button>
             </div>
-            <span className="text-[10px] text-neutral-500">Vincula o produto ao código pra reconhecer na próxima leitura.</span>
+            <span className="text-[10px] text-neutral-400">Vincula o produto ao código pra reconhecer na próxima leitura.</span>
           </div>
 
           {/* Aliases */}
@@ -322,7 +322,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
                 {aliases.map(a => (
                   <span key={a} className="inline-flex items-center gap-1 text-xs bg-neutral-800 border border-neutral-700 rounded-full px-2.5 py-1 text-neutral-200">
                     {a}
-                    <button type="button" onClick={() => removeAlias(a)} className="text-neutral-500 hover:text-red-400 transition">×</button>
+                    <button type="button" onClick={() => removeAlias(a)} className="text-neutral-400 hover:text-red-400 transition">×</button>
                   </span>
                 ))}
               </div>

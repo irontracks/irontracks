@@ -128,14 +128,14 @@ export default function PRPrediction({
             )}
           </div>
         </div>
-        {expanded ? <ChevronUp size={14} className="text-neutral-500" /> : <ChevronDown size={14} className="text-neutral-500" />}
+        {expanded ? <ChevronUp size={14} className="text-neutral-400" /> : <ChevronDown size={14} className="text-neutral-400" />}
       </button>
 
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
           {/* Target selector */}
           <div className="flex items-center gap-2">
-            {/* WCAG 1.4.3 AA — text-neutral-500 falha 4.5:1 sobre dark */}
+            {/* WCAG 1.4.3 AA — neutral-500 mede 4.18:1 sobre #0a0a0a e reprova; 400 dá 7.85:1 */}
             <span className="text-[10px] text-neutral-400 font-bold">Meta:</span>
             <div className="flex gap-1">
               {[5, 10, 15, 20].map(increment => {
@@ -148,7 +148,7 @@ export default function PRPrediction({
                     className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
                       isActive
                         ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400'
-                        : 'bg-neutral-800/50 border border-neutral-700/50 text-neutral-500 hover:text-white'
+                        : 'bg-neutral-800/50 border border-neutral-700/50 text-neutral-400 hover:text-white'
                     }`}
                   >
                     {val}{unit}

@@ -266,7 +266,7 @@ export default function DietGenerator({
                 </div>
 
                 {scope === 'week' && !savedPlanId && (
-                  <p className="px-1 text-[10px] leading-relaxed text-neutral-500">
+                  <p className="px-1 text-[10px] leading-relaxed text-neutral-400">
                     Os outros 6 dias saem deste cardápio, variando os alimentos por outros do
                     seu repertório — mesma meta, sem repetir a semana inteira.
                   </p>
@@ -366,7 +366,7 @@ export default function DietGenerator({
                   )
                 })}
 
-                <p className="text-[10px] text-neutral-500 text-center">
+                <p className="text-[10px] text-neutral-400 text-center">
                   Macros calculados no servidor. Ajuste as porções ao seu apetite.
                 </p>
               </div>

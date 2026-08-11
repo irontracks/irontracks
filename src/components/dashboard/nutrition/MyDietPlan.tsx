@@ -187,7 +187,7 @@ export default function MyDietPlan({
           {/* O nome só aparece quando diz algo além do rótulo: o default do servidor
               é "Minha dieta", e repetir vira "MINHA DIETA / Minha dieta" na tela. */}
           {planTitle && <div className="truncate text-sm font-bold text-white">{planTitle}</div>}
-          <div className="mt-0.5 text-[10px] text-neutral-500">
+          <div className="mt-0.5 text-[10px] text-neutral-400">
             {isWeek ? `Plano da semana · ${days.length} dias` : 'Plano de um dia'}
             {' · '}
             {Math.round(day.totals.calories)} kcal · {Math.round(day.totals.protein)}g P
@@ -197,7 +197,7 @@ export default function MyDietPlan({
           type="button"
           onClick={removePlan}
           disabled={removing}
-          className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-500 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+          className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
         >
           {removing ? '...' : 'Remover'}
         </button>
@@ -318,7 +318,7 @@ export default function MyDietPlan({
       </div>
 
       {isWeek && (
-        <p className="px-4 pb-4 text-[10px] text-neutral-500">
+        <p className="px-4 pb-4 text-[10px] text-neutral-400">
           {weekdayLabel(day.weekday)} · trocar um alimento aqui altera só este dia.
         </p>
       )}

@@ -117,7 +117,7 @@ export const ProfileIncompleteBanner = ({ settings, onComplete }: ProfileIncompl
         type="button"
         onClick={dispensar}
         aria-label="Dispensar aviso por 7 dias"
-        className="shrink-0 -mr-1 p-1.5 rounded-lg text-neutral-500 hover:text-neutral-300 active:scale-95 transition-colors"
+        className="shrink-0 -mr-1 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-300 active:scale-95 transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

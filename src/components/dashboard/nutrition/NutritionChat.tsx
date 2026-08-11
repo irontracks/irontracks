@@ -193,7 +193,7 @@ export default function NutritionChat({
             <Sparkles size={16} className="text-yellow-500" />
             <div>
               <div className="text-sm font-black text-white">Perguntar sobre a dieta</div>
-              <div className="text-[11px] text-neutral-500">Simulo antes de você comer</div>
+              <div className="text-[11px] text-neutral-400">Simulo antes de você comer</div>
             </div>
           </div>
           <button
@@ -209,7 +209,7 @@ export default function NutritionChat({
         <div className="min-h-[180px] flex-1 space-y-3 overflow-y-auto p-4">
           {messages.length === 0 && (
             <div className="space-y-2">
-              <div className="text-xs text-neutral-500">Exemplos:</div>
+              <div className="text-xs text-neutral-400">Exemplos:</div>
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
@@ -229,7 +229,7 @@ export default function NutritionChat({
                 <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-yellow-500/15 px-3 py-2 text-sm text-white">{m.text}</div>
               ) : (
                 <div className="max-w-[92%]">
-                  <div className={`whitespace-pre-wrap text-sm leading-relaxed ${m.failed ? 'text-neutral-500' : 'text-neutral-200'}`}>
+                  <div className={`whitespace-pre-wrap text-sm leading-relaxed ${m.failed ? 'text-neutral-400' : 'text-neutral-200'}`}>
                     <RichText text={m.text} />
                   </div>
                   {m.sim && (
@@ -268,7 +268,7 @@ export default function NutritionChat({
           ))}
 
           {sending && (
-            <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <div className="flex items-center gap-2 text-xs text-neutral-400">
               <Loader2 size={13} className="animate-spin" /> Calculando…
             </div>
           )}
@@ -288,7 +288,7 @@ export default function NutritionChat({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Se eu comer 5 ovos agora…"
             aria-label="Sua pergunta"
-            className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-[16px] text-white outline-none transition placeholder:text-neutral-500 focus:border-yellow-500/30"
+            className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-[16px] text-white outline-none transition placeholder:text-neutral-400 focus:border-yellow-500/30"
           />
           <button
             type="submit"

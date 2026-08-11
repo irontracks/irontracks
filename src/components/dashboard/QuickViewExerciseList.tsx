@@ -178,7 +178,7 @@ const SortableExercise = ({ ex, index, total, onMove, onDragDone }: {
         >
             <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
             <div className="flex items-start gap-2">
-                <span className={`mt-1 p-1.5 -ml-1 transition-colors ${armed ? 'text-yellow-400' : 'text-neutral-500'}`} aria-hidden="true">
+                <span className={`mt-1 p-1.5 -ml-1 transition-colors ${armed ? 'text-yellow-400' : 'text-neutral-400'}`} aria-hidden="true">
                     <GripVertical size={16} />
                 </span>
                 <div className="flex-1 min-w-0">
@@ -314,7 +314,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                     <div className="w-12 h-12 rounded-2xl bg-neutral-800/60 border border-neutral-700/40 flex items-center justify-center">
                         <Dumbbell size={20} className="text-neutral-600" />
                     </div>
-                    <p className="text-neutral-500 text-sm">Este treino não tem exercícios.</p>
+                    <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
                 </div>
             )}
 
@@ -322,7 +322,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                 <div className="flex items-center justify-between gap-2 px-1 pb-1">
                     {organizing ? (
                         <>
-                            <span className="text-[11px] text-neutral-500">
+                            <span className="text-[11px] text-neutral-400">
                                 {saving ? 'Salvando…' : 'Use ↑ ↓ para mover. Salva sozinho.'}
                             </span>
                             <button
@@ -401,7 +401,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                                         <button
                                             type="button"
                                             onClick={() => { setConfirmingDelete(exId); setError('') }}
-                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-neutral-500 hover:text-red-400 transition active:scale-95"
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-neutral-400 hover:text-red-400 transition active:scale-95"
                                             aria-label={`Excluir ${String(ex?.name || 'exercício')} do treino`}
                                         >
                                             <Trash2 size={12} /> Excluir

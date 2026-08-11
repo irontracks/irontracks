@@ -189,7 +189,7 @@ export default function NutritionWorkoutCorrelation() {
         </div>
 
         {/* Para que lado corre o tempo — a grade sozinha não diz. */}
-        <p className="mt-2 text-[10px] text-neutral-500 tabular-nums">
+        <p className="mt-2 text-[10px] text-neutral-400 tabular-nums">
           {primeiro ? `${shortDate(primeiro)} → hoje` : null}
         </p>
       </div>
@@ -199,7 +199,7 @@ export default function NutritionWorkoutCorrelation() {
       <p className="min-h-[1.25rem] text-xs text-neutral-300 tabular-nums">
         {diaSelecionado
           ? detailOf(diaSelecionado)
-          : <span className="text-neutral-500">Toque num dia para ver o registro.</span>}
+          : <span className="text-neutral-400">Toque num dia para ver o registro.</span>}
       </p>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-neutral-400">

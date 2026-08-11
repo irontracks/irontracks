@@ -25,12 +25,12 @@ export const SortableWorkoutItem = memo(function SortableWorkoutItem({
             className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative touch-none select-none"
         >
             <div
-                className={`text-neutral-500 p-2 -m-2 touch-none ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
+                className={`text-neutral-400 p-2 -m-2 touch-none ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
                 onPointerDown={(e) => !saving && controls.start(e)}
             >
                 <GripVertical size={18} />
             </div>
-            <div className="w-10 text-xs font-mono text-neutral-500">#{index + 1}</div>
+            <div className="w-10 text-xs font-mono text-neutral-400">#{index + 1}</div>
             <input
                 aria-label="Título do treino"
                 value={item.title}

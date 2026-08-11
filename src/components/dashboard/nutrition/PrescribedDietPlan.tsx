@@ -208,7 +208,7 @@ export default function PrescribedDietPlan({
           })}
         </div>
 
-        <p className="text-[10px] text-neutral-500 text-center">Plano montado pelo seu professor. Ajuste as porções ao seu apetite.</p>
+        <p className="text-[10px] text-neutral-400 text-center">Plano montado pelo seu professor. Ajuste as porções ao seu apetite.</p>
       </div>
     </div>
   )

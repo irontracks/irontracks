@@ -27,7 +27,7 @@ export default function PhaseSelector({ value, onSelect, isExplicit, touched }: 
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold">Fase</span>
         {!isExplicit && !touched && (
-          <span className="text-[9px] text-neutral-500">sugerida pelo seu objetivo</span>
+          <span className="text-[9px] text-neutral-400">sugerida pelo seu objetivo</span>
         )}
       </div>
 
@@ -46,13 +46,13 @@ export default function PhaseSelector({ value, onSelect, isExplicit, touched }: 
                 : 'border-white/[0.08] bg-white/[0.03] text-neutral-400 hover:text-white hover:border-white/20'}`}
             >
               <span className="text-xs font-bold">{opt.label}</span>
-              <span className={`text-[9px] font-semibold ${isActive ? 'text-yellow-500' : 'text-neutral-500'}`}>{opt.hint}</span>
+              <span className={`text-[9px] font-semibold ${isActive ? 'text-yellow-500' : 'text-neutral-400'}`}>{opt.hint}</span>
             </button>
           )
         })}
       </div>
 
-      <p className="text-[10px] leading-snug text-neutral-500">{active?.description}</p>
+      <p className="text-[10px] leading-snug text-neutral-400">{active?.description}</p>
 
       {touched && (
         <p className="text-[10px] leading-snug text-yellow-500/90">

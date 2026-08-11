@@ -195,7 +195,7 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
                     </div>
 
                     {/* Meta discreta: ajuda a decidir sem competir com o título. */}
-                    <div className="mt-0.5 text-xs text-neutral-500">
+                    <div className="mt-0.5 text-xs text-neutral-400">
                         {exercicios > 0 ? `${exercicios} exercício${exercicios === 1 ? '' : 's'}` : null}
                         {exercicios > 0 && minutos > 0 ? ' · ' : null}
                         {minutos > 0 ? `~${minutos} min` : null}

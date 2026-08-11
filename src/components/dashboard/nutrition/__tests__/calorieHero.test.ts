@@ -61,7 +61,18 @@ describe('hierarquia do card de calorias', () => {
     const hero = src.slice(src.indexOf('<CalorieRing'), src.indexOf('<CalorieRing') + 1800)
     expect(hero).toMatch(/text-2xl font-black[^>]*>\s*\{Math\.round\(remaining\)\}/)
     expect(hero).toMatch(/kcal restantes/)
-    expect(hero, 'a meta é contexto, não protagonista').toMatch(/text-xs text-neutral-500[^>]*>\s*de \{Math\.round\(safeGoals\.calories\)\} kcal/)
+    /**
+     * A cor saiu da asserção em 11/08/2026, e o motivo importa: este caso
+     * travava `text-neutral-500` para garantir que a meta fosse SECUNDÁRIA — mas
+     * neutral-500 mede 4.18:1 sobre #0a0a0a e reprova no WCAG AA. Ou seja, a
+     * hierarquia estava sendo comprada com contraste ilegível.
+     *
+     * Hierarquia se faz com TAMANHO e PESO; cor é reforço, não a única alavanca.
+     * O que o teste exige continua sendo o mesmo: o restante domina
+     * (`text-2xl font-black`) e a meta é contexto (`text-xs`, sem negrito).
+     */
+    expect(hero, 'a meta é contexto, não protagonista').toMatch(/text-xs text-neutral-400[^>]*>\s*de \{Math\.round\(safeGoals\.calories\)\} kcal/)
+    expect(hero, 'contexto não pode ganhar peso de protagonista').not.toMatch(/text-xs font-black[^>]*>\s*de \{Math\.round\(safeGoals\.calories\)\}/)
   })
 
   it('meta exatamente batida não vira "0 kcal restantes"', () => {

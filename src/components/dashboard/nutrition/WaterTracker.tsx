@@ -40,12 +40,12 @@ export default function WaterTracker({
     <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 p-4 ring-1 ring-neutral-800/50">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 flex items-center gap-1.5">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 flex items-center gap-1.5">
             <span>💧</span> Água
           </div>
           <div className="mt-1 text-lg font-semibold text-white">
             {current >= 1000 ? `${(current / 1000).toFixed(1)}L` : `${current}ml`}
-            <span className="text-neutral-500 text-sm"> / {WATER_GOAL / 1000}L</span>
+            <span className="text-neutral-400 text-sm"> / {WATER_GOAL / 1000}L</span>
           </div>
         </div>
         <div className="text-right">

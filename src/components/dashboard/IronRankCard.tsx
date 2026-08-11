@@ -332,7 +332,7 @@ const IronRankCard = memo(function IronRankCard({
                                         ? <div className="text-[9px] text-neutral-400 mt-0.5 truncate">
                                             <span style={{ color: 'rgba(234,179,8,0.65)' }}>{prsTitle}</span>
                                         </div>
-                                        : <div className="text-[9px] text-neutral-500 mt-0.5">Faça um treino para ver seus recordes.</div>
+                                        : <div className="text-[9px] text-neutral-400 mt-0.5">Faça um treino para ver seus recordes.</div>
                                     }
                                 </div>
 
@@ -537,7 +537,7 @@ const IronRankCard = memo(function IronRankCard({
                                                 </span>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <div className="text-[9px] text-neutral-500 font-bold uppercase">Volume</div>
+                                                <div className="text-[9px] text-neutral-400 font-bold uppercase">Volume</div>
                                                 <div className="text-sm font-black text-yellow-400 tabular-nums">
                                                     {Math.round(row.totalVolumeKg).toLocaleString('pt-BR')}&#8201;kg
                                                 </div>
@@ -560,7 +560,7 @@ const IronRankCard = memo(function IronRankCard({
 function MetricBadge({ label, value, highlight }: { label: string; value: string; highlight: boolean }) {
     return (
         <div className="flex flex-col items-center">
-            <span className="text-[9px] uppercase font-bold text-neutral-500">{label}</span>
+            <span className="text-[9px] uppercase font-bold text-neutral-400">{label}</span>
             <span className={`text-[10px] font-black tabular-nums ${highlight ? 'text-yellow-400' : 'text-neutral-400'}`}>{value}</span>
         </div>
     )

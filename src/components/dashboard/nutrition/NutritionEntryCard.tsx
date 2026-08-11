@@ -166,14 +166,14 @@ function NutritionEntryCard({
               <div>
                 <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 font-semibold mb-1.5">Alimentos</div>
                 {draftItems.length === 0 ? (
-                  <div className="text-xs text-neutral-500 py-1.5">Nenhum alimento — adicione abaixo.</div>
+                  <div className="text-xs text-neutral-400 py-1.5">Nenhum alimento — adicione abaixo.</div>
                 ) : (
                   <ul className="space-y-1.5">
                     {draftItems.map((food, i) => (
                       <li key={`${food.label}-${i}`} className="flex items-center justify-between gap-2 rounded-lg bg-neutral-800/40 border border-neutral-700/40 px-2.5 py-1.5">
                         <div className="min-w-0">
                           <div className="text-xs text-neutral-100 truncate">{food.label}</div>
-                          <div className="text-[10px] text-neutral-500">{Math.round(food.calories)} kcal · P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</div>
+                          <div className="text-[10px] text-neutral-400">{Math.round(food.calories)} kcal · P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</div>
                         </div>
                         <button
                           type="button"
@@ -220,7 +220,7 @@ function NutritionEntryCard({
                 <span className="text-[10px] uppercase tracking-wider text-neutral-400 font-semibold">Total</span>
                 <span className="text-xs text-neutral-200 font-semibold">
                   {Math.round(draftTotals.calories)} kcal
-                  <span className="ml-2 text-neutral-500 font-normal">P{Math.round(draftTotals.protein)} C{Math.round(draftTotals.carbs)} G{Math.round(draftTotals.fat)}</span>
+                  <span className="ml-2 text-neutral-400 font-normal">P{Math.round(draftTotals.protein)} C{Math.round(draftTotals.carbs)} G{Math.round(draftTotals.fat)}</span>
                 </span>
               </div>
 
@@ -284,7 +284,7 @@ function NutritionEntryCard({
                         <span className="min-w-0 truncate text-neutral-200">{food.label}</span>
                         <span className="shrink-0 whitespace-nowrap text-neutral-400">
                           <span className="font-semibold text-neutral-100">{Math.round(food.calories)}</span> kcal
-                          <span className="ml-2 text-[10px] text-neutral-500">P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</span>
+                          <span className="ml-2 text-[10px] text-neutral-400">P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</span>
                         </span>
                       </li>
                     ))}
