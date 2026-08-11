@@ -458,6 +458,43 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 - **Push notifications:** nunca modificar sem testar em device físico real.
 - **App ID:** `com.irontracks.app`. **Web dir do Capacitor:** `out/` (gerado por `next build`).
 
+## Acessibilidade — o que dá e o que NÃO dá para verificar aqui (11/08/2026)
+
+**O VoiceOver NÃO EXISTE no Simulador.** Não é configuração: escrever
+`VoiceOverTouchEnabled` via `simctl spawn … defaults write` e reiniciar o
+SpringBoard não liga nada, e a prova está na própria tela de Ajustes →
+Acessibilidade do simulador — a seção "Visão" oferece Texto sob Cursor, Tela e
+Tamanho do Texto, Movimento e Conteúdo Falado, e **VoiceOver não está na lista**
+(num iPhone real é o primeiro item). Não gaste tempo tentando de novo.
+
+**O que dá para auditar, e é bastante:**
+- **Contraste** — medido pela fórmula do WCAG sobre `#0a0a0a`. Guard em
+  `src/__tests__/contrasteTextoMinimo.test.ts` (faixas 500/700/800 proibidas).
+- **Nome de controle** — botão só de ícone precisa de `aria-label`. Guard em
+  `src/__tests__/botaoComNomeAcessivel.test.ts`. ⚠️ O parser desse guard anda
+  caractere a caractere de propósito: `<button([^>]*)>` PARA no `>` do `=>` de
+  arrow function e deixa passar todo botão com handler inline — foi assim que a
+  primeira versão dizia verde com 10 botões mudos.
+- **Estado de disclosure** — `aria-expanded` ligado ao estado, nunca a literal.
+- **Árvore de acessibilidade das telas PÚBLICAS** — o app é web, então o
+  `read_page` do navegador devolve exatamente o que o leitor de tela consome
+  (nome, papel, ordem). Login e cadastro foram auditados assim e estão corretos.
+
+**O que continua SEM verificação, e por quê:** ordem de foco, agrupamento (um
+card lê como uma coisa ou como oito fragmentos?) e anúncio de estado nas telas
+LOGADAS. A árvore do navegador resolveria, mas exige sessão — e o agente não
+digita senha. Os dois caminhos que restam são o **Accessibility Inspector** do
+Xcode (app de GUI, precisa de controle de tela autorizado pelo dono) ou o **dono
+testando no iPhone dele**. Pedido de acesso ao Inspector foi negado em
+11/08/2026; a lacuna segue aberta.
+
+**Regra que vale para tudo aqui:** atributo de acessibilidade ERRADO é pior que
+ausente — o leitor de tela anuncia com confiança uma informação falsa, e o
+usuário não tem como conferir. Na auditoria de ago/2026 isso quase aconteceu
+três vezes (rótulo por palpite em botão com texto dinâmico, `aria-expanded` em
+botão que abre modal, guard com regex furado). Corrija só o inequívoco e
+**reporte o resto em vez de silenciar**.
+
 ## Teste no simulador iOS (o agente verifica sozinho, não o dono)
 **Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
 
