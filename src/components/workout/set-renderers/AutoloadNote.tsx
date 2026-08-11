@@ -33,7 +33,7 @@ export function AutoloadNote({
     <div className={`min-w-0 ${className}`}>
       {rationale ? (
         <div
-          className={`flex items-start gap-1 text-[10px] ${muted ? 'text-neutral-500' : 'text-violet-300/80'}`}
+          className={`flex items-start gap-1 text-[10px] ${muted ? 'text-neutral-400' : 'text-violet-300/80'}`}
           title={rationale}
         >
           <span aria-hidden className="leading-4">🧠</span>

@@ -105,7 +105,7 @@ export default function WorkoutFooter() {
               setTimeout(() => { cancelBusyRef.current = false; }, 1500);
             }
           }}
-          className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-500 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all shrink-0"
+          className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-400 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all shrink-0"
           title="Cancelar treino"
         >
           <X size={18} />

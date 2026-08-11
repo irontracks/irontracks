@@ -67,7 +67,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+              className={isNotesOpen || hasAnyNote ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
             >
               <MessageSquare size={12} />
             </button>
@@ -103,7 +103,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
               type="button"
               disabled={!canDone}
               onClick={handleToggleDone}
-              className={canDone ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'}
+              className={canDone ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed'}
             >
               <Check size={16} />
               <span className="text-xs">Concluir</span>
@@ -111,7 +111,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
           </div>
         )}
       </div>
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps em todos os 7 blocos no modal para concluir.</div>}
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps em todos os 7 blocos no modal para concluir.</div>}
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {/* Anilhas por lado do peso do primeiro bloco — os 7 usam a mesma carga. */}
       <PlateHintLine
@@ -125,7 +125,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
               <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
           <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />

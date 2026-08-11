@@ -850,7 +850,7 @@ const NormalSetInner = ({
                   type="button"
                   onClick={() => setIsPickerOpen(p => !p)}
                   aria-expanded={isPickerOpen}
-                  className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-widest text-neutral-500 hover:text-neutral-300 transition-colors"
+                  className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-300 transition-colors"
                 >
                   {String(log.per_set_method || '').trim() || 'Normal'}
                   <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />

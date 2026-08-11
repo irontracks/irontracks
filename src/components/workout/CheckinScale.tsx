@@ -36,14 +36,14 @@ export function CheckinScale({ label, hint, values, value, onChange, gridCols }:
           <button
             type="button"
             onClick={() => onChange('')}
-            className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-200 transition-colors"
+            className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 hover:text-neutral-200 transition-colors"
           >
             Limpar
           </button>
         )}
       </div>
 
-      {hint ? <p className="text-[11px] text-neutral-500 leading-snug">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-neutral-400 leading-snug">{hint}</p> : null}
 
       <div className={`grid ${gridCols} gap-2`} role="group" aria-labelledby={groupId}>
         {values.map((n) => {

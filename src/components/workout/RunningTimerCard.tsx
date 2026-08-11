@@ -53,7 +53,7 @@ export function RunningTimerCard({
     <div className="rounded-xl border px-3 py-3 bg-neutral-900/50 border-yellow-500/30 space-y-2">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">
+          <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">
             Série {setIdx + 1} • {label} em andamento
           </div>
           <div className="flex items-baseline gap-2 mt-0.5">
@@ -62,7 +62,7 @@ export function RunningTimerCard({
             >
               {hasTarget ? (overtime ? `+${fmt(-remainingSec)}` : fmt(remainingSec)) : fmt(elapsedSec)}
             </span>
-            <span className="text-[11px] font-bold text-neutral-500 truncate">
+            <span className="text-[11px] font-bold text-neutral-400 truncate">
               {hasTarget ? (overtime ? 'além da meta' : `restantes de ${fmt(targetSeconds)}`) : 'em andamento'}
             </span>
           </div>

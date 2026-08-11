@@ -211,7 +211,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
           <div>
             <label
               htmlFor={minutesInputId}
-              className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
+              className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
             >
               Tempo (min)
             </label>
@@ -228,7 +228,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
           <div>
             <label
               htmlFor={speedInputId}
-              className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
+              className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
             >
               {isTreadmill ? 'Veloc. (km/h)' : 'Intensidade'}
             </label>
@@ -246,7 +246,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
             <div>
               <label
                 htmlFor={inclineInputId}
-                className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
+                className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-0.5 flex items-end leading-tight h-[2.6em]"
               >
                 Inclin. (%)
               </label>

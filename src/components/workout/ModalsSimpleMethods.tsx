@@ -64,7 +64,7 @@ export function ModalsSimpleMethods() {
                                 </div>
                             </div>
                             <div className="rounded-xl bg-neutral-800/40 border border-neutral-700/50 p-3 space-y-3">
-                                <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Opcional</div>
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Opcional</div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <div className="text-xs text-neutral-400">Reps Forçadas</div>
