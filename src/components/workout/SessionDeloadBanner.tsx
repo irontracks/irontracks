@@ -73,7 +73,7 @@ export default function SessionDeloadBanner() {
           <div className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
             Descarga do treino
           </div>
-          <div className="mt-0.5 text-[12px] leading-snug text-neutral-500">
+          <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">
             {workoutDeloadEnabled
               ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
               : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
@@ -88,7 +88,7 @@ export default function SessionDeloadBanner() {
             'shrink-0 inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 transition-colors active:scale-95',
             workoutDeloadEnabled
               ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
-              : 'border-neutral-800 bg-neutral-900 text-neutral-500',
+              : 'border-neutral-800 bg-neutral-900 text-neutral-400',
           ].join(' ')}
         >
           <ArrowDown size={15} className={workoutDeloadEnabled ? '' : 'opacity-50'} />

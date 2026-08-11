@@ -111,7 +111,7 @@ export default function PlateCalculatorSheet({
               <h2 id="plate-calc-title" className="text-white font-semibold text-base leading-tight truncate">
                 {screen === 'inv' ? 'Minhas anilhas' : 'Calculadora de anilhas'}
               </h2>
-              <p className="text-neutral-500 text-xs truncate">{exerciseName}</p>
+              <p className="text-neutral-400 text-xs truncate">{exerciseName}</p>
             </div>
           </div>
           <button
@@ -201,7 +201,7 @@ export default function PlateCalculatorSheet({
 
                       {result.below != null || result.exact ? (
                         <>
-                          <p className="text-neutral-500 text-[11px] uppercase tracking-wide mb-2">
+                          <p className="text-neutral-400 text-[11px] uppercase tracking-wide mb-2">
                             Por lado — barra de {fmt(result.barWeightKg)} kg
                           </p>
                           {result.perSide.length > 0 ? (
@@ -218,7 +218,7 @@ export default function PlateCalculatorSheet({
                           ) : (
                             <p className="text-neutral-400 text-sm">Só a barra.</p>
                           )}
-                          <p className="text-neutral-500 text-xs mt-3">
+                          <p className="text-neutral-400 text-xs mt-3">
                             Total montado: <span className="text-white font-semibold">{fmt(result.total)} kg</span>
                           </p>
                         </>
@@ -229,7 +229,7 @@ export default function PlateCalculatorSheet({
               ) : (
                 /* ── Modo conferência: toca nas anilhas que estão na barra ───── */
                 <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
-                  <p className="text-neutral-500 text-[11px] uppercase tracking-wide mb-3">
+                  <p className="text-neutral-400 text-[11px] uppercase tracking-wide mb-3">
                     Pares por lado
                   </p>
                   <div className="space-y-2">
@@ -263,7 +263,7 @@ export default function PlateCalculatorSheet({
                       )
                     })}
                   </div>
-                  <p className="text-neutral-500 text-xs mt-4">
+                  <p className="text-neutral-400 text-xs mt-4">
                     Total na barra: <span className="text-white font-semibold text-base">{fmt(manualTotal)} kg</span>
                   </p>
                 </div>
@@ -271,7 +271,7 @@ export default function PlateCalculatorSheet({
 
               {/* Prova de que o cadastro serviu pra algo */}
               <div className="mt-4">
-                <p className="text-neutral-500 text-[11px] uppercase tracking-wide mb-1.5">Você monta</p>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wide mb-1.5">Você monta</p>
                 <p className="text-neutral-400 text-xs leading-relaxed">
                   {totals.length ? totals.map(fmt).join(' · ') : 'Nenhuma carga — cadastre suas anilhas.'}
                   {totals.length >= 24 ? ' …' : ''}
@@ -302,7 +302,7 @@ export default function PlateCalculatorSheet({
           ) : (
             /* ── Tela de inventário ───────────────────────────────────────── */
             <>
-              <p className="text-neutral-500 text-xs mb-4">
+              <p className="text-neutral-400 text-xs mb-4">
                 Quantas anilhas você tem de cada valor. Conte as unidades — o app calcula os pares.
               </p>
               <div className="space-y-2">
@@ -337,7 +337,7 @@ export default function PlateCalculatorSheet({
                         </button>
                       </div>
                       <span className="text-[11px] w-24 text-right flex-shrink-0">
-                        {p > 0 ? <span className="text-neutral-500">{p} {p === 1 ? 'par' : 'pares'}</span> : null}
+                        {p > 0 ? <span className="text-neutral-400">{p} {p === 1 ? 'par' : 'pares'}</span> : null}
                         {odd ? <span className="text-amber-500/70">{p > 0 ? ' (1 sobrando)' : '1 sobrando'}</span> : null}
                       </span>
                     </div>
@@ -345,7 +345,7 @@ export default function PlateCalculatorSheet({
                 })}
               </div>
 
-              <p className="text-neutral-500 text-[11px] uppercase tracking-wide mt-6 mb-2">Barra</p>
+              <p className="text-neutral-400 text-[11px] uppercase tracking-wide mt-6 mb-2">Barra</p>
               <div className="flex flex-wrap gap-2">
                 {COMMON_BAR_WEIGHTS.map((b) => (
                   <button
@@ -370,7 +370,7 @@ export default function PlateCalculatorSheet({
               </div>
 
               <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
-                <p className="text-neutral-500 text-[11px] uppercase tracking-wide mb-1.5">Você monta</p>
+                <p className="text-neutral-400 text-[11px] uppercase tracking-wide mb-1.5">Você monta</p>
                 <p className="text-neutral-300 text-xs leading-relaxed">
                   {totals.length ? totals.map(fmt).join(' · ') : 'Nenhuma carga com esse inventário.'}
                   {totals.length >= 24 ? ' …' : ''}

@@ -785,8 +785,8 @@ export default function CardioGPSPanel({
           )}
         </div>
         {isOpen
-          ? <ChevronUp size={15} className="text-neutral-500" />
-          : <ChevronDown size={15} className="text-neutral-500" />}
+          ? <ChevronUp size={15} className="text-neutral-400" />
+          : <ChevronDown size={15} className="text-neutral-400" />}
       </button>
 
       {isOpen && content}

@@ -37,7 +37,7 @@ export function PlateHintLine({
   return (
     <div className={`text-[10px] leading-tight text-neutral-400 ${className}`}>
       <span className="font-bold text-neutral-300">Por lado:</span> {perSide}
-      {hint.barKg > 0 ? <span className="text-neutral-500"> · barra {hint.barKg}kg</span> : null}
+      {hint.barKg > 0 ? <span className="text-neutral-400"> · barra {hint.barKg}kg</span> : null}
       {/* Fechar exato nem sempre é possível com o inventário do usuário. Dizer
           "≈" e mostrar o total montável é melhor que dar um número que ele vai
           tentar montar e não conseguir. */}

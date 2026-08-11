@@ -147,7 +147,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               className={
                 isNotesOpen || hasAnyNote
                   ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                  : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
             >
               <MessageSquare size={12} />
@@ -238,7 +238,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               className={
                 canDone
                   ? 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
-                  : 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+                  : 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed'
               }
             >
               <Check size={16} />
@@ -273,7 +273,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
       )}
 
       {!done && !canDone && (
-        <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
+        <div className="pl-12 text-[11px] text-neutral-400 font-semibold">
           Preencha peso e reps em todas as etapas no modal para concluir.
         </div>
       )}
@@ -292,7 +292,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
               <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
           <textarea

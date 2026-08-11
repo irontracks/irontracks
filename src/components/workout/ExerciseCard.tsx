@@ -595,7 +595,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                 // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
                 // seta sem texto no meio de outros ícones, e no celular não há hover
                 // pra revelar o `title` — ninguém descobria que ali morava o deload.
-                deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800',
+                deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800',
               ].join(' ')}
               title="Sugestão de Deload"
               aria-label="Sugestão de Deload"
@@ -727,7 +727,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
             <button
               type="button"
               onClick={(e) => { try { e.stopPropagation(); } catch { } closeDeleteConfirm(); }}
-              className="w-full min-h-[44px] rounded-xl text-sm text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all"
+              className="w-full min-h-[44px] rounded-xl text-sm text-neutral-400 hover:text-neutral-300 active:scale-95 transition-all"
             >
               Cancelar
             </button>

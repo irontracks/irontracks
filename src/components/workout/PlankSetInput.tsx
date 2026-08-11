@@ -184,7 +184,7 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
           <div>
             <label
               htmlFor={weightInputId}
-              className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold block mb-0.5"
+              className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold block mb-0.5"
             >
               Peso corporal (kg)
             </label>
@@ -201,7 +201,7 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
           <div>
             <label
               htmlFor={durationInputId}
-              className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold block mb-0.5"
+              className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold block mb-0.5"
             >
               Tempo alvo (s)
             </label>
