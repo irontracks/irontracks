@@ -86,7 +86,7 @@ export function UpdateAvailableBanner() {
           </p>
 
           {releaseNotes && (
-            <button
+            <button aria-expanded={expanded}
               type="button"
               onClick={() => setExpanded((v) => !v)}
               className="mt-1.5 text-[11px] font-bold text-yellow-400 hover:text-yellow-300 transition-colors inline-flex items-center gap-1"

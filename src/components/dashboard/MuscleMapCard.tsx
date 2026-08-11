@@ -351,7 +351,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <button
+            <button aria-expanded={expanded}
               type="button"
               aria-label={expanded ? 'Recolher' : 'Expandir'}
               onClick={(e) => {
