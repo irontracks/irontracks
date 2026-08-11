@@ -148,3 +148,30 @@ describe('Iron Rank — unidade separada do número', () => {
     expect(src).not.toMatch(/toLocaleString\([^)]*\)\}kg/)
   })
 })
+
+/**
+ * Achado do bloco B da auditoria — só visível em tela ESTREITA.
+ *
+ * Os três botões de ação (Arquivados / Organizar / Ferramentas) usavam `flex-1`
+ * puro: dividem a largura em partes iguais, mas o CONTEÚDO não encolhe junto.
+ * Em 440pt (iPhone 17 Pro Max) cabia; em 390pt (iPhone 16e) o "FERRAMENTAS"
+ * vazava para fora da tela. Nenhum teste pegaria isso — jsdom não mede layout —,
+ * mas o guard trava as duas propriedades que impedem o corte.
+ */
+describe('linha de ações não transborda em tela estreita', () => {
+  const src = readFileSync(join(DIR, 'StudentDashboard.tsx'), 'utf8')
+  const linha = /Linha 2: botões de ação[\s\S]{0,6000}?Ferramentas<\/span>/.exec(src)?.[0] ?? ''
+
+  it('o guard encontrou o bloco', () => {
+    expect(linha).not.toBe('')
+  })
+
+  it('a linha pode quebrar em vez de cortar', () => {
+    expect(linha).toMatch(/flex flex-wrap items-center/)
+  })
+
+  it('cada botão tem largura mínima — é ela que dispara o wrap antes do corte', () => {
+    const minWidths = linha.match(/min-w-\[120px\]/g) ?? []
+    expect(minWidths.length).toBeGreaterThanOrEqual(3)
+  })
+})

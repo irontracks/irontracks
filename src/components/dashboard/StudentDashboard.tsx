@@ -653,15 +653,21 @@ export default function StudentDashboard(props: Props) {
                   </div>
                 </div>
 
-                {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas */}
-                <div className="flex items-center gap-2">
+                {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas.
+                    `flex-wrap` + `min-w` por botão: com `flex-1` puro os três
+                    dividiam a largura em partes iguais, mas o CONTEÚDO não
+                    encolhe junto — em 440pt cabia e em 390pt (iPhone 16e) o
+                    "FERRAMENTAS" vazava para fora da tela. Agora, quando os três
+                    não couberem, o último desce para a linha de baixo em vez de
+                    ser cortado. Verificado no aparelho estreito. */}
+                <div className="flex flex-wrap items-center gap-2">
                   {archivedCount > 0 ? (
                     <button
                       onClick={() => setShowArchived((v) => !v)}
                       className={
                         showArchived
-                          ? 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
-                          : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
+                          ? 'flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
+                          : 'flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
                       }
                     >
                       <span className="inline-flex items-center gap-1.5"><Archive size={13} /> Arquivados ({archivedCount})</span>
@@ -681,11 +687,11 @@ export default function StudentDashboard(props: Props) {
                       setEditListOpen(true)
                       setToolsOpen(false)
                     }}
-                    className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                    className="flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
                   >
                     <span className="inline-flex items-center gap-1.5"><ListOrdered size={13} /> Organizar</span>
                   </button>
-                  <div className="relative flex-1">
+                  <div className="relative flex-1 min-w-[120px]">
                     <button
                       onClick={() => setToolsOpen((v) => !v)}
                       className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
