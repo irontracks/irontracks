@@ -419,16 +419,53 @@ Lançamentos (a conta não tinha refeição no dia) e removi em seguida, deixand
 conta como estava. Vale para nutrição; **não vale para treino** — ali a regra do X →
 Confirmar continua, finalizar polui o `reportHistory` que alimenta o autoload.
 
+### A conta de teste foi ESPELHADA na oficial em 11/08/2026
+
+Decisão do dono, para acabar com "o print dele mostra uma coisa e o simulador
+outra". O que foi copiado de `djmkapple` → `djmkbrasil`:
+
+| | Copiado? | Observação |
+|---|---|---|
+| Templates de treino | **sim** (5, 39 exercícios, 128 séries) | os 6 antigos (A–F) foram **arquivados**, não apagados |
+| Sessões concluídas | **12 mais recentes** | o bastante para autoload/deload lerem histórico de verdade |
+| Meta de nutrição | **sim** (2676 kcal) | |
+| Perfil / objetivo / fase | **sim** | antropometria, `fitnessGoal`, `nutritionPhase`, `autoLoad`, `plateInventory` |
+| Avaliações corporais + fotos | **não** | dado corporal e arquivos no storage; o ganho não paga |
+| Resto do histórico (117 sessões) | **não** | 1,5 MB de JSON, e faria a conta de teste aparecer no **ranking e na comunidade** com 2,4 M kg falsos |
+| Telefone, cidade, academia, notificações, feature flags | **não** | `featureTeamworkV2` ligaria uma feature cujas tabelas não existem |
+
+**Os IDs dos clones são determinísticos** — `md5(<id de origem> || ':clone-teste-v1')::uuid`.
+Isso torna a cópia idempotente (rodar de novo não duplica) e o rollback exato:
+
+```sql
+-- desfaz o clone inteiro e devolve os templates A–F
+with c as (select md5(id::text||':clone-teste-v1')::uuid nid from workouts
+           where user_id='d04bfcef-54ea-4360-9e3d-e174a9ace503')
+delete from workouts w where w.user_id='6cb619ba-1484-41f2-b60c-b67aaea06307'
+  and w.id in (select nid from c);
+update workouts set archived_at=null
+ where user_id='6cb619ba-1484-41f2-b60c-b67aaea06307' and is_template;
+```
+
+**⚠️ O espelho ENVELHECE.** É uma foto de 11/08/2026, não uma sincronização: nada
+mantém as duas contas iguais. Mudou treino ou meta na conta oficial depois dessa
+data e elas divergem de novo — agora com cara de sincronizadas, que é pior.
+**A regra de confirmar qual conta está na tela continua valendo**; o espelho só
+reduz a frequência do problema.
+
 | | `djmkbrasil` (TESTE, no simulador) | `djmkapple` (OFICIAL, o dono treina nela) |
 |---|---|---|
 | `user_id` | `6cb619ba-1484-41f2-b60c-b67aaea06307` | `d04bfcef-54ea-4360-9e3d-e174a9ace503` |
-| Templates | 6 (A–F) | 5 |
-| Sessões concluídas | **1** (`D - e teste`, notes vazio) | **127** |
-| Meta em `nutrition_goals` | **nenhuma** | 2676 kcal · P208 C295 G74 |
-| Fase / perfil | sem fase, perfil ~20% | CUT, perfil completo |
+| Templates ativos | 5 (SEG/TER/QUA/QUI/SEX) + 6 arquivados | 5 (SEG/TER/QUA/QUI/SEX) |
+| Sessões concluídas | **13** (12 clonadas + 1 vazia antiga) | **129** |
+| Meta em `nutrition_goals` | 2676 kcal | 2676 kcal · P208 C295 G74 |
+| Fase / perfil | CUT, perfil preenchido | CUT, perfil completo |
 
-**Como identificar rápido:** a de teste mostra 6 treinos (A–F) e o aviso "Complete seu
-perfil"; a oficial tem 5 e não mostra. O peso do check-in NÃO serve — aparece nas duas.
+**Como identificar rápido, agora que as telas são parecidas:** a de teste tem o
+chip **"ARQUIVADOS (6)"** na lista de treinos e um histórico de 13 sessões; a
+oficial não tem arquivados e tem 129. O aviso "Complete seu perfil" **não serve
+mais** — sumiu da conta de teste quando o perfil foi copiado. O peso do check-in
+nunca serviu.
 
 **O erro concreto, para não se repetir:** em 09/08/2026 um agente leu "0kg levantados"
 e "Meta: 2000 kcal" na tela do simulador, consultou o banco de `djmkapple` (2,4 M kg,
