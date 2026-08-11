@@ -263,11 +263,38 @@ assinatura QStash no `rest/fire`). A CSRF genérica também está mitigada:
 `getSupabaseCookieOptions()` usa `sameSite: 'lax'`, então POST cross-site não
 carrega o cookie de sessão.
 
-**Mover para `src/middleware.ts` é decisão do dono** e merece tarefa própria: liga
-de uma vez o refresh de sessão, o atalho `/` → `/dashboard` e um CSP com nonce por
-request, em cima de usuários reais. Um CSP que nunca rodou em produção quebra
-terceiros silenciosamente (Sentry, Vercel Analytics, RevenueCat) — vai de
-`Content-Security-Policy-Report-Only` primeiro, não direto no modo bloqueante.
+### Ativado em 11/08/2026 — e o CSP está em modo RELATÓRIO
+
+O arquivo foi movido para `src/middleware.ts` e **hoje roda**. O que ele faz:
+renova a sessão (`updateSession`), redireciona `www` → apex e aplica os security
+headers + CSP.
+
+**O atalho `/` → `/dashboard` NÃO voltou, de propósito.** Ele subia só por VER um
+cookie, sem conferir se valia, e o dashboard devolvia — era metade do ping-pong
+do boot, na versão SERVIDOR, que nenhum contador do cliente alcança porque nenhum
+JS chega a rodar. O ganho era cosmético e hoje é redundante (o `useLoginScreen`
+faz isso conferindo a sessão). Guard em `lib/auth/__tests__/bootBounce.test.ts`.
+
+**`/api/` fica fora do matcher:** `updateSession` faz um `getUser()` (ida à rede)
+por request, e ligá-lo em 258 rotas somaria latência a cada chamada sem ganho —
+elas já autenticam sozinhas.
+
+**A renovação é MELHOR-ESFORÇO nos dois níveis** (`try/catch` no `getUser()` e em
+volta do `updateSession`). O que roda em toda navegação não pode ter caminho que
+lance: um throw vira 500 no site inteiro de uma vez — e, como o app nativo carrega
+o front deste servidor, levaria junto todos os aparelhos instalados.
+
+**CSP: `Content-Security-Policy-Report-Only` por padrão.** Uma política que nunca
+rodou quebra terceiros em silêncio — e isso não é teórico: os PRIMEIROS relatórios
+que chegaram foram `script-src-elem ← browser.sentry-cdn.com` e
+`← va.vercel-scripts.com`, ou seja, em modo bloqueante o app teria perdido o
+Sentry e a analítica sem ninguém perceber. Os dois já entraram na allowlist.
+Violações vão para `POST /api/security/csp-report` → Sentry
+(`security.csp.violation`, agrupado por diretiva + host, teto de 50 por
+instância). **Para ligar o modo bloqueante basta `CSP_ENFORCE=true` na Vercel** —
+env var, sem deploy de código. Antes disso, olhe uma janela de relatórios limpa:
+o `script-src` de produção é mais restrito que o de dev (que tem `unsafe-inline`
+e `unsafe-eval`), então dev NÃO prova nada sobre produção.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
