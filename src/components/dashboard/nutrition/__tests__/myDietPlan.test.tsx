@@ -110,29 +110,87 @@ describe('MyDietPlan', () => {
     }
   })
 
+  /**
+   * ESTE CASO ERA FLAKY, e a intermitência era um BUG DE PRODUTO — não
+   * fragilidade de teste (investigado em 10/08/2026, depois de derrubar o CI).
+   *
+   * O posicionamento automático ("abre no dia de HOJE") roda no efeito que
+   * observa `days`, e os botões de dia JÁ ESTÃO na tela nesse instante. Quem
+   * tocasse num dia antes de o efeito rodar era devolvido para hoje em
+   * silêncio — e o swap seguia com o índice errado. Sem relógio fixo, o teste
+   * pegava isso só quando o dia real não fosse quarta E a ordem desse azar:
+   * 62 execuções locais passaram; o runner do CI, mais lento, reprovou.
+   *
+   * Agora o relógio é FIXO (segunda), e o caso abaixo varre a semana inteira.
+   */
   it('trocar alimento manda o DIA selecionado — não sempre o dia 0', async () => {
-    const fetchMock = mockFetch(weekPlan, (url, init) => {
-      if (url.includes('/swap')) {
-        return { ok: true, status: 200, json: async () => ({ ok: true, plan: weekPlan, swapped: { food: 'Atum' } }) }
-      }
-      void init
-      return null
-    })
-    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.setSystemTime(new Date('2026-08-03T12:00:00')) // segunda: hoje ≠ quarta
+      const fetchMock = mockFetch(weekPlan, (url, init) => {
+        if (url.includes('/swap')) {
+          return { ok: true, status: 200, json: async () => ({ ok: true, plan: weekPlan, swapped: { food: 'Atum' } }) }
+        }
+        void init
+        return null
+      })
+      render(<MyDietPlan dateKey="2026-08-03" canApply />)
 
-    // Vai pra quarta (índice 2 na lista que começa na segunda) e abre a refeição.
-    fireEvent.click(await screen.findByRole('button', { name: /Qua/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Café da Manhã/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /Trocar Pão Francês/ }))
+      // Vai pra quarta (índice 2 na lista que começa na segunda) e abre a refeição.
+      fireEvent.click(await screen.findByRole('button', { name: /Qua/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Café da Manhã/ }))
+      fireEvent.click(await screen.findByRole('button', { name: /Trocar Pão Francês/ }))
 
-    await waitFor(() => {
-      const call = fetchMock.mock.calls.find((c) => String(c[0]).includes('/swap'))
-      expect(call).toBeTruthy()
-      const body = JSON.parse(String((call?.[1] as RequestInit)?.body))
-      expect(body.dayIndex).toBe(2)
-      expect(body.mealIndex).toBe(0)
-      expect(body.itemIndex).toBe(0)
-    })
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find((c) => String(c[0]).includes('/swap'))
+        expect(call).toBeTruthy()
+        const body = JSON.parse(String((call?.[1] as RequestInit)?.body))
+        expect(body.dayIndex).toBe(2)
+        expect(body.mealIndex).toBe(0)
+        expect(body.itemIndex).toBe(0)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * A CLASSE do bug, não a instância: em QUALQUER dia da semana, tocar num dia
+   * encerra o posicionamento automático. Sem varrer os sete, o caso acima
+   * passaria sozinho numa quarta-feira — dia em que o automático já acerta o
+   * índice 2 e o clique não precisa funcionar.
+   */
+  describe('a escolha do dia sobrevive ao posicionamento automático', () => {
+    // 02/08/2026 é domingo; sete dias seguidos cobrem a semana.
+    const SEMANA = ['2026-08-02', '2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08']
+
+    for (const hoje of SEMANA) {
+      const diaDaSemana = new Date(`${hoje}T12:00:00`).getDay()
+      it(`com hoje = ${hoje} (getDay ${diaDaSemana}), o swap vai para o dia TOCADO`, async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true })
+        try {
+          vi.setSystemTime(new Date(`${hoje}T12:00:00`))
+          const fetchMock = mockFetch(weekPlan, (url) => (
+            url.includes('/swap')
+              ? { ok: true, status: 200, json: async () => ({ ok: true, plan: weekPlan, swapped: { food: 'Atum' } }) }
+              : null
+          ))
+          render(<MyDietPlan dateKey={hoje} canApply />)
+
+          fireEvent.click(await screen.findByRole('button', { name: /Qua/ }))
+          fireEvent.click(screen.getByRole('button', { name: /Café da Manhã/ }))
+          fireEvent.click(await screen.findByRole('button', { name: /Trocar Pão Francês/ }))
+
+          await waitFor(() => {
+            const call = fetchMock.mock.calls.find((c) => String(c[0]).includes('/swap'))
+            expect(call).toBeTruthy()
+            expect(JSON.parse(String((call?.[1] as RequestInit)?.body)).dayIndex).toBe(2)
+          })
+        } finally {
+          vi.useRealTimers()
+        }
+      })
+    }
   })
 
   it('depois de trocar um alimento, o usuário CONTINUA no dia que escolheu', async () => {
