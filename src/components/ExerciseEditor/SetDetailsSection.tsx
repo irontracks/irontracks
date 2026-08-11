@@ -32,7 +32,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
             {!hideHeader && (
                 <div className="flex items-center justify-between">
                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider">Séries</div>
-                    <div className="text-[10px] text-neutral-500 font-black tabular-nums">{setDetails.length}</div>
+                    <div className="text-[10px] text-neutral-400 font-black tabular-nums">{setDetails.length}</div>
                 </div>
             )}
 

@@ -35,7 +35,7 @@ export function HistoryEmptyState({ isReadOnly, onAdd }: EmptyProps) {
             {/* Content */}
             <div className="px-6 pb-6 -mt-2">
                 <div className="text-white font-black text-lg">Comece sua jornada</div>
-                <div className="text-neutral-500 text-sm mt-1 max-w-xs mx-auto leading-relaxed">
+                <div className="text-neutral-400 text-sm mt-1 max-w-xs mx-auto leading-relaxed">
                     Registre seu primeiro treino e acompanhe sua evolução ao longo do tempo.
                 </div>
                 {!isReadOnly && (
@@ -88,7 +88,7 @@ export function HistoryEmptyPeriod({ onSeeAll, on90Days }: EmptyPeriodProps) {
             {/* Content */}
             <div className="px-5 pb-5 -mt-1">
                 <div className="text-white font-black">Sem treinos nesse período</div>
-                <div className="text-sm text-neutral-500 mt-1">Aumente o período para visualizar mais resultados.</div>
+                <div className="text-sm text-neutral-400 mt-1">Aumente o período para visualizar mais resultados.</div>
                 <div className="mt-4 flex gap-2 flex-wrap">
                     <button
                         type="button"

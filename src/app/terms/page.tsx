@@ -116,7 +116,7 @@ export default function TermsOfUse() {
               IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
             </h1>
           </div>
-          <p className="text-[10px] md:text-xs font-bold text-neutral-500 uppercase tracking-widest hidden md:block">
+          <p className="text-[10px] md:text-xs font-bold text-neutral-400 uppercase tracking-widest hidden md:block">
             Termos de Uso
           </p>
         </div>
@@ -128,7 +128,7 @@ export default function TermsOfUse() {
           <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">
             Termos de Uso (EULA)
           </h2>
-          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-sm font-semibold text-neutral-500">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-sm font-semibold text-neutral-400">
             <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 rounded-full w-fit">
               Válido e em Vigor
             </span>

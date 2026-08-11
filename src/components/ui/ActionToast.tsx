@@ -53,7 +53,7 @@ export function ActionToast({ item, onDismiss }: ActionToastProps) {
         type="button"
         onClick={handleDismiss}
         aria-label="Fechar notificação"
-        className="text-neutral-500 hover:text-neutral-300 transition-colors"
+        className="text-neutral-400 hover:text-neutral-300 transition-colors"
       >
         <X size={14} />
       </button>

@@ -715,7 +715,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     </div>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="text-neutral-500 text-sm">Carregando conversa...</div>
+                    <div className="text-neutral-400 text-sm">Carregando conversa...</div>
                 </div>
             </div>
         );
@@ -774,7 +774,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto" style={{ background: '#090909' }}>
                 <div className="min-h-full flex flex-col justify-end px-4 py-4 space-y-4">
                 {messages.length === 0 ? (
-                    <div className="text-center py-10 text-neutral-500">
+                    <div className="text-center py-10 text-neutral-400">
                         <div className="text-lg mb-2">💬</div>
                         <p className="font-semibold">Comece a conversa</p>
                         <p className="text-sm">Envie uma mensagem para {otherUser?.displayName || otherUserName}</p>
@@ -884,7 +884,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                     Reenviar
                                                 </button>
                                             ) : (
-                                                <p className={`text-[10px] text-right tabular-nums ${isMyMessage ? 'text-black/60' : 'text-neutral-500'
+                                                <p className={`text-[10px] text-right tabular-nums ${isMyMessage ? 'text-black/60' : 'text-neutral-400'
                                                     }`}>
                                                     {message._sendStatus === 'sending' ? 'Enviando…' : formatTime(message.created_at)}
                                                 </p>
@@ -895,7 +895,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                             );
                         })}
                         {loadingMore && (
-                            <div className="text-center text-xs text-neutral-500 py-2">Carregando mensagens...</div>
+                            <div className="text-center text-xs text-neutral-400 py-2">Carregando mensagens...</div>
                         )}
                     </>
                 )}
@@ -946,7 +946,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                         onChange={(e) => setNewMessage(e.target.value)}
                         onFocus={() => setShowActions(false)}
                         placeholder="Digite uma mensagem…"
-                        className="flex-1 min-w-0 rounded-2xl bg-white/[0.06] border border-white/10 text-white outline-none placeholder:text-neutral-500 text-base leading-6 px-4 py-3.5 focus:border-yellow-500/40 focus:bg-white/[0.08] transition-colors"
+                        className="flex-1 min-w-0 rounded-2xl bg-white/[0.06] border border-white/10 text-white outline-none placeholder:text-neutral-400 text-base leading-6 px-4 py-3.5 focus:border-yellow-500/40 focus:bg-white/[0.08] transition-colors"
                         aria-label="Mensagem"
                     />
 

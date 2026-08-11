@@ -484,7 +484,7 @@ export default function SchedulePage() {
               type="button"
               onClick={() => shiftWeek(-1)}
               aria-label="Semana anterior"
-              className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full text-neutral-500 hover:text-white active:scale-95 transition"
+              className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
             >
               <ChevronLeft size={18} />
             </button>
@@ -495,7 +495,7 @@ export default function SchedulePage() {
               type="button"
               onClick={() => shiftWeek(1)}
               aria-label="Próxima semana"
-              className="w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-neutral-500 hover:text-white active:scale-95 transition"
+              className="w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
             >
               <ChevronRight size={18} />
             </button>
@@ -517,7 +517,7 @@ export default function SchedulePage() {
                     isSelected ? 'bg-yellow-500 text-black' : 'text-neutral-400 hover:bg-white/5'
                   }`}
                 >
-                  <span className={`text-[10px] font-bold tracking-wider ${isSelected ? 'text-black/60' : 'text-neutral-500'}`}>
+                  <span className={`text-[10px] font-bold tracking-wider ${isSelected ? 'text-black/60' : 'text-neutral-400'}`}>
                     {WEEKDAY_LABELS[day.getDay()]}
                   </span>
                   <span className={`text-sm tabular-nums ${isSelected ? 'font-black' : 'font-semibold text-white'}`}>
@@ -539,7 +539,7 @@ export default function SchedulePage() {
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="text-sm font-semibold text-neutral-300">{formatLongDate(selectedDateObj)}</h2>
             {!loading && safeAppointments.length > 0 && (
-              <span className="text-xs text-neutral-500 tabular-nums">
+              <span className="text-xs text-neutral-400 tabular-nums">
                 {safeAppointments.length} {safeAppointments.length === 1 ? 'agendamento' : 'agendamentos'}
               </span>
             )}
@@ -565,7 +565,7 @@ export default function SchedulePage() {
               <h3 className="text-base font-bold text-neutral-200 mb-1.5">Dia livre</h3>
               {/* Sem CTA aqui de propósito: a FAB "Agendar" fica visível neste
                   estado e dois botões para a mesma ação viram redundância. */}
-              <p className="text-sm text-neutral-500 max-w-[16rem] leading-relaxed">
+              <p className="text-sm text-neutral-400 max-w-[16rem] leading-relaxed">
                 Nenhum agendamento marcado. Use este espaço para encaixar um aluno.
               </p>
             </div>
@@ -585,7 +585,7 @@ export default function SchedulePage() {
                   >
                     <div className="flex flex-col items-center justify-center min-w-[3.25rem]">
                       <span className="text-base font-black tabular-nums leading-none">{formatTime(item.start_time)}</span>
-                      <span className="text-[11px] text-neutral-500 tabular-nums mt-1 leading-none">
+                      <span className="text-[11px] text-neutral-400 tabular-nums mt-1 leading-none">
                         {formatTime(item.end_time)}
                       </span>
                     </div>
@@ -600,7 +600,7 @@ export default function SchedulePage() {
                       </div>
                       {secondary ? (
                         <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
-                          <User size={13} className="text-neutral-500 shrink-0" />
+                          <User size={13} className="text-neutral-400 shrink-0" />
                           <span className="truncate">{secondary}</span>
                         </div>
                       ) : (
@@ -621,7 +621,7 @@ export default function SchedulePage() {
                         type="button"
                         onClick={() => setDeleteTarget(item)}
                         aria-label={`Excluir ${item.title}`}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition"
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -662,7 +662,7 @@ export default function SchedulePage() {
                   <h2 className="text-lg font-black tracking-tight">
                     {editingAppointment ? 'Editar agendamento' : 'Novo agendamento'}
                   </h2>
-                  <p className="text-xs text-neutral-500 mt-0.5 truncate">
+                  <p className="text-xs text-neutral-400 mt-0.5 truncate">
                     {formatLongDate(parseDateInput(form.date))}
                   </p>
                 </div>
@@ -679,7 +679,7 @@ export default function SchedulePage() {
               <form onSubmit={handleSubmitAppointment} className="px-5 space-y-5">
                 {/* Quando ─ data + janela de horário, agrupadas porque decidem a mesma coisa */}
                 <fieldset className="space-y-2">
-                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
                     Quando
                   </legend>
                   <input
@@ -706,13 +706,13 @@ export default function SchedulePage() {
                     />
                   </div>
                   {durationLabel && (
-                    <p className="text-xs text-neutral-500 pl-0.5">Duração de {durationLabel}</p>
+                    <p className="text-xs text-neutral-400 pl-0.5">Duração de {durationLabel}</p>
                   )}
                 </fieldset>
 
                 {/* Tipo ─ 3 opções fixas viram chips: escolha visível sem abrir picker */}
                 <fieldset>
-                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
                     Tipo
                   </legend>
                   <div className="grid grid-cols-3 gap-2">
@@ -739,7 +739,7 @@ export default function SchedulePage() {
 
                 {/* Aluno ─ segue select (lista dinâmica), mas com chevron próprio */}
                 <fieldset>
-                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
                     Aluno
                   </legend>
                   <div className="relative">
@@ -758,7 +758,7 @@ export default function SchedulePage() {
                     </select>
                     <ChevronDown
                       size={16}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"
                     />
                   </div>
                 </fieldset>

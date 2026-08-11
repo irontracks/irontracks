@@ -106,7 +106,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
             </div>
             <h2 id="cp-title" className="text-lg font-black text-white">Trocar Senha</h2>
           </div>
-          <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center">
+          <button type="button" onClick={handleClose} className="text-neutral-400 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center">
             <X size={18} />
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>

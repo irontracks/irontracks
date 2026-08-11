@@ -189,7 +189,7 @@ export default function NotificationToast({
         </div>
 
         <button
-          className="text-neutral-500 hover:text-white transition-colors shrink-0 ml-1"
+          className="text-neutral-400 hover:text-white transition-colors shrink-0 ml-1"
           onClick={handleCloseClick}
           type="button"
           aria-label="Fechar notificação"

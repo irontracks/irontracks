@@ -97,7 +97,7 @@ class SectionErrorBoundary extends React.Component<Props, State> {
         <div>
           <p className="text-white font-bold text-sm">{section} encontrou um erro</p>
           {this.state.error && (
-            <p className="text-neutral-500 font-mono text-xs mt-1 max-w-xs truncate">
+            <p className="text-neutral-400 font-mono text-xs mt-1 max-w-xs truncate">
               {this.state.error.message}
             </p>
           )}

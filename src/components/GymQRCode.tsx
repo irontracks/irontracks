@@ -123,7 +123,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
           {/* Gym name */}
           {gymName && (
             <div className="text-center">
-              <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Academia</p>
+              <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Academia</p>
               <p className="text-base font-black text-white">{gymName}</p>
             </div>
           )}
@@ -146,7 +146,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
 
           {/* Instruction */}
           {!loading && !error && (
-            <p className="text-xs text-neutral-500 text-center">
+            <p className="text-xs text-neutral-400 text-center">
               Mostre este QR Code para seus alunos escanearem com a câmera do celular
             </p>
           )}

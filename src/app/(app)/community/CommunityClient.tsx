@@ -360,7 +360,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   placeholder="Buscar por nome ou tipo (teacher/student)…"
                 />
                 {query && (
-                  <button type="button" onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-400 transition-colors">
+                  <button type="button" onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-200 transition-colors">
                     <X size={14} />
                   </button>
                 )}
@@ -496,7 +496,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                 ) : feedError && feedItems.length === 0 ? (
                   <GoldGradientBorder>
                     <div className="p-8 flex flex-col items-center gap-3 text-center">
-                      <Rss size={28} className="text-neutral-500" />
+                      <Rss size={28} className="text-neutral-400" />
                       <div className="text-sm font-bold text-white">Não foi possível carregar o feed.</div>
                       <div className="text-xs text-neutral-400">Verifique sua conexão e tente novamente.</div>
                       <GoldButton onClick={() => loadFeed(true)} disabled={feedLoading} variant="gold" className="mt-1">

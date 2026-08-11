@@ -75,7 +75,7 @@ export default function CheckinPage() {
               <p className="text-yellow-400 font-bold">{gymName}</p>
             </div>
           </div>
-          <p className="text-sm text-neutral-500">Redirecionando para o dashboard...</p>
+          <p className="text-sm text-neutral-400">Redirecionando para o dashboard...</p>
         </div>
       )}
 
@@ -88,7 +88,7 @@ export default function CheckinPage() {
             <p className="text-2xl font-black text-white">Já registrado!</p>
             <p className="text-sm text-neutral-400 mt-1">Você já fez check-in em <span className="text-yellow-400">{gymName}</span> nos últimos 5 minutos.</p>
           </div>
-          <p className="text-sm text-neutral-500">Redirecionando...</p>
+          <p className="text-sm text-neutral-400">Redirecionando...</p>
         </div>
       )}
 

@@ -105,7 +105,7 @@ export default function WorkoutRecoveryBanner({ userId }: WorkoutRecoveryBannerP
             <button
               onClick={dismissRecovery}
               disabled={recovering}
-              className="px-3 py-2 rounded-xl text-xs font-medium text-neutral-500 hover:text-neutral-300 transition-colors disabled:opacity-50"
+              className="px-3 py-2 rounded-xl text-xs font-medium text-neutral-400 hover:text-neutral-300 transition-colors disabled:opacity-50"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               Descartar

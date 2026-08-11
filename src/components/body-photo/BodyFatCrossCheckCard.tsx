@@ -77,7 +77,7 @@ export const BodyFatCrossCheckCard: React.FC<{
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2.5">
                     <div className="flex items-center gap-1.5 mb-1">
                         <Sparkles className="w-3 h-3 text-yellow-500" />
-                        <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-500">Estimado na foto</span>
+                        <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-400">Estimado na foto</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">
                         {pct(photoLow)}–{pct(photoHigh)}
@@ -88,7 +88,7 @@ export const BodyFatCrossCheckCard: React.FC<{
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2.5">
                     <div className="flex items-center gap-1.5 mb-1">
                         <Ruler className="w-3 h-3 text-blue-400" />
-                        <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-500">Medido</span>
+                        <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-400">Medido</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">{pct(reference.percent)}</div>
                     <div className="text-[10px] text-neutral-600 mt-1">
@@ -103,7 +103,7 @@ export const BodyFatCrossCheckCard: React.FC<{
             </p>
 
             {check.stale ? (
-                <p className="text-[11px] text-neutral-500 mt-2">
+                <p className="text-[11px] text-neutral-400 mt-2">
                     A medição é de {formatDate(reference.assessmentDate)} — {reference.daysApart} dias antes destas fotos.
                     Parte da diferença pode ser só o tempo entre as duas.
                 </p>

@@ -69,7 +69,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
         <div role="dialog" aria-modal="true" aria-label="Plano tático">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
+            <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold truncate">Plano Tático</div>
             <div className="text-white font-black truncate">
               {formatDateCompact(assessment?.date || assessment?.assessment_date)}
             </div>

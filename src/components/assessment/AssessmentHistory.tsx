@@ -134,7 +134,7 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
       <div className="p-6 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full border-2 border-yellow-500/30 border-t-yellow-500 animate-spin" />
-          <p className="text-neutral-500 text-sm font-bold">Carregando histórico de avaliações...</p>
+          <p className="text-neutral-400 text-sm font-bold">Carregando histórico de avaliações...</p>
         </div>
       </div>
     );
@@ -183,7 +183,7 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
               registradas" — voz de professor numa tela que o próprio aluno abre
               pelo menu Avaliações. Ele lia sobre si mesmo na terceira pessoa.
               O componente serve aos dois contextos, então quem chama informa. */}
-          <p className="text-neutral-500 text-sm">
+          <p className="text-neutral-400 text-sm">
             {selfView
               ? 'Registre sua primeira avaliação para acompanhar a evolução ao longo do tempo.'
               : 'Este aluno ainda não possui avaliações físicas registradas.'}

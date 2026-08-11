@@ -111,7 +111,7 @@ export function ReportMusclePieChart({ data }: ReportMusclePieChartProps) {
                         </div>
                     ))}
                     {segments.length > 5 && (
-                        <div className="text-[10px] text-neutral-500">+{segments.length - 5} outros</div>
+                        <div className="text-[10px] text-neutral-400">+{segments.length - 5} outros</div>
                     )}
                 </div>
             </div>

@@ -90,7 +90,7 @@ export default function UserProfileModal({
         {loading ? (
           <div className="p-10 flex flex-col items-center gap-3">
             <Loader2 size={28} className="text-yellow-500 animate-spin" />
-            <div className="text-sm text-neutral-500">Carregando perfil…</div>
+            <div className="text-sm text-neutral-400">Carregando perfil…</div>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
@@ -142,7 +142,7 @@ export default function UserProfileModal({
                 >
                   <div className="flex justify-center mb-1">{stat.icon}</div>
                   <div className="text-lg font-black text-white">{stat.value}</div>
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">{stat.label}</div>
+                  <div className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">{stat.label}</div>
                 </div>
               ))}
             </div>

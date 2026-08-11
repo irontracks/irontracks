@@ -76,14 +76,14 @@ export function HistorySummaryCard({
                         </div>
                     </div>
                     {[
-                        { icon: <Clock size={12} className="text-yellow-500/60" />, label: 'Tempo', value: <>{summary.totalMinutes}<span className="text-xs text-neutral-500 font-black ml-1">min</span></> },
-                        { icon: <TrendingUp size={12} className="text-yellow-500/60" />, label: 'Média', value: <>{summary.avgMinutes}<span className="text-xs text-neutral-500 font-black ml-1">min</span></> },
+                        { icon: <Clock size={12} className="text-yellow-500/60" />, label: 'Tempo', value: <>{summary.totalMinutes}<span className="text-xs text-neutral-400 font-black ml-1">min</span></> },
+                        { icon: <TrendingUp size={12} className="text-yellow-500/60" />, label: 'Média', value: <>{summary.avgMinutes}<span className="text-xs text-neutral-400 font-black ml-1">min</span></> },
                         { icon: <Dumbbell size={12} className="text-yellow-500/60" />, label: 'Volume', value: summary.volumeLabel },
                     ].map(({ icon, label, value }) => (
                         <div key={label} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <div className="flex items-center gap-1.5 mb-1">
                                 {icon}
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">{label}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">{label}</div>
                             </div>
                             <div className="text-xl font-black tracking-tight text-white">{value}</div>
                         </div>
@@ -93,8 +93,8 @@ export function HistorySummaryCard({
                 {/* Report buttons */}
                 {!loading && hasItems && (
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-800/70">
-                        <FileText size={14} className="text-neutral-500 flex-shrink-0" />
-                        <span className="text-[11px] text-neutral-500 font-bold uppercase tracking-wider flex-shrink-0">Relatórios</span>
+                        <FileText size={14} className="text-neutral-400 flex-shrink-0" />
+                        <span className="text-[11px] text-neutral-400 font-bold uppercase tracking-wider flex-shrink-0">Relatórios</span>
                         <div className="flex-1" />
                         <button
                             type="button"

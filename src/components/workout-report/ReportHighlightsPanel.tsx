@@ -86,7 +86,7 @@ export function ReportHighlightsPanel({
               setCompletionPct >= 70 ? 'text-yellow-400' : 'text-red-400'
               }`}>{setCompletionPct}%</div>
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Séries completas</div>
-            <div className="text-[10px] text-neutral-500 font-mono">{setsCompleted}/{setsPlanned}</div>
+            <div className="text-[10px] text-neutral-400 font-mono">{setsCompleted}/{setsPlanned}</div>
           </div>
         )}
       </div>

@@ -132,7 +132,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                             />
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 text-center mb-2">
                                 <div className="col-span-1">
-                                    <div className="text-[10px] text-neutral-500 block">Sets</div>
+                                    <div className="text-[10px] text-neutral-400 block">Sets</div>
                                     <div className="flex items-center gap-1">
                                         <input
                                             aria-label="Sets"
@@ -151,7 +151,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     </div>
                                 </div>
                                 <div className="col-span-1">
-                                    <div className="text-[10px] text-neutral-500 block">Reps</div>
+                                    <div className="text-[10px] text-neutral-400 block">Reps</div>
                                     <input
                                         aria-label="Reps"
                                         value={ex.reps}
@@ -171,7 +171,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <div className="text-[10px] text-neutral-500 block">Rest(s)</div>
+                                    <div className="text-[10px] text-neutral-400 block">Rest(s)</div>
                                     <input
                                         aria-label="Rest(s)"
                                         inputMode="numeric"
@@ -181,7 +181,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <div className="text-[10px] text-neutral-500 block">Cad</div>
+                                    <div className="text-[10px] text-neutral-400 block">Cad</div>
                                     <input
                                         aria-label="Cadência"
                                         value={ex.cadence}
@@ -190,7 +190,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <div className="text-[10px] text-neutral-500 block">Método</div>
+                                    <div className="text-[10px] text-neutral-400 block">Método</div>
                                     <select
                                         aria-label="Método"
                                         value={['warm-up', 'warm_up', 'warmup'].includes(String(ex.method || '').toLowerCase()) ? 'Normal' : (ex.method || 'Normal')}

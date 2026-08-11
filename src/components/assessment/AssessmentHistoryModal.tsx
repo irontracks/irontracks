@@ -75,7 +75,7 @@ export function AssessmentHistoryModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+                        className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         aria-label="Voltar"
                         title="Voltar"
@@ -105,7 +105,7 @@ export function AssessmentHistoryModal({
                                         <div className="font-black text-white">
                                             {formatDateCompact(a.date || a.assessment_date)}
                                         </div>
-                                        <div className="text-xs text-neutral-500">
+                                        <div className="text-xs text-neutral-400">
                                             {(() => {
                                                 const w = getWeightKg(a);
                                                 const bf = getBodyFatPercent(a);
@@ -173,7 +173,7 @@ export function AssessmentHistoryModal({
                                                         const value = getSkinfoldMm(a, key);
                                                         return (
                                                             <div key={key} className="flex justify-between">
-                                                                <span className="text-neutral-500">{label}:</span>
+                                                                <span className="text-neutral-400">{label}:</span>
                                                                 <span className="font-bold text-white">
                                                                     {value == null ? '-' : String(value)}
                                                                 </span>
@@ -189,7 +189,7 @@ export function AssessmentHistoryModal({
                                                         const value = getMeasurementCm(a, key);
                                                         return (
                                                             <div key={key} className="flex justify-between">
-                                                                <span className="text-neutral-500">{label}:</span>
+                                                                <span className="text-neutral-400">{label}:</span>
                                                                 <span className="font-bold text-white">
                                                                     {value == null ? '-' : String(value)}
                                                                 </span>

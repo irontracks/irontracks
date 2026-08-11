@@ -722,7 +722,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     </div>
 
                                     <div className="flex justify-between mt-4">
-                                        <p className="text-[10px] text-neutral-500">Duração: {(trimRange.end - trimRange.start).toFixed(1)}s (máx {MAX_VIDEO_SECONDS}s)</p>
+                                        <p className="text-[10px] text-neutral-400">Duração: {(trimRange.end - trimRange.start).toFixed(1)}s (máx {MAX_VIDEO_SECONDS}s)</p>
                                         <button onClick={() => {
                                             if (videoRef.current) {
                                                 videoRef.current.currentTime = trimRange.start;

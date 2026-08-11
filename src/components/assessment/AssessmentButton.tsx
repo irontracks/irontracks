@@ -128,7 +128,7 @@ export default function AssessmentButton({
           <div className="absolute top-3 right-3 z-10">
             <button
               onClick={() => setShowForm(false)}
-              className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+              className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
               style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
               aria-label="Fechar"
             >
@@ -162,7 +162,7 @@ export default function AssessmentButton({
             <TrendingUp className="w-4 h-4 text-yellow-500" />
           </div>
         </div>
-        <p className="text-neutral-500 text-sm mb-4">
+        <p className="text-neutral-400 text-sm mb-4">
           Gerencie as avaliações físicas e acompanhe a evolução do aluno
         </p>
         <div className="flex flex-wrap gap-3">

@@ -80,7 +80,7 @@ export const AssessmentSummaryCards = <T,>({
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] text-neutral-500 font-black uppercase tracking-widest">{label}</span>
+              <span className="text-[10px] text-neutral-400 font-black uppercase tracking-widest">{label}</span>
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: `${color}12`, color }}
@@ -94,7 +94,7 @@ export const AssessmentSummaryCards = <T,>({
               <span className="text-2xl font-black text-white tracking-tight">
                 {current != null ? (unit === 'kcal' ? current.toFixed(0) : current.toFixed(1)) : '-'}
               </span>
-              <span className="text-xs font-bold text-neutral-500">{current != null ? unit : ''}</span>
+              <span className="text-xs font-bold text-neutral-400">{current != null ? unit : ''}</span>
             </div>
 
             {/* Progress */}

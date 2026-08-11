@@ -62,11 +62,11 @@ export function WeightTrendCard({ studentId }: { studentId?: string | null }) {
     >
       <div className="flex items-baseline justify-between gap-2 mb-4">
         <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80">Tendência de Peso</h3>
-        <span className="text-[10px] uppercase tracking-widest text-neutral-500">Avaliações + check-ins</span>
+        <span className="text-[10px] uppercase tracking-widest text-neutral-400">Avaliações + check-ins</span>
       </div>
       <div className="h-72">
         {loading ? (
-          <div className="h-full flex items-center justify-center text-neutral-500 text-sm">Carregando…</div>
+          <div className="h-full flex items-center justify-center text-neutral-400 text-sm">Carregando…</div>
         ) : points.length >= 2 ? (
           <Line data={chart} options={options as never} />
         ) : (

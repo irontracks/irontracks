@@ -257,7 +257,7 @@ export default function GuidedTour({
                 <button
                   type="button"
                   onClick={handleSkip}
-                  className="px-4 py-3 text-sm font-medium text-neutral-500 hover:text-neutral-300 transition-colors"
+                  className="px-4 py-3 text-sm font-medium text-neutral-400 hover:text-neutral-300 transition-colors"
                 >
                   Pular
                 </button>

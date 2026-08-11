@@ -234,7 +234,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">{r.dateLabel || '—'}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{r.dateLabel || '—'}</div>
                   <div className="text-sm font-black text-white truncate">{String(r.name || 'Treino')}</div>
                 </div>
               </div>

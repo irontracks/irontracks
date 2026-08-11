@@ -51,7 +51,7 @@ const SetsBar = ({ value, min, max }: { value: number; min: number; max: number 
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ok ? '#4ade80' : '#facc15' }} />
                 <div className="absolute top-0 bottom-0 w-px bg-neutral-500" style={{ left: `${minPct}%` }} />
             </div>
-            <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
+            <div className="flex justify-between text-[10px] text-neutral-400 mt-1">
                 <span>{value} séries/sem</span>
                 <span>alvo {min}–{max}</span>
             </div>
@@ -154,10 +154,10 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                 <div className="mt-3 space-y-1">
                                     {d.coverages.map((c) => (
                                         <div key={c.patternId} className="flex items-center justify-between gap-2 text-[13px]">
-                                            <span className={c.sets > 0 ? 'text-neutral-300' : 'text-neutral-500'}>
+                                            <span className={c.sets > 0 ? 'text-neutral-300' : 'text-neutral-400'}>
                                                 {c.sets > 0 ? '✓' : '—'} {c.patternLabel}
                                             </span>
-                                            <span className="text-neutral-500 shrink-0">
+                                            <span className="text-neutral-400 shrink-0">
                                                 {c.sets > 0 ? `${c.sets} séries` : 'sem estímulo'}
                                             </span>
                                         </div>
@@ -174,7 +174,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                         <span className="font-bold text-yellow-400">Falta {p.label.toLowerCase()}.</span> {p.why}
                                     </p>
                                 ))}
-                                <p className="text-[11px] text-neutral-500">
+                                <p className="text-[11px] text-neutral-400">
                                     Sugestão: {d.suggestedWeeklySets} séries por semana para começar.
                                 </p>
 
@@ -192,7 +192,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                 Tirei da lista: {state.restriction.excluded.join(', ')}.
                                             </p>
                                         ) : null}
-                                        <p className="text-[11px] text-neutral-500 mt-1.5">
+                                        <p className="text-[11px] text-neutral-400 mt-1.5">
                                             Confira se o que sobrou respeita a sua limitação antes de adicionar.
                                         </p>
                                     </div>
@@ -206,7 +206,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-bold text-white truncate">{s.name}</p>
-                                                        <p className="text-[11px] text-neutral-500">
+                                                        <p className="text-[11px] text-neutral-400">
                                                             {s.equipment.length ? s.equipment.map((e) => EQUIPMENT_LABEL[e] ?? e).join(' · ') : 'sem equipamento definido'}
                                                         </p>
                                                     </div>
@@ -241,7 +241,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                     Adicionar <span className="font-black text-white">{s.name}</span> em{' '}
                                                                     <span className="font-black text-white">{confirmTarget.name}</span>?
                                                                 </p>
-                                                                <p className="text-[11px] text-neutral-500 mt-1">
+                                                                <p className="text-[11px] text-neutral-400 mt-1">
                                                                     Entra no fim do treino, com 3 séries em branco.
                                                                 </p>
                                                                 <div className="flex items-center gap-2 mt-3">
@@ -267,11 +267,11 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <p className="text-[11px] uppercase tracking-wide font-bold text-neutral-500">
+                                                                <p className="text-[11px] uppercase tracking-wide font-bold text-neutral-400">
                                                                     Em qual treino? Entra no fim, com 3 séries em branco.
                                                                 </p>
                                                                 {workouts.length === 0 ? (
-                                                                    <p className="text-[13px] text-neutral-500">Nenhum treino ativo encontrado.</p>
+                                                                    <p className="text-[13px] text-neutral-400">Nenhum treino ativo encontrado.</p>
                                                                 ) : workouts.map((w) => (
                                                                     <button
                                                                         key={w.id}
@@ -280,10 +280,10 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                         className="w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left hover:border-purple-400/40 transition disabled:opacity-50"
                                                                     >
                                                                         <span className="text-[13px] text-neutral-200 truncate">{w.name}</span>
-                                                                        <span className="text-[11px] text-neutral-500 shrink-0">{w.exerciseCount} ex.</span>
+                                                                        <span className="text-[11px] text-neutral-400 shrink-0">{w.exerciseCount} ex.</span>
                                                                     </button>
                                                                 ))}
-                                                                <button onClick={() => { setPicking(null); setConfirmTarget(null) }} className="text-[12px] text-neutral-500 underline underline-offset-2 mt-1">
+                                                                <button onClick={() => { setPicking(null); setConfirmTarget(null) }} className="text-[12px] text-neutral-400 underline underline-offset-2 mt-1">
                                                                     Cancelar
                                                                 </button>
                                                             </>
@@ -307,7 +307,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                     antes de acrescentar exercício novo.
                                 </p>
                                 {d.coverages.some((c) => c.exercises.length) ? (
-                                    <p className="text-[11px] text-neutral-500">
+                                    <p className="text-[11px] text-neutral-400">
                                         Já no seu treino: {d.coverages.flatMap((c) => c.exercises).slice(0, 4).join(', ')}.
                                     </p>
                                 ) : null}

@@ -198,13 +198,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-colors',
                   props.settings?.autoLoad
                     ? 'border-violet-400/25 bg-violet-500/15 text-violet-200'
-                    : 'border-white/[0.06] bg-white/[0.04] text-neutral-500',
+                    : 'border-white/[0.06] bg-white/[0.04] text-neutral-400',
                 ].join(' ')}>
                   <Brain size={15} />
                 </span>
                 <span className="text-left min-w-0">
                   <span className="block text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Carga automática</span>
-                  <span className="block text-[11px] text-neutral-500 truncate mt-0.5">
+                  <span className="block text-[11px] text-neutral-400 truncate mt-0.5">
                     {props.settings?.autoLoad ? 'O motor sugere seus pesos' : 'Pesos manuais'}
                   </span>
                 </span>

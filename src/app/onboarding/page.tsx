@@ -91,7 +91,7 @@ export default function OnboardingPage() {
           <div>
             <label htmlFor="ob-name" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Nome completo</label>
             <div className="relative">
-              <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 id="ob-name"
                 type="text"
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
           <div>
             <label htmlFor="ob-pass" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Criar senha</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 id="ob-pass"
                 type={showPassword ? 'text' : 'password'}
@@ -117,7 +117,7 @@ export default function OnboardingPage() {
                 placeholder="Mínimo 6 caracteres"
                 className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-11 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
               />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300">
+              <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-300">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
@@ -126,7 +126,7 @@ export default function OnboardingPage() {
           <div>
             <label htmlFor="ob-pass2" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Confirmar senha</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 id="ob-pass2"
                 type={showPassword ? 'text' : 'password'}

@@ -85,7 +85,7 @@ const StatusBadge = ({ status }: { status: BodyPhotoAssessmentStatus }) => {
 const ScorePill = ({ label, value }: { label: string; value: number | null }) => (
     <div className="flex flex-col items-center min-w-[38px]">
         <span className="text-sm font-black text-white leading-none">{value == null ? '—' : Math.round(value)}</span>
-        <span className="text-[9px] uppercase tracking-wide text-neutral-500 mt-0.5">{label}</span>
+        <span className="text-[9px] uppercase tracking-wide text-neutral-400 mt-0.5">{label}</span>
     </div>
 )
 
@@ -140,7 +140,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                             <h2 className="text-base font-black text-white leading-tight truncate">
                                 {detail ? `Laudo de ${formatDate(detail.assessment.assessment_date)}` : 'Laudos por Foto'}
                             </h2>
-                            <p className="text-[11px] text-neutral-500 truncate">
+                            <p className="text-[11px] text-neutral-400 truncate">
                                 {detail ? 'Avaliação por foto salva' : 'Suas avaliações por foto já geradas'}
                             </p>
                         </div>
@@ -206,7 +206,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                         <div className="space-y-3">
                                             <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} assessmentId={detail.assessment.id} />
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                                                <p className="text-[11px] text-neutral-500">
+                                                <p className="text-[11px] text-neutral-400">
                                                     {correlation.generatedAt
                                                         ? `Cruzamento gerado em ${formatDateTime(correlation.generatedAt)}`
                                                         : 'Cruzamento salvo nesta avaliação'}
@@ -284,7 +284,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                         <Sparkles className="w-7 h-7 text-yellow-500/60" />
                                     </div>
                                     <p className="text-white font-bold">Nenhum laudo por foto ainda</p>
-                                    <p className="text-sm text-neutral-500 mt-1">Use o botão “Por Foto” para gerar o primeiro.</p>
+                                    <p className="text-sm text-neutral-400 mt-1">Use o botão “Por Foto” para gerar o primeiro.</p>
                                 </div>
                             ) : (
                                 items.map((a) => {
@@ -330,12 +330,12 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                                                         <span className="text-sm font-black text-yellow-500 leading-none">
                                                                             {Math.round(a.body_fat_estimate_low)}–{Math.round(a.body_fat_estimate_high)}%
                                                                         </span>
-                                                                        <span className="text-[9px] uppercase tracking-wide text-neutral-500 mt-0.5">Gordura</span>
+                                                                        <span className="text-[9px] uppercase tracking-wide text-neutral-400 mt-0.5">Gordura</span>
                                                                     </div>
                                                                 ) : null}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-[11px] text-neutral-500 mt-1.5">Sem laudo — toque para ver as fotos</p>
+                                                            <p className="text-[11px] text-neutral-400 mt-1.5">Sem laudo — toque para ver as fotos</p>
                                                         )}
                                                     </div>
                                                 </button>

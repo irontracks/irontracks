@@ -172,7 +172,7 @@ export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, type)}
                 >
-                  <Camera className="w-12 h-12 text-neutral-500 mx-auto mb-4" />
+                  <Camera className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
                   <p className="text-neutral-400 mb-2">Arraste a foto aqui ou</p>
                   <button
                     onClick={() => {
@@ -220,7 +220,7 @@ export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps
         </button>
       </div>
 
-      <p className="text-sm text-neutral-500 text-center">
+      <p className="text-sm text-neutral-400 text-center">
         As fotos são opcionais mas ajudam a visualizar a evolução física
       </p>
     </motion.div>

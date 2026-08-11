@@ -70,7 +70,7 @@ export default function VideoTrimmerImpl({ duration, value, onChange, onPreview,
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80">
           <span>Corte do vídeo</span>
-          <span className="text-neutral-500 font-mono normal-case">
+          <span className="text-neutral-400 font-mono normal-case">
             {fmt(safeValue[0])}–{fmt(safeValue[1])}
           </span>
         </div>
