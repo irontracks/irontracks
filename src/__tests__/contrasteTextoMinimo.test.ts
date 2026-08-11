@@ -22,9 +22,10 @@
  * decorativo. A lista só encolhe.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+// `readdirSync(..., { recursive: true })` e NÃO `globSync`: este último só
+// existe a partir do Node 22, e o CI roda Node 20 — passou local e reprovou lá.
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { globSync } from 'node:fs'
 
 const ROOT = join(__dirname, '..')
 
@@ -46,8 +47,10 @@ const EXCECOES: Record<string, string> = {
   'components/dashboard/IronRankCard.tsx': 'ícone decorativo em linha de PR',
 }
 
-const arquivos = globSync('**/*.tsx', { cwd: ROOT })
-  .filter((f) => !f.includes('__tests__'))
+const arquivos = readdirSync(ROOT, { recursive: true, encoding: 'utf8' })
+  .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__'))
+  // Windows devolve '\' — normaliza para casar com as chaves de EXCECOES.
+  .map((f) => f.split('\\').join('/'))
 
 describe('contraste mínimo de texto', () => {
   it('nenhum arquivo novo usa neutral-700/800 em texto', () => {
