@@ -127,7 +127,7 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData, bodyFatP
           >
             {bodyType.label}
           </span>
-          <span className="text-[9px] text-neutral-700 uppercase tracking-[0.2em]">
+          <span className="text-[9px] text-neutral-400 uppercase tracking-[0.2em]">
             {isFemale ? 'F' : 'M'}
           </span>
         </div>
@@ -232,7 +232,7 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData, bodyFatP
 
       {/* Footer */}
       <div className="relative z-10 text-center pb-3">
-        <span className="text-[8px] text-neutral-800 uppercase tracking-[0.2em]">
+        <span className="text-[10px] text-neutral-400 uppercase tracking-[0.2em]">
           cm · toque para destacar
         </span>
       </div>

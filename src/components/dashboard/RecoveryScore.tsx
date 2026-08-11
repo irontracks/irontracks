@@ -166,7 +166,7 @@ const RecoveryScore = memo(function RecoveryScore() {
 
       {/* Apple Watch attribution */}
       <div className="mt-3 pt-2 border-t border-neutral-900">
-        <span className="text-[8px] text-neutral-700 uppercase tracking-[0.2em]">
+        <span className="text-[10px] text-neutral-400 uppercase tracking-[0.2em]">
           ⌚ via Apple Watch · atualizado durante o sono
         </span>
       </div>
