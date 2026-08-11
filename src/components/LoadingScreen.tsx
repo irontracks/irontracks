@@ -2,6 +2,7 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { clearSessionBackup } from '@/utils/auth/sessionBackup'
+import { readBounce, getBounceStorage, resetBounce } from '@/lib/auth/bootBounce'
 
 // Module-level flag: true after the first LoadingScreen has been shown in this
 // browser session. Subsequent mounts skip the splash-in animation so the logo
@@ -14,11 +15,28 @@ const LoadingScreen = () => {
     // Safety valve: if still mounted after 8 s, it means we are stuck in a
     // redirect loop (e.g. failed Apple Sign-In left an inconsistent localStorage).
     // Show a soft offline / retry hint instead of looping indefinitely.
+    //
+    // ⚠️ Só o cronômetro NÃO bastava, e falhava exatamente no caso que ele
+    // existe para cobrir: num ping-pong `/` ↔ `/dashboard` cada volta é uma
+    // navegação COMPLETA, o componente morre e o `setTimeout` renasce do zero.
+    // Com voltas de ~5 s (medido em produção) os 8 s nunca chegavam e o usuário
+    // ficava piscando para sempre — a única saída era desinstalar o app.
+    // Por isso o segundo gatilho lê o contador de ricochete, que vive no
+    // storage e SOBREVIVE às recargas: houve ricochete recente, o socorro
+    // aparece de imediato, sem esperar cronômetro nenhum.
     const [stuck, setStuck] = useState(false)
 
     useEffect(() => {
         splashHasPlayed = true
-        const t = setTimeout(() => setStuck(true), 8000)
+        let hadBounce = false
+        try {
+            hadBounce = readBounce(getBounceStorage(), Date.now()).count > 0
+        } catch { /* sem storage: vale o cronômetro cheio */ }
+        // Ricochete recente encurta a espera a zero em vez de marcar o estado
+        // aqui: `setStuck` síncrono no corpo do efeito dispara render em
+        // cascata (e o lint reprova), e decidir no `useState` inicializador
+        // divergiria do servidor, que nunca tem storage — mismatch de hidratação.
+        const t = setTimeout(() => setStuck(true), hadBounce ? 0 : 8000)
         return () => clearTimeout(t)
     }, [])
 
@@ -34,6 +52,9 @@ const LoadingScreen = () => {
                     onClick={() => {
                         try { localStorage.removeItem('it.logged_in') } catch { }
                         clearSessionBackup()
+                        // Recomeço deliberado do usuário: zera o contador para o
+                        // próximo boot nascer limpo em vez de já abrir no socorro.
+                        resetBounce(getBounceStorage())
                         window.location.replace('/')
                     }}
                 >

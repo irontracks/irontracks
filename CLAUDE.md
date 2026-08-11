@@ -193,6 +193,42 @@ não reproduz na máquina local.
 3. último recurso: desligar `sourcemaps` do Sentry — custa stack trace legível em produção.
 Depois, **Redeploy** no commit atual do `main`.
 
+## Boot em loop no iPhone ("pisca na tela de carregamento e não entra") — ago/2026
+
+Sintoma relatado por usuária real: abre o app, fica piscando no splash, **só
+desinstalar e reinstalar resolve**. Não é cache nem chunk stale — é ricochete de
+navegação, e o que o reinstalar apaga é o `localStorage`.
+
+**A causa:** `it.logged_in` é uma marca gravada no login que **nunca expira e
+nada apagava**. A raiz confiava nela e mandava para `/dashboard`; o
+`dashboard/layout.tsx` conferia a sessão de verdade e devolvia para
+`/?next=/dashboard`. Ping-pong infinito, uma navegação COMPLETA por volta.
+Reproduzido em produção: documento novo a cada ~5 s, indefinidamente.
+
+**Por que o salva-vidas não salvava:** o botão "Voltar ao início" do
+`LoadingScreen` aparecia após 8 s — mas o componente morria a cada volta e o
+`setTimeout` renascia do zero. Ele era inalcançável exatamente no caso para o
+qual foi escrito. **Detector de loop não pode viver em `useState`/`useRef`: tem
+que sobreviver à recarga que ele existe para detectar.** Daí `lib/auth/bootBounce.ts`,
+que conta no storage — fonte única, usada pelos dois lados e pelo `LoadingScreen`.
+
+Fronteira do freio: ao disparar ele apaga só `it.logged_in`, **nunca os cookies
+`sb-*`**. Um dos caminhos do loop roda com sessão VÁLIDA (o dashboard expulsa
+quando o `userId` não hidrata em 3 s), e ali limpar cookie deslogaria um usuário
+legítimo por causa de conexão ruim.
+
+**⚠️ `middleware.ts` NÃO É CARREGADO** (verificado 10/08/2026, três provas:
+`middleware-manifest.json` vazio, `console.log` no corpo nunca imprime, e
+`www.irontracks.com.br` responde 200 em vez do 307 para o apex que ele faria na
+primeira linha). As rotas vivem em `src/app/`, e nesse layout o Next só
+reconhece `src/middleware.ts` — na raiz é ignorado **em silêncio**. As security
+headers vêm do `async headers()` do `next.config.ts`, e foi isso que mascarou.
+Consequência: **`updateSession()` nunca roda**, ou seja, a renovação de sessão do
+`@supabase/ssr` a cada navegação não existe neste app — suspeita não confirmada
+de ser a razão de sessões morrerem sozinhas. **Mover para `src/` é decisão do
+dono**: liga de uma vez refresh de sessão, o atalho `/` → `/dashboard` e CSP com
+nonce por request, em cima de usuários reais.
+
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
 

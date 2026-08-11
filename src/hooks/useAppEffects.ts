@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { unlockAudio } from '@/lib/sounds'
-import { logError } from '@/lib/logger'
+import { logError, logWarnRemote } from '@/lib/logger'
+import { registerBounce, resetBounce, getBounceStorage, clearBoundLoginMark } from '@/lib/auth/bootBounce'
 import type { ActiveWorkoutSession, DirectChatState } from '@/types/app'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isRecord } from '@/utils/guards'
@@ -138,14 +139,37 @@ export function useAppEffects({
   }, [view, directChat, activeSession, reportDataCurrent, userId, authLoading, setView])
 
   // ── Redirect to login when no user ────────────────────────────
+  //
+  // Este é o lado do dashboard no ping-pong que travava iPhones na tela de
+  // carregamento (ago/2026): aqui expulsava para a raiz, e a raiz mandava de
+  // volta para cá. Os 3 s abaixo não distinguem "sem sessão" de "sessão boa que
+  // ainda não hidratou" — numa conexão ruim o segundo caso vira expulsão, e com
+  // cookie VÁLIDO o middleware devolve na hora: loop com sessão perfeita.
+  //
+  // O contador conta as voltas; estourou, não expulsa mais. Ficar parado aqui é
+  // melhor que ricochetear: `userId` ainda pode hidratar e resolver sozinho, e
+  // se a tela ficar no LoadingScreen ele mostra o botão de socorro.
   useEffect(() => {
     if (authLoading) return
     if (userId) return
     const t = setTimeout(() => {
+      const { tripped, count } = registerBounce(getBounceStorage(), Date.now())
+      if (tripped) {
+        clearBoundLoginMark()
+        logWarnRemote('auth.boot.bounce', 'freio de ricochete: dashboard parou de expulsar para a raiz', { count })
+        return
+      }
       try { window.location.replace('/?next=/dashboard') } catch { }
     }, 3000)
     return () => { clearTimeout(t) }
   }, [authLoading, userId, router])
+
+  // Boot saudável zera o contador. Sem isto, no fallback de `localStorage` as
+  // voltas de sessões diferentes se somariam e o freio pegaria um boot são.
+  useEffect(() => {
+    if (authLoading || !userId) return
+    resetBounce(getBounceStorage())
+  }, [authLoading, userId])
 
   // ── Preload common modal chunks staggered (idle-priority) ────
   // Escalonado em 1.5s/2.5s/3.5s/4.5s/5.5s/6.5s pra não competir com bootstrap

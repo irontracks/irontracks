@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { isIosNative } from '@/utils/platform'
-import { logError, logWarn } from '@/lib/logger'
+import { logError, logWarn, logWarnRemote } from '@/lib/logger'
+import { registerBounce, getBounceStorage, clearBoundLoginMark, decideBootRedirect, type PingResult } from '@/lib/auth/bootBounce'
 import { isExpectedAuthError } from '@/utils/auth/expectedAuthError'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
@@ -251,7 +252,32 @@ export function useLoginScreen() {
         if (typeof window === 'undefined') return
         const savedEmail = localStorage.getItem('it_remembered_email')
         if (savedEmail) { setEmailData(prev => ({ ...prev, email: savedEmail })); setRememberMe(true) }
-        if (localStorage.getItem('it.logged_in') === '1') { setIsLoading(true); window.location.replace('/dashboard'); return }
+        // A marca `it.logged_in` é atalho de UI (evita o flash da tela de login
+        // para quem já está logado) — NÃO é prova de sessão. Ela é gravada no
+        // login e nunca expira, então confiar cegamente nela mandava para o
+        // /dashboard gente cuja sessão o servidor já tinha recusado; o dashboard
+        // devolvia para cá e o app ficava piscando na tela de carregamento até o
+        // usuário desinstalar (ago/2026). Agora pergunta ao servidor antes de
+        // subir, e o contador de ricochete é a rede de segurança.
+        if (localStorage.getItem('it.logged_in') === '1') {
+            setIsLoading(true)
+            const { tripped } = registerBounce(getBounceStorage(), Date.now())
+            const stayOnLogin = (reason: string) => {
+                clearBoundLoginMark()
+                logWarnRemote('auth.boot.bounce', reason, { tripped })
+                setIsLoading(false)
+            }
+            if (tripped) { stayOnLogin('freio de ricochete: raiz parou de subir para /dashboard'); return }
+            fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
+                .then((r) => (r.status === 204 ? 'alive' : 'dead') as PingResult)
+                .catch(() => 'unknown' as PingResult)
+                .then((ping) => {
+                    const decision = decideBootRedirect({ tripped, ping })
+                    if (decision === 'show-login') { stayOnLogin('sessao recusada pelo servidor no boot'); return }
+                    window.location.replace('/dashboard')
+                })
+            return
+        }
         try {
             const backup = readSessionBackup()
             if (backup) {
