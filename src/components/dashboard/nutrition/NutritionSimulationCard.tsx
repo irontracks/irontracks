@@ -68,7 +68,7 @@ export default function NutritionSimulationCard({
         </div>
         <div className="shrink-0 text-right">
           <div className="text-lg font-black leading-none text-white">{sim.projection.calories.add}</div>
-          <div className="text-[10px] uppercase tracking-wider text-neutral-500">kcal</div>
+          <div className="text-[10px] uppercase tracking-wider text-neutral-400">kcal</div>
         </div>
       </div>
 
@@ -79,7 +79,7 @@ export default function NutritionSimulationCard({
             <li key={`${it.label}-${i}`} className="flex items-baseline justify-between gap-2 text-[11px]">
               <span className="min-w-0 truncate text-neutral-300">
                 {it.label}
-                {it.grams > 0 && <span className="text-neutral-500"> · {Math.round(it.grams)}g</span>}
+                {it.grams > 0 && <span className="text-neutral-400"> · {Math.round(it.grams)}g</span>}
               </span>
               <span className="shrink-0 text-neutral-400">{Math.round(it.calories)} kcal</span>
             </li>
@@ -93,13 +93,13 @@ export default function NutritionSimulationCard({
           const m = sim.projection[key]
           return (
             <div key={key} className="flex items-baseline justify-between gap-2 text-[11px]">
-              <span className="text-neutral-500">{label}</span>
+              <span className="text-neutral-400">{label}</span>
               <span className="tabular-nums">
                 <span className={m.over ? 'font-bold text-red-300' : 'font-bold text-neutral-100'}>
                   {m.projected}
                   {unit}
                 </span>
-                {m.goal !== null && <span className="text-neutral-500">/{m.goal}{unit}</span>}
+                {m.goal !== null && <span className="text-neutral-400">/{m.goal}{unit}</span>}
               </span>
             </div>
           )

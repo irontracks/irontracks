@@ -30,7 +30,7 @@ function Stat({
     <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
       <div style={{ color }} className="opacity-80">{icon}</div>
       <span className="text-white font-black text-sm leading-none">{value}</span>
-      {/* WCAG 1.4.3 AA — text-neutral-500 sobre fundo dark falha contraste 4.5:1 → 400 */}
+      {/* WCAG 1.4.3 AA — neutral-500 mede 4.18:1 sobre #0a0a0a e reprova; 400 dá 7.85:1 */}
       <span className="text-neutral-400 text-[10px] font-bold uppercase tracking-wide leading-none">{label}</span>
     </div>
   )

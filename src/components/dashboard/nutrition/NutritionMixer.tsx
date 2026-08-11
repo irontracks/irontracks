@@ -849,7 +849,7 @@ export default function NutritionMixer({
                 <div className="text-2xl font-black leading-none text-green-400">Meta batida</div>
               )}
             </div>
-            <div className="text-xs text-neutral-500 tabular-nums">
+            <div className="text-xs text-neutral-400 tabular-nums">
               de {Math.round(safeGoals.calories)} kcal
             </div>
 
@@ -866,7 +866,7 @@ export default function NutritionMixer({
             <Moon size={12} className="shrink-0 text-sky-300" aria-hidden="true" />
             <span className="text-[10px] leading-tight text-sky-300">
               Dia de descanso: meta ajustada <span className="font-semibold">−{Math.round(safeNumber(restDayReduction))} kcal</span>
-              <span className="text-neutral-500"> · proteína mantida</span>
+              <span className="text-neutral-400"> · proteína mantida</span>
             </span>
           </div>
         )}
@@ -878,7 +878,7 @@ export default function NutritionMixer({
             <Flame size={12} className="shrink-0 text-orange-300" aria-hidden="true" />
             <span className="text-[10px] leading-tight text-orange-300">
               Treino hoje: <span className="font-semibold">~{Math.round(safeNumber(workoutCaloriesToday))} kcal</span>
-              <span className="text-neutral-500"> · estimativa, não muda a meta</span>
+              <span className="text-neutral-400"> · estimativa, não muda a meta</span>
             </span>
           </div>
         )}
@@ -1014,7 +1014,7 @@ export default function NutritionMixer({
               {/* `null` = sabemos que o perfil está incompleto. `undefined` = não
                   sabemos (overlay servido do cache offline) — aí não sugerimos nada. */}
               {profileStats === null && (
-                <p className="text-[10px] leading-snug text-neutral-500">
+                <p className="text-[10px] leading-snug text-neutral-400">
                   Informe peso, altura, idade e sexo no perfil para escolher a fase (cutting, manutenção ou off) e calcular a meta automaticamente.
                 </p>
               )}
@@ -1172,11 +1172,11 @@ export default function NutritionMixer({
                               base local (TACO/Open Food Facts/customizado), não existe
                               peso por unidade e o parser precisa chutar — aqui o chute
                               deixa de ser silencioso e o usuário corrige com "200g de X". */}
-                          {it.grams > 0 && <span className="ml-1 text-neutral-500">· {it.grams}g</span>}
+                          {it.grams > 0 && <span className="ml-1 text-neutral-400">· {it.grams}g</span>}
                         </span>
                         <span className="shrink-0 whitespace-nowrap text-neutral-400">
                           <span className="font-semibold text-neutral-100">{it.calories}</span> kcal
-                          <span className="ml-2 text-[10px] text-neutral-500">P{it.protein} C{it.carbs} G{it.fat}</span>
+                          <span className="ml-2 text-[10px] text-neutral-400">P{it.protein} C{it.carbs} G{it.fat}</span>
                         </span>
                       </li>
                     ))}
@@ -1217,7 +1217,7 @@ export default function NutritionMixer({
               )}
 
               {mealPreview.unknownLines.length > 0 && (
-                <div className={`${mealPreview.items.length > 0 ? 'mt-2' : 'mt-1'} text-[11px] text-neutral-500`}>
+                <div className={`${mealPreview.items.length > 0 ? 'mt-2' : 'mt-1'} text-[11px] text-neutral-400`}>
                   Fora da base local: <span className="text-neutral-400">{mealPreview.unknownLines.join(', ')}</span>. Ao tocar em Lançar, a IA calcula os macros e salva pra próxima vez.
                 </div>
               )}
@@ -1260,7 +1260,7 @@ export default function NutritionMixer({
               className={`flex-1 h-11 inline-flex items-center justify-center gap-1.5 rounded-xl font-black text-sm transition ${
                 podeLancar
                   ? 'bg-yellow-500 text-black hover:bg-yellow-400 active:scale-[0.98]'
-                  : 'bg-white/[0.06] text-neutral-500'
+                  : 'bg-white/[0.06] text-neutral-400'
               }`}
             >
               {aiBusy

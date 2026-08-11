@@ -86,7 +86,7 @@ export default function MacroBar({ label, value, goal, color }: MacroBarProps) {
       <div className="flex items-baseline justify-between gap-3">
         <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.15em] font-semibold text-neutral-400">
           {label}
-          <span className="ml-2 normal-case tracking-normal font-medium tabular-nums text-neutral-500">
+          <span className="ml-2 normal-case tracking-normal font-medium tabular-nums text-neutral-400">
             {Math.round(sVal)} / {Math.round(sGoal)} g
           </span>
         </span>

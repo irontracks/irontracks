@@ -58,7 +58,7 @@ export default function DateNavigator({
       >
         {label}
         {!isToday && (
-          <span className="ml-1.5 text-[10px] text-neutral-500">{currentDate.slice(5)}</span>
+          <span className="ml-1.5 text-[10px] text-neutral-400">{currentDate.slice(5)}</span>
         )}
       </button>
 

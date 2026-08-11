@@ -237,7 +237,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
 
           <div className="grid grid-cols-7 gap-2">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={String(i)} className="text-[10px] font-black uppercase tracking-widest text-neutral-500 text-center">
+              <div key={String(i)} className="text-[10px] font-black uppercase tracking-widest text-neutral-400 text-center">
                 {weekdayLabel(i)}
               </div>
             ))}
@@ -291,7 +291,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                 <div className="t-meta text-xs">Dia selecionado</div>
                 <div className="text-white font-black">{selectedDayIso}</div>
               </div>
-              <div className="text-xs text-neutral-500">{loading ? 'Carregando…' : pluralize(selectedWorkouts.length, 'treino')}</div>
+              <div className="text-xs text-neutral-400">{loading ? 'Carregando…' : pluralize(selectedWorkouts.length, 'treino')}</div>
             </div>
             {selectedWorkouts.length ? (
               <div className="mt-3 space-y-2">
@@ -311,7 +311,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                 })}
               </div>
             ) : (
-              <div className="mt-2 text-sm text-neutral-500">Sem treinos nesse dia.</div>
+              <div className="mt-2 text-sm text-neutral-400">Sem treinos nesse dia.</div>
             )}
           </div>
         </div>

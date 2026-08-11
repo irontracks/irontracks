@@ -314,7 +314,7 @@ export default function StoriesBar({
         onPost={uploadStory}
       />
       <div className="flex items-center justify-between px-1">
-        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Stories</div>
+        <div className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Stories</div>
         <button
           type="button"
           onClick={() => reload(true)}

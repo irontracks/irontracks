@@ -604,7 +604,7 @@ export default function StudentDashboard(props: Props) {
                 <button
                   type="button"
                   onClick={() => setCriarAberto(false)}
-                  className="w-full py-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 transition-transform active:scale-95"
+                  className="w-full py-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-400 transition-transform active:scale-95"
                 >
                   Recolher
                 </button>

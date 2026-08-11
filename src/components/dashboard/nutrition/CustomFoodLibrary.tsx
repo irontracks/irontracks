@@ -24,7 +24,7 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
   const id = `cfl-${label.replace(/\s+/g, '-').toLowerCase()}`
   return (
     <div className="flex flex-col gap-0.5">
-      <label htmlFor={id} className="text-[9px] uppercase tracking-widest text-neutral-500">{label}</label>
+      <label htmlFor={id} className="text-[9px] uppercase tracking-widest text-neutral-400">{label}</label>
       <NumericInput
         id={id}
         aria-label={label}
@@ -157,7 +157,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
                   <button
                     type="button"
                     onClick={() => isEditing ? cancelEdit() : startEdit(food)}
-                    className="p-2 rounded-xl text-neutral-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition active:scale-95"
+                    className="p-2 rounded-xl text-neutral-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition active:scale-95"
                     aria-label={isEditing ? 'Cancelar edição' : 'Editar alimento'}
                   >
                     {isEditing ? <X size={15} /> : <Pencil size={15} />}
@@ -165,7 +165,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
                   <button
                     type="button"
                     onClick={() => onDelete(food.id)}
-                    className="p-2 rounded-xl text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition active:scale-95"
+                    className="p-2 rounded-xl text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition active:scale-95"
                     aria-label="Excluir alimento"
                   >
                     <Trash2 size={15} />
@@ -178,7 +178,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
                 <div className="px-4 pb-4 border-t border-neutral-800 space-y-3 pt-3">
                   {/* Name */}
                   <div className="flex flex-col gap-0.5">
-                    <label htmlFor={`cfl-name-${food.id}`} className="text-[9px] uppercase tracking-widest text-neutral-500">Nome</label>
+                    <label htmlFor={`cfl-name-${food.id}`} className="text-[9px] uppercase tracking-widest text-neutral-400">Nome</label>
                     <input
                       id={`cfl-name-${food.id}`}
                       aria-label="Nome do alimento"
@@ -191,7 +191,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
 
                   {/* Aliases */}
                   <div className="flex flex-col gap-0.5">
-                    <label htmlFor={`cfl-aliases-${food.id}`} className="text-[9px] uppercase tracking-widest text-neutral-500">Apelidos (separados por vírgula)</label>
+                    <label htmlFor={`cfl-aliases-${food.id}`} className="text-[9px] uppercase tracking-widest text-neutral-400">Apelidos (separados por vírgula)</label>
                     <input
                       id={`cfl-aliases-${food.id}`}
                       type="text"
