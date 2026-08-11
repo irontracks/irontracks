@@ -290,8 +290,22 @@ que chegaram foram `script-src-elem ← browser.sentry-cdn.com` e
 `← va.vercel-scripts.com`, ou seja, em modo bloqueante o app teria perdido o
 Sentry e a analítica sem ninguém perceber. Os dois já entraram na allowlist.
 Violações vão para `POST /api/security/csp-report` → Sentry
-(`security.csp.violation`, agrupado por diretiva + host, teto de 50 por
-instância). **Para ligar o modo bloqueante basta `CSP_ENFORCE=true` na Vercel** —
+(`security.csp.violation`) **e `audit_events`** — o Sentry sozinho não serve para
+decidir, porque o token não existe neste repo e a pista fica ilegível de onde se
+investiga (mesma lição da Live Activity). Para saber se dá para ligar o modo
+bloqueante:
+
+```sql
+select metadata->>'directive' as diretiva, metadata->>'blocked' as origem,
+       count(*), max(created_at)
+from audit_events where action = 'csp_violation'
+group by 1, 2 order by 3 desc;
+```
+
+A rota é **pública e escreve** (o navegador posta sem sessão — é assim que o
+mecanismo funciona), então os freios são rate limit por IP, dedupe por par
+(diretiva, origem) e teto de linhas por instância. A pergunta é QUAIS diretivas
+quebram, não quantas vezes. **Para ligar o modo bloqueante basta `CSP_ENFORCE=true` na Vercel** —
 env var, sem deploy de código. Antes disso, olhe uma janela de relatórios limpa:
 o `script-src` de produção é mais restrito que o de dev (que tem `unsafe-inline`
 e `unsafe-eval`), então dev NÃO prova nada sobre produção.
