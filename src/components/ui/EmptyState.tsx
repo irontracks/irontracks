@@ -60,8 +60,15 @@ export function EmptyState({ variant, title, description, action, className = ''
         {title}
       </h3>
 
+      {/* `neutral-400`, não `neutral-500`: medido, #737373 sobre #0a0a0a dá
+          4.18:1 e reprova no WCAG AA (mínimo 4.5:1 para texto normal).
+          #a3a3a3 dá 7.85:1. O `WorkoutCard` já tinha essa lição escrita em
+          comentário — aqui ela não tinha chegado.
+          `text-balance` distribui as linhas: sem ele, "Monte um programa de 4,
+          6 ou 8 semanas aqui mesmo." deixava a palavra "mesmo" sozinha na
+          segunda linha, em texto centralizado, onde o órfão é mais visível. */}
       {description && (
-        <p className="text-sm text-neutral-500 max-w-xs leading-relaxed">
+        <p className="text-sm text-neutral-400 max-w-xs leading-relaxed text-balance">
           {description}
         </p>
       )}

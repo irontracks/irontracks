@@ -202,7 +202,10 @@ function WorkoutCardInner({
             + Braços" quebravam em duas linhas. A assinatura visual do app é o
             PESO (font-black), não a caixa; ela continua intacta. Labels curtos
             (HOJE, ARQUIVADO) seguem em caixa alta, que é onde ela funciona. */}
-        <h3 className="font-black text-white text-base mb-0.5 pr-40 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
+        {/* `pr-16` (64px) e não mais `pr-40` (160px): o bloco de ações fechado
+            passou a ser um único botão de 44pt. São ~96px devolvidos ao nome do
+            treino — o dado que o olho procura ao varrer a lista. */}
+        <h3 className="font-black text-white text-base mb-0.5 pr-16 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
         {/* Sem `pr-40` aqui: esta linha fica ABAIXO do bloco de ações, então os
             160px reservados só serviam para estrangular o texto — a meta
@@ -271,8 +274,33 @@ function WorkoutCardInner({
           errado custava caro. Agora exige tocar "⋯" primeiro; um toque a mais é
           barato quando a ação não tem volta. */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/90 rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
+        {/* FECHADO = só "⋯". Antes eram três botões de 44pt sempre visíveis:
+            148px de bloco, que obrigavam o título a reservar `pr-40` (160px) e
+            faziam TODO nome de treino quebrar em duas linhas — três de três nos
+            cards medidos no aparelho. O nome é lido em 100% das visitas;
+            compartilhar e editar são ocasionais. Otimizar a largura para a ação
+            rara, e cobrar do dado principal, é a troca errada.
+            Os 44pt de alvo de toque continuam — o que sai são botões, não área
+            clicável de cada um. */}
         {!maisAberto ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setMaisAberto(true) }}
+            disabled={isBusy}
+            aria-label="Ações do treino"
+            aria-expanded={false}
+            className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+          >
+            {isBusy ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <MoreHorizontal size={14} />}
+          </button>
+        ) : (
           <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setMaisAberto(false) }}
+              aria-label="Voltar"
+              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white"
+            >
+              <ChevronLeft size={14} />
+            </button>
             <button
               onClick={async (e) => { e.stopPropagation(); await runAction('share', () => onShareWorkout(w)) }}
               disabled={isBusy}
@@ -288,25 +316,6 @@ function WorkoutCardInner({
               className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
             >
               {isActionBusy('edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setMaisAberto(true) }}
-              disabled={isBusy}
-              aria-label="Mais ações"
-              aria-expanded={false}
-              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-            >
-              <MoreHorizontal size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              onClick={(e) => { e.stopPropagation(); setMaisAberto(false) }}
-              aria-label="Voltar"
-              className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white"
-            >
-              <ChevronLeft size={14} />
             </button>
             <button
               onClick={async (e) => { e.stopPropagation(); setMaisAberto(false); await runAction('delete', () => onDeleteWorkout(w?.id, w?.title)) }}

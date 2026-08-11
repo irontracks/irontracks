@@ -86,9 +86,9 @@ describe('card de treino — tipografia', () => {
     expect(titulo).toMatch(/font-black/)
   })
 
-  it('o título continua desviando do bloco de ações', () => {
-    // Sem o padding ele passa por baixo dos botões de compartilhar/editar.
-    expect(titulo).toMatch(/pr-40/)
+  it('o título desvia do botão de ações — agora um só, não três', () => {
+    // pr-16 (64px) cobre o unico botao de 44pt; pr-40 era para os tres.
+    expect(titulo).toMatch(/pr-16/)
   })
 
   it('a linha de meta NÃO reserva espaço para os botões — ela fica abaixo deles', () => {
