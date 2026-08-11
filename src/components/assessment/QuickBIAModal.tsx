@@ -269,7 +269,7 @@ export default function QuickBIAModal({
                       : 'rgba(255,255,255,0.08)',
                   }}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">%</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400">%</span>
               </div>
             </div>
 
@@ -298,7 +298,7 @@ export default function QuickBIAModal({
                         borderColor: form[field] ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.08)',
                       }}
                     />
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-neutral-500">{unit}</span>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-neutral-400">{unit}</span>
                   </div>
                 </div>
               ))}

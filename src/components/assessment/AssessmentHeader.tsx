@@ -82,7 +82,7 @@ export const AssessmentHeader = ({
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-black text-white">Avaliações Físicas</h1>
-            <p className="text-neutral-500 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
+            <p className="text-neutral-400 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
           </div>
           <ChevronDown
             className={`w-5 h-5 text-neutral-400 shrink-0 ml-3 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}

@@ -56,7 +56,7 @@ export function LabExamMarkersView({ extracted }: { extracted: LabExamExtracted 
             >
                 <div className="min-w-0">
                     <div className="truncate text-[13px] font-bold text-white">{m.name}</div>
-                    {ref ? <div className="text-[11px] text-neutral-500">ref. {ref}</div> : null}
+                    {ref ? <div className="text-[11px] text-neutral-400">ref. {ref}</div> : null}
                 </div>
                 <div className="shrink-0 text-right">
                     <div className="text-[14px] font-black tabular-nums" style={{ color: tom.cor }}>

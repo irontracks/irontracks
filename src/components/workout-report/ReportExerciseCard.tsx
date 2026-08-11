@@ -130,7 +130,7 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
     }
 
     // No change
-    return { text: '=', rowClass: 'text-neutral-500', isPr: false, e1rmText }
+    return { text: '=', rowClass: 'text-neutral-400', isPr: false, e1rmText }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         items.push({ label: 'HIT', value: `${summary.hitWorkSec}s / ${summary.hitRestSec}s${summary.hitRounds != null ? ` × ${summary.hitRounds}` : ''}` })
                     }
                     if (items.length === 0) {
-                        return <div className="py-3 text-sm text-neutral-500">Cardio concluído.</div>
+                        return <div className="py-3 text-sm text-neutral-400">Cardio concluído.</div>
                     }
                     return (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1">
@@ -370,7 +370,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                     if (!note) return null
                                     return (
                                         <tr key={`${sIdx}-note`} className="border-b border-neutral-800">
-                                            <td className="pb-3 pt-1 text-[10px] uppercase tracking-widest text-neutral-500 font-black">Obs</td>
+                                            <td className="pb-3 pt-1 text-[10px] uppercase tracking-widest text-neutral-400 font-black">Obs</td>
                                             <td className="pb-3 pt-1 text-xs text-neutral-200" colSpan={4}>
                                                 {note}
                                             </td>

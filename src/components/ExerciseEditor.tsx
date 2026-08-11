@@ -195,7 +195,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
                 {/* Nome do treino */}
                 <div>
-                    <label htmlFor="workout-title" className="block text-[11px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                    <label htmlFor="workout-title" className="block text-[11px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-2">
                         Nome do Treino
                     </label>
                     <input
@@ -211,8 +211,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                 {/* Lista de exercícios */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
-                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-neutral-500">Exercícios</p>
-                        <span className="text-[11px] font-black text-neutral-500 tabular-nums">{workout.exercises?.length || 0}</span>
+                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-neutral-400">Exercícios</p>
+                        <span className="text-[11px] font-black text-neutral-400 tabular-nums">{workout.exercises?.length || 0}</span>
                     </div>
 
                     {(workout.exercises || []).map((exercise, index) => {
@@ -272,7 +272,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         <div className="flex-1 min-w-0">
                                             {exerciseType === 'cardio' ? (
                                                 <>
-                                                    <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider mb-1">Modalidade</span>
+                                                    <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Modalidade</span>
                                                     <select
                                                         aria-label="Modalidade"
                                                         value={exercise.name || ''}
@@ -318,7 +318,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             <button
                                                 onClick={() => removeExercise(index)}
                                                 aria-label="Remover exercício"
-                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -391,7 +391,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         {/* Parâmetros secundários — recolhidos num plano mais fundo */}
                                         <div className="grid grid-cols-3 gap-2.5 rounded-xl bg-black/20 p-2.5">
                                             <div>
-                                                <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5">Rest(s)</span>
+                                                <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5">Rest(s)</span>
                                                 <NumericInput
                                                     aria-label="Descanso em segundos"
                                                     decimal={false}
@@ -401,7 +401,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
+                                                <span className="text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
                                                     Cad
                                                     <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
                                                 </span>
@@ -414,7 +414,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
+                                                <span className="text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
                                                     Método
                                                     {(() => {
                                                         const m = String(safeMethod || 'Normal');
@@ -459,7 +459,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
                                                     <div className="flex items-center justify-between gap-3 mb-1.5">
-                                                        <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider">Vídeo (URL)</span>
+                                                        <span className="text-[10px] text-neutral-400 uppercase font-black tracking-wider">Vídeo (URL)</span>
                                                         {String(exercise.videoUrl || '').trim() ? (
                                                             <button
                                                                 type="button"
@@ -489,7 +489,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     />
                                                 </div>
                                                 <div>
-                                                    <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider mb-1.5">Notas</span>
+                                                    <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1.5">Notas</span>
                                                     <textarea
                                                         aria-label="Notas do exercício"
                                                         value={exercise.notes || ''}
@@ -513,7 +513,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                         Séries por série
                                                         {hasCustomSeries && <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Séries personalizadas" />}
                                                     </span>
-                                                    <span className="flex items-center gap-2 text-[10px] font-black text-neutral-500 tabular-nums">
+                                                    <span className="flex items-center gap-2 text-[10px] font-black text-neutral-400 tabular-nums">
                                                         {setDetails.length}
                                                         <ChevronDown size={14} className={`transition-transform duration-200 ${seriesExpanded ? 'rotate-180' : ''}`} />
                                                     </span>

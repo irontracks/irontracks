@@ -77,7 +77,7 @@ export function LabExamProtocolView({ protocol }: { protocol: LabProtocol }) {
                 <PriorityBadge p={adj.priority} />
               </div>
               <p className="text-sm text-neutral-300 mt-1">{adj.recommendation}</p>
-              <p className="text-xs text-neutral-500 mt-1 italic">Porquê: {adj.reason}</p>
+              <p className="text-xs text-neutral-400 mt-1 italic">Porquê: {adj.reason}</p>
             </div>
           ))}
         </div>
@@ -97,7 +97,7 @@ export function LabExamProtocolView({ protocol }: { protocol: LabProtocol }) {
                 <PriorityBadge p={adj.priority} />
               </div>
               <p className="text-sm text-neutral-300 mt-1">{adj.recommendation}</p>
-              <p className="text-xs text-neutral-500 mt-1 italic">Porquê: {adj.reason}</p>
+              <p className="text-xs text-neutral-400 mt-1 italic">Porquê: {adj.reason}</p>
             </div>
           ))}
         </div>
@@ -131,11 +131,11 @@ export function LabExamProtocolView({ protocol }: { protocol: LabProtocol }) {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-xs">
-                  <div><span className="text-neutral-500">Dose:</span> <span className="text-neutral-200 font-bold">{s.dose}</span></div>
-                  <div><span className="text-neutral-500">Quando:</span> <span className="text-neutral-200">{s.timing}</span></div>
-                  <div className="col-span-2"><span className="text-neutral-500">Duração:</span> <span className="text-neutral-200">{s.duration}</span></div>
+                  <div><span className="text-neutral-400">Dose:</span> <span className="text-neutral-200 font-bold">{s.dose}</span></div>
+                  <div><span className="text-neutral-400">Quando:</span> <span className="text-neutral-200">{s.timing}</span></div>
+                  <div className="col-span-2"><span className="text-neutral-400">Duração:</span> <span className="text-neutral-200">{s.duration}</span></div>
                 </div>
-                <p className="text-xs text-neutral-500 mt-1.5 italic">Porquê: {s.reason}</p>
+                <p className="text-xs text-neutral-400 mt-1.5 italic">Porquê: {s.reason}</p>
               </div>
             ))}
           </div>
@@ -147,7 +147,7 @@ export function LabExamProtocolView({ protocol }: { protocol: LabProtocol }) {
         <SectionTitle icon={<CalendarClock className="w-4 h-4" />}>Acompanhamento</SectionTitle>
         <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-3 space-y-2">
           <p className="text-sm text-neutral-200">
-            <span className="text-neutral-500">Reexaminar em:</span> <span className="font-bold">{protocol.followUp.retestIn}</span>
+            <span className="text-neutral-400">Reexaminar em:</span> <span className="font-bold">{protocol.followUp.retestIn}</span>
           </p>
           {protocol.followUp.markersToWatch.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

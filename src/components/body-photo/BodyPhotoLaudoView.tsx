@@ -97,7 +97,7 @@ export const BodyPhotoLaudoView: React.FC<{ laudo: BodyPhotoLaudo }> = ({ laudo 
                     <div className="text-right">
                         <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Fase aparente</span>
                         <div className="text-sm font-bold text-yellow-400">{PHASE_LABELS_PT[laudo.apparentPhase]}</div>
-                        {laudo.somatotype ? <div className="text-xs text-neutral-500">{laudo.somatotype}</div> : null}
+                        {laudo.somatotype ? <div className="text-xs text-neutral-400">{laudo.somatotype}</div> : null}
                     </div>
                 </div>
                 {laudo.confidence === 'low' ? (
@@ -165,7 +165,7 @@ export const BodyPhotoLaudoView: React.FC<{ laudo: BodyPhotoLaudo }> = ({ laudo 
                 <Section title="Proporções">
                     <p className="text-sm text-neutral-300 leading-snug">{laudo.proportions.summary}</p>
                     {laudo.proportions.shoulderToWaist ? (
-                        <p className="text-xs text-neutral-500">Ombro/cintura: {laudo.proportions.shoulderToWaist}</p>
+                        <p className="text-xs text-neutral-400">Ombro/cintura: {laudo.proportions.shoulderToWaist}</p>
                     ) : null}
                 </Section>
             ) : null}

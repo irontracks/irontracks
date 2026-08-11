@@ -78,9 +78,9 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                   <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
                   <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
                   <td className="px-3 py-2 text-right font-mono text-amber-300">{Number.isFinite(kcal) && kcal > 0 ? `~${kcal.toLocaleString('pt-BR')} kcal` : '—'}</td>
-                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
-                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
-                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-400'}`}>{deltaVolumeLabel}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-400'}`}>{deltaRepsLabel}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-400'}`}>{deltaWeightLabel}</td>
                   <td className="px-3 py-2 text-right font-mono text-xs">
                     {(() => {
                       const key = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
@@ -93,7 +93,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                       if (curE1rm <= 0) return '—'
                       const delta = curE1rm - hist
                       if (!Number.isFinite(delta)) return '—'
-                      const cls = delta > 0 ? 'text-green-300' : delta < 0 ? 'text-red-300' : 'text-neutral-500'
+                      const cls = delta > 0 ? 'text-green-300' : delta < 0 ? 'text-red-300' : 'text-neutral-400'
                       return <span className={cls}>{delta > 0 ? '+' : ''}{delta.toFixed(1)} kg</span>
                     })()}
                   </td>

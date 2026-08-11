@@ -212,12 +212,12 @@ export const BIAStep: React.FC<BIAStepProps> = ({
                             : 'rgba(255,255,255,0.08)',
                       }}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-400">
                       {unit}
                     </span>
                   </div>
                   {description && !error && (
-                    <p className="text-xs text-neutral-500 mt-1">{description}</p>
+                    <p className="text-xs text-neutral-400 mt-1">{description}</p>
                   )}
                   {error && (
                     <p className="text-xs text-red-400 mt-1">{error}</p>

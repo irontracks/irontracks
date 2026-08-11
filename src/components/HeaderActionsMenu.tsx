@@ -345,7 +345,7 @@ export default function HeaderActionsMenu({
                       <span className="text-[10px] font-bold text-yellow-500/90 uppercase tracking-wide">{roleLabel}</span>
                     </>
                   ) : (
-                    <span className="text-[10px] text-neutral-500">Ver meu perfil</span>
+                    <span className="text-[10px] text-neutral-400">Ver meu perfil</span>
                   )}
                 </div>
               </button>

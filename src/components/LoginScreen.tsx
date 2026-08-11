@@ -602,7 +602,7 @@ const LoginScreen = () => {
                                     Seu professor cadastrou você? Digite o e-mail que ele usou e enviaremos um código para entrar — sem senha.
                                 </p>
                                 <div className="relative">
-                                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                                     <input
                                         type="email"
                                         inputMode="email"

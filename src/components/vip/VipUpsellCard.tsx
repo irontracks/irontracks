@@ -94,7 +94,7 @@ export function VipUpsellCard({ feature, onDismiss }: {
             <button
                 type="button"
                 onClick={onDismiss}
-                className="mt-2 block w-full text-[12px] font-bold text-neutral-500 transition-colors hover:text-neutral-300"
+                className="mt-2 block w-full text-[12px] font-bold text-neutral-400 transition-colors hover:text-neutral-300"
             >
                 Agora não
             </button>

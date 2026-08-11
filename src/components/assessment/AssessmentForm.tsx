@@ -431,7 +431,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
                 className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index <= currentStep
                     ? 'bg-yellow-500 border-yellow-500 text-black'
-                    : 'bg-neutral-900 border-neutral-700 text-neutral-500 hover:border-neutral-500'
+                    : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-500'
                 } ${index < currentStep ? 'cursor-pointer' : ''}`}
                 disabled={index > currentStep + 1}
               >
@@ -448,7 +448,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         {/* Show only the current step label — no 5-column layout */}
         <div className="mt-3 text-center">
           <p className="text-sm font-semibold text-yellow-500">{currentStepData.title}</p>
-          <p className="text-xs text-neutral-500 mt-0.5">{currentStepData.description}</p>
+          <p className="text-xs text-neutral-400 mt-0.5">{currentStepData.description}</p>
         </div>
       </div>
 
@@ -509,7 +509,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
             <span className="hidden sm:inline">Anterior</span>
           </button>
 
-          <div className="text-xs text-neutral-500 whitespace-nowrap flex items-center gap-2">
+          <div className="text-xs text-neutral-400 whitespace-nowrap flex items-center gap-2">
             <span>Passo {currentStep + 1} de {steps.length}</span>
             {autoSaveStatus === 'saving' && <span className="text-yellow-500/60 animate-pulse">salvando…</span>}
             {autoSaveStatus === 'saved' && <span className="text-green-500/60">✓ salvo</span>}
@@ -545,7 +545,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               onCancel?.();
             }
           }}
-          className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors"
+          className="text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
         >
           Cancelar avaliação
         </button>

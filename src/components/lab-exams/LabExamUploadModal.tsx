@@ -122,7 +122,7 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
             </div>
             <div>
               <h2 className="text-base font-black text-white leading-tight">Análise de Exames</h2>
-              <p className="text-[11px] text-neutral-500">Protocolo integrado por IA</p>
+              <p className="text-[11px] text-neutral-400">Protocolo integrado por IA</p>
             </div>
           </div>
           {/* Fechar sempre disponível; durante processing pergunta antes (não bloqueia) */}
@@ -148,9 +148,9 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
                 onKeyDown={(e) => { if (e.key === 'Enter') inputRef.current?.click() }}
                 className="border-2 border-dashed border-neutral-700 rounded-2xl p-6 text-center hover:border-yellow-500/50 transition cursor-pointer"
               >
-                <Upload className="w-9 h-9 text-neutral-500 mx-auto mb-2" />
+                <Upload className="w-9 h-9 text-neutral-400 mx-auto mb-2" />
                 <p className="text-sm text-neutral-300 font-bold">Toque para escolher arquivos</p>
-                <p className="text-[11px] text-neutral-500 mt-1">PDF, JPG, PNG · até {LAB_EXAM_MAX_FILES} arquivos · máx 20 MB cada</p>
+                <p className="text-[11px] text-neutral-400 mt-1">PDF, JPG, PNG · até {LAB_EXAM_MAX_FILES} arquivos · máx 20 MB cada</p>
                 <input
                   ref={inputRef} type="file" accept="application/pdf,image/*" multiple className="hidden"
                   aria-label="Escolher arquivos de exame"
@@ -165,8 +165,8 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
                     <div key={i} className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-2">
                       <FileText className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                       <span className="text-sm text-neutral-200 truncate flex-1">{f.name}</span>
-                      <span className="text-[10px] text-neutral-500">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
-                      <button onClick={() => removeFile(i)} aria-label="Remover" className="text-neutral-500 hover:text-red-400 transition">
+                      <span className="text-[10px] text-neutral-400">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                      <button onClick={() => removeFile(i)} aria-label="Remover" className="text-neutral-400 hover:text-red-400 transition">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -177,12 +177,12 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
               {/* Metadados opcionais */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="lab-exam-date" className="text-[11px] uppercase font-bold text-neutral-500">Data do exame</label>
+                  <label htmlFor="lab-exam-date" className="text-[11px] uppercase font-bold text-neutral-400">Data do exame</label>
                   <input id="lab-exam-date" type="date" aria-label="Data do exame" value={examDate} onChange={(e) => setExamDate(e.target.value)}
                     className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-[16px] text-white focus:border-yellow-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label htmlFor="lab-exam-lab" className="text-[11px] uppercase font-bold text-neutral-500">Laboratório</label>
+                  <label htmlFor="lab-exam-lab" className="text-[11px] uppercase font-bold text-neutral-400">Laboratório</label>
                   <input id="lab-exam-lab" type="text" aria-label="Laboratório" value={labName} onChange={(e) => setLabName(e.target.value)} placeholder="opcional"
                     className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-[16px] text-white focus:border-yellow-500 focus:outline-none" />
                 </div>
@@ -203,7 +203,7 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
               <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
               <div>
                 <p className="text-white font-bold">{progress || 'Processando…'}</p>
-                <p className="text-xs text-neutral-500 mt-1">Não feche esta janela. Pode levar até 1 minuto.</p>
+                <p className="text-xs text-neutral-400 mt-1">Não feche esta janela. Pode levar até 1 minuto.</p>
               </div>
             </div>
           )}

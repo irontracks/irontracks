@@ -102,7 +102,7 @@ export const ReportMetricsPanel = ({
               return `${v.toLocaleString('pt-BR')} kg`
             })()}
           </div>
-          <div className="text-[10px] text-neutral-500 mt-1">
+          <div className="text-[10px] text-neutral-400 mt-1">
             {(() => {
               const v = formatNumber(reportWeekly?.previousWeekKg)
               if (v == null || v <= 0) return 'sem semana anterior'
@@ -119,7 +119,7 @@ export const ReportMetricsPanel = ({
               return `${v.toFixed(1)}%`
             })()}
           </div>
-          <div className="text-[10px] text-neutral-500 mt-1">
+          <div className="text-[10px] text-neutral-400 mt-1">
             {reportWeekly?.isHeavyWeek ? 'semana pesada' : 'semana normal'}
           </div>
         </div>
@@ -137,7 +137,7 @@ export const ReportMetricsPanel = ({
               return 'Dentro do padrão recente'
             })()}
           </div>
-          <div className="text-[10px] text-neutral-500 mt-1">
+          <div className="text-[10px] text-neutral-400 mt-1">
             {(() => {
               const v = formatNumber(reportLoadFlags?.dayDropPct)
               if (v == null) return '—'

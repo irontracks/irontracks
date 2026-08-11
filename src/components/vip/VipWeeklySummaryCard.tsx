@@ -122,7 +122,7 @@ export default function VipWeeklySummaryCard() {
                 <span className="text-[9px] font-black uppercase tracking-widest text-yellow-600">Treinos</span>
               </div>
               <div className="text-xl font-black text-white">{trainedDays}</div>
-              <div className="text-[10px] text-neutral-500">dia{trainedDays !== 1 ? 's' : ''}</div>
+              <div className="text-[10px] text-neutral-400">dia{trainedDays !== 1 ? 's' : ''}</div>
             </div>
 
             {/* PRs */}
@@ -132,7 +132,7 @@ export default function VipWeeklySummaryCard() {
                 <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Recordes</span>
               </div>
               <div className="text-xl font-black text-white">{prsCount}</div>
-              <div className="text-[10px] text-neutral-500">PR{prsCount !== 1 ? 's' : ''} esta semana</div>
+              <div className="text-[10px] text-neutral-400">PR{prsCount !== 1 ? 's' : ''} esta semana</div>
             </div>
 
             {/* Energia */}
@@ -145,7 +145,7 @@ export default function VipWeeklySummaryCard() {
                 <div className="text-xl font-black text-white">{Math.round(checkins.energy * 10) / 10}</div>
                 {/* A escala é 1–5 ('Ótimo/Normal/Cansado'), não 0–10 — sem o rótulo,
                     um 5 (o máximo possível) parecia nota medíocre. */}
-                <div className="text-[10px] text-neutral-500">média de {energyScale}</div>
+                <div className="text-[10px] text-neutral-400">média de {energyScale}</div>
               </div>
             )}
 
@@ -157,7 +157,7 @@ export default function VipWeeklySummaryCard() {
                   <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Sono</span>
                 </div>
                 <div className="text-xl font-black text-white">{Math.round(checkins.sleep * 10) / 10}</div>
-                <div className="text-[10px] text-neutral-500">média</div>
+                <div className="text-[10px] text-neutral-400">média</div>
               </div>
             )}
           </div>
@@ -171,13 +171,13 @@ export default function VipWeeklySummaryCard() {
             O texto continua no payload para quem consome a API. */}
         {prsList.length ? (
           <div className="mt-3 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-2">Recordes da semana</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">Recordes da semana</div>
             <div className="space-y-1.5">
               {prsList.slice(0, 3).map((pr, i) => (
                 <div key={`${pr.exercise}-${i}`} className="flex items-baseline justify-between gap-3">
                   <span className="text-sm text-neutral-200 truncate">{pr.exercise}</span>
                   <span className="text-sm font-black text-white tabular-nums shrink-0">
-                    {pr.weight}<span className="text-neutral-500 font-bold"> kg × </span>{pr.reps}
+                    {pr.weight}<span className="text-neutral-400 font-bold"> kg × </span>{pr.reps}
                   </span>
                 </div>
               ))}

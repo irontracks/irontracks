@@ -54,7 +54,7 @@ export const ReportSummaryCards = memo(({
                         <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                             <Clock size={16} className="text-amber-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tempo</p>
                     </div>
                     <p className="text-2xl font-black font-mono text-white">{formatDuration(session?.totalTime)}</p>
                 </div>
@@ -65,7 +65,7 @@ export const ReportSummaryCards = memo(({
                         <div className="w-8 h-8 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
                             <Dumbbell size={16} className="text-yellow-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Volume</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume</p>
                     </div>
                     <div className="flex items-baseline gap-1 min-w-0">
                         <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-white truncate">{animVol.toLocaleString('pt-BR')}</span>

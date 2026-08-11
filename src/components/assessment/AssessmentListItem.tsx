@@ -48,7 +48,7 @@ const Destaque = ({ rotulo, valor, d, unidade }: {
   rotulo: string; valor: string; d: MetricDelta | null; unidade: string
 }) => (
   <div className="flex-1 min-w-0 rounded-2xl border border-neutral-800 bg-gradient-to-b from-neutral-900/80 to-neutral-900/30 px-4 py-3">
-    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">{rotulo}</div>
+    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400">{rotulo}</div>
     <div className="mt-1 flex items-baseline gap-2">
       <span className="text-[26px] font-black leading-none text-white tabular-nums">{valor}</span>
       <Delta d={d} unidade={unidade} />
@@ -295,7 +295,7 @@ export function AssessmentListItem({
               <div className="font-black text-white text-sm sm:text-base truncate">
                 {formatDateCompact(assessment.date || assessment.assessment_date)}
               </div>
-              <div className="text-xs text-neutral-500 mt-0.5 truncate">
+              <div className="text-xs text-neutral-400 mt-0.5 truncate">
                 {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
               </div>
             </div>
@@ -389,7 +389,7 @@ export function AssessmentListItem({
                 {/* Dá ESCALA à variação: "+4.3 kg" em 30 dias e em 300 dias são
                     coisas completamente diferentes. */}
                 {dias && (dPeso || dBf || dLean) ? (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-500">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-400">
                     <span>Desde a anterior, há {dias} {dias === 1 ? 'dia' : 'dias'}:</span>
                     {dLean ? (
                       <span style={{ color: tomCor(dLean) }} className="font-bold">
@@ -490,7 +490,7 @@ export function AssessmentListItem({
               onClick={() => onConfirmDelete(assessmentId)}
               title="Excluir avaliação"
               aria-label="Excluir avaliação"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-500 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -613,7 +613,7 @@ export function AssessmentListItem({
                       <div className="text-xl font-black text-white mt-1">
                         {c.value != null ? `${c.value.toFixed(1)}%` : '-'}
                       </div>
-                      <div className="text-[10px] text-neutral-500 mt-0.5">{c.sub}</div>
+                      <div className="text-[10px] text-neutral-400 mt-0.5">{c.sub}</div>
                     </div>
                   ))}
                 </div>

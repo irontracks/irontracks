@@ -26,7 +26,7 @@ export default function ReferralLandingPage() {
           <span className="text-white">IRON</span>
           <span className="text-yellow-500">TRACKS</span>
         </div>
-        <p className="text-neutral-500 text-sm mt-3">Redirecionando...</p>
+        <p className="text-neutral-400 text-sm mt-3">Redirecionando...</p>
       </div>
     </div>
   )

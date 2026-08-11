@@ -805,7 +805,7 @@ export default function StoryViewer({
                   <Image src={imageSrc} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority unoptimized />
                 )
               ) : (
-                <div className="text-neutral-500 font-bold">Mídia indisponível</div>
+                <div className="text-neutral-400 font-bold">Mídia indisponível</div>
               )}
             </motion.div>
           </AnimatePresence>
@@ -949,7 +949,7 @@ export default function StoryViewer({
                   <div className="text-center text-xs text-red-300 py-2" role="alert">{commentsError}</div>
                 ) : null}
                 {((viewersOpen && !viewers.length && !viewersLoading && !viewersError) || (commentsOpen && !comments.length && !commentsLoading && !commentsError)) && (
-                  <div className="text-center text-xs text-neutral-500 py-2">Nada por aqui ainda.</div>
+                  <div className="text-center text-xs text-neutral-400 py-2">Nada por aqui ainda.</div>
                 )}
               </div>
 

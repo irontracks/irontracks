@@ -31,7 +31,7 @@ export function CustomTextPanel({ value, onChange, overflowing }: CustomTextPane
                     Sua legenda
                 </span>
                 <span
-                    className={`text-[10px] font-semibold tabular-nums ${left <= 20 ? 'text-yellow-400' : 'text-neutral-500'}`}
+                    className={`text-[10px] font-semibold tabular-nums ${left <= 20 ? 'text-yellow-400' : 'text-neutral-400'}`}
                 >
                     {left}
                 </span>
@@ -44,10 +44,10 @@ export function CustomTextPanel({ value, onChange, overflowing }: CustomTextPane
                 maxLength={CUSTOM_TEXT_MAX_CHARS}
                 placeholder="Escreva algo para sair no story…"
                 aria-label="Legenda do story"
-                className="w-full resize-none rounded-xl bg-black/30 border border-neutral-700 px-3 py-2 text-[16px] text-white placeholder:text-neutral-500 outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition"
+                className="w-full resize-none rounded-xl bg-black/30 border border-neutral-700 px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition"
             />
 
-            <p className="text-[10px] leading-snug text-neutral-500">
+            <p className="text-[10px] leading-snug text-neutral-400">
                 Sai na fonte do estilo escolhido. Arraste na prévia para posicionar.
             </p>
 

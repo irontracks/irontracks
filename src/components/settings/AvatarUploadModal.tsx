@@ -169,7 +169,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 id="avatar-modal-title" className="text-lg font-black text-white">Foto de Perfil</h2>
-          <button type="button" onClick={handleClose} className="flex items-center justify-center min-h-[44px] min-w-[44px] text-neutral-500 hover:text-white">
+          <button type="button" onClick={handleClose} className="flex items-center justify-center min-h-[44px] min-w-[44px] text-neutral-400 hover:text-white">
             <X size={18} />
           </button>
         </div>

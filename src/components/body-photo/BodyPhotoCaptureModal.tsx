@@ -147,7 +147,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                         <span className="text-sm font-bold text-white">{POSE_LABELS_PT[pose]}</span>
                         {pose === 'front' ? <span className="text-[9px] uppercase font-black text-yellow-500">Obrigatória</span> : null}
                     </div>
-                    <p className="text-[11px] text-neutral-500 leading-snug mt-0.5 min-h-[28px]">{POSE_INSTRUCTIONS_PT[pose]}</p>
+                    <p className="text-[11px] text-neutral-400 leading-snug mt-0.5 min-h-[28px]">{POSE_INSTRUCTIONS_PT[pose]}</p>
                     <button
                         onClick={() => inputRefs.current[pose]?.click()}
                         className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border"
@@ -211,7 +211,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                         </div>
                         <div>
                             <h2 className="text-base font-black text-white leading-tight">Avaliação por Foto</h2>
-                            <p className="text-[11px] text-neutral-500">Laudo de composição corporal por IA</p>
+                            <p className="text-[11px] text-neutral-400">Laudo de composição corporal por IA</p>
                         </div>
                     </div>
                     <button onClick={handleClose} disabled={stage === 'processing'} aria-label="Fechar"
@@ -245,12 +245,12 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm font-bold text-white">Fotos contraídas</span>
-                                            <span className="text-[9px] uppercase font-black text-neutral-500 border border-neutral-700 rounded px-1.5 py-0.5">Opcional</span>
+                                            <span className="text-[9px] uppercase font-black text-neutral-400 border border-neutral-700 rounded px-1.5 py-0.5">Opcional</span>
                                             {flexedCount > 0 ? (
                                                 <span className="text-[10px] font-black text-emerald-400">{flexedCount}/3</span>
                                             ) : null}
                                         </div>
-                                        <p className="text-[11px] text-neutral-500 leading-snug mt-0.5">
+                                        <p className="text-[11px] text-neutral-400 leading-snug mt-0.5">
                                             Mesmas posições, músculo contraído. Deixam a análise de desenvolvimento e simetria bem mais precisa.
                                         </p>
                                     </div>
@@ -272,7 +272,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                             <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
                             <div>
                                 <p className="text-white font-bold">{progress || 'Processando…'}</p>
-                                <p className="text-xs text-neutral-500 mt-1">Não feche esta janela.</p>
+                                <p className="text-xs text-neutral-400 mt-1">Não feche esta janela.</p>
                             </div>
                         </div>
                     )}

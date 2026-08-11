@@ -123,7 +123,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-base font-black text-white truncate">Exame de sangue</h2>
-                  {viewing.lab_name ? <p className="text-[11px] text-neutral-500 truncate">{viewing.lab_name}</p> : null}
+                  {viewing.lab_name ? <p className="text-[11px] text-neutral-400 truncate">{viewing.lab_name}</p> : null}
                 </div>
               </div>
               <button onClick={() => setViewing(null)} aria-label="Fechar"
@@ -140,7 +140,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
                     key={id}
                     type="button"
                     onClick={() => setTab(id)}
-                    className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-colors ${tab === id ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' : 'text-neutral-500 border border-transparent hover:text-neutral-300'}`}
+                    className={`rounded-lg px-3 py-1.5 text-[12px] font-bold transition-colors ${tab === id ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' : 'text-neutral-400 border border-transparent hover:text-neutral-300'}`}
                   >
                     {rotulo}
                   </button>

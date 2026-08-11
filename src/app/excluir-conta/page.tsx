@@ -42,7 +42,7 @@ export default function AccountDeletionPage() {
             <li>Toque em <strong>Excluir minha conta</strong>.</li>
             <li>Digite <strong>EXCLUIR</strong> para confirmar.</li>
           </ol>
-          <p className="mt-4 text-sm leading-relaxed text-neutral-500">
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
             A exclusão iniciada no app é processada imediatamente e encerra a sessão da conta.
           </p>
         </section>
@@ -62,7 +62,7 @@ export default function AccountDeletionPage() {
           >
             Solicitar exclusão por e-mail
           </a>
-          <p className="mt-3 text-sm text-neutral-500">
+          <p className="mt-3 text-sm text-neutral-400">
             Contato: irontrackscompany@gmail.com · prazo de atendimento: até 30 dias.
           </p>
         </section>
@@ -80,7 +80,7 @@ export default function AccountDeletionPage() {
           </p>
         </section>
 
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-neutral-400">
           Saiba mais na nossa{' '}
           <Link href="/privacy" className="font-semibold text-yellow-500 underline">
             Política de Privacidade

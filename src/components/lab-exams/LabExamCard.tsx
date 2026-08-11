@@ -51,7 +51,7 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-white">{formatDate(exam.exam_date)}</span>
-            {exam.lab_name ? <span className="text-[11px] text-neutral-500 truncate">· {exam.lab_name}</span> : null}
+            {exam.lab_name ? <span className="text-[11px] text-neutral-400 truncate">· {exam.lab_name}</span> : null}
           </div>
 
           {isProcessing ? (
@@ -66,7 +66,7 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
               {examTypes.slice(0, 2).map((t, i) => (
                 <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300">{t}</span>
               ))}
-              {examTypes.length > 2 ? <span className="text-[10px] text-neutral-500">+{examTypes.length - 2}</span> : null}
+              {examTypes.length > 2 ? <span className="text-[10px] text-neutral-400">+{examTypes.length - 2}</span> : null}
               {alteredCount > 0 ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
                   {alteredCount} alterado{alteredCount > 1 ? 's' : ''}
@@ -86,7 +86,7 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
 
       {onDelete && (
         <div className="px-4 pb-3 -mt-1 flex justify-end">
-          <button onClick={onDelete} className="text-[11px] text-neutral-500 hover:text-red-400 transition inline-flex items-center gap-1">
+          <button onClick={onDelete} className="text-[11px] text-neutral-400 hover:text-red-400 transition inline-flex items-center gap-1">
             <Trash2 className="w-3 h-3" /> Apagar
           </button>
         </div>

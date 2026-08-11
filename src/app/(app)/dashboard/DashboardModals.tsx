@@ -226,7 +226,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             <h3 className="font-bold text-white">Completar Perfil</h3>
                             <button type="button" onClick={() => setShowCompleteProfile(false)} className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Nome de Exibição</label>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Nome de Exibição</label>
                         <input value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500" />
                         <div className="flex gap-2 mt-5">
                             <button type="button" onClick={() => setShowCompleteProfile(false)} disabled={savingProfile} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50">Cancelar</button>
@@ -261,7 +261,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             Selecionar Arquivo
                             <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" aria-label="Escolher arquivo JSON do treino" />
                         </label>
-                        <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
+                        <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-400 text-sm hover:text-white">Cancelar</button>
                     </div>
                 </div>
             )}
@@ -317,7 +317,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-yellow-500/70 leading-none mb-1">Treino</div>
                                             <h3 className="font-bold text-white text-lg leading-snug truncate">{title}</h3>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[11px] font-bold text-neutral-500">{exCount} exercício{exCount !== 1 ? 's' : ''}</span>
+                                                <span className="text-[11px] font-bold text-neutral-400">{exCount} exercício{exCount !== 1 ? 's' : ''}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -411,7 +411,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 const s = isRecord(openStudent) ? (openStudent as Record<string, unknown>) : {}
                                 const list = Array.isArray(s.workouts) ? s.workouts : []
                                 if (list.length !== 0) return null
-                                return <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
+                                return <p className="text-neutral-400 text-sm">Nenhum treino encontrado.</p>
                             })()}
                             {(() => {
                                 const s = isRecord(openStudent) ? (openStudent as Record<string, unknown>) : {}
@@ -491,10 +491,10 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 <h3 className="font-bold text-white truncate">{(activeSession as Record<string, unknown>).workout && typeof (activeSession as Record<string, unknown>).workout === 'object' ? String(((activeSession as Record<string, unknown>).workout as Record<string, unknown>)?.title || 'Treino em andamento') : 'Treino em andamento'}</h3>
                                 <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
                                     <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs((activeSession as Record<string, unknown>).startedAt); const endMs = effectiveTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
-                                    <span className="text-neutral-500">tempo atual</span>
+                                    <span className="text-neutral-400">tempo atual</span>
                                     <span className="opacity-30">•</span>
                                     <span className="font-mono text-neutral-200">{(() => { const workout = (activeSession as Record<string, unknown>).workout; const list = workout && typeof workout === 'object' && Array.isArray((workout as Record<string, unknown>).exercises) ? ((workout as Record<string, unknown>).exercises as unknown[]) : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
-                                    <span className="text-neutral-500">estimado total</span>
+                                    <span className="text-neutral-400">estimado total</span>
                                 </div>
                                 <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
                                     {(() => {
@@ -599,7 +599,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
                                     className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
                                 />
-                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">
+                                <p className="mt-1.5 text-[11px] text-neutral-400 leading-snug">
                                     {profileBodyWeightKg ? (
                                         <>
                                             Do seu perfil: <span className="font-bold text-neutral-300">{formatKgPtBr(profileBodyWeightKg)} kg</span>.
@@ -650,7 +650,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), sleepHours: e.target.value })}
                                     className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
                                 />
-                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">Dormir pouco reduz a carga sugerida no treino de hoje.</p>
+                                <p className="mt-1.5 text-[11px] text-neutral-400 leading-snug">Dormir pouco reduz a carga sugerida no treino de hoje.</p>
                             </div>
                             <div>
                                 <label className="block t-meta text-xs mb-2">Notas (opcional)</label>

@@ -23,7 +23,7 @@ const TREND_STYLE: Record<BodyPhotoCorrelation['links'][number]['trend'], { c: s
 const Stat = ({ label, value }: { label: string; value: string }) => (
     <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-center">
         <div className="text-lg font-black text-white leading-none">{value}</div>
-        <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 mt-1">{label}</div>
+        <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 mt-1">{label}</div>
     </div>
 )
 
@@ -72,11 +72,11 @@ export const BodyPhotoCorrelationView: React.FC<{
                 lateral, abdominal) sumia da lista mesmo com muita série. */}
             {(window.topExercisesBySets?.length || window.topExercises?.length) ? (
                 <div className="space-y-1.5">
-                    <h4 className="text-[11px] uppercase tracking-widest font-black text-neutral-500">Mais treinados no período</h4>
+                    <h4 className="text-[11px] uppercase tracking-widest font-black text-neutral-400">Mais treinados no período</h4>
                     {(window.topExercisesBySets?.length ? window.topExercisesBySets : window.topExercises).slice(0, 5).map((ex, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                             <span className="text-neutral-300 truncate">{ex.name}</span>
-                            <span className="text-neutral-500 shrink-0 ml-2">{ex.sets} séries · {formatVolume(ex.volumeKg)}</span>
+                            <span className="text-neutral-400 shrink-0 ml-2">{ex.sets} séries · {formatVolume(ex.volumeKg)}</span>
                         </div>
                     ))}
                 </div>
