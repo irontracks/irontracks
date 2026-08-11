@@ -279,7 +279,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                       <div className="text-[10px] font-bold text-neutral-600">—</div>
                     )}
                   </div>
-                  {hasAnyCheckin ? <div className="mt-1 text-[10px] font-bold text-neutral-300">check-in</div> : <div className="mt-1 text-[10px] text-neutral-700"> </div>}
+                  {hasAnyCheckin ? <div className="mt-1 text-[10px] font-bold text-neutral-300">check-in</div> : <div className="mt-1 text-[10px]" aria-hidden="true">&nbsp;</div>}
                 </button>
               )
             })}

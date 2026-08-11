@@ -66,7 +66,7 @@ export default async function WaitApprovalPage() {
             Sair da conta
           </Link>
           
-          <p className="text-[10px] text-neutral-700 mt-6 font-mono uppercase tracking-widest">
+          <p className="text-[10px] text-neutral-400 mt-6 font-mono uppercase tracking-widest">
             ID: {user.id.slice(0, 8)}...
           </p>
         </div>
