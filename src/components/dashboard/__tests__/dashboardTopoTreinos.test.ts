@@ -98,6 +98,32 @@ describe('card de treino — tipografia', () => {
   })
 })
 
+describe('atalhos de criar treino recolhem quando já há treinos', () => {
+  const src = read('StudentDashboard.tsx')
+  const code = codeOnly(src)
+
+  it('o botão fechado só existe para quem tem treinos', () => {
+    expect(code).toMatch(/workouts\.length > 0 && !criarAberto/)
+  })
+
+  it('com a lista VAZIA os três seguem abertos — aí criar é a ação primária', () => {
+    // Recolher no onboarding esconderia a única coisa que o usuário pode fazer.
+    expect(code).toMatch(/workouts\.length === 0 \|\| criarAberto/)
+  })
+
+  it('o botão fechado não usa dourado sólido — criar deixou de ser primária', () => {
+    const fechado = /onClick=\{\(\) => setCriarAberto\(true\)\}[\s\S]{0,400}?>/.exec(src)?.[0] ?? ''
+    expect(fechado).not.toBe('')
+    expect(fechado).toMatch(/bg-yellow-500\/\[0\.06\]/)
+    // `bg-yellow-500` puro (sólido) é do CTA de iniciar treino.
+    expect(fechado).not.toMatch(/bg-yellow-500["\s]/)
+  })
+
+  it('dá para recolher de volta', () => {
+    expect(code).toMatch(/setCriarAberto\(false\)/)
+  })
+})
+
 describe('Iron Rank — unidade separada do número', () => {
   // Blindando a CLASSE, não a instância: eu tinha corrigido só o "levantados" e
   // este guard pegou outras TRÊS ocorrências no mesmo arquivo — inclusive o
