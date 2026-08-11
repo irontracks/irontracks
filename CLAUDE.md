@@ -413,11 +413,21 @@ print do IPHONE do dono trazia 2279/2676 kcal (= oficial). Ou seja: **simulador 
 teste, aparelho do dono = oficial** — quando ele mandar um screenshot, ele NÃO é da
 mesma conta que você está vendo.
 
-**Escrita para conferir tela na conta de teste é aceitável se for reversível e
-desfeita na hora.** Em 10/08 lancei "150g frango + 100g arroz" para ver o card de
-Lançamentos (a conta não tinha refeição no dia) e removi em seguida, deixando a
-conta como estava. Vale para nutrição; **não vale para treino** — ali a regra do X →
-Confirmar continua, finalizar polui o `reportHistory` que alimenta o autoload.
+**Escrever na conta de teste é LIBERADO — inclusive finalizar treino** (decisão do
+dono, 11/08/2026: "djmkbrasil é só para testes"). A regra antiga mandava sempre
+descartar; ela existia porque se acreditava que finalizar poluiria o histórico do
+dono, e isso é falso — o histórico dele está na `djmkapple`. A trava custava as
+telas que só existem DEPOIS do treino: relatório, PDF, story e o autoload
+recalculando a carga. Nada disso era verificável.
+
+Continua valendo, e não é detalhe:
+- **A conta oficial (`djmkapple`) segue intocável.** Nenhuma escrita, nunca.
+- **A conta de teste vive no banco de PRODUÇÃO**, então treino finalizado pode
+  aparecer no feed da comunidade para usuários reais. Não é motivo para não
+  finalizar; é motivo para não fazer 20 seguidos nem inventar PR absurdo.
+- **Limpar depois continua sendo boa educação**, não obrigação: apagar a sessão de
+  teste evita que o histórico da conta vire lixo e que o autoload aprenda de
+  números inventados.
 
 ### A conta de teste foi ESPELHADA na oficial em 11/08/2026
 
@@ -511,7 +521,12 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
 ```
 Depois instala o `.app` de `/tmp/itsim-dd/Build/Products/Debug-iphonesimulator/App.app`.
 
-**⚠️ SEMPRE CANCELAR o treino de teste — NUNCA finalizar.** O simulador loga numa conta REAL (dados de produção). Finalizar grava um treino falso no histórico do dono e polui o `reportHistory` que alimenta o autoload. Usar o **X → Confirmar** ("não salva no histórico"). O mesmo vale pra qualquer escrita: preferir fluxos reversíveis.
+**Finalizar treino no simulador é PERMITIDO desde 11/08/2026** — a conta do
+simulador é a de teste, e o histórico do dono não é tocado (ver a seção das duas
+contas). Sem isso, relatório, PDF, story e o recálculo do autoload não eram
+verificáveis por ninguém. Use o **X → Descartar** quando a sessão não interessa,
+e finalize quando o que você precisa ver está do outro lado. **A conta oficial
+continua sem escrita, sempre.**
 
 **Limitação conhecida:** com `CODE_SIGNING_ALLOWED=NO` a extensão do widget não registra as `ActivityConfiguration` — o log mostra `activitykit … Fetched descriptors for content states: []` e **a Live Activity não renderiza no simulador**. Isso é do build, NÃO é regressão. Não tire conclusão sobre a Ilha Dinâmica a partir do simulador.
 
