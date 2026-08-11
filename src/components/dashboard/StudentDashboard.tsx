@@ -204,6 +204,21 @@ export default function StudentDashboard(props: Props) {
     [showArchived, workoutsForTab],
   )
 
+  /**
+   * "Este usuário tem treino?" — a resposta é sobre treino ATIVO, não sobre o
+   * tamanho do array.
+   *
+   * `workouts.length` inclui os arquivados, e isso produzia uma tela que se
+   * contradizia: com todos os treinos arquivados, o topo mostrava o botão
+   * recolhido "Criar treino" (o estado de quem já tem treinos) enquanto o corpo
+   * da lista dizia "Nenhum treino criado" e oferecia "Criar meu primeiro
+   * treino". Visto no aparelho em 11/08/2026.
+   *
+   * Independe de `showArchived` de propósito: abrir a gaveta de arquivados é um
+   * modo de visualização, não faz o usuário passar a ter treinos.
+   */
+  const temTreinoAtivo = useMemo(() => workouts.some((w) => !w?.archived_at), [workouts])
+
   // Índice do card com CTA sólido (dourado). Só um card por vez chama a ação —
   // o treino de HOJE; se nenhum bate com hoje, o primeiro da lista mantém a
   // âncora visual. Os demais ficam com CTA outline (reduz a "parede" de botões).
@@ -464,7 +479,7 @@ export default function StudentDashboard(props: Props) {
                   DISCRETO (borda + fundo tênue), não sólido: com treinos
                   montados, criar deixa de ser a ação primária, e o dourado
                   cheio pertence a quem é. */}
-              {workouts.length > 0 && !criarAberto && (
+              {temTreinoAtivo && !criarAberto && (
                 <button
                   type="button"
                   onClick={() => setCriarAberto(true)}
@@ -481,13 +496,13 @@ export default function StudentDashboard(props: Props) {
                 </button>
               )}
 
-              {(workouts.length === 0 || criarAberto) && (
+              {(!temTreinoAtivo || criarAberto) && (
                 <>
               <button
                 onClick={handleCreateWorkout}
                 disabled={creatingWorkout}
                 className={`btn-shimmer-sweep group relative w-full rounded-2xl p-[1px] transition-all duration-300 active:scale-[0.97] disabled:opacity-70 ${
-                  workouts.length === 0 ? 'animate-pulse' : ''
+                  !temTreinoAtivo ? 'animate-pulse' : ''
                 }`}
                 style={{
                   background: 'linear-gradient(135deg, #D4A017, #F5C542, #D4A017, #B8860B)',
@@ -522,7 +537,7 @@ export default function StudentDashboard(props: Props) {
                       <span className="text-base font-black text-white tracking-wide">
                         {creatingWorkout
                           ? 'Abrindo editor...'
-                          : workouts.length === 0
+                          : !temTreinoAtivo
                             ? 'Crie seu primeiro treino!'
                             : 'Novo Treino'}
                       </span>
@@ -585,7 +600,7 @@ export default function StudentDashboard(props: Props) {
 
               {/* Recolher de volta. Só aparece para quem tem treinos: com a
                   lista vazia não há para onde recolher — os atalhos são a tela. */}
-              {workouts.length > 0 && (
+              {temTreinoAtivo && (
                 <button
                   type="button"
                   onClick={() => setCriarAberto(false)}

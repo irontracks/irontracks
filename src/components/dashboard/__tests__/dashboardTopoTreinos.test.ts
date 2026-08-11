@@ -103,12 +103,26 @@ describe('atalhos de criar treino recolhem quando já há treinos', () => {
   const code = codeOnly(src)
 
   it('o botão fechado só existe para quem tem treinos', () => {
-    expect(code).toMatch(/workouts\.length > 0 && !criarAberto/)
+    expect(code).toMatch(/temTreinoAtivo && !criarAberto/)
   })
 
   it('com a lista VAZIA os três seguem abertos — aí criar é a ação primária', () => {
     // Recolher no onboarding esconderia a única coisa que o usuário pode fazer.
-    expect(code).toMatch(/workouts\.length === 0 \|\| criarAberto/)
+    expect(code).toMatch(/!temTreinoAtivo \|\| criarAberto/)
+  })
+
+  /**
+   * `workouts.length` inclui ARQUIVADOS. Com todos os treinos arquivados a tela
+   * se contradizia: topo no estado "já tem treinos" (botão recolhido) e corpo
+   * dizendo "Nenhum treino criado" com CTA de primeiro treino. Visto no
+   * aparelho em 11/08/2026 — o defeito nasceu na rodada anterior desta mesma
+   * auditoria.
+   */
+  it('a pergunta "tem treino?" ignora os arquivados', () => {
+    expect(code).toMatch(/temTreinoAtivo = useMemo\(\(\) => workouts\.some\(\(w\) => !w\?\.archived_at\)/)
+    // Nenhum ramo de UI pode voltar a decidir pelo tamanho cru do array.
+    expect(code).not.toMatch(/workouts\.length === 0/)
+    expect(code).not.toMatch(/workouts\.length > 0/)
   })
 
   it('o botão fechado não usa dourado sólido — criar deixou de ser primária', () => {
