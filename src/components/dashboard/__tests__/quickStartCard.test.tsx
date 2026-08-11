@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickStartCard } from '@/components/dashboard/QuickStartCard'
 import type { DashboardWorkout } from '@/types/dashboard'
@@ -87,6 +87,36 @@ describe('quando NÃO aparecer', () => {
         )
         expect(screen.queryByRole('button', { name: /Treinar agora/i })).not.toBeInTheDocument()
         expect(screen.getByText(/Treino concluído hoje/i)).toBeInTheDocument()
+    })
+
+    // jsdom mantém o localStorage entre casos do mesmo arquivo: sem isto, o
+    // primeiro teste que dispensa faz o card do SEGUINTE nascer já oculto, e o
+    // segundo passa a testar nada (ele falhava nos dois estados da mutação —
+    // sinal clássico de guard que não exercita o caminho).
+    beforeEach(() => {
+        try { window.localStorage.removeItem('it.trainedCard.dismissed') } catch { }
+    })
+
+    it('o aviso de conclusão pode ser dispensado — e some na hora', () => {
+        render(<QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday />)
+        fireEvent.click(screen.getByRole('button', { name: /Dispensar aviso/i }))
+        expect(screen.queryByText(/Treino concluído hoje/i)).not.toBeInTheDocument()
+    })
+
+    it('a dispensa vale só para HOJE — guarda o dia, não um booleano', () => {
+        // Guardar `true` faria o card sumir para sempre e o topo voltar a ficar
+        // órfão a partir do segundo dia.
+        render(<QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday />)
+        fireEvent.click(screen.getByRole('button', { name: /Dispensar aviso/i }))
+        const salvo = window.localStorage.getItem('it.trainedCard.dismissed')
+        expect(salvo).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    })
+
+    it('dispensa de ONTEM não esconde o card de hoje', () => {
+        window.localStorage.setItem('it.trainedCard.dismissed', '2020-01-01')
+        render(<QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday />)
+        expect(screen.getByText(/Treino concluído hoje/i)).toBeInTheDocument()
+        window.localStorage.removeItem('it.trainedCard.dismissed')
     })
 
     it('sem nenhum treino cadastrado, nem o estado de conclusão aparece', () => {
