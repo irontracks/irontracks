@@ -98,7 +98,7 @@ export const StudentLoadEvolution: React.FC = () => {
     }, [current, metric]);
 
     if (loading) {
-        return <div className="flex items-center justify-center py-8 text-neutral-500 gap-2"><Loader2 size={18} className="animate-spin" /><span className="text-sm">Carregando evolução...</span></div>;
+        return <div className="flex items-center justify-center py-8 text-neutral-400 gap-2"><Loader2 size={18} className="animate-spin" /><span className="text-sm">Carregando evolução...</span></div>;
     }
     if (error) {
         return (

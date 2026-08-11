@@ -114,7 +114,7 @@ export const ApplyWorkoutToStudentsModal: React.FC<Props> = ({ workoutName, stud
                                         </span>
                                         <span className="min-w-0 flex-1">
                                             <span className="block text-sm text-white truncate">{label}</span>
-                                            {s.email && <span className="block text-xs text-neutral-500 truncate">{String(s.email)}</span>}
+                                            {s.email && <span className="block text-xs text-neutral-400 truncate">{String(s.email)}</span>}
                                         </span>
                                         <span className={`h-5 w-5 rounded-md flex items-center justify-center flex-shrink-0 ${checked ? 'bg-yellow-500 text-black' : 'border border-neutral-600'}`}>
                                             {checked && <Check size={13} />}

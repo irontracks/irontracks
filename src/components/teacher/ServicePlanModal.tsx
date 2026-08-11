@@ -138,7 +138,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-neutral-800 flex-shrink-0">
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-widest">Plano de Cobrança</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-widest">Plano de Cobrança</p>
             <h2 className="text-white font-bold text-lg">{plan ? 'Editar Plano' : 'Novo Plano'}</h2>
           </div>
           <button onClick={onClose} className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors" aria-label="Fechar">
@@ -182,7 +182,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               <DollarSign size={11} /> Valor (R$)
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm font-bold">R$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 text-sm font-bold">R$</span>
               <NumericInput
                 id="sp-price"
                 aria-label="Valor do plano em reais"
@@ -194,7 +194,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               />
             </div>
             {form.price_cents > 0 && (
-              <p className="text-xs text-neutral-500 mt-1">{fmtBRL(form.price_cents)}</p>
+              <p className="text-xs text-neutral-400 mt-1">{fmtBRL(form.price_cents)}</p>
             )}
           </div>
 
@@ -258,7 +258,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               ))}
             </div>
             {form.training_days.length > 0 && (
-              <p className="text-xs text-neutral-500 mt-1.5">
+              <p className="text-xs text-neutral-400 mt-1.5">
                 {form.training_days.length}x/semana — {form.training_days.map(d => WEEK_DAYS.find(w => w.key === d)?.label).join(', ')}
               </p>
             )}

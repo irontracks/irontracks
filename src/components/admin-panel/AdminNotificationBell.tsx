@@ -182,10 +182,10 @@ export function AdminNotificationBell({ onNavigate }: Props) {
 
           <div className="flex-1 overflow-y-auto">
             {loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-xs text-neutral-500">Carregando…</div>
+              <div className="px-4 py-8 text-center text-xs text-neutral-400">Carregando…</div>
             )}
             {!loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-xs text-neutral-500">
+              <div className="px-4 py-8 text-center text-xs text-neutral-400">
                 Sem notificações no momento.
               </div>
             )}
@@ -201,7 +201,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
                 >
                   <div
                     className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${n.is_read
-                      ? 'bg-neutral-900 text-neutral-500'
+                      ? 'bg-neutral-900 text-neutral-400'
                       : 'bg-yellow-500/15 text-yellow-400'
                       }`}
                   >
@@ -210,7 +210,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-xs font-bold text-white truncate">{n.title}</div>
-                      <div className="text-[10px] text-neutral-500 shrink-0">
+                      <div className="text-[10px] text-neutral-400 shrink-0">
                         {formatRelative(n.created_at)}
                       </div>
                     </div>

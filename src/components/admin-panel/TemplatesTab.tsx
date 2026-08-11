@@ -49,7 +49,7 @@ export const TemplatesTab: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                     <input
                         type="text"
                         aria-label="Buscar templates"
@@ -85,7 +85,7 @@ export const TemplatesTab: React.FC = () => {
                             <h3 className="font-bold text-white text-lg mb-1 line-clamp-2">
                                 {normalizeWorkoutTitle(t.name)}
                             </h3>
-                            <p className="text-sm text-neutral-500 line-clamp-2">
+                            <p className="text-sm text-neutral-400 line-clamp-2">
                                 {t.description || 'Sem descrição.'}
                             </p>
                         </div>
@@ -122,7 +122,7 @@ export const TemplatesTab: React.FC = () => {
                             <BookOpen size={32} className="text-neutral-600" />
                         </div>
                         <h3 className="text-white font-bold text-lg mb-1">Nenhum template encontrado</h3>
-                        <p className="text-neutral-500">Crie seu primeiro template de treino.</p>
+                        <p className="text-neutral-400">Crie seu primeiro template de treino.</p>
                     </div>
                 )}
             </div>

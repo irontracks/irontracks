@@ -40,7 +40,7 @@ export default function TeacherPlanBadge({ planState, onUpgradeClick }: TeacherP
 
       {/* student count */}
       <div className="flex items-center gap-0.5 text-[11px] text-neutral-300">
-        <Users size={11} className="text-neutral-500" />
+        <Users size={11} className="text-neutral-400" />
         <span>{studentCount}{isUnlimited ? '' : `/${maxStudents}`}</span>
       </div>
 

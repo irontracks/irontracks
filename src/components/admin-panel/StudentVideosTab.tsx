@@ -185,7 +185,7 @@ export const StudentVideosTab: React.FC = () => {
                                 {/* Feedback textarea */}
                                 <div className="mt-3">
                                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                                    <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Mensagem para o aluno</label>
+                                    <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-2">Mensagem para o aluno</label>
                                     {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                                     <textarea
                                         value={String(draft || '')}

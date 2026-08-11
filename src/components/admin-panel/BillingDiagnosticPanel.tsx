@@ -81,7 +81,7 @@ function CheckRow({ name, check }: { name: string; check: DiagnosticCheck }) {
           <p className="text-xs text-neutral-300 mt-0.5 break-words">{check.message}</p>
           {check.data ? (
             <details className="mt-1.5">
-              <summary className="text-[10px] text-neutral-500 cursor-pointer hover:text-neutral-300">Ver detalhes</summary>
+              <summary className="text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-300">Ver detalhes</summary>
               <pre className="mt-1 text-[10px] text-neutral-400 bg-neutral-900/60 rounded-lg p-2 overflow-x-auto max-h-48 overflow-y-auto">
                 {JSON.stringify(check.data, null, 2)}
               </pre>
@@ -236,7 +236,7 @@ export function BillingDiagnosticPanel() {
       </div>
 
       {diagnostic?.timestamp && (
-        <p className="text-[10px] text-neutral-500 mt-2 text-right">
+        <p className="text-[10px] text-neutral-400 mt-2 text-right">
           Atualizado em {new Date(diagnostic.timestamp).toLocaleString('pt-BR')}
         </p>
       )}
@@ -254,7 +254,7 @@ export function BillingDiagnosticPanel() {
 
         <div className="space-y-2">
           <div>
-            <label htmlFor="sim-teacher" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-1 block">Professor</label>
+            <label htmlFor="sim-teacher" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-1 block">Professor</label>
             <select
               id="sim-teacher"
               value={selectedTeacherId}
@@ -272,7 +272,7 @@ export function BillingDiagnosticPanel() {
           </div>
 
           <div>
-            <label htmlFor="sim-plan" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-1 block">Plano</label>
+            <label htmlFor="sim-plan" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-1 block">Plano</label>
             <select
               id="sim-plan"
               value={selectedPlan}

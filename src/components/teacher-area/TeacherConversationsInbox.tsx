@@ -68,7 +68,7 @@ export const TeacherConversationsInbox: React.FC<{ onGoToStudents?: () => void }
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center py-12 text-neutral-500 gap-2">
+                <div className="flex items-center justify-center py-12 text-neutral-400 gap-2">
                     <Loader2 size={18} className="animate-spin" /> <span className="text-sm">Carregando...</span>
                 </div>
             ) : error ? (
@@ -86,7 +86,7 @@ export const TeacherConversationsInbox: React.FC<{ onGoToStudents?: () => void }
                         nenhum. O texto antigo ("abra um aluno e toque em Conversar")
                         mandava procurar um aluno que não existe. */}
                     <p className="text-white font-bold">Nenhum aluno vinculado</p>
-                    <p className="text-neutral-500 text-sm mt-1">Cadastre um aluno para começar a conversar.</p>
+                    <p className="text-neutral-400 text-sm mt-1">Cadastre um aluno para começar a conversar.</p>
                     {onGoToStudents ? (
                         <button
                             type="button"
@@ -115,7 +115,7 @@ export const TeacherConversationsInbox: React.FC<{ onGoToStudents?: () => void }
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center justify-between gap-2">
                                         <span className="text-sm font-bold text-white truncate">{c.name}</span>
-                                        <span className="text-[11px] text-neutral-500 flex-shrink-0">{formatWhen(c.lastMessageAt)}</span>
+                                        <span className="text-[11px] text-neutral-400 flex-shrink-0">{formatWhen(c.lastMessageAt)}</span>
                                     </span>
                                     <span className="flex items-center justify-between gap-2 mt-0.5">
                                         <span className="text-xs text-neutral-400 truncate">{c.lastMessage || 'Toque para conversar'}</span>
