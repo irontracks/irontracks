@@ -187,13 +187,24 @@ export default function VipWeeklySummaryCard() {
           <div className="mt-3 text-sm text-neutral-400">Nenhum treino nos últimos 7 dias.</div>
         ) : null}
 
+        {/* Estes chips são a PROVENIÊNCIA do resumo — o que a IA leu para
+            escrever —, não métricas. Sem rótulo, o primeiro deles ("4 dias
+            treinados (últimos 7d)") lia como repetição burra do card de cima,
+            que mostra o mesmo 4 em corpo 20. Com "Baseado em", o mesmo número
+            passa a ter papel próprio: lá é o dado, aqui é a fonte.
+            Mesma armadilha que já derrubou o `summaryText` cru logo acima —
+            número repetido sem contexto vira ruído, mesmo quando o dado é o
+            certo. */}
         {dataUsed.length ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3">
+            <div className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Baseado em</div>
+            <div className="flex flex-wrap gap-1.5">
             {dataUsed.map((x) => (
               <div key={x} className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 px-2 py-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 {x}
               </div>
             ))}
+            </div>
           </div>
         ) : null}
       </div>

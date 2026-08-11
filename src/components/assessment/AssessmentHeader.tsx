@@ -149,14 +149,24 @@ export const AssessmentHeader = ({
               Ver Histórico
             </button>
           </div>
+          {/* Dizia "Fechar" e fazia `history.back()` — duas coisas diferentes.
+              O rótulo agora nomeia a ação real, e existe `aria-label`: em botão
+              só de ícone, `title` não é lido de forma confiável por leitor de
+              tela, então quem usa VoiceOver ouvia "botão" e mais nada.
+
+              `self-start` tira o X do centro da pilha de cinco botões, onde ele
+              ficava na altura do "Por Foto" e, por proximidade, parecia
+              pertencer a ele. No topo, lê como controle do CARD — que é o que
+              de fato é. */}
           {!onClose ? (
             <button
               onClick={() => {
                 if (typeof window !== 'undefined') window.history.back()
               }}
-              className="shrink-0 w-11 h-11 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all duration-300 active:scale-95 flex items-center justify-center"
+              className="shrink-0 self-start w-11 h-11 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all duration-300 active:scale-95 flex items-center justify-center"
               style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-              title="Fechar"
+              title="Voltar"
+              aria-label="Voltar"
               type="button"
             >
               <X className="w-5 h-5" />
