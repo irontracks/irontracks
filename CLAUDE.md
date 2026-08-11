@@ -380,12 +380,27 @@ texto e deixava o separador `·` órfão), e o título não força `uppercase` (
 ~12% de largura; a assinatura do app é o **peso**, não a caixa). Guards em
 `components/dashboard/__tests__/dashboardTopoTreinos.test.ts`.
 
-**Como desfazer, se o dono não gostar:** tudo entrou em UM commit de squash.
-`git revert <sha do merge do #747>` devolve exatamente o estado anterior, e o
-deploy web leva a reversão a todos os aparelhos no próximo boot — **sem
+**Como desfazer, se o dono não gostar** — tudo entrou em UM commit de squash:
+
+```bash
+git revert --no-edit 6ac1dd63871c272e2541c587636c58d6fc8fe8c9
+```
+
+**O revert foi ENSAIADO antes de a mudança ser entregue**, não só documentado:
+aplicado numa branch descartável, ele entra sem conflito (8 arquivos, −236
+linhas) e o estado revertido passa em `tsc` e nos 5107 testes. Um rollback que
+ninguém tentou é promessa, não plano.
+
+O deploy web leva a reversão a todos os aparelhos no próximo boot — **sem
 TestFlight**, porque o app nativo carrega o front do servidor. Os guards novos
 voltam junto (estão no mesmo commit), então não sobra teste órfão cobrando um
 comportamento revertido.
+
+**Reverter em parte** também é possível: as cinco correções são independentes.
+O `git revert` desfaz o pacote; para desfazer só uma (ex.: manter o topo novo e
+voltar o `uppercase` do título), edite o arquivo e apague o guard correspondente
+em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
+caso, e é assim que ele avisa que a decisão está sendo revertida de propósito.
 
 ## Regra da hierarquia — um fato, um lugar (ago/2026)
 **Antes de mexer em qualquer card que MOSTRE DADOS, leia `docs/DESIGN_HIERARCHY.md`.**
