@@ -396,7 +396,19 @@ TestFlight**, porque o app nativo carrega o front do servidor. Os guards novos
 voltam junto (estão no mesmo commit), então não sobra teste órfão cobrando um
 comportamento revertido.
 
-**Reverter em parte** também é possível: as cinco correções são independentes.
+**Segunda rodada (PR #749):** os três atalhos de CRIAR (Novo/Express/Cardio)
+ocupavam ~220pt antes da lista e agora ficam recolhidos atrás de um botão
+"Criar treino" — **mas só para quem já tem treinos**. Com a lista vazia eles
+seguem abertos: no onboarding criar É a ação primária, e recolher esconderia a
+única coisa que o usuário pode fazer. O botão fechado usa dourado DISCRETO;
+dourado sólido pertence ao CTA de iniciar. Revert: `git revert --no-edit
+1c0fa89158f4bc13a6d69d8166b4b1835870c746`.
+
+Resultado medido no aparelho: a lista de treinos subiu ~196pt e passaram a
+caber **três cards na primeira tela** (dois inteiros + o começo do terceiro),
+contra nenhum card inteiro antes.
+
+**Reverter em parte** também é possível: as correções são independentes.
 O `git revert` desfaz o pacote; para desfazer só uma (ex.: manter o topo novo e
 voltar o `uppercase` do título), edite o arquivo e apague o guard correspondente
 em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
