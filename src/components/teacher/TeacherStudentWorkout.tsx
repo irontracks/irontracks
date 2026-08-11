@@ -184,7 +184,7 @@ export function TeacherStudentWorkout() {
           <button
             type="button"
             onClick={() => void fetchSession()}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-neutral-500 hover:text-white transition-colors shrink-0"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors shrink-0"
             title="Atualizar"
           >
             <RefreshCw size={13} />

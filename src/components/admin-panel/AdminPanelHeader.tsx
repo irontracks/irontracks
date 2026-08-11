@@ -92,7 +92,7 @@ export const AdminPanelHeader = ({
               notificações admin e botão fechar. Em telas pequenas oculta
               o texto da tab e deixa só os botões. */}
           <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-neutral-400">
               {currentTabLabel}
             </span>
             {isAdmin && <AdminNotificationBell onNavigate={handleNotifNavigate} />}

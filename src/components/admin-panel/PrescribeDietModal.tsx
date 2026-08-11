@@ -83,7 +83,7 @@ export const PrescribeDietModal: React.FC<Props> = ({ onClose, onCreated }) => {
                         <Salad size={18} />
                         <div className="min-w-0">
                             <h3 className="font-bold text-white truncate">Plano alimentar</h3>
-                            <p className="text-[11px] text-neutral-500 truncate">Cardápio com IA para {studentName}</p>
+                            <p className="text-[11px] text-neutral-400 truncate">Cardápio com IA para {studentName}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-neutral-800 rounded-full text-neutral-300 flex-shrink-0" aria-label="Fechar"><X size={16} /></button>
@@ -123,7 +123,7 @@ export const PrescribeDietModal: React.FC<Props> = ({ onClose, onCreated }) => {
                         <input id="d-notes" aria-label="Observações" className={FIELD} value={notes} maxLength={300}
                             onChange={(e) => setNotes(e.target.value)} placeholder="sem lactose, treino 18h, evitar frituras..." />
                     </div>
-                    <p className="text-[11px] text-neutral-500">A IA monta o cardápio com os alimentos que o aluno já come e o contexto dele (objetivo, exames). Substitui o plano ativo anterior.</p>
+                    <p className="text-[11px] text-neutral-400">A IA monta o cardápio com os alimentos que o aluno já come e o contexto dele (objetivo, exames). Substitui o plano ativo anterior.</p>
                 </div>
 
                 <div className="p-4 border-t border-neutral-800">

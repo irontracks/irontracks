@@ -100,7 +100,7 @@ export default async function AcquisitionPage() {
 function Stat({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
     <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-4">
-      <div className="text-xs uppercase tracking-widest text-neutral-500">{label}</div>
+      <div className="text-xs uppercase tracking-widest text-neutral-400">{label}</div>
       <div className="text-3xl font-black text-white mt-1">{value}</div>
       {sub && <div className="text-xs text-yellow-500 mt-1">{sub}</div>}
     </div>
@@ -112,12 +112,12 @@ function Group({ title, rows }: { title: string; rows: Row[] }) {
     <section className="rounded-2xl bg-neutral-900/60 border border-neutral-800 p-5">
       <h2 className="text-sm font-black uppercase tracking-widest text-neutral-400 mb-3">{title}</h2>
       {rows.length === 0 ? (
-        <p className="text-neutral-500 text-sm">(sem dados)</p>
+        <p className="text-neutral-400 text-sm">(sem dados)</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-neutral-500 border-b border-neutral-800">
+              <tr className="text-left text-neutral-400 border-b border-neutral-800">
                 <th className="py-2">Valor</th>
                 <th className="py-2 text-right">Cadastros</th>
                 <th className="py-2 text-right">VIPs</th>

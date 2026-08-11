@@ -70,7 +70,7 @@ export const PeriodizationModal: React.FC<Props> = ({ onClose, onCreated }) => {
                         <CalendarRange size={18} />
                         <div className="min-w-0">
                             <h3 className="font-bold text-white truncate">Periodização</h3>
-                            <p className="text-[11px] text-neutral-500 truncate">Plano de várias semanas para {studentName}</p>
+                            <p className="text-[11px] text-neutral-400 truncate">Plano de várias semanas para {studentName}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-neutral-800 rounded-full text-neutral-300 flex-shrink-0" aria-label="Fechar"><X size={16} /></button>
@@ -126,7 +126,7 @@ export const PeriodizationModal: React.FC<Props> = ({ onClose, onCreated }) => {
                         <label className={LABEL} htmlFor="p-lim">Limitações (opcional)</label>
                         <input id="p-lim" aria-label="Limitações" className={SELECT} value={limitations} onChange={(e) => setLimitations(e.target.value)} placeholder="lesão no ombro, joelho..." />
                     </div>
-                    <p className="text-[11px] text-neutral-500">A IA usa o histórico de carga do aluno pra calibrar os pesos. Os treinos entram como modelos na conta dele.</p>
+                    <p className="text-[11px] text-neutral-400">A IA usa o histórico de carga do aluno pra calibrar os pesos. Os treinos entram como modelos na conta dele.</p>
                 </div>
 
                 <div className="p-4 border-t border-neutral-800">

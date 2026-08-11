@@ -185,7 +185,7 @@ export function CronsStatusTab() {
 
       {/* Lista de crons */}
       {loading && crons.length === 0 ? (
-        <div className="flex items-center justify-center py-12 text-neutral-500">
+        <div className="flex items-center justify-center py-12 text-neutral-400">
           <Loader2 size={24} className="animate-spin" />
         </div>
       ) : (
@@ -221,7 +221,7 @@ export function CronsStatusTab() {
                       {formatCronSchedule(c.schedule)}
                     </span>
                   </div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">
+                  <div className="text-[11px] text-neutral-400 mt-0.5">
                     Última execução: {formatTimeSince(c.hoursSinceLastRun, c.lastRunAt)}
                   </div>
                 </div>

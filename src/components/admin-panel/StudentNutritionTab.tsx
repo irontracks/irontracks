@@ -100,18 +100,18 @@ export const StudentNutritionTab: React.FC = () => {
                     </div>
                 </div>
                 {!studentId && (
-                    <p className="mt-3 text-xs text-neutral-500">Este aluno ainda não possui acesso ao app — não é possível prescrever um plano.</p>
+                    <p className="mt-3 text-xs text-neutral-400">Este aluno ainda não possui acesso ao app — não é possível prescrever um plano.</p>
                 )}
             </div>
 
-            {loading && <p className="text-center text-neutral-500 text-sm animate-pulse">Carregando plano...</p>}
+            {loading && <p className="text-center text-neutral-400 text-sm animate-pulse">Carregando plano...</p>}
 
             {!loading && plan && grand && (
                 <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <h4 className="text-sm font-bold text-white truncate">{plan.plan_name || 'Plano alimentar'}</h4>
-                            <p className="text-[11px] text-neutral-500">{plan.meals.length} refeições</p>
+                            <p className="text-[11px] text-neutral-400">{plan.meals.length} refeições</p>
                         </div>
                         <span className="shrink-0 text-[11px] tabular-nums text-yellow-300/90">{Math.round(grand.calories)} kcal · {Math.round(grand.protein)}g P</span>
                     </div>

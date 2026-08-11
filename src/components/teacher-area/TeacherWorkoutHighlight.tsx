@@ -38,7 +38,7 @@ export const TeacherWorkoutHighlight: React.FC<Props> = ({ onOpenWorkouts, onOpe
                     onClick={onOpenStudents}
                     className="flex-1 min-h-[48px] px-4 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 font-black rounded-2xl flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
                 >
-                    <Users size={18} /> Treino por aluno <ArrowRight size={16} className="text-neutral-500" />
+                    <Users size={18} /> Treino por aluno <ArrowRight size={16} className="text-neutral-400" />
                 </button>
             </div>
         </div>

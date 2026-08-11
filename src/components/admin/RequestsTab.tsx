@@ -199,7 +199,7 @@ export default function RequestsTab() {
         return (
             <div className="w-full space-y-4">
                 <div className="flex items-center justify-between px-1">{tabs}</div>
-                <div className="flex flex-col items-center justify-center h-64 text-neutral-500">
+                <div className="flex flex-col items-center justify-center h-64 text-neutral-400">
                     <div className="w-16 h-16 bg-neutral-900 rounded-full flex items-center justify-center mb-4 border border-neutral-800">
                         <Check className="text-neutral-700" size={32} />
                     </div>
@@ -242,7 +242,7 @@ export default function RequestsTab() {
                                             </span>
                                         )}
                                     </h4>
-                                    <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+                                    <div className="flex items-center gap-1 text-[10px] text-neutral-400">
                                         <Clock size={10} />
                                         <span>{new Date(req.created_at).toLocaleDateString()} às {new Date(req.created_at).toLocaleTimeString().slice(0, 5)}</span>
                                     </div>
@@ -258,15 +258,15 @@ export default function RequestsTab() {
                                 </div>
                             )}
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
-                                <Mail size={14} className="text-neutral-500" />
+                                <Mail size={14} className="text-neutral-400" />
                                 <span className="truncate select-all">{req.email}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
-                                <Phone size={14} className="text-neutral-500" />
+                                <Phone size={14} className="text-neutral-400" />
                                 <span className="select-all">{req.phone || '-'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
-                                <Calendar size={14} className="text-neutral-500" />
+                                <Calendar size={14} className="text-neutral-400" />
                                 <span>{req.birth_date ? new Date(req.birth_date).toLocaleDateString() : '-'}</span>
                             </div>
                         </div>

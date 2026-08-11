@@ -37,7 +37,7 @@ export function StudentEvolutionTab() {
                             </span>
                             <div className="text-right">
                                 <span className="block font-bold text-white">{String((a as UnknownRecord)?.bf ?? '')}% Gordura</span>
-                                <span className="text-xs text-neutral-500">{String((a as UnknownRecord)?.weight ?? '')}kg</span>
+                                <span className="text-xs text-neutral-400">{String((a as UnknownRecord)?.weight ?? '')}kg</span>
                             </div>
                         </div>
                     ))}
