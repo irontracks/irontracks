@@ -196,9 +196,20 @@ function WorkoutCardInner({
             <span className="w-1.5 h-1.5 rounded-full bg-black/70 animate-pulse" /> HOJE
           </span>
         )}
-        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-40 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
+        {/* Sem `uppercase`: o nome do treino é o que o olho procura na lista, e
+            caixa alta custa ~12% mais largura — com os 160px reservados à
+            direita para os botões de ação, títulos como "SEG · Upper B - Peito
+            + Braços" quebravam em duas linhas. A assinatura visual do app é o
+            PESO (font-black), não a caixa; ela continua intacta. Labels curtos
+            (HOJE, ARQUIVADO) seguem em caixa alta, que é onde ela funciona. */}
+        <h3 className="font-black text-white text-base mb-0.5 pr-40 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
-        <p className="text-[11px] text-neutral-400 font-mono mb-3 flex flex-wrap items-center gap-x-1.5 pr-40">
+        {/* Sem `pr-40` aqui: esta linha fica ABAIXO do bloco de ações, então os
+            160px reservados só serviam para estrangular o texto — a meta
+            quebrava em duas linhas e deixava o separador "·" órfão no fim da
+            primeira. O padding é necessário no título (que corre ao lado dos
+            botões), não aqui. */}
+        <p className="text-[11px] text-neutral-400 font-mono mb-3 flex flex-wrap items-center gap-x-1.5">
           <span>{pluralize(exercisesCount, 'exercício')}</span>
           {estMinutes > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>~{estMinutes} min</span></>)}
           {totalSets > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>{pluralize(totalSets, 'série', 'séries')}</span></>)}

@@ -260,7 +260,11 @@ const IronRankCard = memo(function IronRankCard({
                             {/* Progress */}
                             <div className="mt-2">
                                 <div className="flex items-baseline justify-between mb-1">
-                                    <span className="text-[10px] text-neutral-400 font-semibold">{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
+                                    {/* Espaço fino (U+2009) entre número e unidade: "261.415 kg", não
+                                        "261.415kg". Regra tipográfica padrão (SI), e é o card que o app
+                                        usa como troféu — colado denuncia pressa. Fino em vez de espaço
+                                        normal para o par não se separar em quebra de linha. */}
+                                    <span className="text-[10px] text-neutral-400 font-semibold">{totalVolumeKg.toLocaleString('pt-BR')}&#8201;kg levantados</span>
                                     <span className="text-[10px] font-black tabular-nums text-yellow-400">{Math.round(progress)}%</span>
                                 </div>
                                 <div className="h-2 rounded-full overflow-hidden"
@@ -284,7 +288,7 @@ const IronRankCard = memo(function IronRankCard({
                                 </div>
                                 <div className="flex justify-between mt-1">
                                     <span className="text-[9px] text-neutral-400">Toque para ver o ranking</span>
-                                    <span className="text-[9px] text-neutral-400">próx. {nextVol.toLocaleString('pt-BR')}kg</span>
+                                    <span className="text-[9px] text-neutral-400">próx. {nextVol.toLocaleString('pt-BR')}&#8201;kg</span>
                                 </div>
                             </div>
                         </button>
@@ -496,7 +500,7 @@ const IronRankCard = memo(function IronRankCard({
                             ) : leaderboard.length === 0 ? (
                                 <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <div className="font-bold text-neutral-200 text-sm">Ainda não há dados suficientes.</div>
-                                    <div className="mt-1 text-neutral-400 text-xs">Seu volume: <span className="text-yellow-400 font-black">{Math.round(totalVolumeKg).toLocaleString('pt-BR')}kg</span></div>
+                                    <div className="mt-1 text-neutral-400 text-xs">Seu volume: <span className="text-yellow-400 font-black">{Math.round(totalVolumeKg).toLocaleString('pt-BR')}&#8201;kg</span></div>
                                     <button type="button" onClick={() => setReloadRank(v => v + 1)}
                                         className="mt-3 px-3 py-2 rounded-xl text-xs font-black text-neutral-300"
                                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -535,7 +539,7 @@ const IronRankCard = memo(function IronRankCard({
                                             <div className="text-right shrink-0">
                                                 <div className="text-[9px] text-neutral-500 font-bold uppercase">Volume</div>
                                                 <div className="text-sm font-black text-yellow-400 tabular-nums">
-                                                    {Math.round(row.totalVolumeKg).toLocaleString('pt-BR')}kg
+                                                    {Math.round(row.totalVolumeKg).toLocaleString('pt-BR')}&#8201;kg
                                                 </div>
                                             </div>
                                         </div>
