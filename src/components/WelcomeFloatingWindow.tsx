@@ -81,7 +81,7 @@ export default function WelcomeFloatingWindow({ user, onClose }: WelcomeFloating
                         <div className="w-12 h-12 rounded-xl bg-yellow-500 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/20">
                             <Crown size={24} className="text-black" />
                         </div>
-                        <button
+                        <button aria-label="Fechar"
                             onClick={handleClose}
                             className="text-neutral-400 hover:text-white transition-colors"
                         >

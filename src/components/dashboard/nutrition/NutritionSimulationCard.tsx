@@ -107,7 +107,7 @@ export default function NutritionSimulationCard({
       </div>
 
       {canLog && (
-        <button
+        <button aria-label="Lançar refeição"
           type="button"
           onClick={onLog}
           disabled={logging || logged}

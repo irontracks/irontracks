@@ -293,7 +293,7 @@ export default function VipPeriodizationPanel({
             >
               {calendarOpen ? 'Esconder' : 'Mostrar'}
             </button>
-            <button type="button" onClick={loadActive} disabled={loading} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white disabled:opacity-60">
+            <button aria-label="Atualizar" type="button" onClick={loadActive} disabled={loading} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white disabled:opacity-60">
               <RefreshCw size={14} />
             </button>
           </div>

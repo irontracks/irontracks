@@ -148,7 +148,7 @@ export default function ChallengesPanel({
           <span className="text-xs font-black uppercase tracking-widest text-yellow-500">Desafios</span>
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="text-neutral-400 hover:text-white">
+          <button aria-label="Fechar" type="button" onClick={onClose} className="text-neutral-400 hover:text-white">
             <X size={16} />
           </button>
         )}

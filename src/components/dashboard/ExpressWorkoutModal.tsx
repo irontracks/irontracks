@@ -197,7 +197,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
           {/* Generate button */}
-          <button
+          <button aria-label="Gerar treino"
             type="button"
             onClick={handleGenerate}
             disabled={loading}

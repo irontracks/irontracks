@@ -207,7 +207,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, loading, error,
         <div className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between mb-1">
                 <h4 className="font-black text-white text-sm">Configurações do Inbox</h4>
-                <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300">
+                <button aria-label="Fechar" type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300">
                     <X size={16} />
                 </button>
             </div>

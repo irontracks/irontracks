@@ -133,7 +133,7 @@ export function StoryControlPanel({
                             <p className="text-xs text-amber-200 font-medium">Modo LIVE ativado</p>
                             <p className="text-[10px] text-amber-300/70 mt-1">Arraste os elementos na pré-visualização para personalizar.</p>
                         </div>
-                        <button onClick={onResetPositions} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-amber-500/20 text-amber-300" title="Resetar posições">
+                        <button aria-label="Redefinir posições" onClick={onResetPositions} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-amber-500/20 text-amber-300" title="Resetar posições">
                             <RotateCcw size={14} />
                         </button>
                     </div>

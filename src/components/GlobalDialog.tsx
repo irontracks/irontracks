@@ -107,7 +107,7 @@ const GlobalDialog = () => {
 
 				{/* Premium header with big centered icon */}
 				<div className="px-6 pt-6 pb-4 text-center relative">
-					<button
+					<button aria-label="Fechar"
 						onClick={handleClose}
 						className="absolute top-4 right-4 text-neutral-600 hover:text-white transition-colors p-1 rounded-lg hover:bg-neutral-800"
 					>

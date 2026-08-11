@@ -184,7 +184,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
           <div className="text-[10px] uppercase tracking-widest text-neutral-400">Biblioteca de alimentos</div>
           <div className="mt-0.5 text-base font-semibold text-white">📷 Escanear rótulo nutricional</div>
         </div>
-        <button type="button" onClick={onClose} className="text-neutral-400 hover:text-white text-xl transition">✕</button>
+        <button aria-label="Fechar" type="button" onClick={onClose} className="text-neutral-400 hover:text-white text-xl transition">✕</button>
       </div>
 
       {initialBarcode && (

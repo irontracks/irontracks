@@ -706,7 +706,7 @@ export default function StoryViewer({
               <div className="text-[11px] text-neutral-300 font-bold">{formatAgo(story.createdAt)}</div>
             </div>
             {isMine && (
-              <button onClick={handleDelete} disabled={deleting} className="w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60 disabled:opacity-60">
+              <button aria-label="Excluir story" onClick={handleDelete} disabled={deleting} className="w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60 disabled:opacity-60">
                 {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
@@ -719,7 +719,7 @@ export default function StoryViewer({
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-            <button onClick={onClose} className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60">
+            <button aria-label="Fechar" onClick={onClose} className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60">
               <X size={18} />
             </button>
           </div>
@@ -842,7 +842,7 @@ export default function StoryViewer({
                     <Heart size={20} />
                   </div>
                 ) : (
-                  <button onClick={toggleLike} disabled={liking} className={`w-12 h-12 rounded-2xl border flex items-center justify-center disabled:opacity-60 ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
+                  <button aria-label="Curtir" onClick={toggleLike} disabled={liking} className={`w-12 h-12 rounded-2xl border flex items-center justify-center disabled:opacity-60 ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
                     <Heart size={20} className={story.hasLiked ? 'fill-current' : ''} />
                   </button>
                 )}
