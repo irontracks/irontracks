@@ -63,7 +63,16 @@ scripts/        # Scripts de build e utilitários
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
-**Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`) — hoje pelo **`userSnapshot`** (ver abaixo), não cada uma por conta. Ao mexer em meta/nutrição, ajuste as DUAS.
+**Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`) — hoje pelo **`userSnapshot`** (ver abaixo), não cada uma por conta. Ao mexer em meta/nutrição, ajuste as DUAS. **O overlay renderiza o MESMO `NutritionMixer`** — ou seja, todo card da página existe também no app nativo; a exceção continua sendo a navegação até a página, que só a web tem.
+
+**Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
+> ⚠️ **Pendência para o dono:** proteína (`#fbbf24`, matiz 43°) e gordura (`#f97316`, 25°) estão a **18,7°** — abaixo dos 40° que o heatmap exige de si mesmo. Onde há rótulo ao lado, passa; na barra empilhada do card de lançamento, âmbar e laranja ficam adjacentes (hoje o azul do carbo entra no meio e salva). Trocar a cor da gordura mexe em 3 telas — decisão não tomada.
+
+**Heatmap Treino × Nutrição:** o bucketing por dia vive em `lib/nutrition/correlationDays.ts` (função pura, dia sempre BRT). Antes a rota fazia `toISOString().slice(0,10)` — dia UTC —, então **todo treino depois das 21h BRT acendia o quadrado do dia seguinte** e o próprio "hoje" da grade virava amanhã. A rota não devolve mais `workout_calories`: era o literal `300` por sessão exibido como se fosse medição.
+
+**`MyDietPlan` — o posicionamento automático não pode vencer o usuário.** "Abre no dia de HOJE" roda no efeito que observa `days`, e os botões de dia já estão na tela nesse instante: quem tocasse num dia antes de o efeito rodar era devolvido para hoje em silêncio, e o swap ia para o índice errado. `positionedRef.current = true` é marcado no efeito **e no clique**. Guard varre os sete dias da semana.
+
+**"Já treinou hoje?" tem fonte única: `lib/workout/trainedToday.ts`** — usada pelo `QuickStartCard` (o atalho "Treinar agora" some depois da sessão concluída) e pelo `RestDayPromptCard`. Dia BRT, `is_template = false`, e **nunca** selecionar `workouts.notes` para responder um booleano.
 
 **`userSnapshot` (`lib/user/snapshot.ts`) — o LEITOR único dos dados do usuário. Comece por ele antes de escrever qualquer `from('user_settings')`.** Devolve os fatos já resolvidos (antropometria declarada, objetivo, fase da dieta, stats de TDEE, meta do dia + de onde ela veio) por setor: `profile`, `nutrition`. Nasceu porque as mesmas 5 chaves de perfil eram extraídas em DOIS lugares independentes (`extractProfileStats` e o `profileSection` do `userContext`) e a fiação "meta salva > TDEE do perfil" existia em TRÊS (página, overlay, contexto de IA) — o tipo de duplicação que não quebra nada hoje e diverge em silêncio no dia em que o perfil ganhar um campo.
 
@@ -193,6 +202,25 @@ O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**.
 
 `testTimeout` é **15s**, não o default de 5s: a suíte falhava de forma NÃO determinística porque o primeiro caso de um arquivo com `await import()` dinâmico levava 6s sob contenção (isolado roda em 1,3s). Timeout serve para pegar teste TRAVADO, não teste lento sob carga.
 
+### Teste que muda de resultado conforme o DIA não é flaky — é teste que às vezes não testa nada (ago/2026)
+`myDietPlan > trocar alimento manda o DIA selecionado` derrubou o CI e parecia
+flaky. **Não era**: escondia bug de produto (ver `MyDietPlan`, abaixo).
+
+O que custou caro foi o método. **62 execuções locais passaram** — 15 do caso
+isolado, 15 do arquivo, 8 da suíte inteira, 10 com a CPU saturada, 12 com
+`--sequence.shuffle`. Força bruta não acha corrida rara: é caça a fantasma.
+
+**O que achou em 2 minutos:** fixar o relógio e varrer os SETE dias da semana. O
+teste falhava em seis e passava só na quarta — o único dia em que o
+posicionamento automático já acertava o índice esperado e o clique não precisava
+funcionar. Sem `setSystemTime`, ele tinha 6/7 de chance de pegar o bug e passava
+por sorte; o runner do CI, mais lento, ampliava a janela.
+
+Regra que fica: **todo teste que dependa de "hoje" fixa o relógio**, e quando o
+resultado esperado varia com o calendário, o guard **varre a semana inteira** —
+senão ele passa sozinho no dia certo. Mesmo raciocínio vale para fuso e virada
+de mês.
+
 ## Guard falso — os cinco jeitos de errar que já aconteceram aqui
 
 Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padrões que passaram verdes COM o bug presente:
@@ -261,6 +289,18 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 dono em 09/08/2026 — **o simulador está logado em `djmkbrasil@gmail.com`, a conta de
 TESTE**. (Esta linha já afirmou o contrário; a conta do simulador MUDA, então trate
 como pista datada e **confirme antes de comparar tela × banco**.)
+
+**Reconfirmado em 10/08/2026, e some com a dúvida em 5 s:** o SIMULADOR mostrava 6
+treinos A–F, "Complete seu perfil 20%" e meta 2000 kcal (= teste); no mesmo dia, o
+print do IPHONE do dono trazia 2279/2676 kcal (= oficial). Ou seja: **simulador =
+teste, aparelho do dono = oficial** — quando ele mandar um screenshot, ele NÃO é da
+mesma conta que você está vendo.
+
+**Escrita para conferir tela na conta de teste é aceitável se for reversível e
+desfeita na hora.** Em 10/08 lancei "150g frango + 100g arroz" para ver o card de
+Lançamentos (a conta não tinha refeição no dia) e removi em seguida, deixando a
+conta como estava. Vale para nutrição; **não vale para treino** — ali a regra do X →
+Confirmar continua, finalizar polui o `reportHistory` que alimenta o autoload.
 
 | | `djmkbrasil` (TESTE, no simulador) | `djmkapple` (OFICIAL, o dono treina nela) |
 |---|---|---|
@@ -538,6 +578,15 @@ Quando o agente está desenvolvendo numa branch e abriu PR, o fluxo padrão ao t
 2. Marcar o PR como ready (sair de draft)
 3. Mergear com **squash** (mantém main com 1 commit por feature, casa com o histórico atual)
 4. Vercel deploya prod automático no push pra main
+
+**O merge tem que ser CONDICIONADO ao resultado, não encadeado depois da espera.**
+Em 10/08/2026 mergeei um PR com o CI VERMELHO porque escrevi
+`for … sleep …; done; gh pr merge` — o loop terminou (por falha, não por sucesso)
+e o merge rodou em seguida, sem ninguém olhar o status. Forma certa:
+```bash
+s=$(gh pr checks <n> | grep quality-check | awk '{print $2}')
+[ "$s" = "pass" ] && gh pr merge <n> --squash --delete-branch || echo "ABORTADO: $s"
+```
 
 Não é preciso pedir confirmação a cada PR — esta regra é a confirmação durável. Exceções em que o agente DEVE pedir antes de mergear:
 - Mudança em `middleware.ts`, fluxos de auth, schemas do banco com migration, ou pagamentos (RevenueCat/IAP)
