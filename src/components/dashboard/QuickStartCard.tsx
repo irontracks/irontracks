@@ -1,11 +1,12 @@
 'use client'
 
 import React, { memo, useCallback, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronRight, Dumbbell, Loader2, Play } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Dumbbell, Loader2, Play, X } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { estimateWorkoutMinutes } from '@/utils/workout/estimateDuration'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 type QuickStartCardProps = {
     workouts: DashboardWorkout[]
@@ -59,8 +60,37 @@ function Corpo({ onClick, ariaLabel, children }: { onClick?: () => void; ariaLab
     )
 }
 
+/**
+ * Chave da dispensa do card "Treino concluído hoje". Guarda o DIA (BRT), não um
+ * booleano: assim a dispensa vale só para hoje e o card volta amanhã sozinho,
+ * sem precisar de limpeza agendada.
+ */
+const CHAVE_DISPENSA = 'it.trainedCard.dismissed'
+
 function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQuickView, trainedToday }: QuickStartCardProps) {
     const [iniciando, setIniciando] = useState(false)
+    const [concluidoDispensado, setConcluidoDispensado] = useState(() => {
+        // No servidor não há storage — e este ramo só é alcançado depois que
+        // `trainedToday` resolve no cliente, então não há HTML do servidor com
+        // este card para divergir na hidratação.
+        if (typeof window === 'undefined') return false
+        try {
+            return window.localStorage.getItem(CHAVE_DISPENSA) === brtDateKey()
+        } catch {
+            return false
+        }
+    })
+
+    const dispensarConcluido = useCallback(() => {
+        triggerHaptic('light').catch(() => { })
+        setConcluidoDispensado(true)
+        try {
+            window.localStorage.setItem(CHAVE_DISPENSA, brtDateKey())
+        } catch {
+            // Storage bloqueado: some nesta sessão e volta no próximo boot.
+            // Perder a dispensa é melhor que não deixar dispensar.
+        }
+    }, [])
 
     const alvo = useMemo(() => {
         const lista = (Array.isArray(workouts) ? workouts : []).filter((w) => !w?.archived_at)
@@ -97,16 +127,34 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
     // O card abaixo mantém o topo falando de treino e, de quebra, responde a
     // pergunta que o sumiço do botão cria ("cadê o iniciar?").
     if (trainedToday) {
-        if (!alvo) return null
+        if (!alvo || concluidoDispensado) return null
         return (
             <div className="mb-3 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-emerald-300">Treino concluído hoje</p>
                     <p className="text-[11px] leading-snug text-neutral-400">
                         Sua sessão já está no histórico.
                     </p>
                 </div>
+                {/* Dispensar. Este card informa uma vez e, dali até a virada do
+                    dia, é só ocupação do espaço mais nobre da tela. Some até
+                    amanhã — não para sempre: a informação continua verdadeira
+                    todo dia em que houver treino, e sumir de vez faria o topo
+                    voltar a ficar órfão. */}
+                <button
+                    type="button"
+                    onClick={dispensarConcluido}
+                    aria-label="Dispensar aviso de treino concluído"
+                    // 44pt de alvo (h-11 w-11) com margem negativa para não
+                    // inflar o card — seria incoerente sair de uma auditoria de
+                    // acessibilidade criando um alvo de 36. `neutral-400` pelo
+                    // mesmo motivo: 500 passa o mínimo de ícone (3:1), mas é a
+                    // faixa que acabamos de tirar dos textos.
+                    className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition-transform hover:text-neutral-200 active:scale-90"
+                >
+                    <X size={16} />
+                </button>
             </div>
         )
     }
