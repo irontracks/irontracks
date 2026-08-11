@@ -104,4 +104,23 @@ describe('o relatório tem para onde ir', () => {
     expect(read(join('src', 'app', CSP_REPORT_PATH.replace(/^\//, ''), 'route.ts')))
       .toMatch(/MAX_REPORTS_PER_INSTANCE/)
   })
+
+  // O Sentry sozinho não responde a pergunta de quem decide: o token não existe
+  // neste repo, então a pista fica ilegível justamente de onde se investiga.
+  // Mesma lição que gerou `api/diag/live-activity` em ago/2026.
+  it('grava também em audit_events, que é consultável por SQL', () => {
+    const src = read(join('src', 'app', CSP_REPORT_PATH.replace(/^\//, ''), 'route.ts'))
+    expect(src).toMatch(/from\('audit_events'\)\.insert/)
+    expect(src).toMatch(/action: 'csp_violation'/)
+    expect(src).toMatch(/createAdminClient/)
+  })
+
+  // Rota pública que ESCREVE no banco: o navegador posta sem sessão, então não
+  // dá para exigir auth — os freios têm que ser outros.
+  it('a rota pública tem rate limit, dedupe e teto de linhas', () => {
+    const src = read(join('src', 'app', CSP_REPORT_PATH.replace(/^\//, ''), 'route.ts'))
+    expect(src).toMatch(/checkRateLimitAsync/)
+    expect(src).toMatch(/seen\.has\(key\)/)
+    expect(src).toMatch(/MAX_AUDIT_ROWS_PER_INSTANCE/)
+  })
 })
