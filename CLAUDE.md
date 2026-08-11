@@ -208,6 +208,26 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 2. **ESLint (comando exato):** `node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0` — output vazio = limpo. Em worktree, ver Gotchas.
 3. **`npm run test:unit`** se tocou lógica de negócio; **`npm run test:smoke`** se tocou rotas ou APIs.
 
+## Regra da hierarquia — um fato, um lugar (ago/2026)
+**Antes de mexer em qualquer card que MOSTRE DADOS, leia `docs/DESIGN_HIERARCHY.md`.**
+
+A regra em uma linha: **um fato aparece uma vez, cada bloco tem UM destaque, e o
+destaque é o número acionável** ("faltam 97 g", não "111 g consumidos").
+
+Ela nasceu porque o mesmo defeito apareceu **quatro vezes** na auditoria de
+design de ago/2026 — barras de macro, heatmap, card de lançamento e hero de
+calorias —, sempre com o dado duplicado ganhando MAIS peso que o original, e
+sempre com o número que o usuário procura no menor tipo da tela. Não foi
+descuido de ninguém: a regra não estava escrita, então cada card resolveu a
+hierarquia por conta própria.
+
+`src/__tests__/designHierarchyRatchet.test.ts` faz valer a parte mecânica
+(imprimir como texto o percentual que o próprio componente desenha) e tem
+`EXCECOES` que **só encolhe**. O resto é code review — as três perguntas estão
+no doc. O guard NÃO acusa "mesmo valor duas vezes" de propósito: foi medido,
+produz quase só falso positivo (`.map()`, `aria-valuetext`) e guard que grita no
+lugar errado é afrouxado na primeira semana.
+
 ## Padrão de auditoria (obrigatório fechar com testes)
 **Regra fixa do dono: SEMPRE mirar 100% de cobertura.** Uma auditoria só está concluída quando TODA superfície relacionada foi varrida — inclusive as "menores" (buckets de storage, uploads de avatar/foto, onboarding/access-request, crons, etc.). Nunca deixar uma superfície "de raspão" ou "não abri a fundo": ou varre e confirma sólida, ou reporta o achado. Não encerrar dizendo "falta varrer X" — varrer X.
 
