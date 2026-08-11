@@ -74,7 +74,7 @@ export default function WorkoutHeader() {
 
               {/* Overflow menu */}
               <div className="relative" ref={overflowRef}>
-                <button
+                <button aria-label="Mais opções"
                   type="button"
                   onClick={() => setOverflowOpen(v => !v)}
                   className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"

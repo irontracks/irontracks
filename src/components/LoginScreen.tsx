@@ -704,7 +704,7 @@ const LoginScreen = () => {
                     <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
                             <h3 className="text-lg font-black text-white italic">PEDIR ACESSO</h3>
-                            <button onClick={() => setShowRequestModal(false)} className="text-neutral-400 hover:text-white">
+                            <button aria-label="Fechar" onClick={() => setShowRequestModal(false)} className="text-neutral-400 hover:text-white">
                                 <X size={20} />
                             </button>
                         </div>

@@ -153,7 +153,7 @@ export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps
                     className="w-full h-48 object-cover rounded-lg"
                     unoptimized
                   />
-                  <button
+                  <button aria-label="Remover foto"
                     onClick={() => removePhoto(existingPhoto.id)}
                     className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                   >

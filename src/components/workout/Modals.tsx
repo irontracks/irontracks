@@ -53,7 +53,7 @@ const ExerciseSortRow = ({
       dragControls={dragControls}
       className="rounded-xl bg-neutral-800 border border-neutral-700 p-3 flex items-center gap-3"
     >
-      <button
+      <button aria-label="Arrastar para reordenar"
         type="button"
         onPointerDown={(e) => dragControls.start(e)}
         className="h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 inline-flex items-center justify-center active:scale-95"
@@ -425,7 +425,7 @@ export default function Modals() {
                 <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
                 <div className="text-lg font-black text-white truncate">Adicionar exercício extra</div>
               </div>
-              <button
+              <button aria-label="Fechar"
                 type="button"
                 onClick={() => setAddExerciseOpen(false)}
                 className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"

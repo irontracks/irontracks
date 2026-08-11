@@ -190,7 +190,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
               >
                 <MessageSquare size={12} />
               </button>
-              <button
+              <button aria-label="Editar método"
                 type="button"
                 title={GROUP_METHOD_INFO[effectiveMethod] ?? effectiveMethod}
                 onClick={() => setGroupMethodModal({ key, method: effectiveMethod, weight: weightValue, reps: repsValue, rpe: rpeValue, info: GROUP_METHOD_INFO[effectiveMethod] ?? '', error: '' })}

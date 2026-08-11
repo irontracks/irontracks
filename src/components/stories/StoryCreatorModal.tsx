@@ -417,17 +417,17 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                 </button>
                 {step === 'editor' && (
                     <div className="flex gap-4">
-                        <button onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'text' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
+                        <button aria-label="Texto" onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'text' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
                             <Type size={20} />
                         </button>
-                        <button onClick={() => setActiveTool(activeTool === 'emoji' ? null : 'emoji')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'emoji' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
+                        <button aria-label="Emoji" onClick={() => setActiveTool(activeTool === 'emoji' ? null : 'emoji')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'emoji' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
                             <Smile size={20} />
                         </button>
-                        <button onClick={() => setActiveTool(activeTool === 'filter' ? null : 'filter')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'filter' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
+                        <button aria-label="Filtros" onClick={() => setActiveTool(activeTool === 'filter' ? null : 'filter')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'filter' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
                             <Sparkles size={20} />
                         </button>
                         {mediaType === 'video' && (
-                            <button onClick={() => setActiveTool(activeTool === 'trim' ? null : 'trim')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'trim' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
+                            <button aria-label="Cortar vídeo" onClick={() => setActiveTool(activeTool === 'trim' ? null : 'trim')} className={`p-2 rounded-full backdrop-blur-md ${activeTool === 'trim' ? 'bg-white text-black' : 'bg-black/20 text-white'}`}>
                                 <Scissors size={20} />
                             </button>
                         )}
@@ -514,7 +514,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     onClick={() => { /* Optional: Edit on click */ }}
                                 >
                                     {ov.content}
-                                    <button
+                                    <button aria-label="Remover elemento"
                                         onClick={(e) => { e.stopPropagation(); removeOverlay(ov.id); }}
                                         className="absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 opacity-0 hover:opacity-100 transition-opacity"
                                     >

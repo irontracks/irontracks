@@ -1,50 +1,73 @@
 /**
- * Guard: botão só de ícone precisa de nome acessível.
+ * Guard: botão cujo conteúdo é SÓ ícone precisa de nome acessível.
  *
- * Quem usa VoiceOver ouve "botão" e mais nada — o ícone não fala. Foram 26
- * casos no app em 11/08/2026, quase todos fechar/voltar de modal: o usuário
- * cego encontrava a saída por tentativa e erro.
+ * Quem usa VoiceOver ouve "botão" e mais nada — o ícone não fala. Boa parte dos
+ * casos reais eram fechar/voltar de modal: o usuário cego procurava a SAÍDA por
+ * tentativa e erro.
  *
- * `title` NÃO resolve. Em botão sem texto, o VoiceOver do iOS não o anuncia de
- * forma confiável — e este repo tinha exatamente esse caso no header das
- * Avaliações, com `title="Fechar"` e nenhum `aria-label` (e o title ainda
- * mentia: a ação era voltar).
+ * `title` não resolve: em botão sem texto o VoiceOver do iOS não o anuncia de
+ * forma confiável — e este repo tinha esse caso no header das Avaliações, com
+ * `title="Fechar"` numa ação que era voltar.
  *
- * ## O detector errou duas vezes antes de acertar, e vale saber por quê
- * 1ª versão acusou botões cujo texto vinha de expressão condicional
- * (`{saved ? <>…Salvo</> : 'Salvar'}`) — a regex apagava a expressão inteira
- * junto com o ícone. Corrigido lendo as strings literais de dentro dela.
- * 2ª versão acusou wrappers genéricos (`<button>{children}</button>`,
- * `{action.label}`), onde o nome chega por prop e um `aria-label` fixo seria
- * ERRADO. Corrigido tratando `{ident}` puro como conteúdo dinâmico.
+ * ## Duas lições que este arquivo carrega
  *
- * Guard que grita no lugar errado é afrouxado na primeira semana — por isso as
- * duas correções vieram antes de qualquer `aria-label` ser escrito no app.
+ * **1. O regex `<button([^>]*)>` está ERRADO e não deve voltar.** Ele corta nos
+ * `=>` das arrow functions (`onClick={() => ...}`), então os atributos vinham
+ * truncados e botões com handler inline escapavam da verificação. A primeira
+ * versão deste guard tinha esse furo: acusava 26 casos quando existiam 36.
+ * O parser abaixo anda caractere a caractere respeitando chaves e strings.
+ *
+ * **2. A regra é PRECISA, não heurística.** Três tentativas de adivinhar "tem
+ * texto?" produziram falsos positivos diferentes: botões com texto em expressão
+ * condicional (`{saved ? <>…Salvo</> : 'Salvar'}`), wrappers genéricos
+ * (`<button>{children}</button>`) e rótulos vindos de dado (`{cfg.label}`).
+ * Colar `aria-label` em qualquer um deles seria pior que o problema — rótulo
+ * errado o usuário acredita.
+ * Por isso o guard só acusa o caso em que NÃO HÁ COMO existir nome: o conteúdo
+ * é exclusivamente uma ou mais tags JSX auto-fecháveis de componente.
+ * Conteúdo dinâmico fica de fora de propósito — não é falso negativo, é
+ * abstenção consciente.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = join(__dirname, '..')
-const BOTAO = /<button\b([^>]*)>([\s\S]*?)<\/button>/g
-/** `{children}`, `{label}`, `{action.label}` — o nome vem de fora. */
-const CONTEUDO_DINAMICO = /^\{\s*[A-Za-z_$][\w$]*(\.[\w$]+)*\s*\}$/
 
-/** Tem texto visível? Considera literais dentro de expressões condicionais. */
-function temTextoVisivel(inner: string): boolean {
-  const semComentario = inner.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trim()
-  if (CONTEUDO_DINAMICO.test(semComentario)) return true
+/** Conteúdo que é só `<Icone ... />`, uma ou mais vezes. Nada de texto, nada de `{}`. */
+const SO_ICONES = /^(?:\s*<[A-Z][A-Za-z0-9]*\b[^>]*\/>\s*)+$/
 
-  const literais = [...semComentario.matchAll(/'([^'\\]{2,})'|"([^"\\]{2,})"/g)]
-  const temLiteralDeTexto = literais.some((m) => {
-    const s = m[1] ?? m[2] ?? ''
-    // descarta o que é claramente classe/atributo css
-    return /[A-Za-zÀ-ÿ]/.test(s) && !/^[a-z-]+$/.test(s)
-  })
-  if (temLiteralDeTexto) return true
-
-  const semTags = semComentario.replace(/<[^>]*>/g, '').replace(/\{[^{}]*\}/g, '')
-  return /[A-Za-zÀ-ÿ]{2,}/.test(semTags)
+/**
+ * Percorre a tag `<button …>` respeitando chaves e strings, para não parar no
+ * `>` de uma arrow function. Devolve [atributos, conteúdo].
+ */
+function* botoes(src: string): Generator<{ pos: number; attrs: string; inner: string }> {
+  const abre = /<button\b/g
+  let m: RegExpExecArray | null
+  while ((m = abre.exec(src))) {
+    let i = abre.lastIndex
+    let profundidade = 0
+    let aspas: string | null = null
+    while (i < src.length) {
+      const c = src[i]
+      if (aspas) {
+        if (c === aspas && src[i - 1] !== '\\') aspas = null
+      } else if (c === '"' || c === "'" || c === '`') {
+        aspas = c
+      } else if (c === '{') profundidade++
+      else if (c === '}') profundidade--
+      else if (c === '>' && profundidade === 0) {
+        const fim = src.indexOf('</button>', i)
+        yield {
+          pos: m.index,
+          attrs: src.slice(abre.lastIndex, i),
+          inner: fim > 0 ? src.slice(i + 1, fim) : '',
+        }
+        break
+      }
+      i++
+    }
+  }
 }
 
 const arquivos = readdirSync(ROOT, { recursive: true, encoding: 'utf8' })
@@ -56,24 +79,30 @@ describe('nome acessível em botão só de ícone', () => {
     expect(arquivos.length).toBeGreaterThan(50)
   })
 
+  it('o parser não para no "=>" de arrow function', () => {
+    // Sem isto o guard volta a ter o furo que deixou 10 botões passarem.
+    const amostra = `<button onClick={() => setOpen(true)} aria-label="Abrir"><X /></button>`
+    const [b] = [...botoes(amostra)]
+    expect(b.attrs).toContain('aria-label="Abrir"')
+    expect(b.inner.trim()).toBe('<X />')
+  })
+
   it('nenhum botão só de ícone fica sem aria-label', () => {
     const infratores: string[] = []
     for (const rel of arquivos) {
       const src = readFileSync(join(ROOT, rel), 'utf8')
       if (!src.includes('<button')) continue
-      for (const m of src.matchAll(BOTAO)) {
-        const [, attrs, inner] = m
-        if (attrs.includes('aria-label') || attrs.includes('aria-labelledby')) continue
-        if (temTextoVisivel(inner)) continue
-        const linha = src.slice(0, m.index).split('\n').length
-        infratores.push(`${rel}:${linha}`)
+      for (const { pos, attrs, inner } of botoes(src)) {
+        if (/aria-(label|labelledby)/.test(attrs)) continue
+        if (!SO_ICONES.test(inner.replace(/\{\/\*[\s\S]*?\*\/\}/g, ''))) continue
+        infratores.push(`${rel}:${src.slice(0, pos).split('\n').length}`)
       }
     }
     expect(
       infratores,
-      'Botão sem texto precisa de aria-label — quem usa leitor de tela só ouve ' +
-        '"botão". `title` não substitui: não é anunciado de forma confiável em ' +
-        'botão sem texto no VoiceOver do iOS.',
+      'Botão cujo conteúdo é só ícone precisa de aria-label — quem usa leitor ' +
+        'de tela ouve apenas "botão". `title` não substitui: não é anunciado de ' +
+        'forma confiável em botão sem texto no VoiceOver do iOS.',
     ).toEqual([])
   })
 })
