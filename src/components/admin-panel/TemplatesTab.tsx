@@ -98,14 +98,14 @@ export const TemplatesTab: React.FC = () => {
                             >
                                 <Users size={14} /> Aplicar a alunos
                             </button>
-                            <button
+                            <button aria-label="Editar modelo"
                                 onClick={() => setEditingTemplate(t)}
                                 className="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors"
                                 title="Editar"
                             >
                                 <Edit size={14} />
                             </button>
-                            <button
+                            <button aria-label="Excluir modelo"
                                 onClick={() => handleDeleteTemplate(t.id)}
                                 className="p-2 bg-neutral-800 hover:bg-red-500/10 hover:text-red-500 text-neutral-400 rounded-lg transition-colors"
                                 title="Excluir"

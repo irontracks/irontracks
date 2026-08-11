@@ -341,8 +341,8 @@ export const StudentWorkoutsTab: React.FC = () => {
                                 <p className="text-xs text-neutral-400">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
-                                <button
+                                <button aria-label="Editar treino" onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
+                                <button aria-label="Excluir treino"
                                     disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                                     onClick={async (e) => {
                                         e.stopPropagation();
@@ -387,8 +387,8 @@ export const StudentWorkoutsTab: React.FC = () => {
                         <p className="text-xs text-neutral-400">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
-                        <button
+                        <button aria-label="Editar treino" onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
+                        <button aria-label="Excluir treino"
                             disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                             onClick={async (e) => {
                                 e.stopPropagation();

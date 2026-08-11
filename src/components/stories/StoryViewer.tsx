@@ -824,7 +824,7 @@ export default function StoryViewer({
             <div className="flex items-center gap-2">
               {isMine && (
                 <div className="flex flex-col items-center">
-                  <button onClick={() => { setViewersOpen(!viewersOpen); setCommentsOpen(false); if (!viewersOpen) loadViewers(story.id) }} className="w-12 h-12 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white flex items-center justify-center">
+                  <button aria-label="Ver quem assistiu" onClick={() => { setViewersOpen(!viewersOpen); setCommentsOpen(false); if (!viewersOpen) loadViewers(story.id) }} className="w-12 h-12 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white flex items-center justify-center">
                     <Eye size={20} />
                   </button>
                   <span className="text-[10px] font-bold text-white drop-shadow">{viewCount}</span>
@@ -850,7 +850,7 @@ export default function StoryViewer({
               </div>
 
               <div className="flex flex-col items-center">
-                <button onClick={() => { setCommentsOpen(!commentsOpen); setViewersOpen(false); if (!commentsOpen) loadComments(story.id) }} className="w-12 h-12 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white flex items-center justify-center">
+                <button aria-label="Comentários" onClick={() => { setCommentsOpen(!commentsOpen); setViewersOpen(false); if (!commentsOpen) loadComments(story.id) }} className="w-12 h-12 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white flex items-center justify-center">
                   <MessageCircle size={20} />
                 </button>
                 <span className="text-[10px] font-bold text-white drop-shadow">{story.commentCount}</span>

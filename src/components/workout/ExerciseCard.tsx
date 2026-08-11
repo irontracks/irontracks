@@ -747,7 +747,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               <Plus size={16} />
               <span className="text-sm">Série extra</span>
             </button>
-            <button
+            <button aria-label="Remover exercício"
               type="button"
               onClick={() => {
                 removeExtraSetFromExercise(exIdx);

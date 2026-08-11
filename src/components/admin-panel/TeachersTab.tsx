@@ -293,7 +293,7 @@ export const TeachersTab: React.FC = () => {
             <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
                 {/* Back header */}
                 <div className="flex items-center gap-3">
-                    <button
+                    <button aria-label="Voltar"
                         onClick={() => setSelectedTeacher(null)}
                         className="w-9 h-9 rounded-2xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 hover:border-neutral-600 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
                     >

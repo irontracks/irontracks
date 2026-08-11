@@ -74,7 +74,7 @@ export default function WorkoutFooter() {
     <div className={`fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe ${keyboardOpen ? 'hidden' : ''}`}>
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
-        <button
+        <button aria-label="Descartar treino"
           type="button"
           onClick={async () => {
             if (cancelBusyRef.current) return;

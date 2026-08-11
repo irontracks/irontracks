@@ -224,7 +224,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
             <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden bg-neutral-900">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt="Preview" className="w-full h-full object-cover object-top" />
-              <button
+              <button aria-label="Descartar foto"
                 type="button"
                 onClick={() => { setPreview(null); setFile(null) }}
                 className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
@@ -583,7 +583,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
           {/* Navigation arrows */}
           {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
           <div className="absolute left-2 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
-            <button
+            <button aria-label="Foto anterior"
               type="button"
               onClick={() => {
                 const idx = photos.findIndex((p) => p.id === lightbox.id)
@@ -597,7 +597,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
           </div>
           {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
           <div className="absolute right-2 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
-            <button
+            <button aria-label="Próxima foto"
               type="button"
               onClick={() => {
                 const idx = photos.findIndex((p) => p.id === lightbox.id)

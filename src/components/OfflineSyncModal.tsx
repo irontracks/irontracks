@@ -202,7 +202,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
                             >
                               Retry
                             </button>
-                            <button
+                            <button aria-label="Ver diagnóstico"
                               type="button"
                               disabled={busy}
                               onClick={async () => {

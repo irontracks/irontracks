@@ -181,7 +181,7 @@ export function TeacherStudentWorkout() {
             <span className="text-xs font-black uppercase tracking-widest text-green-400">Ao Vivo</span>
             <span className="text-xs text-neutral-400 font-bold truncate">{workoutName}</span>
           </div>
-          <button
+          <button aria-label="Atualizar"
             type="button"
             onClick={() => void fetchSession()}
             className="p-1.5 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors shrink-0"

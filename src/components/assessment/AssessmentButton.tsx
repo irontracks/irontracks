@@ -205,14 +205,14 @@ export default function AssessmentButton({
   if (variant === 'icon') {
     return (
       <div className={`flex gap-2 ${className}`}>
-        <button
+        <button aria-label="Nova avaliação"
           onClick={handleNewAssessment}
           className="p-2 rounded-xl transition-all active:scale-95 btn-gold-animated"
           title="Nova Avaliação"
         >
           <Plus className="w-4 h-4" />
         </button>
-        <button
+        <button aria-label="Ver histórico"
           onClick={handleViewHistory}
           className="p-2 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/30 transition-all active:scale-95"
           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}

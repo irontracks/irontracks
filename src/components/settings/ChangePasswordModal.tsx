@@ -106,7 +106,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
             </div>
             <h2 id="cp-title" className="text-lg font-black text-white">Trocar Senha</h2>
           </div>
-          <button type="button" onClick={handleClose} className="text-neutral-400 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center">
+          <button aria-label="Fechar" type="button" onClick={handleClose} className="text-neutral-400 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center">
             <X size={18} />
           </button>
         </div>

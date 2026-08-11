@@ -114,7 +114,7 @@ export default function WorkoutRecoveryBanner({ userId }: WorkoutRecoveryBannerP
         </div>
 
         {/* Close button */}
-        <button
+        <button aria-label="Dispensar"
           onClick={dismissRecovery}
           disabled={recovering}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-600 hover:text-neutral-400 transition-colors flex-shrink-0"

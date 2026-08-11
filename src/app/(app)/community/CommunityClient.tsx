@@ -360,7 +360,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   placeholder="Buscar por nome ou tipo (teacher/student)…"
                 />
                 {query && (
-                  <button type="button" onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-200 transition-colors">
+                  <button aria-label="Limpar busca" type="button" onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-200 transition-colors">
                     <X size={14} />
                   </button>
                 )}
