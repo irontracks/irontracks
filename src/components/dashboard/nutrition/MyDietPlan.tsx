@@ -213,7 +213,14 @@ export default function MyDietPlan({
               <button
                 key={`${d.weekday}-${i}`}
                 type="button"
-                onClick={() => setDayIndex(i)}
+                /* `positionedRef` aqui, e não só no efeito: o posicionamento
+                   automático roda quando `days` chega, e o botão já está na
+                   tela nesse instante. Quem tocasse num dia antes de o efeito
+                   rodar era jogado de volta para HOJE, em silêncio — o swap
+                   seguia com o índice errado. Escolha do usuário encerra o
+                   posicionamento automático, que é o que o comentário do efeito
+                   sempre disse. */
+                onClick={() => { positionedRef.current = true; setDayIndex(i) }}
                 aria-pressed={active}
                 className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${
                   active ? 'bg-yellow-500/20 text-yellow-300' : 'text-neutral-400 hover:bg-white/[0.05] hover:text-white'
