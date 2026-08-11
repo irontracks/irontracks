@@ -72,7 +72,7 @@ export default function MuscleBalanceCard() {
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
     >
       {/* Header */}
-      <button
+      <button aria-expanded={expanded}
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"

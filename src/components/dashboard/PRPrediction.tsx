@@ -109,7 +109,7 @@ export default function PRPrediction({
 
   return (
     <div className="rounded-xl bg-gradient-to-r from-amber-950/30 to-neutral-900/60 border border-amber-500/15 overflow-hidden">
-      <button
+      <button aria-expanded={expanded}
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left"

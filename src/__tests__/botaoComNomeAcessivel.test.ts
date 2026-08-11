@@ -106,3 +106,45 @@ describe('nome acessível em botão só de ícone', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * Disclosure inline precisa anunciar se está aberto ou fechado.
+ *
+ * Sem `aria-expanded`, o leitor de tela anuncia "botão Equilíbrio Muscular" e
+ * o usuário não tem como saber se o conteúdo está aberto — nem descobre que
+ * ele existe. Com o atributo, o VoiceOver diz "recolhido"/"expandido".
+ *
+ * ## Por que só 5, se havia 159 candidatos
+ * Dos 159 controles que mexem em estado de abertura, **53 abrem MODAL** — e ali
+ * `aria-expanded` é INCORRETO: modal quer `role="dialog"` e gestão de foco, não
+ * disclosure. Outros são toggles de senha (pedem `aria-pressed` ou rótulo que
+ * muda) e menus (pedem `aria-haspopup` junto).
+ *
+ * Chutar o atributo errado é pior que não ter: o leitor de tela anuncia com
+ * confiança uma informação falsa. Então este guard cobre só o caso inequívoco —
+ * estado literalmente chamado `expanded`, controlando conteúdo na própria tela.
+ * O resto continua reportado, não silenciado.
+ */
+describe('disclosure inline anuncia o estado', () => {
+  const ALVOS = [
+    'components/MuscleBalanceCard.tsx',
+    'components/dashboard/MuscleMapCard.tsx',
+    'components/dashboard/PRPrediction.tsx',
+    'components/dashboard/nutrition/NutritionDayScore.tsx',
+    'components/update/UpdateAvailableBanner.tsx',
+  ]
+
+  it.each(ALVOS)('%s tem aria-expanded ligado ao estado', (rel) => {
+    const src = readFileSync(join(ROOT, rel), 'utf8')
+    expect(src, 'o botão precisa refletir o estado, não um valor fixo')
+      .toMatch(/aria-expanded=\{expanded\}/)
+  })
+
+  it('nenhum deles usa valor literal em vez do estado', () => {
+    for (const rel of ALVOS) {
+      const src = readFileSync(join(ROOT, rel), 'utf8')
+      expect(src).not.toMatch(/aria-expanded=\{(true|false)\}/)
+      expect(src).not.toMatch(/aria-expanded="(true|false)"/)
+    }
+  })
+})
