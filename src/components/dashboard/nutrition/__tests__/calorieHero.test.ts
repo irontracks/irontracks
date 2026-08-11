@@ -103,3 +103,38 @@ describe('hierarquia do card de calorias', () => {
       .toBeGreaterThanOrEqual(4)
   })
 })
+
+/**
+ * "+0 kcal acima" — reportado pelo dono em 11/08/2026, com print da conta dele:
+ * 2848 kcal consumidos, meta 2676. São 172 acima, e a tela dizia ZERO.
+ *
+ * Causa: `remaining` nascia clampado —
+ *   `const remaining = Math.max(0, meta - consumido)`
+ * O clamp existe para o ramo "restantes" (não faz sentido "−172 restantes"),
+ * mas o ramo "acima" lia a MESMA variável. Com a meta estourada o clamp já
+ * tinha apagado a informação: `Math.abs(0)` = 0.
+ *
+ * O sinal de que eram duas contas divergentes estava à vista: `calorieOver`
+ * decide pelo `calorieRatio` (consumido/meta), enquanto o número saía do
+ * `remaining` clampado. Rótulo de um lado, valor do outro.
+ */
+describe('estouro de meta mostra QUANTO estourou', () => {
+  const src = executavel(MIXER)
+
+  it('o excedente não pode sair do valor clampado em zero', () => {
+    // `Math.max(0, ...)` no mesmo valor que alimenta o ramo "acima" é o bug.
+    expect(src).not.toMatch(/\+\{Math\.round\(Math\.abs\(remaining\)\)\}/)
+  })
+
+  it('existe uma grandeza própria para o excedente', () => {
+    expect(src).toMatch(/const excedenteCalorico/)
+    expect(src).toMatch(/\+\{Math\.round\(excedenteCalorico\)\}/)
+  })
+
+  it('o saldo cru é a fonte dos dois ramos — uma conta, não duas', () => {
+    // Rótulo e número tinham origens diferentes; é isso que os realinha.
+    expect(src).toMatch(/const saldoCalorico = safeGoals\.calories - safeNumber\(totals\?\.calories\)/)
+    expect(src).toMatch(/const remaining = Math\.max\(0, saldoCalorico\)/)
+    expect(src).toMatch(/const excedenteCalorico = Math\.max\(0, -saldoCalorico\)/)
+  })
+})
