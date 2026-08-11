@@ -444,7 +444,23 @@ export default function NutritionMixer({
   const calorieRatio = safeGoals.calories > 0 ? safeNumber(totals?.calories) / safeGoals.calories : 0
   const caloriePct = Math.round(clamp01(calorieRatio) * PERCENT_SCALE)
   const calorieOver = safeGoals.calories > 0 && calorieRatio > 1
-  const remaining = Math.max(0, safeGoals.calories - safeNumber(totals?.calories))
+  /**
+   * Saldo CRU — pode ser negativo, e é justamente aí que mora a informação.
+   *
+   * Antes existia só `remaining = Math.max(0, meta - consumido)`. O clamp faz
+   * sentido para "quanto ainda cabe" (não existe "−172 restantes"), mas o ramo
+   * de ESTOURO lia a mesma variável: com a meta ultrapassada o clamp já tinha
+   * apagado o número, e a tela mostrava "+0 kcal acima" — reportado com print
+   * da conta do dono em 11/08/2026 (2848 consumidos, meta 2676, ou seja 172
+   * acima).
+   *
+   * O sinal de que eram duas contas divergentes estava à vista: quem decidia o
+   * RÓTULO era `calorieOver` (via `calorieRatio`), e quem dava o NÚMERO era o
+   * `remaining` clampado. Agora as duas leituras saem do mesmo saldo.
+   */
+  const saldoCalorico = safeGoals.calories - safeNumber(totals?.calories)
+  const remaining = Math.max(0, saldoCalorico)
+  const excedenteCalorico = Math.max(0, -saldoCalorico)
 
   // ── Simulação ao vivo — parser local (base + repertório do usuário), zero
   // latência. Mostra os macros parciais da refeição ENQUANTO o usuário digita,
@@ -837,7 +853,7 @@ export default function NutritionMixer({
             <div>
               {calorieOver ? (
                 <div className="text-2xl font-black tabular-nums leading-none text-red-400">
-                  +{Math.round(Math.abs(remaining))}
+                  +{Math.round(excedenteCalorico)}
                   <span className="ml-1 text-sm font-bold text-red-300/80">kcal acima</span>
                 </div>
               ) : remaining > 0 ? (
