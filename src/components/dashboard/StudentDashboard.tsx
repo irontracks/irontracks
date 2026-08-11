@@ -137,6 +137,19 @@ export default function StudentDashboard(props: Props) {
   const workouts = useMemo(() => Array.isArray(props.workouts) ? props.workouts : [], [props.workouts])
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
   const [toolsOpen, setToolsOpen] = useState(false)
+  /**
+   * Os três atalhos de CRIAR treino (Novo / Express / Cardio) ficam recolhidos
+   * atrás de um botão quando o usuário JÁ TEM treinos montados.
+   *
+   * Eles ocupavam ~220pt antes da lista — para quem tem cinco treinos prontos,
+   * o app oferecia três formas de criar mais um antes de deixar iniciar
+   * qualquer um. Recolhidos, devolvem essa altura à primeira dobra sem sumir:
+   * o botão continua visível, a um toque.
+   *
+   * Com a lista VAZIA nada disso vale — aí criar É a ação primária e os três
+   * seguem abertos e em destaque. Mesma lógica de plano A/B do QuickStartCard.
+   */
+  const [criarAberto, setCriarAberto] = useState(false)
   const [workoutsTab, setWorkoutsTab] = useState<'normal' | 'periodized'>('normal')
   const [showArchived, setShowArchived] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
@@ -447,7 +460,29 @@ export default function StudentDashboard(props: Props) {
 
               <StudentSubscriptionCard />
 
+              {/* Botão fechado — só existe para quem já tem treinos. Dourado
+                  DISCRETO (borda + fundo tênue), não sólido: com treinos
+                  montados, criar deixa de ser a ação primária, e o dourado
+                  cheio pertence a quem é. */}
+              {workouts.length > 0 && !criarAberto && (
+                <button
+                  type="button"
+                  onClick={() => setCriarAberto(true)}
+                  aria-expanded={false}
+                  className="w-full flex items-center justify-between rounded-2xl border border-yellow-500/20 bg-yellow-500/[0.06] px-4 py-3 transition-transform active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus size={16} className="text-yellow-400" strokeWidth={3} />
+                    <span className="text-sm font-black text-white">Criar treino</span>
+                  </span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                    Novo · Express · Cardio
+                  </span>
+                </button>
+              )}
 
+              {(workouts.length === 0 || criarAberto) && (
+                <>
               <button
                 onClick={handleCreateWorkout}
                 disabled={creatingWorkout}
@@ -546,6 +581,20 @@ export default function StudentDashboard(props: Props) {
                     <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
+              )}
+
+              {/* Recolher de volta. Só aparece para quem tem treinos: com a
+                  lista vazia não há para onde recolher — os atalhos são a tela. */}
+              {workouts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCriarAberto(false)}
+                  className="w-full py-1.5 text-[11px] font-bold uppercase tracking-wider text-neutral-500 transition-transform active:scale-95"
+                >
+                  Recolher
+                </button>
+              )}
+                </>
               )}
 
               <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
