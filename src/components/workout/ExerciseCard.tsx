@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
+import { stripRedundantOpening, noteNeedsExpand } from './helpers/exerciseNotePreview';
 import {
   NormalSet,
   RestPauseSet,
@@ -84,6 +85,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   const deloadAlertRaw = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
   const deloadAlert = sessionDeloadAlert ? undefined : deloadAlertRaw;
   const observation = String(ex?.notes || '').trim();
+  // Preview sem a abertura que só repete o título (ver exerciseNotePreview).
+  const notePreview = useMemo(() => stripRedundantOpening(observation, name), [observation, name]);
+  const noteCollapsible = noteNeedsExpand(notePreview);
   const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
   const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
   const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
@@ -113,6 +117,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   // Só aparece em exercício de BARRA: em máquina/cabo/halter não existe anilha por
   // lado, e o ícone seria ruído num header que já tem 6 botões.
   const [plateCalcOpen, setPlateCalcOpen] = useState(false);
+  // Nota recolhida por padrão, e o estado é por CARD: abrir a técnica de um
+  // exercício não deve abrir a dos outros sete.
+  const [noteOpen, setNoteOpen] = useState(false);
   const isBarbell = useMemo(
     () => resolveIncrement(inferEquipmentFromName(name)).equipmentClass === 'barbell',
     [name],
@@ -438,9 +445,38 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               );
             })()}
           </div>
+          {/* Observação do professor — contexto de PREPARAÇÃO, não de execução.
+              Antes vinha sempre aberta, em caixa com borda dourada: seis linhas
+              de texto corrido por exercício empurravam a primeira série para
+              fora da tela, e o dourado (que neste app significa AÇÃO) competia
+              em peso com o botão de concluir. Agora nasce em duas linhas, com
+              régua neutra, e abre sob toque. */}
           {observation ? (
-            <div className="mt-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20 px-3 py-2">
-              <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
+            <div className="mt-2 border-l-2 border-white/10 pl-2.5">
+              <div
+                className={[
+                  'text-[13px] text-neutral-400 leading-relaxed whitespace-pre-wrap',
+                  noteOpen ? '' : 'line-clamp-2',
+                ].join(' ')}
+              >
+                {noteOpen ? observation : notePreview}
+              </div>
+              {noteCollapsible ? (
+                <button
+                  type="button"
+                  aria-expanded={noteOpen}
+                  onClick={(e) => {
+                    // O card inteiro é um role="button" que recolhe o exercício;
+                    // sem parar a propagação, ler a técnica fecharia o exercício.
+                    try { e.preventDefault(); e.stopPropagation(); } catch { }
+                    setNoteOpen((v) => !v);
+                  }}
+                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-neutral-400 active:scale-95 transition-transform"
+                >
+                  {noteOpen ? 'Ocultar' : 'Ver técnica'}
+                  {noteOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+              ) : null}
             </div>
           ) : null}
           {/* Aviso proativo de deload: a análise de estagnação/regressão já existia
