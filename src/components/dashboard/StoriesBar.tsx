@@ -404,28 +404,27 @@ export default function StoriesBar({
         })}
       </div>
 
-      {/* Estado vazio no padrão da Comunidade — o melhor componente do app:
-          ícone, título, explicação e AÇÃO. Aqui era uma frase cinza ensinando um
-          gesto invisível ("segure seu avatar"), que é a pior affordance
-          possível: instrução sobre algo que não se vê. Agora tem botão. */}
+      {/* Estado vazio — UMA LINHA, de propósito.
+          Já foi um card centralizado com ícone em círculo, título, subtítulo e
+          botão sólido dourado: ~167pt de altura. O problema não era ser feio, e
+          sim ONDE ele calha de aparecer. Na aba TREINOS, quando o atalho de
+          iniciar some (usuário já treinou hoje), esse bloco subia para o topo
+          por gravidade — a aba de execução abria convidando a publicar foto, e
+          o primeiro treino só entrava no rodapé da primeira tela.
+          Um estado vazio não deve ter o peso visual de um card cheio: quando
+          não há nada para mostrar, o certo é ocupar pouco. A ação continua a um
+          toque, e o dourado volta a significar só o que é ação primária. */}
       {ordered.length === 0 && !loading && !error ? (
-        <div className="mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 px-4 py-5 text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/10 border border-yellow-500/20">
-            <Camera className="h-5 w-5 text-yellow-500" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-black text-white">Nenhum story ainda</p>
-          <p className="mt-0.5 text-xs text-neutral-400 leading-snug">
-            Publique o seu e apareça para quem te segue.
-          </p>
-          <button
-            type="button"
-            onClick={() => setIsCreatorOpen(true)}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-yellow-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-black active:scale-95 transition-transform hover:bg-yellow-400"
-          >
-            <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-            Publicar story
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsCreatorOpen(true)}
+          className="mt-2 flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left transition-transform active:scale-[0.99]"
+        >
+          <Camera className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+          <span className="text-[12px] text-neutral-400">
+            Nenhum story ainda — <span className="font-bold text-neutral-200">publique o seu</span>
+          </span>
+        </button>
       ) : null}
 
       {open && currentGroup ? (

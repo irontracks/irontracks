@@ -50,9 +50,16 @@ describe('ícones de interface', () => {
 describe('estado vazio dos stories', () => {
     const src = readFileSync(join(SRC, 'components', 'dashboard', 'StoriesBar.tsx'), 'utf8')
 
+    // Casava a string exata "Publicar story". Isso travava a REDAÇÃO, não a
+    // affordance: em 11/08/2026 o estado vazio virou uma linha ("Nenhum story
+    // ainda — publique o seu") e o teste reprovou uma versão que continua
+    // perfeitamente acionável. Agora assere o que importa — que o estado vazio
+    // É um controle de verdade, e não texto morto.
     it('tem ação, não só uma frase', () => {
-        expect(src).toContain('Publicar story')
-        expect(src).toContain('setIsCreatorOpen(true)')
+        const vazio = /ordered\.length === 0 && !loading && !error \? \(([\s\S]*?)\) : null/.exec(src)?.[1] ?? ''
+        expect(vazio, 'bloco do estado vazio não encontrado — o guard perdeu o alvo').not.toBe('')
+        expect(vazio).toMatch(/<button/)
+        expect(vazio).toContain('setIsCreatorOpen(true)')
     })
 
     it('não ensina mais um gesto invisível', () => {

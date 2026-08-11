@@ -76,9 +76,23 @@ describe('quando NÃO aparecer', () => {
      * agora" como primeira coisa da tela. O convite é ruído para quem acabou de
      * terminar — a tela do pós-treino deve ficar limpa.
      */
-    it('some depois da sessão concluída hoje', () => {
-        const { container } = render(
+    // Este caso já exigiu container VAZIO. O invariante que importava — não
+    // empurrar mais treino para quem já treinou — continua valendo e está
+    // assertado abaixo. O que mudou (11/08/2026) foi o que ocupa o espaço:
+    // sumir deixava o topo da aba TREINOS órfão, e quem subia por gravidade era
+    // o estado vazio da barra de stories. Agora o topo informa a conclusão.
+    it('não oferece iniciar depois da sessão concluída hoje — mas o topo não fica órfão', () => {
+        render(
             <QuickStartCard workouts={[treino('A')]} onStartSession={() => { }} trainedToday />,
+        )
+        expect(screen.queryByRole('button', { name: /Treinar agora/i })).not.toBeInTheDocument()
+        expect(screen.getByText(/Treino concluído hoje/i)).toBeInTheDocument()
+    })
+
+    it('sem nenhum treino cadastrado, nem o estado de conclusão aparece', () => {
+        // Quem não tem treino nunca treinou: afirmar conclusão seria mentira.
+        const { container } = render(
+            <QuickStartCard workouts={[]} onStartSession={() => { }} trainedToday />,
         )
         expect(container).toBeEmptyDOMElement()
     })

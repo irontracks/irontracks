@@ -1,7 +1,7 @@
 'use client'
 
 import React, { memo, useCallback, useMemo, useState } from 'react'
-import { ChevronRight, Dumbbell, Loader2, Play } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Dumbbell, Loader2, Play } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { estimateWorkoutMinutes } from '@/utils/workout/estimateDuration'
@@ -87,7 +87,31 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
         onQuickView(alvo)
     }, [alvo, onQuickView])
 
-    if (hasActiveSession || trainedToday || !alvo) return null
+    // Com treino em andamento o topo cala: a resposta está acontecendo na tela.
+    if (hasActiveSession) return null
+
+    // ── Plano B: já treinou hoje ──────────────────────────────────────────────
+    // Antes isto era `return null` junto com os outros casos, e o espaço nobre
+    // ficava órfão — quem ocupava era o estado VAZIO da barra de stories, por
+    // gravidade. Ou seja: a aba TREINOS abria convidando a publicar foto.
+    // O card abaixo mantém o topo falando de treino e, de quebra, responde a
+    // pergunta que o sumiço do botão cria ("cadê o iniciar?").
+    if (trainedToday) {
+        if (!alvo) return null
+        return (
+            <div className="mb-3 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
+                <div className="min-w-0">
+                    <p className="text-sm font-black text-emerald-300">Treino concluído hoje</p>
+                    <p className="text-[11px] leading-snug text-neutral-400">
+                        Sua sessão já está no histórico.
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!alvo) return null
 
     const titulo = String(alvo?.title || 'Treino').trim()
     const ehHoje = isWorkoutToday(titulo)

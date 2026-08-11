@@ -353,6 +353,40 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 2. **ESLint (comando exato):** `node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0` — output vazio = limpo. Em worktree, ver Gotchas.
 3. **`npm run test:unit`** se tocou lógica de negócio; **`npm run test:smoke`** se tocou rotas ou APIs.
 
+## Topo da aba TREINOS — a regra do espaço nobre (11/08/2026, PR #747)
+
+**Quando um card do topo some, ALGUÉM tem que assumir o espaço.** Se ninguém
+assume, quem sobe é o bloco seguinte — e o seguinte raramente é o certo.
+
+Foi o que aconteceu: o `QuickStartCard` devolvia `null` para quem já tinha
+treinado no dia, e o vazio era preenchido por gravidade pelo **estado vazio da
+barra de stories**. Resultado medido no iPhone 17 Pro Max: cabeçalho + abas
+(~190pt) + stories vazio (~167pt) + três CTAs de criação (~220pt) = **cerca de
+dois terços da primeira tela antes do primeiro treino**, numa aba chamada
+TREINOS. A aba de execução abria convidando a publicar foto.
+
+Duas regras que ficam:
+
+1. **Estado vazio não tem o peso de card cheio.** Quando não há nada para
+   mostrar, ocupe pouco. O de stories era ícone em círculo + título + subtítulo
+   + botão sólido dourado; virou uma linha. E **sem dourado** — a cor é da ação
+   primária, não de convite social.
+2. **`return null` num card de topo é uma decisão, não um atalho.** Antes de
+   devolver nada, pergunte o que sobe no lugar.
+
+Detalhes de tipografia do `WorkoutCard` que valem além dele: a linha de meta não
+leva `pr-40` (ela fica ABAIXO do bloco de ações — o padding só estrangulava o
+texto e deixava o separador `·` órfão), e o título não força `uppercase` (custa
+~12% de largura; a assinatura do app é o **peso**, não a caixa). Guards em
+`components/dashboard/__tests__/dashboardTopoTreinos.test.ts`.
+
+**Como desfazer, se o dono não gostar:** tudo entrou em UM commit de squash.
+`git revert <sha do merge do #747>` devolve exatamente o estado anterior, e o
+deploy web leva a reversão a todos os aparelhos no próximo boot — **sem
+TestFlight**, porque o app nativo carrega o front do servidor. Os guards novos
+voltam junto (estão no mesmo commit), então não sobra teste órfão cobrando um
+comportamento revertido.
+
 ## Regra da hierarquia — um fato, um lugar (ago/2026)
 **Antes de mexer em qualquer card que MOSTRE DADOS, leia `docs/DESIGN_HIERARCHY.md`.**
 
