@@ -217,17 +217,57 @@ Fronteira do freio: ao disparar ele apaga só `it.logged_in`, **nunca os cookies
 quando o `userId` não hidrata em 3 s), e ali limpar cookie deslogaria um usuário
 legítimo por causa de conexão ruim.
 
-**⚠️ `middleware.ts` NÃO É CARREGADO** (verificado 10/08/2026, três provas:
-`middleware-manifest.json` vazio, `console.log` no corpo nunca imprime, e
-`www.irontracks.com.br` responde 200 em vez do 307 para o apex que ele faria na
-primeira linha). As rotas vivem em `src/app/`, e nesse layout o Next só
-reconhece `src/middleware.ts` — na raiz é ignorado **em silêncio**. As security
-headers vêm do `async headers()` do `next.config.ts`, e foi isso que mascarou.
-Consequência: **`updateSession()` nunca roda**, ou seja, a renovação de sessão do
-`@supabase/ssr` a cada navegação não existe neste app — suspeita não confirmada
-de ser a razão de sessões morrerem sozinhas. **Mover para `src/` é decisão do
-dono**: liga de uma vez refresh de sessão, o atalho `/` → `/dashboard` e CSP com
-nonce por request, em cima de usuários reais.
+## ⚠️ O middleware NÃO RODA desde 27/02/2026 — e o app está SEM CSP
+
+Verificado em 10–11/08/2026. **Não reinvestigar do zero: as provas estão aqui.**
+
+`middleware.ts` mora na RAIZ, mas as rotas vivem em `src/app/` — nesse layout o
+Next só reconhece `src/middleware.ts`, e na raiz o arquivo é ignorado **em
+silêncio**, sem erro e sem aviso no build. Quatro provas independentes:
+
+* `.next/server/middleware-manifest.json` → `"middleware": {}`
+* `console.log` no corpo da função nunca imprime, nem em dev
+* `https://www.irontracks.com.br/` responde **200** em vez do 307 para o apex,
+  que é a PRIMEIRA coisa que o arquivo faria
+* produção **não devolve header `Content-Security-Policy`** (nem meta tag)
+
+**Linha do tempo (git):**
+
+| Data | Commit | O que houve |
+|---|---|---|
+| 20/02/2026 | `ca3b0575` | `src/middleware.ts` criado, 116 linhas, num commit de **segurança**: `updateSession` + gate 401 nas rotas `/api/` + CSRF por Origin/Referer + CSP com nonce |
+| 27/02/2026 | `ee61f30e` | commit "deploy: 2026-02-27-0925" **renomeia `src/middleware.ts` → `src/proxy.ts`** (`R098`). Middleware desativado. `src/proxy.ts` depois some do repo |
+| 07/03/2026 | `ebfb2606` | "restore all missing root config files … middleware … (deploy fix)" recria como **`middleware.ts` na raiz**, versão reduzida (46 linhas): sem gate de API, sem CSRF, sem lista de rotas públicas. E na raiz não carrega |
+
+Mesmo padrão de perda por reescrita de histórico que sumiu com as tabelas de
+treino em dupla — vale suspeitar dele em qualquer "isso deveria existir e não
+existe" datado de fev–mar/2026.
+
+**O que está de fato quebrado (medido, não presumido):**
+
+1. **Sem CSP em produção há ~6 meses.** `buildCspHeader`/`applySecurityHeaders`
+   (`utils/security/headers.ts`) são usados **exclusivamente** pelo middleware
+   morto. O que sobra vem do `async headers()` do `next.config.ts`:
+   `x-frame-options`, `x-content-type-options`, `referrer-policy`, HSTS — e foi
+   justamente isso que mascarou a ausência, porque a resposta "parece" protegida.
+2. **`updateSession()` nunca roda** — a renovação de sessão do `@supabase/ssr` a
+   cada navegação não existe neste app. Suspeita **não confirmada** de ser a
+   razão de sessões morrerem sozinhas e caírem no ricochete de boot acima.
+3. **`www` não redireciona para o apex.**
+
+**O que NÃO está aberto** (conferido um a um, para ninguém gastar auditoria de
+novo): o gate de API do middleware era defesa em profundidade — **252 das 258
+rotas** validam sozinhas, e as 6 restantes são públicas por desenho ou protegidas
+por outro mecanismo (`requireRoleOrBearer` no `admin/students/assign-teacher`,
+assinatura QStash no `rest/fire`). A CSRF genérica também está mitigada:
+`getSupabaseCookieOptions()` usa `sameSite: 'lax'`, então POST cross-site não
+carrega o cookie de sessão.
+
+**Mover para `src/middleware.ts` é decisão do dono** e merece tarefa própria: liga
+de uma vez o refresh de sessão, o atalho `/` → `/dashboard` e um CSP com nonce por
+request, em cima de usuários reais. Um CSP que nunca rodou em produção quebra
+terceiros silenciosamente (Sentry, Vercel Analytics, RevenueCat) — vai de
+`Content-Security-Policy-Report-Only` primeiro, não direto no modo bloqueante.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
