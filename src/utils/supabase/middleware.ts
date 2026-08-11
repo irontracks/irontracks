@@ -40,6 +40,15 @@ export async function updateSession(request: NextRequest, requestHeaders?: Heade
     },
   })
 
-  await supabase.auth.getUser()
+  // Enquanto o middleware esteve desativado (fev–ago/2026) esta linha era
+  // inofensiva. Agora ela roda em TODA navegação: uma rejeição aqui — Supabase
+  // fora do ar, DNS, timeout — sobe pelo middleware e vira 500 em todas as
+  // páginas do site ao mesmo tempo. Renovar a sessão é MELHOR-ESFORÇO: falhou,
+  // segue sem renovar (o usuário continua com o cookie que já tinha, e as rotas
+  // autenticam por conta própria). Indisponibilidade de terceiro não pode
+  // derrubar o app inteiro.
+  try {
+    await supabase.auth.getUser()
+  } catch { /* melhor-esforço: navegação segue sem o refresh */ }
   return response
 }

@@ -143,17 +143,15 @@ describe('bootBounce — decisão do boot', () => {
 })
 
 describe('fiação — os dois lados do ping-pong usam o freio', () => {
-  // Preventivo: o `middleware.ts` está inerte hoje (mora na raiz, mas o Next só
-  // o carrega em `src/` quando as rotas vivem em `src/app` — ver o aviso no topo
-  // do arquivo). O guard trava a regra para quando ele for ativado, para que
-  // mover o arquivo não ligue o atalho e o loop de servidor no mesmo commit.
-  it('o middleware NÃO reaplica o atalho da raiz quando a volta vem do dashboard', () => {
-    const src = codeOnly(readSource('middleware.ts'))
-    // O atalho existe...
-    expect(src).toMatch(/pathname === ''/)
-    // ...e é condicionado à guarda de ricochete.
-    expect(src).toMatch(/!bouncedFromDashboard/)
-    expect(src).toMatch(/bouncedFromDashboard\s*=/)
+  // O middleware foi ativado em 11/08/2026 (mudou de lugar, da raiz para
+  // `src/`) SEM o atalho `/` → `/dashboard` que existia na versão morta. Aquele
+  // atalho subia só por VER um cookie, sem conferir se valia, e o dashboard
+  // devolvia — ping-pong de SERVIDOR, que nenhum contador do cliente alcança
+  // porque nenhum JS chega a rodar. Este guard impede que ele volte junto.
+  it('o middleware não tem atalho da raiz para o dashboard', () => {
+    const src = codeOnly(readSource('src/middleware.ts'))
+    expect(src).not.toMatch(/pathname === ''/)
+    expect(src).not.toMatch(/pathname = ''/)
   })
 
   it('a raiz confere a sessão no servidor antes de subir', () => {
