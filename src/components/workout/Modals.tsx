@@ -65,7 +65,7 @@ const ExerciseSortRow = ({
         <div className="text-[11px] text-neutral-400">Posição {index + 1}</div>
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <button aria-label="Mover para cima"
           type="button"
           onClick={onMoveUp}
           disabled={!canMoveUp}
@@ -77,7 +77,7 @@ const ExerciseSortRow = ({
         >
           <ArrowUp size={16} />
         </button>
-        <button
+        <button aria-label="Mover para baixo"
           type="button"
           onClick={onMoveDown}
           disabled={!canMoveDown}
@@ -657,7 +657,7 @@ export default function Modals() {
                 <div className="text-lg font-black text-white truncate">Organizar exercícios</div>
                 <div className="text-xs text-neutral-400">Arraste ou use as setas para reordenar.</div>
               </div>
-              <button
+              <button aria-label="Fechar"
                 type="button"
                 onClick={requestCloseOrganize}
                 className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"

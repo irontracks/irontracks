@@ -110,7 +110,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
             <QrCode size={16} className="text-yellow-500" />
             <p className="font-black text-white text-sm">QR Code de Check-in</p>
           </div>
-          <button
+          <button aria-label="Fechar"
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white"

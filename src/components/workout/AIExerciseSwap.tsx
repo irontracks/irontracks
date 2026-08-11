@@ -116,7 +116,7 @@ export default function AIExerciseSwap({
               <p style={{ fontSize: '10px', color: '#737373', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{exerciseName}</p>
             </div>
           </div>
-          <button
+          <button aria-label="Fechar"
             type="button"
             onClick={closeModal}
             style={{ color: '#737373', padding: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '0.5rem' }}

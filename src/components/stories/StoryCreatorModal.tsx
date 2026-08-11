@@ -412,7 +412,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
         >
             {/* Top Bar */}
             <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-                <button onClick={onClose} className="p-2 bg-black/20 rounded-full backdrop-blur-md">
+                <button aria-label="Fechar" onClick={onClose} className="p-2 bg-black/20 rounded-full backdrop-blur-md">
                     <X className="text-white" />
                 </button>
                 {step === 'editor' && (

@@ -395,7 +395,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 pt-safe pb-3 pt-4 border-b border-neutral-800/60 bg-neutral-950/95 backdrop-blur">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={onClose} className="text-neutral-400 hover:text-white">
+          <button aria-label="Voltar" type="button" onClick={onClose} className="text-neutral-400 hover:text-white">
             <ChevronLeft size={22} />
           </button>
           <div>

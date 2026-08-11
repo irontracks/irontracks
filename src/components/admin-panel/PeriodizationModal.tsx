@@ -130,7 +130,7 @@ export const PeriodizationModal: React.FC<Props> = ({ onClose, onCreated }) => {
                 </div>
 
                 <div className="p-4 border-t border-neutral-800">
-                    <button
+                    <button aria-label="Gerar periodização"
                         type="button"
                         onClick={generate}
                         disabled={submitting || !studentId}

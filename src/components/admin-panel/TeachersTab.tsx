@@ -69,7 +69,7 @@ const TeacherCard = ({
                         </div>
                     </div>
                 </div>
-                <button
+                <button aria-label="Editar professor"
                     onClick={onEdit}
                     className="flex-shrink-0 w-8 h-8 rounded-xl bg-neutral-800/80 hover:bg-yellow-500/15 border border-neutral-700/60 hover:border-yellow-500/40 text-neutral-400 hover:text-yellow-400 flex items-center justify-center transition-all duration-200 active:scale-95"
                     title="Editar"

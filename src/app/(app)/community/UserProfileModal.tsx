@@ -77,7 +77,7 @@ export default function UserProfileModal({
         {/* Header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div id="user-profile-title" className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-500">Perfil</div>
-          <button
+          <button aria-label="Fechar"
             type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"

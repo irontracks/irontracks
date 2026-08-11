@@ -285,7 +285,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                             30 Dias
                         </button>
                     </div>
-                    <button onClick={loadStats} disabled={loading} className="p-2 bg-neutral-900 hover:bg-neutral-800 rounded-lg border border-neutral-800 text-neutral-400 hover:text-white disabled:opacity-60">
+                    <button aria-label="Atualizar" onClick={loadStats} disabled={loading} className="p-2 bg-neutral-900 hover:bg-neutral-800 rounded-lg border border-neutral-800 text-neutral-400 hover:text-white disabled:opacity-60">
                         <RefreshCw size={18} />
                     </button>
                     <button onClick={downloadCsv} className="p-2 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-black font-bold flex items-center gap-2">

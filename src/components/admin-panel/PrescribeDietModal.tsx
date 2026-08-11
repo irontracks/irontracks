@@ -127,7 +127,7 @@ export const PrescribeDietModal: React.FC<Props> = ({ onClose, onCreated }) => {
                 </div>
 
                 <div className="p-4 border-t border-neutral-800">
-                    <button
+                    <button aria-label="Prescrever dieta"
                         type="button"
                         onClick={prescribe}
                         disabled={submitting || !studentId}
