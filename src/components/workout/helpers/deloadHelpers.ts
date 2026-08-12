@@ -81,6 +81,49 @@ export const appendDeloadAudit = (entry: unknown, userId?: string | null) => {
     } catch { }
 };
 
+// ─── Sugestão do último treino (o que vira placeholder e, no deload, log) ─────
+
+/** Sugestão crua vinda do histórico, antes de virar texto na tela. */
+export type RawSuggestion = {
+    weight?: number | null
+    reps?: number | null
+    rpe?: number | null
+}
+
+/**
+ * Arredonda a sugestão ANTES de ela virar texto.
+ *
+ * `avgReps` é uma MÉDIA — 58 reps em 3 séries dá 19,333… — e o placeholder a
+ * imprimia crua: "19.33333333333333" no campo de reps do modal de etapas do
+ * Drop-Set (print do dono, 12/08/2026). O mesmo objeto alimenta a série normal
+ * e o rest-pause, então o defeito é da FAMÍLIA, não daquele modal.
+ *
+ * E não é só cosmético: quando o DELOAD é aplicado numa série ainda sem reps,
+ * `buildDeloadPatches` GRAVA `String(suggestion.reps)` no log — o número feio
+ * entraria no `workouts.notes`, no volume e no PDF. (Varri a produção em
+ * 12/08/2026: nenhum log fracionário chegou a ser gravado, mas o caminho
+ * estava aberto.)
+ *
+ * Repetição é contagem: inteiro. Peso admite fração real (2,5 kg) mas não 12
+ * casas — 2 bastam, e não mudam o deload, que rearredonda por `roundToStep`.
+ */
+export const roundSuggestion = (raw: RawSuggestion): RawSuggestion => {
+    const round = (v: number | null | undefined, casas: number): number | null => {
+        // `Number(null)` é 0, e 0 é finito: sem esta guarda, "não sei" virava
+        // um "0 reps" com cara de dado (pego pelo próprio teste desta função).
+        if (v == null) return null
+        const n = Number(v)
+        if (!Number.isFinite(n)) return null
+        const f = 10 ** casas
+        return Math.round(n * f) / f
+    }
+    return {
+        weight: round(raw.weight, 2),
+        reps: round(raw.reps, 0),
+        rpe: round(raw.rpe, 1),
+    }
+}
+
 // ─── Aplicação do deload (núcleo puro) ────────────────────────────────────────
 
 export type DeloadSetInput = {

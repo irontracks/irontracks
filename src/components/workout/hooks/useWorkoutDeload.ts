@@ -57,6 +57,7 @@ import {
   getDeloadReason,
   buildDeloadPatches,
   clampDeloadWeight,
+  roundSuggestion,
 } from '../helpers/deloadHelpers';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
@@ -561,11 +562,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           const setRepsVal = perSetReps[setIdx] ?? fallbackReps;
           const setRpeVal = perSetRpes[setIdx] ?? null;
           if (!setWeight || !Number.isFinite(setWeight) || setWeight <= 0) continue;
-          patch[setKey] = {
+          // Arredonda AQUI, na fonte: este objeto é o placeholder que a tela
+          // imprime e o valor que o deload grava no log (ver roundSuggestion).
+          patch[setKey] = roundSuggestion({
             weight: setWeight,
             reps: setRepsVal ?? null,
             rpe: setRpeVal,
-          };
+          });
         }
       });
 
@@ -754,7 +757,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const nextRpe = rpeBase != null ? rpeBase : (nextWeight || repsBase ? DEFAULT_SUGGESTED_RPE : null);
         const hasSuggestion = nextWeight != null || repsBase != null || nextRpe != null;
         if (hasSuggestion) {
-          entries[setKey] = { weight: nextWeight ?? null, reps: repsBase ?? null, rpe: nextRpe ?? null };
+          // Mesmo motivo do outro caminho: `latestAvgReps` é média e viraria
+          // texto cru no placeholder (e log, no deload). Ver roundSuggestion.
+          entries[setKey] = roundSuggestion({ weight: nextWeight ?? null, reps: repsBase ?? null, rpe: nextRpe ?? null }) as DeloadSetEntries[string];
         }
       }
       const hasEntries = Object.keys(entries).length > 0;
