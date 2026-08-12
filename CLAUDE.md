@@ -485,9 +485,12 @@ O que **não** está feito, para não ser redescoberto nem refeito:
 
 ### Fechado em 12/08/2026
 
-- **Janelas sem semântica** — 11 das 12 ganharam `dialogProps` + `useFocusTrap`
-  + `backdropProps` (PR #779). Sobra 1 em `JANELA_PENDENTE`. Backdrop com
-  `role="button"` virou `presentation`: o véu não é controle.
+- **Janelas sem semântica — ZERADO.** 11 das 12 ganharam `dialogProps` +
+  `useFocusTrap` + `backdropProps` (PR #779); a 12ª (`TeacherChatHost`) é
+  contêiner de tela e foi para `NAO_E_JANELA`. `JANELA_PENDENTE` está **vazia**.
+  Backdrop com `role="button"` virou `presentation`: o véu não é controle.
+  ⚠️ O #779 deixou a 12ª nas DUAS listas — o filtro não quebra com isso, por
+  isso passou despercebido. Hoje um caso do ratchet reprova a duplicata.
 - **Alvo de toque** (PR #778) — 90 botões abaixo de 44pt ganharam `.tap-44`,
   que estende a área pelo `::after` **sem mover pixel**. Nenhum falhava o WCAG
   2.5.8 (24×24): é ergonomia de academia, não conformidade. Guard novo, era a

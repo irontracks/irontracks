@@ -69,7 +69,6 @@ const NAO_E_JANELA: Record<string, string> = {
 
 /** Janelas de verdade que ainda não têm a semântica. SÓ ENCOLHE. */
 const JANELA_PENDENTE = new Set([
-  'components/teacher-area/TeacherChatHost.tsx',
 ])
 const listarTsx = (dir: string): string[] =>
   readdirSync(join(SRC, dir), { withFileTypes: true }).flatMap((e) =>
@@ -118,5 +117,15 @@ describe('ratchet de semântica de janela', () => {
     const vivos = new Set(comOverlay.map((f) => f.rel))
     const fantasmas = [...JANELA_PENDENTE, ...Object.keys(NAO_E_JANELA)].filter((rel) => !vivos.has(rel))
     expect(fantasmas, 'entrada obsoleta — remova').toEqual([])
+  })
+
+  it('nenhuma entrada mora nas DUAS listas', () => {
+    // Pertencer a `JANELA_PENDENTE` e a `NAO_E_JANELA` ao mesmo tempo não quebra
+    // o filtro — e é por isso que passa despercebido. As duas listas dizem
+    // coisas opostas ("falta virar janela" × "não é janela"), então a duplicata
+    // deixa a decisão registrada de forma ambígua e a allowlist vira papel de
+    // parede. Aconteceu em 12/08/2026 ao mover o TeacherChatHost.
+    const duplicadas = [...JANELA_PENDENTE].filter((rel) => rel in NAO_E_JANELA)
+    expect(duplicadas, 'decida: ou falta semântica, ou não é janela').toEqual([])
   })
 })
