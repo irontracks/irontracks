@@ -17,6 +17,7 @@ import { ActiveWorkoutProps } from './workout/types';
 import { logError } from '@/lib/logger';
 import { hasOutdoorCardio, shouldShowCardioPanel } from '@/utils/cardio/outdoorCardio';
 import dynamic from 'next/dynamic';
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false });
 
 export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null; onRevokeControl?: () => void | Promise<void> }) {
@@ -189,7 +190,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               className={[
                 'mx-4 mt-3 w-[calc(100%-2rem)] rounded-2xl border px-3.5 py-3 flex items-center justify-between gap-3 transition-colors',
                 props.settings?.autoLoad
-                  ? 'border-violet-400/20 bg-violet-500/[0.07]'
+                  ? MACHINE_ACCENT.surface
                   : 'border-white/[0.06] bg-white/[0.03]',
               ].join(' ')}
             >
@@ -197,7 +198,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
                 <span className={[
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-colors',
                   props.settings?.autoLoad
-                    ? 'border-violet-400/25 bg-violet-500/15 text-violet-200'
+                    ? MACHINE_ACCENT.surfaceActive
                     : 'border-white/[0.06] bg-white/[0.04] text-neutral-400',
                 ].join(' ')}>
                   <Brain size={15} />
@@ -212,7 +213,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               <span className={[
                 'relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border transition-colors',
                 props.settings?.autoLoad
-                  ? 'bg-violet-500 border-violet-400/40 shadow-[0_0_12px_rgba(139,92,246,0.35)]'
+                  ? MACHINE_ACCENT.toggleOn
                   : 'bg-neutral-800 border-white/[0.08]',
               ].join(' ')}>
                 <span className={[

@@ -21,6 +21,7 @@ import { listActiveWorkouts, type ActiveWorkoutOption } from '@/actions/muscleGa
 import { addExerciseToWorkout } from '@/actions/workoutExercises-actions'
 import { fetchMuscleGap, type MuscleGapResponse, type MuscleGapSuggestion } from '@/lib/api/muscleGap'
 import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 
 interface Props {
     assessmentId: string
@@ -131,7 +132,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
         <div className="rounded-2xl border border-neutral-800 bg-neutral-950 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
                 <div className="flex items-center gap-2 min-w-0">
-                    <Dumbbell className="w-4 h-4 text-purple-300 shrink-0" />
+                    <Dumbbell className={`w-4 h-4 shrink-0 ${MACHINE_ACCENT.icon}`} />
                     <h4 className="text-sm font-black text-white truncate">
                         Ajustar treino · {d?.muscleLabel || muscleLabel}
                     </h4>
@@ -143,7 +144,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
 
             <div className="p-4 space-y-4">
                 {loading ? (
-                    <div className="py-6 flex justify-center"><Loader2 className="w-6 h-6 text-purple-300 animate-spin" /></div>
+                    <div className="py-6 flex justify-center"><Loader2 className={`w-6 h-6 animate-spin ${MACHINE_ACCENT.icon}`} /></div>
                 ) : !state?.ok || !d ? (
                     <p className="text-sm text-red-400">{state?.error || 'Não consegui analisar este grupo.'}</p>
                 ) : (
@@ -277,7 +278,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                         key={w.id}
                                                                         onClick={() => chooseWorkout(w)}
                                                                         disabled={saving}
-                                                                        className="w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left hover:border-purple-400/40 transition disabled:opacity-50"
+                                                                        className={`w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left transition disabled:opacity-50 ${MACHINE_ACCENT.hoverBorder}`}
                                                                     >
                                                                         <span className="text-[13px] text-neutral-200 truncate">{w.name}</span>
                                                                         <span className="text-[11px] text-neutral-400 shrink-0">{w.exerciseCount} ex.</span>
@@ -325,7 +326,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                 <ul className="space-y-1.5">
                                     {(state.techniqueCues ?? []).map((cue, i) => (
                                         <li key={i} className="flex items-start gap-2 text-[13px] text-neutral-300">
-                                            <span className="mt-1 text-purple-300">•</span><span className="leading-snug">{cue}</span>
+                                            <span className={`mt-1 ${MACHINE_ACCENT.icon}`}>•</span><span className="leading-snug">{cue}</span>
                                         </li>
                                     ))}
                                 </ul>

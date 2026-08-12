@@ -3,7 +3,7 @@
 import { memo, useState } from 'react'
 import { X } from 'lucide-react'
 import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
-import { MACRO_COLORS, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { MACRO_COLORS, MACRO_SEGMENT_GAP_PX, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -251,7 +251,13 @@ function NutritionEntryCard({
                   de vermelho —, e o carboidrato era amarelo, enquanto o card
                   Macronutrientes logo acima o desenha em azul. Mesma tela,
                   mesmas categorias, duas codificações. */}
-              <div className="mt-3 h-2.5 rounded-full overflow-hidden flex bg-neutral-800">
+              <div
+                className="mt-3 h-2.5 rounded-full overflow-hidden flex bg-neutral-800"
+                /* O fio do fundo entre segmentos: sem ele, uma refeição sem
+                   carboidrato encosta âmbar em laranja (18,7° de matiz) e os
+                   dois viram uma mancha só. Ver MACRO_SEGMENT_GAP_PX. */
+                style={{ gap: `${MACRO_SEGMENT_GAP_PX}px` }}
+              >
                 {proteinPct > 0 && <div className="h-full" style={{ width: `${proteinPct}%`, backgroundColor: MACRO_COLORS.protein }} />}
                 {carbsPct > 0 && <div className="h-full" style={{ width: `${carbsPct}%`, backgroundColor: MACRO_COLORS.carbs }} />}
                 {fatPct > 0 && <div className="h-full" style={{ width: `${fatPct}%`, backgroundColor: MACRO_COLORS.fat }} />}

@@ -6,6 +6,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
+import { stripDayPrefix } from '@/lib/workout/workoutTitle'
 
 export default function WorkoutHeader() {
   const {
@@ -119,7 +120,9 @@ export default function WorkoutHeader() {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-end gap-2">
-              <div className="font-black text-white truncate tracking-tight">{String(workout?.title || 'Treino')}</div>
+              {/* Sem o prefixo de dia: você já está treinando, e eram esses seis
+                  caracteres que empurravam "Costas + Ombro" para fora. */}
+              <div className="font-black text-white truncate tracking-tight">{stripDayPrefix(workout?.title) || 'Treino'}</div>
               <HeartRateMonitor />
             </div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-0.5">

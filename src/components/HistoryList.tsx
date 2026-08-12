@@ -21,6 +21,7 @@ import { HistoryListProps, WorkoutSummary } from '@/components/historyListTypes'
 import { useHistoryData, toDateMs } from '@/components/history/hooks/useHistoryData';
 import { useHistoryActions } from '@/components/history/hooks/useHistoryActions';
 import { useHistoryPeriodReport } from '@/components/history/hooks/useHistoryPeriodReport';
+import { stripDayPrefix } from '@/lib/workout/workoutTitle'
 
 const HistoryList: React.FC<HistoryListProps> = ({
     user, settings, onViewReport, onResume, onBack, targetId, targetEmail,
@@ -107,7 +108,9 @@ const HistoryList: React.FC<HistoryListProps> = ({
         toggleSelectionMode(); // exits selection mode + clears
     }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const formatHistoryTitle = (t: unknown) => typeof t === 'string' && t ? t : 'Treino';
+    // O prefixo de dia sai: a data completa já aparece na linha logo abaixo,
+    // e dizê-la duas vezes custava o fim do título.
+    const formatHistoryTitle = (t: unknown) => stripDayPrefix(t) || 'Treino';
 
     const formatCompletedAt = (dateValue: unknown) => {
         try {

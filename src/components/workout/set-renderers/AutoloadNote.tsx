@@ -8,6 +8,8 @@
  * 13 vezes — que é exatamente como essa família acumula bug silencioso.
  */
 
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
+
 export function AutoloadNote({
   show,
   rationale,
@@ -33,7 +35,7 @@ export function AutoloadNote({
     <div className={`min-w-0 ${className}`}>
       {rationale ? (
         <div
-          className={`flex items-start gap-1 text-[10px] ${muted ? 'text-neutral-400' : 'text-violet-300/80'}`}
+          className={`flex items-start gap-1 text-[10px] ${muted ? 'text-neutral-400' : MACHINE_ACCENT.text}`}
           title={rationale}
         >
           <span aria-hidden className="leading-4">🧠</span>

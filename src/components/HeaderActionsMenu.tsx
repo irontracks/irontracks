@@ -57,6 +57,27 @@ function IconBox({ children, gold = false }: { children: React.ReactNode; gold?:
   )
 }
 
+/**
+ * Badge de "tem coisa nova" no menu do avatar.
+ *
+ * Era `bg-red-500 text-white`. Vermelho neste app quer dizer ERRO e PERDA —
+ * meta estourada, excluir, falhou. Uma mensagem nova não é nenhuma dessas
+ * coisas, e gastar o vermelho nela é o mesmo defeito que a paleta de macros já
+ * pagou caro: quando tudo é alarme, o alarme não avisa mais nada.
+ *
+ * O dourado é a cor de "olhe aqui" no IronTracks, e este é o badge padrão do
+ * design system. Ele não some de vista: o item do menu só muda de cor no HOVER,
+ * que no celular não existe — em repouso, o badge é o único sinal, e por isso
+ * ele fica, apenas na cor certa.
+ *
+ * O ponto vermelho SOBRE O AVATAR (menu fechado) continua vermelho de
+ * propósito: ali vale a convenção de plataforma que o usuário já traz do iOS,
+ * é o único indicador quando o menu está fechado, e um ponto dourado sobre um
+ * cabeçalho dourado desapareceria.
+ */
+const NOVO_BADGE =
+  'text-[10px] font-bold bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 rounded-full px-2 py-0.5 leading-none'
+
 function MenuItem({
   icon,
   label,
@@ -403,7 +424,7 @@ export default function HeaderActionsMenu({
                 gold={!!hasUnreadNotification}
                 badge={
                   hasUnreadNotification ? (
-                    <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-2 py-0.5 leading-none">
+                    <span className={NOVO_BADGE}>
                       Novo
                     </span>
                   ) : undefined
@@ -416,7 +437,7 @@ export default function HeaderActionsMenu({
                 gold={!!hasUnreadChat}
                 badge={
                   hasUnreadChat ? (
-                    <span className="text-[10px] font-bold bg-red-500 text-white rounded-full px-2 py-0.5 leading-none">
+                    <span className={NOVO_BADGE}>
                       Novo
                     </span>
                   ) : undefined
