@@ -6,16 +6,19 @@ import { ManualExercise, WorkoutLog, WorkoutSummary, isRecord, parseRawSession }
 import { calculateTotalVolumeFromLogs } from './useHistoryData';
 import { buildReportMetrics } from '@/utils/report/reportMetrics';
 import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics';
+import type { KcalProfileLike } from '@/utils/calories/sessionKcalInputs';
 
 interface UseHistoryActionsProps {
     user: { id?: string; role?: string } | null;
+    /** Perfil declarado — entra no rateio de kcal do `reportMeta` recalculado. */
+    settings?: KcalProfileLike | null;
     supabase: SupabaseClient;
     setHistory: React.Dispatch<React.SetStateAction<WorkoutSummary[]>>;
     alert: (msg: string, title?: string) => Promise<unknown>;
     confirm: (msg: string, title?: string) => Promise<boolean>;
 }
 
-export function useHistoryActions({ user, supabase, setHistory, alert, confirm }: UseHistoryActionsProps) {
+export function useHistoryActions({ user, settings, supabase, setHistory, alert, confirm }: UseHistoryActionsProps) {
     // ── Selection mode ───────────────────────────────────────────────────────
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -217,7 +220,7 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
                 totalTime: totalSeconds, realTotalTime: totalSeconds,
                 logs, exercises, notes: editNotes || '',
             };
-            session.reportMeta = buildReportMetrics(session);
+            session.reportMeta = buildReportMetrics(session, null, settings ?? null);
             // As MÉTRICAS OFICIAIS que a IA já tinha gravado viraram passado ao
             // mudar os pesos: re-sincroniza, senão as duas fontes de volume da
             // mesma sessão voltam a divergir (guard volumeSingleSource).

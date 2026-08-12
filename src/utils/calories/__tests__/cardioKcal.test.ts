@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { estimateCardioKcal, isCardioExercise, metForCardio, clampSessionKcal, MAX_SESSION_KCAL } from '../cardioKcal'
 import { estimateSessionKcal, estimateSessionKcalBreakdown } from '../sessionKcal'
+import { sessionKcalInputs } from '../sessionKcalInputs'
+
+const inputs = (profile: { bodyWeightKg?: unknown; biologicalSex?: unknown }) => sessionKcalInputs(null, profile)
 
 describe('clampSessionKcal', () => {
   it('mantém valores válidos (arredondando)', () => {
@@ -68,7 +71,7 @@ const feito = (min: number) => ({ '0-0': { done: true, durationSeconds: min * 60
 describe('estimateCardioKcal', () => {
   it('esteira 10 min, RPE 8, 78 kg, masculino ≈ 94 kcal', () => {
     const session = { exercises: [{ name: 'Esteira', type: 'cardio', reps: 10, rpe: 8 }], logs: feito(10) }
-    const res = estimateCardioKcal(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    const res = estimateCardioKcal(session, inputs({ bodyWeightKg: 78, biologicalSex: 'male' }))
     // met = 6.0 × 1.21 = 7.26 ; kcal = 7.26 × 78 × (10/60) = 94.38
     expect(res.totalKcal).toBe(94)
     expect(res.cardioMinutes).toBe(10)
@@ -77,13 +80,13 @@ describe('estimateCardioKcal', () => {
 
   it('feminino aplica fator de sexo (0.90)', () => {
     const session = { exercises: [{ name: 'Esteira', type: 'cardio', reps: 10, rpe: 8 }], logs: feito(10) }
-    const res = estimateCardioKcal(session, { bodyWeightKg: 78, biologicalSex: 'female' })
+    const res = estimateCardioKcal(session, inputs({ bodyWeightKg: 78, biologicalSex: 'female' }))
     expect(res.totalKcal).toBe(85) // 94.38 × 0.90 = 84.94
   })
 
   it('corrida 30 min RPE 5 ≈ 382 kcal', () => {
     const session = { exercises: [{ name: 'Corrida', type: 'cardio', reps: 30, rpe: 5 }], logs: feito(30) }
-    const res = estimateCardioKcal(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    const res = estimateCardioKcal(session, inputs({ bodyWeightKg: 78, biologicalSex: 'male' }))
     // 9.8 × 78 × 0.5 = 382.2
     expect(res.totalKcal).toBe(382)
   })
@@ -117,7 +120,7 @@ describe('estimateSessionKcal — integração de cardio', () => {
       exercises: [{ name: 'Esteira', type: 'cardio', reps: 10, rpe: 8 }],
       logs: { '0-0': { done: true, durationSeconds: 600 } },
     }
-    const kcal = estimateSessionKcal(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    const kcal = estimateSessionKcal(session, inputs({ bodyWeightKg: 78, biologicalSex: 'male' }))
     expect(kcal).toBe(94)
   })
 
@@ -127,7 +130,7 @@ describe('estimateSessionKcal — integração de cardio', () => {
       exercises: [{ name: 'Corrida', type: 'cardio', reps: 30, rpe: 8 }],
       logs: { '0-0': { done: true, durationSeconds: 1800 } },
     }
-    const kcal = estimateSessionKcal(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    const kcal = estimateSessionKcal(session, inputs({ bodyWeightKg: 78, biologicalSex: 'male' }))
     // Modelo leve (MET 3.5) daria ~136 kcal em 30 min; corrida intensa deve ser bem mais.
     expect(kcal).toBeGreaterThan(300)
   })
@@ -140,7 +143,7 @@ describe('estimateSessionKcalBreakdown', () => {
       exercises: [{ name: 'Esteira', type: 'cardio', reps: 10, rpe: 8 }],
       logs: { '0-0': { done: true, durationSeconds: 600 } },
     }
-    const bd = estimateSessionKcalBreakdown(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    const bd = estimateSessionKcalBreakdown(session, inputs({ bodyWeightKg: 78, biologicalSex: 'male' }))
     expect(bd.cardioTotalKcal).toBe(94)
     expect(bd.cardioPerExerciseKcal[0]).toBe(94)
     expect(bd.strengthKcal).toBe(0) // sessão só de cardio
@@ -153,7 +156,7 @@ describe('estimateSessionKcalBreakdown', () => {
       exercises: [{ name: 'Supino reto', type: 'strength', reps: 10 }],
       logs: { '0-0': { weight: 80, reps: 10, done: true } },
     }
-    const bd = estimateSessionKcalBreakdown(session, { bodyWeightKg: 80, biologicalSex: 'male' })
+    const bd = estimateSessionKcalBreakdown(session, inputs({ bodyWeightKg: 80, biologicalSex: 'male' }))
     expect(bd.cardioTotalKcal).toBe(0)
     expect(bd.total).toBe(bd.strengthKcal)
   })

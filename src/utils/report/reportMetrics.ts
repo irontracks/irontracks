@@ -3,6 +3,7 @@ import type { UnknownRecord } from '@/types/app'
 import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, sessionVolumeKg } from './setVolume'
 import { detectSessionDeload, isDeloadSession, type SessionDeload } from './sessionDeload'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
+import { sessionKcalInputs, type KcalProfileLike } from '@/utils/calories/sessionKcalInputs'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 const isObject = (value: unknown): value is UnknownRecord =>
@@ -437,7 +438,14 @@ export type ReportMetrics = {
   exercises: ReportExerciseMetrics[]
 }
 
-export const buildReportMetrics = (session: UnknownRecord, previousSession?: UnknownRecord | null): ReportMetrics => {
+/**
+ * @param profile perfil declarado do usuário (`snapshot.profile`). Sem ele, o
+ *   rateio de kcal por exercício cai no peso default enquanto o card do
+ *   relatório usa o peso real — e as parcelas deixam de somar o total exibido
+ *   (era o efeito do `{}` que ficava aqui: 491 das 596 sessões em produção não
+ *   têm peso no check-in, então o fallback da sessão não salvava esses casos).
+ */
+export const buildReportMetrics = (session: UnknownRecord, previousSession?: UnknownRecord | null, profile?: KcalProfileLike | null): ReportMetrics => {
   const exercises = Array.isArray(session.exercises) ? (session.exercises as unknown[]) : []
   const logs = isObject(session.logs) ? (session.logs as UnknownRecord) : {}
   const prevMap = previousSession && isObject(previousSession) ? buildPrevByExercise(previousSession) : null
@@ -532,7 +540,7 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
   // FORÇA é rateada entre os demais por tempo/volume. Σ = total exibido.
   // (cardioPerExerciseKcal é keyed por índice de session.exercises = order-1.)
   try {
-    const bd = estimateSessionKcalBreakdown(session, {})
+    const bd = estimateSessionKcalBreakdown(session, sessionKcalInputs(session, profile))
     if (bd.total > 0 && metrics.length > 0) {
       const perExercise = distributeKcalWithFixed(
         metrics.map((m) => ({

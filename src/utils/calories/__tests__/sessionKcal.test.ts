@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { estimateSessionKcal, estimateSessionKcalBreakdown } from '../sessionKcal'
+import { sessionKcalInputs } from '../sessionKcalInputs'
+
+/** Ingredientes de teste: passa pelo MESMO leitor único que a produção usa. */
+const inputs = (profile?: { bodyWeightKg?: unknown; biologicalSex?: unknown }, session: unknown = null) =>
+  sessionKcalInputs(session, profile ?? null)
 
 // Sessão sintética: ~60 min, volume moderado, 2 exercícios.
 const session = {
@@ -17,33 +22,33 @@ const session = {
 
 describe('estimateSessionKcal', () => {
   it('returns a realistic kcal for a strength session', () => {
-    const kcal = estimateSessionKcal(session, { bodyWeightKg: 90, biologicalSex: 'male' })
+    const kcal = estimateSessionKcal(session, inputs({ bodyWeightKg: 90, biologicalSex: 'male' }))
     expect(kcal).toBeGreaterThan(150)
     expect(kcal).toBeLessThan(900)
   })
 
   it('scales with body weight', () => {
-    const light = estimateSessionKcal(session, { bodyWeightKg: 60, biologicalSex: 'male' })
-    const heavy = estimateSessionKcal(session, { bodyWeightKg: 110, biologicalSex: 'male' })
+    const light = estimateSessionKcal(session, inputs({ bodyWeightKg: 60, biologicalSex: 'male' }))
+    const heavy = estimateSessionKcal(session, inputs({ bodyWeightKg: 110, biologicalSex: 'male' }))
     expect(heavy).toBeGreaterThan(light)
   })
 
   it('applies the female correction (lower than male, same body weight)', () => {
-    const male = estimateSessionKcal(session, { bodyWeightKg: 70, biologicalSex: 'male' })
-    const female = estimateSessionKcal(session, { bodyWeightKg: 70, biologicalSex: 'female' })
+    const male = estimateSessionKcal(session, inputs({ bodyWeightKg: 70, biologicalSex: 'male' }))
+    const female = estimateSessionKcal(session, inputs({ bodyWeightKg: 70, biologicalSex: 'female' }))
     expect(female).toBeLessThan(male)
   })
 
   it('falls back to pre-checkin body weight when profile weight is absent', () => {
     const withPreCheckin = { ...session, preCheckin: { weight: '95' } }
-    const kcal = estimateSessionKcal(withPreCheckin, {})
+    const kcal = estimateSessionKcal(withPreCheckin, inputs(null, withPreCheckin))
     expect(kcal).toBeGreaterThan(150)
   })
 
   it('returns 0 for empty / invalid sessions', () => {
-    expect(estimateSessionKcal(null)).toBe(0)
-    expect(estimateSessionKcal({})).toBe(0)
-    expect(estimateSessionKcal({ totalTime: 0, logs: {} })).toBe(0)
+    expect(estimateSessionKcal(null, inputs())).toBe(0)
+    expect(estimateSessionKcal({}, inputs())).toBe(0)
+    expect(estimateSessionKcal({ totalTime: 0, logs: {} }, inputs())).toBe(0)
   })
 })
 
@@ -77,7 +82,7 @@ const withClass = {
   exercises: [...strengthPart.exercises, fitDance],
   logs: { ...strengthPart.logs, ...aulaFeita(2) },
 }
-const opts = { bodyWeightKg: 65, biologicalSex: 'female' }
+const opts = inputs({ bodyWeightKg: 65, biologicalSex: 'female' })
 
 describe('estimateSessionKcalBreakdown — aula de cardio maior que a sessão', () => {
   it('NÃO zera a musculação quando a aula não cabe na duração registrada', () => {

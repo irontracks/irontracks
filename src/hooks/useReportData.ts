@@ -19,6 +19,7 @@ import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/forma
 import { isSetCompleted } from '@/utils/report/setCompletion'
 import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { sessionKcalInputs, type KcalProfileLike, type SessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -90,6 +91,8 @@ export interface UseReportDataReturn {
   volumeDelta: number
   volumeDeltaAbs: number
   calories: number
+  /** Ingredientes já resolvidos — o PDF recebe ESTES, não remonta os seus. */
+  kcalInputs: SessionKcalInputs
   outdoorBike: AnyObj | null
   cardioGps: AnyObj | null
   // Set completion
@@ -323,33 +326,13 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   })
   const cardioGps = cardioGpsQuery.data ?? null
 
-  // Body weight from pre-workout check-in (answers.body_weight_kg), falls back to 75 kg default
-  const preCheckinAnswers = (() => {
-    const pc = preCheckin && typeof preCheckin === 'object' ? (preCheckin as AnyObj) : null
-    if (!pc) return null
-    return pc?.answers && typeof pc.answers === 'object' ? (pc.answers as AnyObj) : null
-  })()
-  const checkinBodyWeightKg = (() => {
-    // Priority: 1. check-in answers, 2. pre-checkin session weight, 3. profile bodyWeightKg
-    const fromAnswers = Number(preCheckinAnswers?.body_weight_kg)
-    if (Number.isFinite(fromAnswers) && fromAnswers >= 20 && fromAnswers <= 300) return fromAnswers
-    const fromSession = Number((safeSession?.preCheckin as AnyObj)?.weight ?? (safeSession?.preCheckin as AnyObj)?.body_weight_kg)
-    if (Number.isFinite(fromSession) && fromSession >= 20 && fromSession <= 300) return fromSession
-    // Fallback: use profile bodyWeightKg for users who completed their profile (no need to ask weight at check-in)
-    const fromProfile = Number(settings?.bodyWeightKg)
-    if (Number.isFinite(fromProfile) && fromProfile >= 20 && fromProfile <= 300) return fromProfile
-    return null
-  })()
-
-  // RPE from post-workout check-in (answers.rpe) — used to scale MET ±15%
-  const postCheckinRpe = (() => {
-    const pc = postCheckin && typeof postCheckin === 'object' ? (postCheckin as AnyObj) : null
-    if (!pc) return null
-    const answers = pc?.answers && typeof pc.answers === 'object' ? (pc.answers as AnyObj) : null
-    const rpe = answers?.rpe ?? pc?.rpe
-    const n = Number(rpe)
-    return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
-  })()
+  // Ingredientes da kcal: UMA resolução, a mesma que a nutrição e o PDF usam.
+  // Antes esta tela resolvia peso/RPE por conta própria e a aba Nutrição fazia o
+  // seu — daí os 744 × 698 kcal na MESMA sessão (12/08/2026).
+  const kcalInputs = useMemo(
+    () => sessionKcalInputs(safeSession, settings as KcalProfileLike | null, { preCheckin, postCheckin }),
+    [safeSession, settings, preCheckin, postCheckin],
+  )
 
   // ── Calorias: modelo UNIFICADO (força + cardio) ─────────────────────────
   // Antes esta tela usava estimateCaloriesMet (SÓ força) — o PDF, a nutrição e o
@@ -359,12 +342,8 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const calories = useMemo(() => {
     const bikeKcal = clampSessionKcal(outdoorBike?.caloriesKcal)
     if (bikeKcal > 0) return bikeKcal
-    return estimateSessionKcal(safeSession, {
-      bodyWeightKg: checkinBodyWeightKg,
-      biologicalSex: typeof settings?.biologicalSex === 'string' ? settings.biologicalSex : null,
-      rpe: postCheckinRpe,
-    })
-  }, [safeSession, checkinBodyWeightKg, settings?.biologicalSex, postCheckinRpe, outdoorBike])
+    return estimateSessionKcal(safeSession, kcalInputs)
+  }, [safeSession, kcalInputs, outdoorBike])
 
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
@@ -529,7 +508,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     postCheckin,
     aiState, setAiState,
     applyState, setApplyState,
-    sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike, cardioGps,
+    sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, kcalInputs, outdoorBike, cardioGps,
     setsCompleted, setsPlanned, setCompletionPct,
     reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
     prevLogsMap, prevBaseMsMap,

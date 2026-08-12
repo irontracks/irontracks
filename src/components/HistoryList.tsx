@@ -43,7 +43,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
     } = data;
 
     // ── Actions hook ─────────────────────────────────────────────────────────
-    const actions = useHistoryActions({ user, supabase, setHistory: data.setHistory, alert, confirm });
+    const actions = useHistoryActions({ user, settings, supabase, setHistory: data.setHistory, alert, confirm });
     const {
         isSelectionMode, selectedIds,
         toggleSelectionMode, toggleItemSelection, handleBulkDelete,

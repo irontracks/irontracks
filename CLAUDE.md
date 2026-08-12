@@ -63,33 +63,43 @@ scripts/        # Scripts de build e utilitários
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
-> ⚠️ **ABERTO (12/08/2026) — o mesmo treino mostra DOIS números de caloria.**
-> Relatado com print pelo dono: **~698 kcal** no card "Treino hoje" da aba
-> Nutrição e **~744 kcal** no card CALORIAS do relatório. Mesma sessão.
->
-> **Causa confirmada por leitura de código (não é hipótese):** a fonte única
-> existe na CONTA, não nos INGREDIENTES. São **7 chamadores** de
-> `estimateSessionKcal` e cada um monta os argumentos por conta própria:
->
-> | chamador | peso | RPE |
-> |---|---|---|
-> | `hooks/useReportData.ts:362` (relatório) | do **check-in** do dia | **passa** |
-> | `NutritionOverlay.tsx:147` (aba nutrição) | do **perfil** | não passa |
-> | `app/(app)/dashboard/nutrition/page.tsx:184` | do perfil | não passa |
-> | `utils/report/reportMetrics.ts:535` | **`{}`** → cai no `DEFAULT_BODY_WEIGHT_KG = 78` | não passa |
-> | `utils/report/buildHtml.ts:120` (PDF) | o que o chamador passar | idem |
->
-> O RPE é multiplicador do modelo MET: 744 ÷ 698 = **1,066**, a ordem de
-> grandeza exata do fator. Efeito colateral do `{}` no `reportMetrics`: o
-> rateio POR EXERCÍCIO usa 78 kg enquanto o total do card usa o peso real —
-> **as parcelas não somam o total exibido**.
->
-> **Correção certa:** um leitor único dos ingredientes — `sessionKcalInputs(session, user)`
-> resolvendo peso (check-in > perfil > default), sexo e RPE UMA vez, com os 7
-> chamadores consumindo dele, e guard proibindo objeto literal fora do módulo.
-> **Não basta adicionar `rpe` na chamada da nutrição**: isso alinha os dois
-> números de hoje e deixa os outros cinco esperando a próxima divergência.
-> Mesmo enredo do `userSnapshot` e do `macroColors`.
+**Os INGREDIENTES da kcal têm fonte única: `utils/calories/sessionKcalInputs.ts`**
+(corrigido em 12/08/2026). O modelo MET sempre foi um só — o que divergia eram os
+ARGUMENTOS: o relatório passava peso do check-in **e RPE**, a nutrição passava só
+o peso do perfil, e o `reportMetrics` passava `{}`. Na mesma sessão do dono:
+**744 kcal no relatório × 698 na aba Nutrição**, e 744 ÷ 698 = **1,066** — o
+multiplicador de RPE do modelo, medido, não estimado.
+
+`sessionKcalInputs(session, profile, checkins?)` resolve UMA vez:
+**peso** = check-in da tabela > check-in embutido na sessão > perfil > default ·
+**sexo** = perfil > sessão · **RPE** = pós-treino (tabela > embutido). O
+`SessionKcalInputs` é **branded**: objeto literal não compila, então chamador
+novo não reinventa a ordem. Os 7 chamadores consomem dele; `buildReportMetrics`
+e `useHistoryActions` ganharam o parâmetro `profile`, e a rota `workouts/finish`
+lê o perfil pelo `userSnapshot`. O PDF recebe os ingredientes **prontos** da tela
+(`opts.kcalInputs`) — não pode discordar do card que o usuário acabou de ver.
+
+**Duas coisas que a nota anterior errava, para ninguém repetir a conta:** (1) o
+`{}` do `reportMetrics` **não caía sempre em 78 kg** — `estimateSessionKcal` já
+tinha fallback para o `preCheckin` da sessão, então nas 105 sessões com peso no
+check-in o peso saía certo e só o RPE faltava; nas **491 de 596** sem esse
+campo, aí sim o rateio por exercício usava 78 kg contra o peso real do card e as
+parcelas não somavam o total. (2) O RPE está **dentro do JSON da sessão**
+(`postCheckin.rpe`, conferido no banco), e é por isso que a nutrição alcança o
+número do relatório sem ir buscar check-in nenhum.
+
+Guards em `utils/calories/__tests__/sessionKcalInputs.test.ts`: precedências,
+fiação (as três superfícies no mesmo número) e source-guard que reprova objeto
+literal como 2º argumento — o parser anda caractere a caractere porque
+`[^;]*?` atravessa a chamada inteira em arquivo sem ponto-e-vírgula e acusa o
+`{` de outra linha. Provados por mutação (literal na nutrição, RPE amputado,
+precedência invertida → vermelho nos três).
+
+**Dívida conhecida, pequena:** o `reportMeta.exercises[].caloriesKcal` **gravado**
+nas sessões antigas ficou com o rateio velho. A tela do relatório não usa esse
+campo (redistribui o total exibido), mas o **story de treino** usa — sessão
+antiga compartilhada mostra o rateio antigo até ser regravada. Não vale migração
+de 596 linhas.
 
 **Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`) — hoje pelo **`userSnapshot`** (ver abaixo), não cada uma por conta. Ao mexer em meta/nutrição, ajuste as DUAS. **O overlay renderiza o MESMO `NutritionMixer`** — ou seja, todo card da página existe também no app nativo; a exceção continua sendo a navegação até a página, que só a web tem.
 
@@ -460,20 +470,18 @@ caso, e é assim que ele avisa que a decisão está sendo revertida de propósit
 Lista curta do que **não** está feito, para não ser redescoberto nem refeito.
 Ordem de impacto:
 
-1. **Divergência de calorias** — ver o aviso na seção Calorias. É o único com
-   sintoma visível para o usuário.
-2. **12 janelas sem semântica** — `JANELA_PENDENTE` em
+1. **12 janelas sem semântica** — `JANELA_PENDENTE` em
    `src/__tests__/modalDialogRatchet.test.ts`. A triagem já foi feita: as 21
    entradas de `NAO_E_JANELA` (splash, telas, `role="menu"`, barra do descanso)
    **não devem** virar `dialog`. Padrão pronto em `workout/Modals.tsx`.
-3. **47 textos corridos em 9px** (ver piso tipográfico).
-4. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08.
-5. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram o
+2. **47 textos corridos em 9px** (ver piso tipográfico).
+3. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08.
+4. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram o
    X corrigido e provado por TESTE, mas **nunca foram tocados na tela**. A
    navegação por coordenadas no treino ativo é cara e arriscada (já concluiu
    série e apagou outra por engano). Se for verificar, use o iPhone do dono: abrir
    um exercício em Drop-Set e tocar no X **no centro do ícone**.
-6. **Ordem de foco e agrupamento nas telas logadas** — genuinamente bloqueado
+5. **Ordem de foco e agrupamento nas telas logadas** — genuinamente bloqueado
    daqui. Exige Accessibility Inspector (acesso negado 2×) ou o dono no iPhone.
    **Não gaste tempo tentando VoiceOver no Simulador: ele não existe lá.**
 

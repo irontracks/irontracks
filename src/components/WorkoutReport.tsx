@@ -109,7 +109,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         postCheckin: rawPostCheckin,
         aiState, setAiState,
         applyState, setApplyState,
-        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike, cardioGps,
+        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, kcalInputs, outdoorBike, cardioGps,
         setsCompleted, setsPlanned, setCompletionPct,
         reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
@@ -239,10 +239,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
                 logoDataUrl: logoDataUrl || undefined,
-                // User profile data for accurate calorie calculation
-                bodyWeightKg: Number(settings?.bodyWeightKg) || undefined,
+                // Ingredientes da kcal JÁ resolvidos pela tela — o PDF usa os
+                // mesmos, senão volta a divergir do card que o usuário viu.
+                // (`biologicalSex` continua indo à parte: o mapa muscular usa.)
+                kcalInputs,
                 biologicalSex: String(settings?.biologicalSex || '').toLowerCase() || undefined,
-                rpe: Number(postCheckin?.rpe) || undefined,
                 // Weekly muscle map snapshot — same data the in-page section uses
                 muscleMapWeek: muscleMapWeek.status === 'ready' ? muscleMapWeek.data : null,
                 muscleMapAssets,
