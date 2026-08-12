@@ -660,7 +660,7 @@ export function buildReportHTML(
         ? 'color:#4ade80;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)'
         : dir === 'down'
           ? 'color:#f87171;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25)'
-          : 'color:#737373;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)'
+          : 'color:#a3a3a3;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)'
       const zebra = rowIdx % 2 === 0 ? '' : 'background:rgba(255,255,255,0.025)'
       // Non-working sets (Aquecimento / Reconhecimento) render muted so the
       // reader naturally focuses on the sets that count toward stats.
@@ -747,6 +747,14 @@ export function buildReportHTML(
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    /* CONTRASTE — este arquivo gera o PDF/compartilhamento, um caminho
+       SEPARADO do React, com hex inline em vez de classes. A varredura de
+       contraste de 11/08/2026 varreu classes Tailwind e por isso NÃO tocou
+       aqui: #6b7280 (4.02:1) e #737373 (4.10:1) sobre o fundo #0d0d0d
+       reprovavam o mínimo de 4.5 do WCAG AA — e estavam no nome do atleta, nos
+       rótulos das estatísticas e no cabeçalho das tabelas, ou seja, no texto
+       que diz o que cada número significa. Hoje usam #a3a3a3 (7.70:1).
+       Guard que CALCULA o contraste: utils/report/__tests__/contrastePdf.test.ts */
     body {
       background: #0d0d0d !important;
       color: #f5f5f5;
@@ -781,7 +789,7 @@ export function buildReportHTML(
     .header-right { text-align: right; }
     .header-workout { font-size: 22px; font-weight: 900; color: #ffffff; line-height: 1.15; max-width: 340px; }
     .header-date { font-size: 12px; color: #a3a3a3; margin-top: 4px; }
-    .header-athlete { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-top: 2px; }
+    .header-athlete { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #a3a3a3; margin-top: 2px; }
     .header-athlete strong { color: #d4d4d4; }
 
     /* ── Gold accent stripe under header ─────────── */
@@ -839,11 +847,11 @@ export function buildReportHTML(
       background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(180,83,9,0.08)) !important;
       border-color: rgba(245,158,11,0.4) !important;
     }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: #6b7280; margin-bottom: 6px; }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: #a3a3a3; margin-bottom: 6px; }
     .stat-value { font-size: 26px; font-weight: 900; color: #ffffff; line-height: 1.05; font-variant-numeric: tabular-nums; }
     .stat-value-gold { color: #f59e0b !important; }
-    .stat-unit  { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
-    .stat-sub   { font-size: 11px; font-weight: 700; color: #6b7280; margin-top: 3px; }
+    .stat-unit  { font-size: 11px; font-weight: 700; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-sub   { font-size: 11px; font-weight: 700; color: #a3a3a3; margin-top: 3px; }
 
     /* ── AI Cards ─────────────────────────────────── */
     .ai-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -863,7 +871,7 @@ export function buildReportHTML(
       background: rgba(239,68,68,0.07) !important;
       border-color: rgba(239,68,68,0.3) !important;
     }
-    .ai-card-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; margin-bottom: 10px; }
+    .ai-card-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #a3a3a3; margin-bottom: 10px; }
     .ai-label-green { color: #4ade80 !important; }
     .ai-label-red   { color: #f87171 !important; }
     .bullet-list { padding-left: 0; list-style: none; display: grid; gap: 6px; margin-top: 4px; }
@@ -874,10 +882,10 @@ export function buildReportHTML(
     .table-wrap { border-radius: 14px; overflow: hidden; border: 1px solid #262626; }
     table { width: 100%; border-collapse: collapse; }
     .thead-row { background: #0b0b0b !important; -webkit-print-color-adjust: exact !important; }
-    .th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #6b7280; border-bottom: 1px solid #262626; }
+    .th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #a3a3a3; border-bottom: 1px solid #262626; }
     .th-center { text-align: center; }
     .td-mono  { padding: 11px 12px; font-family: ui-monospace, monospace; }
-    .td-muted { color: #6b7280; }
+    .td-muted { color: #a3a3a3; }
     .td-name  { padding: 11px 12px; font-weight: 700; color: #f5f5f5; }
     .td-weight { padding: 11px 12px; font-size: 17px; font-weight: 900; color: #ffffff; }
     .td-center { text-align: center; }
@@ -929,7 +937,11 @@ export function buildReportHTML(
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.2em;
-      color: #4a4a4a;
+      /* Era #4a4a4a: 2.19:1 sobre #0d0d0d. Em 10px com tracking de 0.2em isso
+         é quase invisível — e é o rodapé do documento que o usuário compartilha.
+         Achado pelo guard que CALCULA o contraste, não pela leitura humana:
+         passou batido na inspeção manual das cores deste arquivo. */
+      color: #a3a3a3;
     }
     .footer-brand { color: #f59e0b !important; font-weight: 900; }
 
