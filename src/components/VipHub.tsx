@@ -494,12 +494,16 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             {credits?.insights ? chip('Insights', credits.insights.used, credits.insights.limit) : null}
           </div>
 
+          {/* Os quatro atalhos são IRMÃOS e usam a mesma família de acento. O
+              ícone de Nutrição era verde — e verde neste app é STATUS (sucesso).
+              Não era condicional a `macrosEnabled`, ou seja, não comunicava
+              "liberado": era decoração, e a única cor divergente de quatro. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
             {[
               { onClick: () => onOpenWizard?.(), icon: <Zap size={18} className="text-yellow-400" />, label: 'Wizard', sub: 'Gere treino rápido' },
               { onClick: () => setInsightsOpen((v) => !v), icon: <Sparkles size={18} className="text-amber-300" />, label: 'Insights', sub: 'Relatórios e PRs' },
               { onClick: () => onOpenHistory?.(), icon: <BarChart3 size={18} className="text-amber-400" />, label: 'Histórico', sub: 'Todos os treinos' },
-              { onClick: openNutrition, icon: <ChefHat size={18} className="text-green-400" />, label: 'Nutrição', sub: nutritionSubtitle },
+              { onClick: openNutrition, icon: <ChefHat size={18} className="text-amber-400" />, label: 'Nutrição', sub: nutritionSubtitle },
             ].map(({ onClick, icon, label, sub }, i) => (
               <button
                 key={i}
