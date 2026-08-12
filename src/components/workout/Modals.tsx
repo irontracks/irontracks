@@ -207,7 +207,7 @@ export default function Modals() {
                   postCheckinResolveRef.current = null;
                   if (typeof r === 'function') r(null);
                 }}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                 aria-label="Fechar"
               >
                 <X size={18} />
@@ -585,7 +585,7 @@ export default function Modals() {
                 <button
                   type="button"
                   onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
-                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-amber-500' : 'bg-neutral-700'}`}
+                  className={`tap-44 w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-amber-500' : 'bg-neutral-700'}`}
                   aria-label="Toggle unilateral"
                   style={{ minWidth: '3rem' }}
                 >
@@ -632,7 +632,7 @@ export default function Modals() {
                 <button
                   type="button"
                   onClick={() => setPersistToPlan(!persistToPlan)}
-                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${persistToPlan ? 'bg-emerald-500' : 'bg-neutral-700'}`}
+                  className={`tap-44 w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${persistToPlan ? 'bg-emerald-500' : 'bg-neutral-700'}`}
                   aria-label="Toggle atualizar plano de treino"
                   style={{ minWidth: '3rem' }}
                 >
@@ -751,7 +751,7 @@ export default function Modals() {
               <button
                 type="button"
                 onClick={() => setClusterModal(null)}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                 aria-label="Fechar"
               >
                 <X size={18} />

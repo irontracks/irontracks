@@ -77,7 +77,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+            className="tap-44 w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
             aria-label="Voltar"
             title="Voltar"
           >

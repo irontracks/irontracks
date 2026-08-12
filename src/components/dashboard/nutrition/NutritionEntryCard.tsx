@@ -182,7 +182,7 @@ function NutritionEntryCard({
                           /* `before:-inset-2` leva a área de toque a ~44px sem
                              engordar a linha da lista — mesmo recurso do botão
                              METAS. O alvo visível continua discreto; o dedo, não. */
-                          className="relative shrink-0 w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-700/50 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 flex items-center justify-center transition before:absolute before:-inset-2 before:content-['']"
+                          className="relative shrink-0 tap-44 w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-700/50 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 flex items-center justify-center transition before:absolute before:-inset-2 before:content-['']"
                         >
                           <X size={13} strokeWidth={2.5} aria-hidden="true" />
                         </button>

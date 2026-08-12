@@ -388,7 +388,7 @@ const NotificationCenter = ({ user, initialOpen, embedded, open: externalOpen }:
             {/* Bell trigger */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${isOpen
+                className={`relative tap-44 w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90 ${isOpen
                     ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 shadow-lg shadow-yellow-900/20'
                     : 'bg-neutral-800/80 text-neutral-400 border border-neutral-700/50 hover:text-white hover:bg-neutral-700/80'
                     }`}

@@ -209,7 +209,7 @@ export default function CardioSessionModal({
           type="button"
           onClick={handleDelete}
           disabled={deleting}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
+          className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
           style={{
             background: confirmDelete ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)',
             border: confirmDelete ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)',

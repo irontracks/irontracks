@@ -638,3 +638,25 @@ select {
     scroll-behavior: auto !important;
   }
 }
+/* ── Alvo de toque mínimo (44pt da HIG) sem tocar no desenho ───────────
+   O contexto de uso é treino: mão suada, antebraço bombeado, olhar
+   dividido entre a tela e o espelho. Um ícone de 40px é confortável no
+   sofá e escorregadio entre séries.
+
+   A área tocável cresce pelo ::after, não pela caixa: o botão continua
+   com o tamanho visual que o layout espera (nenhum pixel se move) e o
+   dedo ganha os 44pt. Ampliar `w-*`/`h-*` teria empurrado ícone, gap e
+   alinhamento em 53 arquivos — custo alto para resolver ergonomia.
+
+   `pointer-events: none` no ::after seria um erro: é justamente ele que
+   precisa receber o toque. Sem `content` não existe caixa nenhuma. */
+.tap-44 { position: relative; }
+.tap-44::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}

@@ -115,7 +115,7 @@ export function HistoryListManualModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
+                        className="tap-44 w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         aria-label="Voltar"
                         title="Voltar"

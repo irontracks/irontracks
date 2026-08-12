@@ -428,7 +428,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               <button
                 onClick={() => handleStepClick(index)}
                 aria-label={step.id}
-                className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
+                className={`flex-shrink-0 flex items-center justify-center tap-44 w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index <= currentStep
                     ? 'bg-yellow-500 border-yellow-500 text-black'
                     : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-500'

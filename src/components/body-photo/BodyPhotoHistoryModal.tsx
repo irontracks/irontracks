@@ -132,7 +132,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                             <button
                                 onClick={backToList}
                                 aria-label="Voltar para a lista"
-                                className="w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center shrink-0"
+                                className="tap-44 w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center shrink-0"
                             >
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
@@ -153,7 +153,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                     <button
                         onClick={onClose}
                         aria-label="Fechar"
-                        className="w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center shrink-0"
+                        className="tap-44 w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center shrink-0"
                     >
                         <X className="w-5 h-5" />
                     </button>

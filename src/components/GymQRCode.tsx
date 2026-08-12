@@ -118,7 +118,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
           <button aria-label="Fechar"
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white"
+            className="tap-44 w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white"
           >
             <X size={14} />
           </button>

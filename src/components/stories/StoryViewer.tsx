@@ -706,20 +706,20 @@ export default function StoryViewer({
               <div className="text-[11px] text-neutral-300 font-bold">{formatAgo(story.createdAt)}</div>
             </div>
             {isMine && (
-              <button aria-label="Excluir story" onClick={handleDelete} disabled={deleting} className="w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60 disabled:opacity-60">
+              <button aria-label="Excluir story" onClick={handleDelete} disabled={deleting} className="tap-44 w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60 disabled:opacity-60">
                 {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
             {isVideo && (
               <button
                 onClick={toggleMuted}
-                className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60"
+                className="tap-44 w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60"
                 aria-label={muted ? 'Ativar som' : 'Desativar som'}
               >
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-            <button aria-label="Fechar" onClick={onClose} className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60">
+            <button aria-label="Fechar" onClick={onClose} className="tap-44 w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60">
               <X size={18} />
             </button>
           </div>
@@ -898,7 +898,7 @@ export default function StoryViewer({
                       setIsReacting(false)
                     }
                   }}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 disabled:opacity-60 ${
+                  className={`tap-44 w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 disabled:opacity-60 ${
                     myReaction === emoji ? 'bg-yellow-500/20 border-yellow-500/60' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
                   } ${reactedEmoji === emoji ? 'scale-125' : ''} border`}
                 >

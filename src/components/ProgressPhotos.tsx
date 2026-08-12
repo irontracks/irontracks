@@ -227,7 +227,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
               <button aria-label="Descartar foto"
                 type="button"
                 onClick={() => { setPreview(null); setFile(null) }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
+                className="absolute top-2 right-2 tap-44 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
               >
                 <X size={12} />
               </button>
@@ -541,7 +541,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleDelete(photo.id) }}
                       disabled={deletingId === photo.id}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center text-neutral-400 hover:text-red-400 transition-colors"
+                      className="absolute top-2 right-2 tap-44 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center text-neutral-400 hover:text-red-400 transition-colors"
                     >
                       {deletingId === photo.id
                         ? <Loader2 size={11} className="animate-spin" />
@@ -589,7 +589,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
                 const idx = photos.findIndex((p) => p.id === lightbox.id)
                 if (idx > 0) setLightbox(photos[idx - 1])
               }}
-              className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white disabled:opacity-30"
+              className="tap-44 w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white disabled:opacity-30"
               disabled={photos.findIndex((p) => p.id === lightbox.id) === 0}
             >
               <ChevronLeft size={18} />
@@ -603,7 +603,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
                 const idx = photos.findIndex((p) => p.id === lightbox.id)
                 if (idx < photos.length - 1) setLightbox(photos[idx + 1])
               }}
-              className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white disabled:opacity-30"
+              className="tap-44 w-10 h-10 rounded-full bg-black/60 flex items-center justify-center text-white disabled:opacity-30"
               disabled={photos.findIndex((p) => p.id === lightbox.id) === photos.length - 1}
             >
               <ChevronRight size={18} />

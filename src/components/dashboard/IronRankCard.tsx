@@ -479,7 +479,7 @@ const IronRankCard = memo(function IronRankCard({
                                 <div id="iron-rank-title" className="text-white font-black text-lg">Ranking Global</div>
                             </div>
                             <button type="button" onClick={() => setRankOpen(false)}
-                                className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                className="tap-44 w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
                                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
                                 aria-label="Fechar">
                                 <X size={17} />

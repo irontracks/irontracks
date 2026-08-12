@@ -97,7 +97,7 @@ function SetRow({
       <button
         type="button"
         onClick={toggleDone}
-        className="w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-[11px] transition-all active:scale-95"
+        className="tap-44 w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-[11px] transition-all active:scale-95"
         style={{
           background: log.done ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)',
           color: log.done ? '#22c55e' : 'rgba(255,255,255,0.5)',
@@ -197,7 +197,7 @@ function ExerciseCard({
           <button
             type="button"
             onClick={() => adjustSets(-1)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white/50 active:scale-95 transition-all"
+            className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-white/50 active:scale-95 transition-all"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
             aria-label="Remover série"
           >
@@ -207,7 +207,7 @@ function ExerciseCard({
           <button
             type="button"
             onClick={() => adjustSets(1)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white/50 active:scale-95 transition-all"
+            className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-white/50 active:scale-95 transition-all"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
             aria-label="Adicionar série"
           >

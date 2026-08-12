@@ -76,7 +76,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
               {state?.online === false ? 'Sem internet agora.' : hasJobs ? 'Fila pronta para sincronizar quando possível.' : 'Nenhuma pendência.'}
             </div>
           </div>
-          <button type="button" onClick={() => onClose?.()} className="w-10 h-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 hover:bg-neutral-900 inline-flex items-center justify-center" aria-label="Voltar" title="Voltar">
+          <button type="button" onClick={() => onClose?.()} className="tap-44 w-10 h-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 hover:bg-neutral-900 inline-flex items-center justify-center" aria-label="Voltar" title="Voltar">
             <ArrowLeft size={18} />
           </button>
         </div>

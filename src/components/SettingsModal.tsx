@@ -274,7 +274,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div id="settings-modal-title" className="text-white font-black text-lg truncate">Configurações</div>
             </div>
           </div>
-          <button type="button" onClick={() => props?.onClose?.()} className="w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
+          <button type="button" onClick={() => props?.onClose?.()} className="tap-44 w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
             <ArrowLeft size={18} />
           </button>
         </div>

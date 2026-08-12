@@ -705,7 +705,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
                 <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 sticky top-0 z-20 justify-center relative flex" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                     <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
-                    <button onClick={onClose} className="absolute left-4 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar">
+                    <button onClick={onClose} className="absolute left-4 tap-44 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar">
                         <ChevronLeft size={20} />
                     </button>
                     <div className="w-10 h-10 rounded-full bg-neutral-800 animate-pulse" />
@@ -725,7 +725,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
             <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 sticky top-0 z-20 justify-center relative flex" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                 <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
-                <button onClick={onClose} className="absolute left-4 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar">
+                <button onClick={onClose} className="absolute left-4 tap-44 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar">
                     <ChevronLeft size={20} />
                 </button>
 
@@ -963,7 +963,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 {showEmoji && (
                     <div className="absolute left-4 right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
                         {['😀', '😁', '😂', '😉', '😊', '😍', '👍', '💪', '🔥', '🙏', '🥳', '🤝', '🤩', '🤔', '👏', '🙌'].map(e => (
-                            <button type="button" key={e} className="text-xl w-9 h-9 rounded-xl hover:bg-neutral-900 active:scale-95 transition-transform" onClick={() => insertEmoji(e)}>{e}</button>
+                            <button type="button" key={e} className="text-xl tap-44 w-9 h-9 rounded-xl hover:bg-neutral-900 active:scale-95 transition-transform" onClick={() => insertEmoji(e)}>{e}</button>
                         ))}
                     </div>
                 )}

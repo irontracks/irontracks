@@ -221,7 +221,7 @@ export default function BIAAttachmentInput({
             type="button"
             onClick={handleRemove}
             disabled={disabled || extracting}
-            className="w-8 h-8 rounded-lg border flex items-center justify-center text-neutral-300 hover:text-white hover:border-red-500/40 transition-all shrink-0 disabled:opacity-50"
+            className="tap-44 w-8 h-8 rounded-lg border flex items-center justify-center text-neutral-300 hover:text-white hover:border-red-500/40 transition-all shrink-0 disabled:opacity-50"
             style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.10)' }}
             aria-label="Remover anexo"
             title="Remover anexo"

@@ -176,7 +176,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                 <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                     <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
                     <div className="flex items-center gap-3">
-                        <button aria-label="Voltar" onClick={onClose} className="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <button aria-label="Voltar" onClick={onClose} className="tap-44 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <ChevronLeft size={20} />
                         </button>
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-black" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 12px rgba(234,179,8,0.3)' }}>
@@ -201,7 +201,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
             <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20 relative" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                 <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
                 <div className="flex items-center gap-3">
-                    <button aria-label="Voltar" onClick={onClose} className="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <button aria-label="Voltar" onClick={onClose} className="tap-44 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <ChevronLeft size={20} />
                     </button>
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-black" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 12px rgba(234,179,8,0.3)' }}>

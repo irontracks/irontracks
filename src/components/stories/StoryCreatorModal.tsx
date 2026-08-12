@@ -543,7 +543,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             <button
                                                 key={c}
                                                 onClick={() => setTextColor(c)}
-                                                className={`w-8 h-8 rounded-full border-2 ${textColor === c ? 'border-white scale-110' : 'border-transparent'} ${COLOR_CLASS_MAP[c] || 'bg-white'}`}
+                                                className={`tap-44 w-8 h-8 rounded-full border-2 ${textColor === c ? 'border-white scale-110' : 'border-transparent'} ${COLOR_CLASS_MAP[c] || 'bg-white'}`}
                                                 aria-label={`Cor ${c}`}
                                             />
                                         ))}

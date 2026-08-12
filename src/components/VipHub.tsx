@@ -565,7 +565,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             <button
               type="button"
               onClick={() => setMessages([])}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-red-400 transition-all active:scale-95"
+              className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-red-400 transition-all active:scale-95"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
               aria-label="Limpar conversa"
             >

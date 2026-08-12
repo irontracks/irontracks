@@ -309,7 +309,7 @@ export default function RouteMapLeaflet({ points, height = 200, grow, live, acqu
               )
             }
           }}
-          className="absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          className="absolute bottom-3 right-3 tap-44 w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
           style={{
             zIndex: 1000,
             background: 'rgba(15,15,15,0.92)',

@@ -201,7 +201,7 @@ export function PremiumToggle({
             aria-label="Toggle"
             onClick={() => !disabled && onChange(!value)}
             disabled={disabled}
-            className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`relative flex-shrink-0 tap-44 w-12 h-6 rounded-full transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             style={{
                 background: value ? undefined : 'rgba(60,60,60,0.8)',
                 ...(value
@@ -321,7 +321,7 @@ export function ModalHeader({
                 <button
                     type="button"
                     onClick={onClose}
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors flex-shrink-0"
+                    className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors flex-shrink-0"
                     style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${surface.border}` }}
                     aria-label="Fechar"
                 >

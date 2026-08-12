@@ -71,7 +71,7 @@ const TeacherCard = ({
                 </div>
                 <button aria-label="Editar professor"
                     onClick={onEdit}
-                    className="flex-shrink-0 w-8 h-8 rounded-xl bg-neutral-800/80 hover:bg-yellow-500/15 border border-neutral-700/60 hover:border-yellow-500/40 text-neutral-400 hover:text-yellow-400 flex items-center justify-center transition-all duration-200 active:scale-95"
+                    className="flex-shrink-0 tap-44 w-8 h-8 rounded-xl bg-neutral-800/80 hover:bg-yellow-500/15 border border-neutral-700/60 hover:border-yellow-500/40 text-neutral-400 hover:text-yellow-400 flex items-center justify-center transition-all duration-200 active:scale-95"
                     title="Editar"
                 >
                     <Edit3 size={13} />
@@ -295,7 +295,7 @@ export const TeachersTab: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button aria-label="Voltar"
                         onClick={() => setSelectedTeacher(null)}
-                        className="w-9 h-9 rounded-2xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 hover:border-neutral-600 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
+                        className="tap-44 w-9 h-9 rounded-2xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 hover:border-neutral-600 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
                     >
                         <ChevronLeft size={18} />
                     </button>

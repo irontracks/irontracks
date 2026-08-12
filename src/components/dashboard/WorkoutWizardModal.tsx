@@ -406,7 +406,7 @@ export default function WorkoutWizardModal(props: Props) {
             <button
               type="button"
               onClick={props.onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-90"
+              className="tap-44 w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-90"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
               aria-label="Voltar"
               title="Voltar"
@@ -538,7 +538,7 @@ export default function WorkoutWizardModal(props: Props) {
                         key={n}
                         type="button"
                         onClick={() => setAnswers((p) => ({ ...p, daysPerWeek: clampDays(n) }))}
-                        className={`w-9 h-9 rounded-lg font-black text-sm transition-all active:scale-90 ${
+                        className={`tap-44 w-9 h-9 rounded-lg font-black text-sm transition-all active:scale-90 ${
                           answers.daysPerWeek === n
                             ? 'bg-yellow-500 text-black'
                             : 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700'

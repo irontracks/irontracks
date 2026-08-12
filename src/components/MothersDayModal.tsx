@@ -69,7 +69,7 @@ export default function MothersDayModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-xl text-white/80 hover:text-white inline-flex items-center justify-center transition-colors"
+          className="absolute top-3 right-3 z-10 tap-44 w-9 h-9 rounded-xl text-white/80 hover:text-white inline-flex items-center justify-center transition-colors"
           style={{
             background: 'rgba(0,0,0,0.5)',
             border: '1px solid rgba(255,255,255,0.15)',

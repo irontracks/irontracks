@@ -252,7 +252,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
                   key={key}
                   type="button"
                   onClick={() => toggleDay(key)}
-                  className={`w-12 h-10 rounded-xl text-xs font-bold border transition-all ${
+                  className={`tap-44 w-12 h-10 rounded-xl text-xs font-bold border transition-all ${
                     form.training_days.includes(key)
                       ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
                       : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600'
