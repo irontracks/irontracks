@@ -63,6 +63,34 @@ scripts/        # Scripts de build e utilitários
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
+> ⚠️ **ABERTO (12/08/2026) — o mesmo treino mostra DOIS números de caloria.**
+> Relatado com print pelo dono: **~698 kcal** no card "Treino hoje" da aba
+> Nutrição e **~744 kcal** no card CALORIAS do relatório. Mesma sessão.
+>
+> **Causa confirmada por leitura de código (não é hipótese):** a fonte única
+> existe na CONTA, não nos INGREDIENTES. São **7 chamadores** de
+> `estimateSessionKcal` e cada um monta os argumentos por conta própria:
+>
+> | chamador | peso | RPE |
+> |---|---|---|
+> | `hooks/useReportData.ts:362` (relatório) | do **check-in** do dia | **passa** |
+> | `NutritionOverlay.tsx:147` (aba nutrição) | do **perfil** | não passa |
+> | `app/(app)/dashboard/nutrition/page.tsx:184` | do perfil | não passa |
+> | `utils/report/reportMetrics.ts:535` | **`{}`** → cai no `DEFAULT_BODY_WEIGHT_KG = 78` | não passa |
+> | `utils/report/buildHtml.ts:120` (PDF) | o que o chamador passar | idem |
+>
+> O RPE é multiplicador do modelo MET: 744 ÷ 698 = **1,066**, a ordem de
+> grandeza exata do fator. Efeito colateral do `{}` no `reportMetrics`: o
+> rateio POR EXERCÍCIO usa 78 kg enquanto o total do card usa o peso real —
+> **as parcelas não somam o total exibido**.
+>
+> **Correção certa:** um leitor único dos ingredientes — `sessionKcalInputs(session, user)`
+> resolvendo peso (check-in > perfil > default), sexo e RPE UMA vez, com os 7
+> chamadores consumindo dele, e guard proibindo objeto literal fora do módulo.
+> **Não basta adicionar `rpe` na chamada da nutrição**: isso alinha os dois
+> números de hoje e deixa os outros cinco esperando a próxima divergência.
+> Mesmo enredo do `userSnapshot` e do `macroColors`.
+
 **Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`) — hoje pelo **`userSnapshot`** (ver abaixo), não cada uma por conta. Ao mexer em meta/nutrição, ajuste as DUAS. **O overlay renderiza o MESMO `NutritionMixer`** — ou seja, todo card da página existe também no app nativo; a exceção continua sendo a navegação até a página, que só a web tem.
 
 **Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
@@ -305,7 +333,20 @@ group by 1, 2 order by 3 desc;
 A rota é **pública e escreve** (o navegador posta sem sessão — é assim que o
 mecanismo funciona), então os freios são rate limit por IP, dedupe por par
 (diretiva, origem) e teto de linhas por instância. A pergunta é QUAIS diretivas
-quebram, não quantas vezes. **Para ligar o modo bloqueante basta `CSP_ENFORCE=true` na Vercel** —
+quebram, não quantas vezes.
+
+**Primeira janela lida em 12/08/2026 (24 h, 16 eventos) — e ela pagou por si.**
+Duas origens, as duas do PRÓPRIO app e nenhuma no header: `api.cloudinary.com`
+(o provedor de storage — em modo bloqueante teria caído TODO upload de imagem:
+avaliação corporal, avatar, story) e `itunes.apple.com` (o lookup que alimenta o
+aviso de nova versão). As duas entraram no `connect-src`; guard em
+`utils/security/__tests__/cspConnectSrc.test.ts` cobra que o chamador continue
+existindo. **Ligar o enforce antes dessa janela teria derrubado o upload de fotos.**
+
+⚠️ **O enforce continua DESLIGADO, de propósito.** O header mudou em 12/08, então
+a janela existente é anterior à mudança. Antes de ligar, colete outra janela
+limpa (24 h após o deploy) com o SQL acima: se vier vazia, **`CSP_ENFORCE=true` na
+Vercel** basta —
 env var, sem deploy de código. Antes disso, olhe uma janela de relatórios limpa:
 o `script-src` de produção é mais restrito que o de dev (que tem `unsafe-inline`
 e `unsafe-eval`), então dev NÃO prova nada sobre produção.
@@ -413,6 +454,74 @@ O `git revert` desfaz o pacote; para desfazer só uma (ex.: manter o topo novo e
 voltar o `uppercase` do título), edite o arquivo e apague o guard correspondente
 em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
 caso, e é assim que ele avisa que a decisão está sendo revertida de propósito.
+
+## Débito ABERTO em design/a11y (fechado até 12/08/2026)
+
+Lista curta do que **não** está feito, para não ser redescoberto nem refeito.
+Ordem de impacto:
+
+1. **Divergência de calorias** — ver o aviso na seção Calorias. É o único com
+   sintoma visível para o usuário.
+2. **12 janelas sem semântica** — `JANELA_PENDENTE` em
+   `src/__tests__/modalDialogRatchet.test.ts`. A triagem já foi feita: as 21
+   entradas de `NAO_E_JANELA` (splash, telas, `role="menu"`, barra do descanso)
+   **não devem** virar `dialog`. Padrão pronto em `workout/Modals.tsx`.
+3. **47 textos corridos em 9px** (ver piso tipográfico).
+4. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08.
+5. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram o
+   X corrigido e provado por TESTE, mas **nunca foram tocados na tela**. A
+   navegação por coordenadas no treino ativo é cara e arriscada (já concluiu
+   série e apagou outra por engano). Se for verificar, use o iPhone do dono: abrir
+   um exercício em Drop-Set e tocar no X **no centro do ícone**.
+6. **Ordem de foco e agrupamento nas telas logadas** — genuinamente bloqueado
+   daqui. Exige Accessibility Inspector (acesso negado 2×) ou o dono no iPhone.
+   **Não gaste tempo tentando VoiceOver no Simulador: ele não existe lá.**
+
+## Violeta é a cor da MÁQUINA — `lib/design/machineAccent` (12/08/2026)
+
+**Violeta = a máquina decidiu. Dourado = você decide.** Nada de violeta em
+elemento que o usuário aciona; nada de dourado em valor que ele não escolheu.
+
+A cor já existia em 21 lugares (9 arquivos) e, do lado do usuário, era **sempre**
+saída de máquina: card CARGA AUTOMÁTICA, nota "🧠 Última vez…", campo de peso
+sugerido, cartão de ajuste da avaliação por foto. Quatro superfícies que ninguém
+combinou — o app convergiu sozinho. O defeito não era a cor: era ela existir **de
+fato e não de direito**, replicada à mão com valores ligeiramente diferentes.
+
+Ela é necessária: em âmbar, a sugestão do motor ficaria indistinguível do que o
+usuário digitou; em cinza, viraria texto secundário que ninguém lê. Guard varre
+`components/` e tem `NAO_E_A_COR_DA_MAQUINA` com o motivo de cada exceção
+(paleta categórica de gráfico, anel de story, paleta oferecida ao usuário, tier
+admin em tela administrativa).
+
+## Piso tipográfico: 9px (12/08/2026)
+
+142 usos de `text-[9px]` em 61 arquivos e **12 abaixo disso**, incluindo um
+`text-[6px]` no círculo do timer de descanso. Dos 142, **95 são eyebrow label**
+(maiúscula, `font-black`, tracking largo) — nessa forma 9px lê bem e é escolha
+do design system; ficam. **Abaixo de 9px não há forma que salve**, e os 12
+encontrados eram todos label: o argumento do tracking já estava no limite e
+continuou encolhendo. Guard em `__tests__/corpoMinimoTexto.test.ts`.
+
+**Débito conhecido:** 47 usos de 9px em texto CORRIDO (não label). Não corrigidos
+porque subir 47 corpos muda layout em 47 lugares e isso não se entrega sem olhar
+cada um.
+
+## Contraste: `text-white/NN` escapava pela sintaxe (12/08/2026)
+
+O guard proibia `neutral-500` (4.18:1) e **deixava passar `text-white/40`, que
+mede 3.75:1** — pior, e só porque a regex olhava outra coisa. Eram 54 ocorrências
+em 12 arquivos, todas texto real. Medido sobre `#0a0a0a`: `/40` = 3.75:1 ·
+`/45` = 4.39:1 · `/50` = 5.15:1. **O piso é `/55`.** `hover:` fica de fora (estado
+transitório, e no celular nem existe).
+
+## Guard cego por migração — o 6º jeito de errar (12/08/2026)
+
+Ao migrar classe literal para token (`text-violet-300/80` → `MACHINE_ACCENT.text`),
+**dois guards ficaram verdes e cegos**: `plateHint` e `valorVsSugestao` procuravam
+a string que deixou de existir. Não nasceu de teste mal escrito — nasceu de uma
+migração que deixou o teste passando por inércia. **Ao trocar classe por token,
+varra os testes que citam a classe antiga** e faça o guard apontar para a FONTE.
 
 ## Regra da hierarquia — um fato, um lugar (ago/2026)
 **Antes de mexer em qualquer card que MOSTRE DADOS, leia `docs/DESIGN_HIERARCHY.md`.**
