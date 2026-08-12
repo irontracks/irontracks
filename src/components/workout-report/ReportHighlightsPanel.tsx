@@ -37,9 +37,16 @@ export function ReportHighlightsPanel({
         {prCount > 0 && (
           <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
             style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.14), rgba(180,83,9,0.10))', boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
-            <div className="absolute inset-0 opacity-30">
+            {/* A arte comemorativa fica, mas atrás de um SCRIM. Sem ele, o
+                contraste do texto dependia de onde a explosão dourada calhava
+                de estar clara ou escura — ou seja, era imprevisível, e no
+                aparelho o nome do exercício sumia sobre o brilho. Agora o
+                gradiente garante um piso escuro constante sob o texto, que é
+                como se resolve texto-sobre-imagem em qualquer lugar. */}
+            <div className="absolute inset-0 opacity-25">
               <NextImage src="/report-pr.png" alt="" fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover object-center" />
             </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/60 to-neutral-950/30" />
             <div className="relative z-10 p-3 flex flex-col gap-1">
               <div className="text-2xl font-black text-yellow-400">{prCount}</div>
               <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
@@ -49,7 +56,7 @@ export function ReportHighlightsPanel({
                 <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
               )}
               {detectedPrs[0] && (
-                <div className="text-[10px] text-yellow-200 opacity-80 line-clamp-2 leading-tight">
+                <div className="text-[10px] text-yellow-100 line-clamp-2 leading-tight">
                   {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
                 </div>
               )}
