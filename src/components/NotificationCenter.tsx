@@ -12,6 +12,8 @@ import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { logError } from '@/lib/logger'
 import type { AppNotification } from '@/types/social'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type NotificationItem = AppNotification & { data?: Record<string, unknown> };
 
@@ -162,6 +164,7 @@ function IconBubble({ children, bg, border }: { children: React.ReactNode; bg: s
 const NotificationCenter = ({ user, initialOpen, embedded, open: externalOpen }: NotificationCenterProps) => {
     const { confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
+    const panelRef = useFocusTrap(isOpen, () => setIsOpen(false));
     // In embedded mode, use the externally-controlled `open` prop (showNotifCenter from parent)
     const effectiveOpen = embedded ? !!externalOpen : isOpen;
     const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
@@ -404,10 +407,10 @@ const NotificationCenter = ({ user, initialOpen, embedded, open: externalOpen }:
             {isOpen && (
                 <>
                     {/* Backdrop */}
-                    <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label="Fechar notificações" onClick={() => setIsOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false) }} />
+                    <div className="fixed inset-0 z-40" {...backdropProps(() => setIsOpen(false), 'Fechar notificações')} />
 
                     {/* Panel */}
-                    <div className="absolute right-0 top-13 w-[340px] z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div ref={panelRef} {...dialogProps('Notificações')} className="absolute right-0 top-13 w-[340px] z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                         {/* Glass panel */}
                         <div className="rounded-3xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.08), 0 30px 80px rgba(0,0,0,0.65)', backdropFilter: 'blur(24px)' }}>
 

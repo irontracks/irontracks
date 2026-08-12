@@ -6,6 +6,8 @@ import { X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Pho
 import LoadingScreen from '@/components/LoadingScreen';
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useLoginScreen } from '@/hooks/useLoginScreen'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ── Floating Gold Particles Background ──────────────────────────────────────
 
@@ -163,6 +165,10 @@ const LoginScreen = () => {
         handleRequestSubmit,
         handleInputChange,
     } = useLoginScreen()
+
+    // Antes do early return do loading: hook não pode ficar atrás de condicional.
+    const requestModalRef = useFocusTrap(!!showRequestModal, () => setShowRequestModal(false))
+    const noAccountModalRef = useFocusTrap(!!showNoAccountModal, () => setShowNoAccountModal(false))
 
     if (isLoading) {
         return <LoadingScreen />
@@ -700,8 +706,8 @@ const LoginScreen = () => {
 
             {/* Access Request Modal */}
             {showRequestModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-safe pb-safe bg-black/80 backdrop-blur-sm">
-                    <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-safe pb-safe bg-black/80 backdrop-blur-sm" {...backdropProps(() => setShowRequestModal(false))}>
+                    <div ref={requestModalRef} {...dialogProps('Pedir acesso')} className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
                             <h3 className="text-lg font-black text-white italic">PEDIR ACESSO</h3>
                             <button aria-label="Fechar" onClick={() => setShowRequestModal(false)} className="text-neutral-400 hover:text-white">
@@ -847,8 +853,8 @@ const LoginScreen = () => {
 
             {/* Modal: Sem Cadastro (Apple Sign-In sem conta) */}
             {showNoAccountModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 pt-safe pb-safe">
-                    <div className="w-full max-w-sm bg-neutral-900 border border-neutral-700/50 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 pt-safe pb-safe" {...backdropProps(() => setShowNoAccountModal(false))}>
+                    <div ref={noAccountModalRef} {...dialogProps('Conta não encontrada')} className="w-full max-w-sm bg-neutral-900 border border-neutral-700/50 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
                         {/* Icon */}
                         <div className="flex justify-center mb-5">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/10 border border-red-500/30 flex items-center justify-center">

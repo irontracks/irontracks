@@ -8,6 +8,8 @@ import { LabExamUploadModal } from './LabExamUploadModal'
 import { LabExamCard } from './LabExamCard'
 import { LabExamProtocolView } from './LabExamProtocolView'
 import { LabExamMarkersView } from './LabExamMarkersView'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 /**
  * Seção de Exames Laboratoriais — botão de adicionar, lista de exames e os
@@ -23,6 +25,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
   /** Aba do modal: os resultados são o dado primário, então abrem primeiro. */
   const [tab, setTab] = useState<'resultados' | 'protocolo'>('resultados')
   const [gerando, setGerando] = useState(false)
+  const viewingRef = useFocusTrap(!!viewing, () => setViewing(null))
   const [erroProtocolo, setErroProtocolo] = useState('')
 
   /**
@@ -114,8 +117,8 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
 
       {/* Resultados + protocolo do exame já analisado */}
       {viewing && (viewing.extracted_markers || viewing.protocol) && (
-        <div className="fixed inset-0 z-[2200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-          <div className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
+        <div className="fixed inset-0 z-[2200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4" {...backdropProps(() => setViewing(null))}>
+          <div ref={viewingRef} {...dialogProps('Exame de sangue')} className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}>
