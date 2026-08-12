@@ -42,7 +42,7 @@ export function StudentControlConsent({ teacherName, onAccept, onReject }: Stude
         <p className="text-[12px] font-black text-white leading-snug">
           Prof. <span className="text-amber-300">{teacherName}</span> quer controlar seu treino
         </p>
-        <p className="text-[10px] text-white/40 mt-0.5">Ele poderá anotar séries e editar exercícios</p>
+        <p className="text-[10px] text-white/55 mt-0.5">Ele poderá anotar séries e editar exercícios</p>
       </div>
 
       <div className="flex gap-1.5 flex-shrink-0">

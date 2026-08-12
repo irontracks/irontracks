@@ -105,13 +105,13 @@ export default function ReferralSection() {
         </div>
         <div>
           <p className="text-2xl font-black text-white">{count}</p>
-          <p className="text-xs text-white/40">{count === 1 ? 'amigo convidado' : 'amigos convidados'}</p>
+          <p className="text-xs text-white/55">{count === 1 ? 'amigo convidado' : 'amigos convidados'}</p>
         </div>
       </div>
 
       {/* Referral code display */}
       <div className="space-y-2">
-        <p className="text-xs font-black text-white/40 uppercase tracking-widest">Seu código de convite</p>
+        <p className="text-xs font-black text-white/55 uppercase tracking-widest">Seu código de convite</p>
         <div
           className="flex items-center gap-3 rounded-xl px-4 py-3"
           style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -122,7 +122,7 @@ export default function ReferralSection() {
             onClick={handleCopy}
             disabled={copied}
             aria-label="Copiar código"
-            className="text-white/40 hover:text-white transition-colors disabled:opacity-60"
+            className="text-white/55 hover:text-white transition-colors disabled:opacity-60"
           >
             {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
           </button>
@@ -155,7 +155,7 @@ export default function ReferralSection() {
 
       {/* Enter someone else's code */}
       <div className="space-y-2 pt-2">
-        <p className="text-xs font-black text-white/40 uppercase tracking-widest">Entrou por convite? Digite o código</p>
+        <p className="text-xs font-black text-white/55 uppercase tracking-widest">Entrou por convite? Digite o código</p>
         <div className="flex gap-2">
           <input
             type="text"

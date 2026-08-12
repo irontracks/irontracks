@@ -26,8 +26,8 @@
  *    aparências quase iguais sobre um card já translúcido. Agora o preenchimento
  *    não desenha NADA e o "sem registro" tem trilho visível.
  *
- * 5. CONTRASTE. Rótulos dos dias em `text-white/20` compõem ~1,6:1 sobre o card
- *    — e são a chave de leitura da grade inteira. A legenda em `text-white/40`
+ * 5. CONTRASTE. Rótulos dos dias em `text-white/55` compõem ~1,6:1 sobre o card
+ *    — e são a chave de leitura da grade inteira. A legenda em `text-white/55`
  *    dava ~3:1. O mínimo do WCAG AA é 4,5:1; `neutral-400` entrega ~7:1.
  *
  * 6. "SINCRONIA 68%" não dizia sincronia de quê (a conta é: dos dias treinados,
