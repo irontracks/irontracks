@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 
 import MacroBar, { MACRO_COLORS, MACRO_OVER_COLOR } from '../MacroBar'
+import { MACRO_SEGMENT_GAP_PX } from '@/lib/nutrition/macroColors'
 
 /**
  * Barra de macronutriente do card Macronutrientes.
@@ -176,5 +177,49 @@ describe('MacroBar', () => {
     const { container } = render(<MacroBar label="Gordura" value={10} goal={0} color={MACRO_COLORS.fat} />)
     expect(container.innerHTML).not.toContain('NaN')
     expect(container.innerHTML).not.toContain('Infinity')
+  })
+})
+
+/**
+ * Adjacência de cores vizinhas (12/08/2026).
+ *
+ * A paleta exige 40° de matiz entre categorias e proteína/gordura estão a
+ * **18,7°**. A pendência ficou meses aberta como "trocar a cor da gordura" —
+ * caro, e sem faixa de matiz livre (vermelho é erro, verde é sucesso, azul é
+ * carboidrato, violeta virou a cor da máquina).
+ *
+ * A distância de matiz nunca foi o problema: dois matizes próximos convivem bem
+ * enquanto não se TOCAM. O que corrige é o fio do fundo entre os blocos.
+ */
+describe('segmentos vizinhos não se tocam', () => {
+  const raiz = join(__dirname, '..')
+  const ler = (f: string) => readFileSync(join(raiz, f), 'utf8')
+
+  it('o card de lançamento separa os três macros', () => {
+    // Sem isto, refeição sem carboidrato encosta âmbar (43°) em laranja (25°).
+    expect(ler('NutritionEntryCard.tsx')).toMatch(/gap: `\$\{MACRO_SEGMENT_GAP_PX\}px`/)
+  })
+
+  it('o vermelho de estouro não encosta no macro', () => {
+    // 25° contra a gordura: o alerta some justamente onde precisa ser lido.
+    expect(ler('MacroBar.tsx')).toMatch(/borderLeft: `\$\{MACRO_SEGMENT_GAP_PX\}px solid/)
+  })
+
+  it('a espessura vem da fonte única, não de um literal solto', () => {
+    for (const f of ['NutritionEntryCard.tsx', 'MacroBar.tsx']) {
+      expect(ler(f), `${f} deve importar a constante`).toMatch(/MACRO_SEGMENT_GAP_PX/)
+    }
+  })
+
+  it('o fio é visível no aparelho e não vira listra', () => {
+    expect(MACRO_SEGMENT_GAP_PX).toBeGreaterThanOrEqual(2)
+    expect(MACRO_SEGMENT_GAP_PX).toBeLessThanOrEqual(3)
+  })
+
+  it('a gordura continua laranja — a correção não gastou matiz', () => {
+    // Se algum dia trocarem a cor, que seja decisão consciente e não efeito
+    // colateral: este caso documenta que o separador tornou a troca dispensável.
+    expect(MACRO_COLORS.fat).toBe('#f97316')
+    expect(MACRO_COLORS.protein).toBe('#fbbf24')
   })
 })

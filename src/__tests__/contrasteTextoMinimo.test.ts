@@ -62,6 +62,26 @@ const EXCECOES: Record<string, string> = {
  */
 const PROIBIDAS = /text-neutral-(500|700|800)\b/
 
+/**
+ * Branco com opacidade — a MESMA falha, escrita com outra sintaxe.
+ *
+ * O guard acima proibia `neutral-500` (4.18:1) e deixava passar
+ * `text-white/40`, que mede **3.75:1** — pior. Não por decisão: por sintaxe.
+ * Eram 54 ocorrências em 12 arquivos, todas em `<p>`/`<span>` de texto real
+ * (varridas em 12/08/2026), incluindo o Heat Map do VIP e o painel de cardio.
+ *
+ * Branco sobre `#0a0a0a`, medido: `/40` = 3.75:1 · `/45` = 4.39:1 ·
+ * `/50` = 5.15:1. O corte fica em **50**, e o repo padronizou `/55` — a mesma
+ * escolha feita no card Equilíbrio Muscular.
+ *
+ * O `hover:`/`group-hover:` fica de fora de propósito: é estado transitório de
+ * ponteiro, e no celular nem existe. O que precisa passar é o repouso.
+ */
+const BRANCO_FRACO = /(?<!hover:)\btext-white\/(?:[0-4]?[0-9])\b/
+
+/** Exceções do branco fraco. Vazia — a varredura de 12/08/2026 zerou o débito. */
+const EXCECOES_BRANCO: Record<string, string> = {}
+
 const arquivos = readdirSync(ROOT, { recursive: true, encoding: 'utf8' })
   .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__'))
   // Windows devolve '\' — normaliza para casar com as chaves de EXCECOES.
@@ -82,6 +102,19 @@ describe('contraste mínimo de texto', () => {
         'neutral-700 mede 1.91:1 e neutral-800 mede 1.31:1. Use neutral-400 ' +
         '(7.85:1), ou registre a exceção com o motivo se for controle ' +
         'desabilitado ou ícone puramente decorativo.',
+    ).toEqual([])
+  })
+
+  it('branco com opacidade não escapa pela sintaxe', () => {
+    const infratores = arquivos.filter((rel) => {
+      if (EXCECOES_BRANCO[rel]) return false
+      return BRANCO_FRACO.test(readFileSync(join(ROOT, rel), 'utf8'))
+    })
+    expect(
+      infratores,
+      'Sobre #0a0a0a, text-white/40 mede 3.75:1 e /30 mede 2.36:1 — abaixo do ' +
+        'mínimo de 4.5 do WCAG AA, e piores que o neutral-500 que este mesmo ' +
+        'guard já proíbe. Use text-white/55 (5.9:1) ou mais.',
     ).toEqual([])
   })
 

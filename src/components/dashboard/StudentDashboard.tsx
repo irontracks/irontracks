@@ -569,9 +569,9 @@ export default function StudentDashboard(props: Props) {
                   </div>
                   <div className="text-left flex-1">
                     <p className="text-sm font-black text-white">Treino Express</p>
-                    <p className="text-xs text-white/30">IA gera em segundos · 15–45 min</p>
+                    <p className="text-xs text-white/55">IA gera em segundos · 15–45 min</p>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/55">
                     <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
@@ -590,9 +590,9 @@ export default function StudentDashboard(props: Props) {
                   </div>
                   <div className="text-left flex-1">
                     <p className="text-sm font-black text-white">Cardio</p>
-                    <p className="text-xs text-white/30">Corrida, caminhada, bike</p>
+                    <p className="text-xs text-white/55">Corrida, caminhada, bike</p>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/55">
                     <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>

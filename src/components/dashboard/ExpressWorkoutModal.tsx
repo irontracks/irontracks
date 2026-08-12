@@ -113,7 +113,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
             </div>
             <div>
               <p id="express-workout-title" className="font-black text-white text-sm">Treino Express</p>
-              <p className="text-xs text-white/30">IA gera seu treino em segundos</p>
+              <p className="text-xs text-white/55">IA gera seu treino em segundos</p>
             </div>
           </div>
           <button
@@ -130,7 +130,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
         <div className="px-5 pb-6 space-y-4">
           {/* Time */}
           <div className="space-y-2">
-            <p className="text-xs font-black text-white/40 uppercase tracking-widest">Tempo disponível</p>
+            <p className="text-xs font-black text-white/55 uppercase tracking-widest">Tempo disponível</p>
             <div className="grid grid-cols-4 gap-2">
               {TIME_OPTIONS.map(opt => (
                 <button
@@ -144,7 +144,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
                   }}
                 >
                   <span className={`text-sm font-black ${time === opt.value ? 'text-yellow-400' : 'text-white/60'}`}>{opt.label}</span>
-                  <span className="text-[9px] text-white/30">{opt.desc}</span>
+                  <span className="text-[9px] text-white/55">{opt.desc}</span>
                 </button>
               ))}
             </div>
@@ -152,7 +152,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
 
           {/* Focus */}
           <div className="space-y-2">
-            <p className="text-xs font-black text-white/40 uppercase tracking-widest">Foco muscular</p>
+            <p className="text-xs font-black text-white/55 uppercase tracking-widest">Foco muscular</p>
             <div className="grid grid-cols-3 gap-2">
               {FOCUS_OPTIONS.map(opt => (
                 <button
@@ -174,7 +174,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
 
           {/* Equipment */}
           <div className="space-y-2">
-            <p className="text-xs font-black text-white/40 uppercase tracking-widest">Equipamento</p>
+            <p className="text-xs font-black text-white/55 uppercase tracking-widest">Equipamento</p>
             <div className="grid grid-cols-3 gap-2">
               {EQUIPMENT_OPTIONS.map(opt => (
                 <button

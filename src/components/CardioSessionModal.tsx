@@ -74,7 +74,7 @@ function MetricCard({
         border: `1px solid ${accent ? 'rgba(34,197,94,0.2)' : orange ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.06)'}`,
       }}
     >
-      <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{label}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-white/55">{label}</p>
       <p className="text-2xl font-black font-mono" style={{ color }}>{value}</p>
     </div>
   )
@@ -203,7 +203,7 @@ export default function CardioSessionModal({
           <p className="text-sm font-black text-white">
             {activityInfo.emoji} {activityInfo.label}
           </p>
-          <p className="text-[11px] text-white/40 mt-0.5">{dateText}</p>
+          <p className="text-[11px] text-white/55 mt-0.5">{dateText}</p>
         </div>
         <button
           type="button"
@@ -263,7 +263,7 @@ export default function CardioSessionModal({
 
         {/* Activity type selector */}
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Tipo de atividade</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2">Tipo de atividade</p>
           <div className="flex gap-2">
             {ACTIVITY_TYPES.map((t) => (
               <button
@@ -319,7 +319,7 @@ export default function CardioSessionModal({
         {/* Notes */}
         <div>
           <p className="text-sm font-black text-white mb-2">
-            Observações <span className="text-white/30 font-normal">(opcional)</span>
+            Observações <span className="text-white/55 font-normal">(opcional)</span>
           </p>
           <textarea
             value={notes}

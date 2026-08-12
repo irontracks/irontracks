@@ -144,7 +144,7 @@ function CompletionScreen({
         </div>
         <div className="text-center">
           <p className="text-lg font-black text-white">Cardio Concluído!</p>
-          <p className="text-xs text-white/40">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <p className="text-xs text-white/55">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
       </div>
 
@@ -203,7 +203,7 @@ function CompletionScreen({
 
       {/* Notes */}
       <div>
-        <p className="text-sm font-black text-white mb-2">Observações <span className="text-white/30 font-normal">(opcional)</span></p>
+        <p className="text-sm font-black text-white mb-2">Observações <span className="text-white/55 font-normal">(opcional)</span></p>
         <textarea
           ref={textareaRef}
           value={notes}
@@ -281,7 +281,7 @@ function MetricBig({
         border: `1px solid ${accent ? 'rgba(34,197,94,0.2)' : orange ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.06)'}`,
       }}
     >
-      <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{label}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-white/55">{label}</p>
       <p className="text-2xl font-black font-mono" style={{ color }}>{value}</p>
     </div>
   )
@@ -531,7 +531,7 @@ export default function CardioGPSPanel({
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold" style={{ color: signal.color }}>{signal.label}</span>
         {metrics.accuracyMeters !== null && (
-          <span className="text-xs text-white/40">±{Math.round(metrics.accuracyMeters)}m</span>
+          <span className="text-xs text-white/55">±{Math.round(metrics.accuracyMeters)}m</span>
         )}
       </div>
     </div>
@@ -550,7 +550,7 @@ export default function CardioGPSPanel({
 
   const activityTypeSelector = !isTracking && !savedTrackId ? (
     <div className="mb-3 flex-shrink-0">
-      <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Tipo de atividade</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2">Tipo de atividade</p>
       <div className="flex gap-2">
         {ACTIVITY_TYPES.map((t) => (
           <button
@@ -573,7 +573,7 @@ export default function CardioGPSPanel({
           </button>
         ))}
       </div>
-      <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-snug text-white/40">
+      <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-snug text-white/55">
         <MapPin size={11} className="mt-0.5 flex-shrink-0" />
         <span>Rastreamento por GPS (atividades ao ar livre). Para esteira, elíptico ou outro cardio indoor, use o cardio do treino com Tempo e Intensidade — o GPS não registra distância parado.</span>
       </p>
@@ -632,7 +632,7 @@ export default function CardioGPSPanel({
           </div>
           <button
             onClick={handleReset}
-            className="rounded-lg px-3 py-1.5 text-xs text-white/40 hover:text-white transition-colors"
+            className="rounded-lg px-3 py-1.5 text-xs text-white/55 hover:text-white transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)' }}
           >
             Novo
@@ -820,10 +820,10 @@ function MetricCard({
         border: `1px solid ${accent ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)'}`,
       }}
     >
-      <p className="text-xs text-white/40">{label}</p>
+      <p className="text-xs text-white/55">{label}</p>
       <p className={`text-base font-bold ${accent ? 'text-green-400' : 'text-white'}`}>
         {value}
-        {unit && <span className="text-xs text-white/30 ml-0.5">{unit}</span>}
+        {unit && <span className="text-xs text-white/55 ml-0.5">{unit}</span>}
       </p>
     </div>
   )

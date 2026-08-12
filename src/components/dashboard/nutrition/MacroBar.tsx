@@ -7,6 +7,7 @@
  * daqui.
  */
 export { MACRO_COLORS, MACRO_OVER_COLOR } from '@/lib/nutrition/macroColors'
+import { MACRO_SEGMENT_GAP_PX } from '@/lib/nutrition/macroColors'
 import { MACRO_OVER_COLOR } from '@/lib/nutrition/macroColors'
 
 const safeNumber = (value: unknown): number => {
@@ -121,7 +122,15 @@ export default function MacroBar({ label, value, goal, color }: MacroBarProps) {
         {over && (
           <div
             className="absolute inset-y-0 right-0 rounded-r-full transition-all duration-500 ease-out"
-            style={{ width: `${overPct}%`, backgroundColor: MACRO_OVER_COLOR }}
+            /* `borderLeft` na cor da trilha afasta o vermelho do macro. Contra a
+               gordura eram 25° de matiz — o alerta encostado no laranja deixava
+               de ser lido como alerta. Ver MACRO_SEGMENT_GAP_PX. */
+            style={{
+              width: `${overPct}%`,
+              backgroundColor: MACRO_OVER_COLOR,
+              borderLeft: `${MACRO_SEGMENT_GAP_PX}px solid rgba(255,255,255,0.07)`,
+              boxSizing: 'content-box',
+            }}
           />
         )}
       </div>

@@ -300,7 +300,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
           >
             <div>
               <p className="text-sm font-medium text-white">{label}</p>
-              <p className="text-xs text-white/40">{desc}</p>
+              <p className="text-xs text-white/55">{desc}</p>
             </div>
             <button
               onClick={() => toggleSetting(key)}
@@ -344,14 +344,14 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 <span>{gym.is_primary ? '⭐' : '📍'}</span>
                 <div>
                   <p className="text-sm font-medium text-white">{gym.name}</p>
-                  <p className="text-xs text-white/30">Raio: {gym.radius_meters}m</p>
+                  <p className="text-xs text-white/55">Raio: {gym.radius_meters}m</p>
                 </div>
               </div>
               <div className="flex gap-1">
                 {!gym.is_primary && (
                   <button
                     onClick={() => setPrimary(gym.id)}
-                    className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-amber-400 transition-colors"
+                    className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/55 hover:text-amber-400 transition-colors"
                     title="Definir como principal"
                     aria-label={`Definir ${gym.name} como academia principal`}
                   >
@@ -360,7 +360,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 )}
                 <button
                   onClick={() => setQrGym({ id: gym.id, name: gym.name })}
-                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-yellow-400 transition-colors"
+                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/55 hover:text-yellow-400 transition-colors"
                   title="QR Code de check-in"
                   aria-label={`QR Code de check-in de ${gym.name}`}
                 >
@@ -368,7 +368,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 </button>
                 <button
                   onClick={() => deleteGym(gym.id)}
-                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-red-400 transition-colors"
+                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/55 hover:text-red-400 transition-colors"
                   title="Remover"
                   aria-label={`Remover ${gym.name}`}
                 >
@@ -385,7 +385,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
           )}
 
           {gyms.length === 0 && !addingGym && (
-            <p className="text-center text-xs text-white/30 py-4">Nenhuma academia salva</p>
+            <p className="text-center text-xs text-white/55 py-4">Nenhuma academia salva</p>
           )}
 
           {/* Add Gym Form with Autocomplete */}
@@ -434,7 +434,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-white/30 truncate">{s.display}</p>
+                        <p className="text-xs text-white/55 truncate">{s.display}</p>
                       </button>
                     ))}
                   </div>

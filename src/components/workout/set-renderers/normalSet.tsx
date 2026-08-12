@@ -21,6 +21,7 @@ import { AutoloadNote } from './AutoloadNote';
 import { PlateHintLine } from './PlateHintLine';
 import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { FailureToggle } from './FailureToggle';
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -602,7 +603,7 @@ const NormalSetInner = ({
             onBlur={wField.handleBlur}
             placeholder={weightPlaceholder}
             title={sideIsAuto ? (autoSuggestion?.rationale || undefined) : undefined}
-            className={sideIsAuto ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
+            className={sideIsAuto ? `${inputBase} ${MACHINE_ACCENT.field}` : inputBase}
           />
 
           {/* Reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
@@ -784,7 +785,7 @@ const NormalSetInner = ({
               onBlur={weightField.handleBlur}
               placeholder={weightPlaceholder}
               title={isAutoWeight ? (autoSuggestion?.rationale || undefined) : undefined}
-              className={isAutoWeight ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
+              className={isAutoWeight ? `${inputBase} ${MACHINE_ACCENT.field}` : inputBase}
             />
 
             {/* reps — plannedReps becomes the placeholder (narrow column, compact padding) */}

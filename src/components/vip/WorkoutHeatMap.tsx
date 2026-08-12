@@ -163,7 +163,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
           {emptyReason === 'no-gym' ? (
             <>
               <p className="text-sm font-semibold text-white/80">Cadastre sua academia para começar</p>
-              <p className="max-w-[280px] text-xs leading-relaxed text-white/40">
+              <p className="max-w-[280px] text-xs leading-relaxed text-white/55">
                 O check-in é automático: assim que você chega na academia salva, o app registra a presença e ela aparece aqui.
               </p>
               <button
@@ -176,11 +176,11 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
               </button>
             </>
           ) : emptyReason === 'error' ? (
-            <p className="text-sm text-white/30">Não foi possível carregar seus check-ins agora.</p>
+            <p className="text-sm text-white/55">Não foi possível carregar seus check-ins agora.</p>
           ) : (
             <>
-              <p className="text-sm text-white/40">Nenhum check-in neste período</p>
-              <p className="max-w-[280px] text-xs leading-relaxed text-white/30">
+              <p className="text-sm text-white/55">Nenhum check-in neste período</p>
+              <p className="max-w-[280px] text-xs leading-relaxed text-white/55">
                 Abra o app na sua academia para registrar a presença.
               </p>
             </>
@@ -191,20 +191,20 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
           {/* Stats Row */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl p-2 text-center" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
-              <p className="text-xs text-white/40">Check-ins</p>
+              <p className="text-xs text-white/55">Check-ins</p>
               <p className="text-lg font-bold text-amber-400">{totalCheckins}</p>
             </div>
             <div className="rounded-xl p-2 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs text-white/40">Locais</p>
+              <p className="text-xs text-white/55">Locais</p>
               <p className="text-lg font-bold text-white">{uniqueLocations}</p>
             </div>
             <div className="rounded-xl p-2 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-xs text-white/40">Frequência</p>
+              <p className="text-xs text-white/55">Frequência</p>
               <p className="text-lg font-bold text-white">
                 {selectedPeriod === 'month'
                   ? `${(totalCheckins / 4).toFixed(1)}`
                   : `${(totalCheckins / 52).toFixed(1)}`}
-                <span className="text-xs text-white/30 ml-0.5">/sem</span>
+                <span className="text-xs text-white/55 ml-0.5">/sem</span>
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{cluster.name || 'Local desconhecido'}</p>
-                  <p className="text-xs text-white/30">{cluster.count} check-in{cluster.count > 1 ? 's' : ''}</p>
+                  <p className="text-xs text-white/55">{cluster.count} check-in{cluster.count > 1 ? 's' : ''}</p>
                 </div>
                 {/* Intensity bar */}
                 <div className="w-16 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>

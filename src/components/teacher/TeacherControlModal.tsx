@@ -189,7 +189,7 @@ function ExerciseCard({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-black text-white truncate">{ex.name || 'Exercício'}</p>
           {ex.restTime != null && Number(ex.restTime) > 0 && (
-            <p className="text-[10px] text-white/30 mt-0.5">{Number(ex.restTime)}s descanso</p>
+            <p className="text-[10px] text-white/55 mt-0.5">{Number(ex.restTime)}s descanso</p>
           )}
         </div>
         {/* Adjust sets */}
@@ -218,10 +218,10 @@ function ExerciseCard({
 
       {/* Column headers */}
       <div className="grid grid-cols-4 gap-2 px-3 pb-1.5">
-        <div className="text-[9px] font-black uppercase tracking-widest text-white/20 text-center">Série</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-white/20 text-center">Kg</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-white/20 text-center">Reps</div>
-        <div className="text-[9px] font-black uppercase tracking-widest text-white/20 text-center">RPE</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Série</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Kg</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Reps</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">RPE</div>
       </div>
 
       {/* Set rows */}
@@ -346,13 +346,13 @@ export function TeacherControlModal({
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 gap-2 text-white/40">
+          <div className="flex items-center justify-center py-16 gap-2 text-white/55">
             <Loader2 size={18} className="animate-spin" />
             <span className="text-sm">Carregando treino...</span>
           </div>
         ) : exercises.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-white/30">Nenhum exercício neste treino</p>
+            <p className="text-sm text-white/55">Nenhum exercício neste treino</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">

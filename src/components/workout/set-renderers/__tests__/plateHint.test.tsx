@@ -80,7 +80,11 @@ describe('Rodapé da sugestão é compartilhado pelos renderers', () => {
         const src = readFileSync(join(dir, f), 'utf8')
         // Assinatura do RODAPÉ da sugestão (não confundir com o 🧠 que marca as
         // etapas do drop-set, que é outro elemento e pode continuar inline).
-        return /text-\[10px\] text-violet-300\/80/.test(src)
+        // As DUAS formas: a classe literal antiga e o token que a substituiu
+        // (`MACHINE_ACCENT.text`, 12/08/2026). Mirar só na literal deixaria o
+        // guard cego no dia seguinte à migração — uma cópia nova usaria o token
+        // e passaria batido.
+        return /text-\[10px\] text-violet-300\/80|MACHINE_ACCENT\.text/.test(src)
       })
     expect(offenders, 'use <AutoloadNote> — bloco copiado diverge em silêncio').toEqual([])
   })

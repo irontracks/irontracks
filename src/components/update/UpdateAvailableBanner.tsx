@@ -127,7 +127,7 @@ export function UpdateAvailableBanner() {
         <button
           type="button"
           onClick={dismiss}
-          className="flex-shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+          className="flex-shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg text-white/55 hover:text-white hover:bg-white/5 transition-colors"
           aria-label="Fechar aviso de atualização"
         >
           <X size={14} />

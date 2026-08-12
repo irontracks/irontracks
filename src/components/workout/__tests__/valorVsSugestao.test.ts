@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 
 /**
  * Valor digitado × sugestão — auditoria de design, ago/2026.
@@ -48,6 +49,12 @@ describe('tom do placeholder', () => {
     it('a sugestão do motor continua com a moldura violeta própria', () => {
         // O autoload identifica-se por borda/fundo, não por cor de texto —
         // isso não pode se perder junto.
-        expect(normalSet).toContain('border-violet-500/60')
+        //
+        // A moldura saiu da mão e virou `MACHINE_ACCENT.field` (12/08/2026),
+        // então o guard aponta para a FONTE em vez da classe: procurar só a
+        // literal o deixaria cego no dia da migração, e o valor real aqui é
+        // "o campo sugerido tem moldura própria", não "a string é esta".
+        expect(normalSet).toMatch(/MACHINE_ACCENT\.field|border-violet-500\/60/)
+        expect(MACHINE_ACCENT.field, 'a moldura deixou de ser violeta').toContain('border-violet-500/60')
     })
 })
