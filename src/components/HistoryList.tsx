@@ -5,7 +5,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HistorySummaryCard } from '@/components/history/HistorySummaryCard';
 import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/HistoryEmptyStates';
 import {
-    CalendarDays, ChevronLeft, ChevronRight, Clock,
+    CalendarDays, ChevronLeft, ChevronRight, Clock, MoreHorizontal,
     Dumbbell, Edit3, History, MapPin, Plus, Trash2, TrendingUp,
     CheckCircle2, Circle, Lock, Activity, RotateCcw,
 } from 'lucide-react';
@@ -76,6 +76,15 @@ const HistoryList: React.FC<HistoryListProps> = ({
     // ── Virtualized list ─────────────────────────────────────────────────────
     const parentRef = useRef<HTMLDivElement | null>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
+    /**
+     * Id da sessão cujas ações estão abertas. Antes os três botões (excluir,
+     * retomar, editar) ficavam SEMPRE visíveis: 44pt cada, somando ~152px que
+     * estrangulavam o título — "TER · Lower A ..." truncado no aparelho — e,
+     * pior, deixavam a EXCLUSÃO como primeiro alvo da linha, a um toque.
+     * O card de treino do dashboard já resolvia isso com disclosure; esta tela
+     * ficou para trás. Mesma solução, para as duas não divergirem.
+     */
+    const [acoesAbertas, setAcoesAbertas] = useState<string | null>(null);
     useLayoutEffect(() => {
         const el = parentRef.current;
         if (!el) return;
@@ -287,15 +296,34 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                         {meta.vol > 0 && (
                                                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-yellow-500/80 bg-yellow-500/5 border border-yellow-500/15 px-2 py-0.5 rounded-full">
                                                                                 <TrendingUp size={10} />
-                                                                                {meta.vol >= 1000 ? `${(meta.vol / 1000).toFixed(1)}t` : `${Math.round(meta.vol)}kg`}
+                                                                                {meta.vol >= 1000 ? `${(meta.vol / 1000).toFixed(1)}\u2009t` : `${Math.round(meta.vol)}\u2009kg`}
                                                                             </span>
                                                                         )}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center gap-2.5 shrink-0">
-                                                                {!isReadOnly && !isSelectionMode && (
+                                                                {!isReadOnly && !isSelectionMode && acoesAbertas !== String(session?.id) && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => { e.stopPropagation(); setAcoesAbertas(String(session?.id)); }}
+                                                                        className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:text-white active:scale-95"
+                                                                        aria-label="Ações da sessão"
+                                                                        aria-expanded={false}
+                                                                    >
+                                                                        <MoreHorizontal size={16} className="pointer-events-none" />
+                                                                    </button>
+                                                                )}
+                                                                {!isReadOnly && !isSelectionMode && acoesAbertas === String(session?.id) && (
                                                                     <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); setAcoesAbertas(null); }}
+                                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:text-white active:scale-95"
+                                                                            aria-label="Fechar ações"
+                                                                        >
+                                                                            <ChevronRight size={16} className="pointer-events-none" />
+                                                                        </button>
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => handleDeleteClick(e, session)}
