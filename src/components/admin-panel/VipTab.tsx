@@ -392,7 +392,7 @@ export const VipTab: React.FC = () => {
                                             <span className="font-bold text-white text-sm truncate">{item.name || item.email || 'Sem Nome'}</span>
                                             <TierBadge tier={item.tier} size="sm" />
                                             {isExpiring && (
-                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/15 text-amber-400 border border-amber-500/20">
                                                     <AlertCircle size={8} />
                                                     Expirando
                                                 </span>

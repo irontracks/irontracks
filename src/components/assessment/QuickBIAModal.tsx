@@ -24,6 +24,8 @@ import {
   biaExtractionToAnthropometry,
 } from '@/utils/storage/biaExtraction'
 import type { BiaExtractionData } from '@/utils/storage/biaExtraction'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface QuickBIAModalProps {
   isOpen: boolean
@@ -70,6 +72,9 @@ export default function QuickBIAModal({
   onClose,
   onSaved,
 }: QuickBIAModalProps) {
+  /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
+  const dlgRef = useFocusTrap(isOpen, onClose)
+
   const [form, setForm] = useState<FormState>(buildInitial())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -187,7 +192,7 @@ export default function QuickBIAModal({
           exit={{ scale: 0.95, opacity: 0 }}
         >
           {/* Gold shimmer */}
-          <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
+          <div ref={dlgRef} {...dialogProps('Avaliação rápida por bioimpedância')} className="h-px bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent" />
 
           {/* Header */}
           <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-white/5">

@@ -1,37 +1,37 @@
 /**
- * Ratchet: overlay de tela inteira sem semântica de janela (12/08/2026).
+ * Ratchet: overlay de tela inteira sem semântica de janela.
  *
- * ## O que estava acontecendo
- * 76 componentes desenham um `fixed inset-0`. Em 42 deles não havia
- * `role="dialog"`: para o leitor de tela, abrir a janela não anunciava nada, ela
- * não tinha nome, e o conteúdo por baixo seguia sendo lido como se ainda
- * estivesse ao alcance.
+ * 76 componentes desenham um `fixed inset-0`. Em 42 não havia `role="dialog"`:
+ * abrir a janela não anunciava nada, ela não tinha nome, e o conteúdo por baixo
+ * seguia sendo lido como se estivesse ao alcance.
  *
- * ## Por que uma lista, e não uma correção de uma vez
- * Corrigir os 42 numa tacada exigiria tocar em Story composer, avaliação por
- * foto, área do professor e chat — áreas que nunca foram auditadas — e
- * `aria-modal` só é honesto acompanhado de `useFocusTrap`, que MUDA
- * comportamento (foco automático ao abrir, teclado subindo no iOS). Isso não se
- * entrega no escuro. O primeiro lote foi o fluxo mais usado do app: os 12
- * modais do treino ativo.
+ * ## A triagem (12/08/2026)
+ *
+ * A primeira versão desta lista era BRUTA — 40 caminhos sem classificação, com
+ * um aviso de que nem todo `fixed inset-0` é janela. Isso era honesto e inútil:
+ * quem fosse corrigir teria de refazer a análise, e o risco era alguém marcar um
+ * splash como `dialog` — **atributo errado é pior que ausente**, porque o leitor
+ * de tela passa a anunciar com confiança uma coisa falsa.
+ *
+ * A lista agora está separada por NATUREZA, e a distinção é observável no código,
+ * não no nome do arquivo (`CardioSessionModal` não é modal; `SessionDeloadBanner`
+ * é):
+ *
+ * - **janela** — cobre a tela com um véu escuro (`bg-black/NN`), o conteúdo fica
+ *   centrado, e existe um fora para clicar. É o que vira `dialog`.
+ * - **não é janela** — ocupa a tela porque É a tela (view de navegação, splash,
+ *   visualizador imersivo), ou porque é outra coisa com semântica própria: menu
+ *   (`role="menu"`), barra de descanso que não bloqueia, banner.
  *
  * ## A regra
- * A lista **só encolhe**. Arquivo novo com `fixed inset-0` e sem semântica de
- * janela reprova; entrada que já foi corrigida e continua aqui também reprova —
- * sem essa segunda metade a lista vira papel de parede e o débito fica
- * congelado com cara de resolvido.
  *
- * ## Cuidado ao remover uma entrada
- * Nem todo `fixed inset-0` é modal: splash de carregamento, tela cheia de
- * navegação, banner de topo e a barra do descanso ocupam a tela sem serem
- * janela — e marcar essas como `dialog` seria pior que o silêncio de hoje,
- * porque o leitor de tela anunciaria com confiança uma coisa que não é verdade.
- * A triagem NÃO foi feita: a lista abaixo é bruta, e classificar cada caso é
- * parte do trabalho de quem for corrigir.
+ * `JANELA_PENDENTE` **só encolhe**, nas duas direções: entrada nova reprova, e
+ * entrada já corrigida que não sai também reprova. `NAO_E_JANELA` carrega o
+ * motivo de cada uma — sem motivo, não entra, senão vira gaveta de silenciar
+ * guard.
  *
- * Padrão a seguir: `dialogProps()` de `utils/a11y/backdrop` no container +
- * `useFocusTrap` + `backdropProps()` no fundo. Exemplo pronto:
- * `components/workout/Modals.tsx`.
+ * Padrão a seguir: `dialogProps()` no container + `useFocusTrap` + `backdropProps()`
+ * no fundo. Exemplos prontos: `workout/Modals.tsx`, `lab-exams/LabExamUploadModal.tsx`.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -39,50 +39,48 @@ import { join } from 'node:path'
 
 const SRC = join(__dirname, '..')
 
-/** Débito conhecido. SÓ ENCOLHE. */
-const SEM_SEMANTICA_DE_JANELA = new Set([
-    'components/ActiveWorkout.tsx',
-    'components/AdminPanelV2.tsx',
-    'components/CardioSessionModal.tsx',
-    'components/CardioStoryComposer.tsx',
-    'components/ChatDirectScreen.tsx',
-    'components/ChatListScreen.tsx',
-    'components/ExerciseEditor/EditorHeader.tsx',
-    'components/GymQRCode.tsx',
-    'components/HistoryList.tsx',
-    'components/LoadingScreen.tsx',
-    'components/LoginScreen.tsx',
-    'components/NotificationCenter.tsx',
-    'components/NutritionStoryComposer.tsx',
-    'components/ProgressPhotos.tsx',
-    'components/ServiceWorkerRegister.tsx',
-    'components/StoryComposer.tsx',
-    'components/StoryComposerIosSavePanel.tsx',
-    'components/WorkoutReport.tsx',
-    'components/admin-panel/StudentWorkoutsTab.tsx',
-    'components/assessment/AssessmentButton.tsx',
-    'components/assessment/QuickBIAModal.tsx',
-    'components/body-photo/BodyPhotoCaptureModal.tsx',
-    'components/body-photo/BodyPhotoHistoryModal.tsx',
-    'components/dashboard/WeeklyMuscleSummary.tsx',
-    'components/dashboard/WorkoutToolsPanel.tsx',
-    'components/dashboard/nutrition/BarcodeScanner.tsx',
-    'components/lab-exams/LabExamUploadModal.tsx',
-    'components/lab-exams/LabExamsSection.tsx',
-    'components/stories/StoryViewer.tsx',
-    'components/student/StudentSubscriptionCard.tsx',
-    'components/teacher-area/TeacherArea.tsx',
-    'components/teacher-area/TeacherAreaNav.tsx',
-    'components/teacher-area/TeacherChatHost.tsx',
-    'components/teacher/ServicePlanModal.tsx',
-    'components/teacher/TeacherControlModal.tsx',
-    'components/teacher/TeacherUpgradeModal.tsx',
-    'components/ui/PremiumUI.tsx',
-    'components/vip/PeriodizationCreateModal.tsx',
-    'components/workout/RestTimerOverlay.tsx',
-    'components/workout/SessionDeloadBanner.tsx',
-])
+/**
+ * NÃO são janelas — e por isso NÃO podem virar `dialog`. Cada uma com o motivo.
+ */
+const NAO_E_JANELA: Record<string, string> = {
+  'components/ActiveWorkout.tsx': 'a TELA do treino ativo — view de navegação, não janela sobre a página',
+  'components/AdminPanelV2.tsx': 'painel administrativo em tela cheia',
+  'components/ChatDirectScreen.tsx': 'tela de conversa',
+  'components/ChatListScreen.tsx': 'tela de lista de conversas',
+  'components/HistoryList.tsx': 'tela de histórico',
+  'components/WorkoutReport.tsx': 'tela de relatório do treino',
+  'components/LoadingScreen.tsx': 'splash de carregamento — não há nada para anunciar nem foco a prender',
+  'components/ServiceWorkerRegister.tsx': 'falso positivo: a string aparece dentro de um COMENTÁRIO, não há overlay',
+  'components/dashboard/WeeklyMuscleSummary.tsx': 'tela do resumo semanal',
+  'components/teacher-area/TeacherArea.tsx': 'tela da área do professor',
+  'components/CardioSessionModal.tsx': 'apesar do nome, é tela cheia sem véu — sessão de cardio em andamento',
+  'components/teacher/TeacherControlModal.tsx': 'idem: tela cheia de controle, sem backdrop',
+  'components/stories/StoryViewer.tsx': 'visualizador imersivo em tela cheia (linguagem do formato story), não janela',
+  'components/StoryComposer.tsx': 'editor em tela cheia',
+  'components/NutritionStoryComposer.tsx': 'editor em tela cheia',
+  'components/CardioStoryComposer.tsx': 'editor em tela cheia',
+  'components/StoryComposerIosSavePanel.tsx': 'painel de salvar em tela cheia',
+  'components/dashboard/nutrition/BarcodeScanner.tsx': 'câmera em tela cheia',
+  'components/workout/RestTimerOverlay.tsx': 'barra do descanso — cobre a tela sem bloquear a interação por baixo',
+  'components/ExerciseEditor/EditorHeader.tsx': 'é um MENU (role="menu"), semântica própria — dialog seria errado',
+  'components/ui/PremiumUI.tsx': 'ModalOverlay sem nenhum consumidor no repo (código morto, verificado)',
+}
 
+/** Janelas de verdade que ainda não têm a semântica. SÓ ENCOLHE. */
+const JANELA_PENDENTE = new Set([
+  'components/LoginScreen.tsx',
+  'components/NotificationCenter.tsx',
+  'components/ProgressPhotos.tsx',
+  'components/admin-panel/StudentWorkoutsTab.tsx',
+  'components/assessment/AssessmentButton.tsx',
+  'components/dashboard/WorkoutToolsPanel.tsx',
+  'components/lab-exams/LabExamsSection.tsx',
+  'components/student/StudentSubscriptionCard.tsx',
+  'components/teacher-area/TeacherAreaNav.tsx',
+  'components/teacher-area/TeacherChatHost.tsx',
+  'components/vip/PeriodizationCreateModal.tsx',
+  'components/workout/SessionDeloadBanner.tsx',
+])
 const listarTsx = (dir: string): string[] =>
   readdirSync(join(SRC, dir), { withFileTypes: true }).flatMap((e) =>
     e.isDirectory()
@@ -105,7 +103,7 @@ describe('ratchet de semântica de janela', () => {
     const novos = comOverlay
       .filter((f) => !TEM_JANELA.test(f.src))
       .map((f) => f.rel)
-      .filter((rel) => !SEM_SEMANTICA_DE_JANELA.has(rel))
+      .filter((rel) => !JANELA_PENDENTE.has(rel) && !(rel in NAO_E_JANELA))
 
     expect(
       novos,
@@ -120,15 +118,15 @@ describe('ratchet de semântica de janela', () => {
     // Sem isto a lista nunca encolhe de verdade: o débito seria "resolvido" no
     // código e continuaria contabilizado aqui para sempre.
     const jaCorrigidos = comOverlay
-      .filter((f) => TEM_JANELA.test(f.src) && SEM_SEMANTICA_DE_JANELA.has(f.rel))
+      .filter((f) => TEM_JANELA.test(f.src) && JANELA_PENDENTE.has(f.rel))
       .map((f) => f.rel)
 
-    expect(jaCorrigidos, 'já tem semântica de janela — remova de SEM_SEMANTICA_DE_JANELA').toEqual([])
+    expect(jaCorrigidos, 'já tem semântica de janela — remova de JANELA_PENDENTE').toEqual([])
   })
 
   it('a lista não cita arquivo que sumiu ou perdeu o overlay', () => {
     const vivos = new Set(comOverlay.map((f) => f.rel))
-    const fantasmas = [...SEM_SEMANTICA_DE_JANELA].filter((rel) => !vivos.has(rel))
+    const fantasmas = [...JANELA_PENDENTE, ...Object.keys(NAO_E_JANELA)].filter((rel) => !vivos.has(rel))
     expect(fantasmas, 'entrada obsoleta — remova').toEqual([])
   })
 })

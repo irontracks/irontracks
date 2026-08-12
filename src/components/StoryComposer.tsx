@@ -172,10 +172,10 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                         <div className="absolute left-0 right-0 top-0 bg-black/25" style={{ height: `${(SAFE_TOP / CANVAS_H) * 100}%` }} />
                         <div className="absolute left-0 right-0 bottom-0 bg-black/25" style={{ height: `${(SAFE_BOTTOM / CANVAS_H) * 100}%` }} />
                         <div className="absolute left-0 right-0 flex items-center justify-center" style={{ top: `${(SAFE_TOP / CANVAS_H) * 100 - 5}%` }}>
-                          <span className="text-[7px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">SAFE TOP</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">SAFE TOP</span>
                         </div>
                         <div className="absolute left-0 right-0 flex items-center justify-center" style={{ bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100 - 5}%` }}>
-                          <span className="text-[7px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">SAFE BOTTOM</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">SAFE BOTTOM</span>
                         </div>
                       </div>
                     )}

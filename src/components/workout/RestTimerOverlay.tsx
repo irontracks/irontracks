@@ -763,7 +763,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                     : formatDuration(baseSeconds)}
                             </span>
                             <span
-                                className="text-[6px] font-black uppercase mt-0.5 leading-none"
+                                className="text-[9px] font-black uppercase mt-0.5 leading-none"
                                 style={{
                                     color: isOvertime ? '#ef4444' : isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#737373',
                                     letterSpacing: '0.02em',

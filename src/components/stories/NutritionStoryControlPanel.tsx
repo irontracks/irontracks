@@ -91,7 +91,7 @@ export function NutritionStoryControlPanel({
                 className="block h-7 w-7 rounded-full ring-1 ring-white/20"
                 style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0%, ${t.swatch[1]} 100%)` }}
               />
-              <span className={['text-[8px] font-bold uppercase tracking-wide truncate w-full text-center',
+              <span className={['text-[9px] font-bold uppercase tracking-wide truncate w-full text-center',
                 templateId === t.id ? 'text-white' : 'text-neutral-400',
               ].join(' ')}>{t.name}</span>
             </button>

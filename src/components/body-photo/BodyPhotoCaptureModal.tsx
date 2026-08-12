@@ -11,6 +11,8 @@ import { BODY_PHOTO_FLEXED_POSES, BODY_PHOTO_POSES, BODY_PHOTO_RELAXED_POSES, PO
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
 import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type Stage = 'capture' | 'processing' | 'result' | 'error'
 
@@ -58,6 +60,9 @@ interface Props {
 }
 
 export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentUserId, gender = 'M', onSaved }) => {
+    /* `aria-modal` sem confinar o Tab seria promessa falsa — andam juntos. */
+    const dlgRef = useFocusTrap(open, onClose)
+
     const [stage, setStage] = useState<Stage>('capture')
     const [photos, setPhotos] = useState<Partial<Record<BodyPhotoPose, CompressedPhoto>>>({})
     const [busyPose, setBusyPose] = useState<BodyPhotoPose | null>(null)
@@ -202,7 +207,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
 
     return (
         <div className="fixed inset-0 z-[2200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-            <div className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
+            <div ref={dlgRef} {...dialogProps('Capturar foto corporal')} className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 shrink-0">
                     <div className="flex items-center gap-2.5">

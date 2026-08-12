@@ -241,7 +241,7 @@ const IronRankCard = memo(function IronRankCard({
                                 </div>
                                 {/* Title */}
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[8px] font-black uppercase tracking-[0.22em] text-yellow-500 leading-none mb-0.5">Iron Rank</div>
+                                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500 leading-none mb-0.5">Iron Rank</div>
                                     <div className="text-white font-black text-[13px] leading-tight truncate">{levelName}</div>
                                 </div>
                                 {/* Streak + arrow */}
@@ -320,9 +320,9 @@ const IronRankCard = memo(function IronRankCard({
 
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-yellow-500">Novos Recordes</span>
+                                        <span className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500">Novos Recordes</span>
                                         {prs.length > 0 && (
-                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase text-black"
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase text-black"
                                                 style={{ background: 'linear-gradient(90deg, #d97706, #f59e0b)' }}>
                                                 {prs.length} PR{prs.length > 1 ? 's' : ''}
                                             </span>

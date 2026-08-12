@@ -529,7 +529,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     className="h-2 rounded-full"
                     style={{ background: 'linear-gradient(90deg, #3f3f46 0%, #3f3f46 12%, #eab308 34%, #f59e0b 56%, #fb923c 78%, #ef4444 100%)' }}
                   />
-                  <div className="mt-1 flex justify-between text-[8px] leading-none font-black uppercase tracking-wider">
+                  <div className="mt-1 flex justify-between text-[9px] leading-none font-black uppercase tracking-wider">
                     <span className="text-neutral-400">Nenhum</span>
                     <span className="text-yellow-500/80">Baixo</span>
                     <span className="text-amber-400/80">Na meta</span>
