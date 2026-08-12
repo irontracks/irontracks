@@ -29,6 +29,8 @@ import { BodyFatCrossCheckCard } from './BodyFatCrossCheckCard'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
 import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 /**
  * Sem prop `open`: o pai MONTA este componente só quando abre. Assim o estado
@@ -90,6 +92,9 @@ const ScorePill = ({ label, value }: { label: string; value: number | null }) =>
 )
 
 export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
+    /* `aria-modal` sem confinar o Tab seria promessa falsa — andam juntos. */
+    const dlgRef = useFocusTrap(true, onClose)
+
     const {
         items, listLoading, listError, reloadList,
         detail, detailLoading, detailError, openDetail, backToList,
@@ -119,7 +124,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
 
     return (
         <div className="fixed inset-0 z-[2200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-            <div className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
+            <div ref={dlgRef} {...dialogProps('Histórico de fotos corporais')} className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">

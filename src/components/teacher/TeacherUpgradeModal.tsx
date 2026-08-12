@@ -16,6 +16,8 @@ import type {
 } from '@/lib/api/teacher-billing'
 import type { TeacherPlanState } from '@/hooks/useTeacherPlan'
 import { backdropProps } from '@/utils/a11y/backdrop'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,9 @@ const StatusBadge = ({ status }: { status: string }) => {
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function TeacherUpgradeModal({ open, onClose, planState }: TeacherUpgradeModalProps) {
+  /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
+  const dlgRef = useFocusTrap(open, onClose)
+
   const [step, setStep] = useState<Step>('plans')
   const [plans, setPlans] = useState<TeacherPlanRow[]>([])
   const [loadingPlans, setLoadingPlans] = useState(false)
@@ -238,7 +243,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
       {...backdropProps(() => onClose(), 'Fechar upgrade')}
     >
-      <div className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+      <div ref={dlgRef} {...dialogProps('Assinatura de professor')} className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-neutral-800 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">

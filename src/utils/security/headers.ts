@@ -24,7 +24,15 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co https://*.supabase.in https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org`,
     `media-src 'self' blob: https://*.supabase.co https://*.supabase.in https://res.cloudinary.com`,
-    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com`,
+    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com https://api.cloudinary.com https://itunes.apple.com`,
+    // `api.cloudinary.com` e `itunes.apple.com` entraram em 12/08/2026 pelos
+    // RELATÓRIOS, não por leitura de código: foram as duas unicas violacoes da
+    // primeira janela em Report-Only (16 eventos, 24 h). A primeira e o
+    // provedor de storage — em modo bloqueante teria caido TODO upload de
+    // imagem do app (avaliacao corporal, avatar, story); a segunda e o lookup
+    // da App Store que alimenta o aviso de nova versao. Nenhuma das duas
+    // aparecia no header antes, e nenhuma teria sido notada sem o modo
+    // relatorio — que e exatamente o motivo de ele existir.
     `frame-src 'none'`,
     `frame-ancestors 'none'`,
     `object-src 'none'`,

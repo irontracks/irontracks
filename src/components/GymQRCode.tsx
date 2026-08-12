@@ -15,6 +15,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Download, Loader2, RefreshCw, X, QrCode, Check } from 'lucide-react'
 import { toCanvas as qrToCanvas } from 'qrcode'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface GymQRCodeProps {
   /** UUID of the gym owned by the current user */
@@ -24,6 +26,9 @@ interface GymQRCodeProps {
 }
 
 export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
+  /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
+  const dlgRef = useFocusTrap(true, onClose)
+
   useBackHandler(true, onClose)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -103,7 +108,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
 
   return (
     <div className="fixed inset-0 z-[1600] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden">
+      <div ref={dlgRef} {...dialogProps('QR Code da academia')} className="w-full max-w-sm bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
           <div className="flex items-center gap-2">

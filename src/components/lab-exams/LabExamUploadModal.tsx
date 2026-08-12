@@ -8,6 +8,8 @@ import { LAB_PROTOCOL_DISCLAIMER, type LabProtocol } from '@/schemas/labExam'
 import { LabExamProtocolView } from './LabExamProtocolView'
 import { VipUpsellCard } from '@/components/vip/VipUpsellCard'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type Stage = 'select' | 'processing' | 'result' | 'error' | 'upsell'
 
@@ -26,6 +28,9 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; erro
 }
 
 export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Props) {
+  /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
+  const dlgRef = useFocusTrap(open, onClose)
+
   const [stage, setStage] = useState<Stage>('select')
   const [files, setFiles] = useState<File[]>([])
   const [examDate, setExamDate] = useState('')
@@ -113,7 +118,7 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
 
   return (
     <div className="fixed inset-0 z-[2200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
+      <div ref={dlgRef} {...dialogProps('Enviar exame laboratorial')} className="w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl border border-neutral-800 bg-neutral-950 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 shrink-0">
           <div className="flex items-center gap-2.5">

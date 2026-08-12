@@ -9,6 +9,8 @@ import { apiTeacherServicePlans } from '@/lib/api/student-billing'
 import type { ServicePlan, BillingInterval, TrainingDay } from '@/lib/api/student-billing'
 import { NumericInput } from '@/components/ui/NumericInput'
 import { backdropProps } from '@/utils/a11y/backdrop'
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,9 @@ interface ServicePlanModalProps {
 }
 
 export default function ServicePlanModal({ open, plan, onClose, onSaved }: ServicePlanModalProps) {
+  /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
+  const dlgRef = useFocusTrap(open, onClose)
+
   const [form, setForm] = useState({ ...DEFAULT })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -134,7 +139,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
       className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
       {...backdropProps(() => onClose(), 'Fechar plano de serviço')}
     >
-      <div className="relative w-full max-w-lg bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
+      <div ref={dlgRef} {...dialogProps('Plano de serviço')} className="relative w-full max-w-lg bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-neutral-800 flex-shrink-0">
           <div>
