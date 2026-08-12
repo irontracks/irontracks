@@ -9,7 +9,8 @@ import { useWorkoutTimer } from './WorkoutTimerContext';
 import { isObject, buildBlocksByCount, normalizeExerciseKey, getSuggestion, watermarkPlaceholder } from './utils';
 import { normalizeMiniSets } from './helpers/restPauseRules';
 import { UnknownRecord, WorkoutExercise } from './types';
-import { backdropProps } from '@/utils/a11y/backdrop'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 /**
  * ModalsComplexMethods
@@ -41,6 +42,16 @@ export function ModalsComplexMethods() {
     const clusterSug = getSuggestion(deloadSuggestions, String((clusterModal as UnknownRecord | null)?.key ?? ''));
 
     // Ticker drives the 1-second check that turns rest buttons green when done
+    /* Um trap por janela — `aria-modal` sem confinar o Tab seria promessa falsa
+       (ver `utils/a11y/backdrop`). O `isOpen` é argumento, então a chamada é
+       incondicional e a ordem dos hooks nunca muda. */
+    const restPauseRef = useFocusTrap(!!restPauseModal, () => setRestPauseModal(null));
+    const dropSetRef = useFocusTrap(!!dropSetModal, () => setDropSetModal(null));
+    const strippingRef = useFocusTrap(!!strippingModal, () => setStrippingModal(null));
+    const fst7Ref = useFocusTrap(!!fst7Modal, () => setFst7Modal(null));
+    const waveRef = useFocusTrap(!!waveModal, () => setWaveModal(null));
+    const clusterRef = useFocusTrap(!!clusterModal, () => setClusterModal(null));
+
     const { ticker } = useWorkoutTimer();
     // Maps "{modalKey}-{kind}-{idx}" → timestamp when the user tapped the rest button
     const [restStartedAt, setRestStartedAt] = React.useState<Record<string, number>>({});
@@ -58,6 +69,7 @@ export function ModalsComplexMethods() {
                     {...backdropProps(() => setRestPauseModal(null))}
                 >
                     <div
+                        ref={restPauseRef} {...dialogProps('Preencher minis do Rest-Pause')}
                         className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -71,7 +83,7 @@ export function ModalsComplexMethods() {
                             </div>
                             <button
                                 type="button"
-                                {...backdropProps(() => setRestPauseModal(null))}
+                                onClick={() => setRestPauseModal(null)}
                                 className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                 aria-label="Fechar"
                             >
@@ -242,7 +254,7 @@ export function ModalsComplexMethods() {
                         <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2 flex-shrink-0">
                             <button
                                 type="button"
-                                {...backdropProps(() => setRestPauseModal(null))}
+                                onClick={() => setRestPauseModal(null)}
                                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                             >
                                 Cancelar
@@ -306,7 +318,8 @@ export function ModalsComplexMethods() {
                         {...backdropProps(() => setDropSetModal(null))}
                     >
                         <div
-                            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                            ref={dropSetRef} {...dialogProps('Etapas do Drop-Set')}
+                        className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
@@ -317,7 +330,7 @@ export function ModalsComplexMethods() {
                                 </div>
                                 <button
                                     type="button"
-                                    {...backdropProps(() => setDropSetModal(null))}
+                                    onClick={() => setDropSetModal(null)}
                                     className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                     aria-label="Fechar"
                                 >
@@ -409,7 +422,7 @@ export function ModalsComplexMethods() {
                             <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
                                 <button
                                     type="button"
-                                    {...backdropProps(() => setDropSetModal(null))}
+                                    onClick={() => setDropSetModal(null)}
                                     className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                                 >
                                     Cancelar
@@ -435,7 +448,7 @@ export function ModalsComplexMethods() {
                     : [];
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Stripping" onClick={() => setStrippingModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setStrippingModal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                        <div ref={strippingRef} {...dialogProps('Etapas do Stripping')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Stripping</div>
@@ -477,7 +490,7 @@ export function ModalsComplexMethods() {
                 const intraSec = parseTrainingNumber(fst7Modal.intra_sec) ?? 30;
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal FST-7" onClick={() => setFst7Modal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setFst7Modal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                        <div ref={fst7Ref} {...dialogProps('Séries do FST-7')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">FST-7</div>
@@ -525,7 +538,7 @@ export function ModalsComplexMethods() {
                     : [{ heavy: 3, medium: 5, ultra: 2 }, { heavy: 3, medium: 5, ultra: 2 }];
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Wave" onClick={() => setWaveModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setWaveModal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                        <div ref={waveRef} {...dialogProps('Ondas da série')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Onda (Wave Loading)</div>
@@ -592,6 +605,7 @@ export function ModalsComplexMethods() {
                     {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
                 >
                     <div
+                        ref={clusterRef} {...dialogProps('Preencher blocos do cluster')}
                         className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
