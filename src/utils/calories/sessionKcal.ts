@@ -9,6 +9,7 @@
 import { estimateCaloriesMet } from './metEstimate'
 import { estimateCardioKcal } from './cardioKcal'
 import { isCardioExercise } from '@/utils/exercise/isCardio'
+import type { SessionKcalInputs } from './sessionKcalInputs'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
@@ -31,12 +32,6 @@ function hasNonCardioWork(session: Record<string, unknown>, logs: Record<string,
   })
 }
 
-export interface SessionKcalOpts {
-  bodyWeightKg?: number | null
-  biologicalSex?: string | null
-  rpe?: number | null
-}
-
 export interface SessionKcalBreakdown {
   /** Total da sessão (força + cardio), arredondado. */
   total: number
@@ -53,7 +48,7 @@ export interface SessionKcalBreakdown {
  * relatório pra dar a cada exercício de cardio sua kcal-MET exata e ratear só o
  * restante (força) entre os demais.
  */
-export function estimateSessionKcalBreakdown(session: unknown, opts: SessionKcalOpts = {}): SessionKcalBreakdown {
+export function estimateSessionKcalBreakdown(session: unknown, inputs: SessionKcalInputs): SessionKcalBreakdown {
   const sessionObj = isRecord(session) ? session : {}
   const sessionLogs = isRecord(sessionObj.logs) ? sessionObj.logs : {}
   const totalTimeSeconds = Number(sessionObj.totalTime) || 0
@@ -73,25 +68,12 @@ export function estimateSessionKcalBreakdown(session: unknown, opts: SessionKcal
         .filter(Boolean)
     : null
 
-  // Body weight: profile (opts) first, then session pre-checkin.
-  const pcRaw = isRecord(sessionObj.preCheckin) ? (sessionObj.preCheckin as Record<string, unknown>) : null
-  const bwCandidates: unknown[] = [
-    opts.bodyWeightKg,
-    pcRaw?.weight,
-    pcRaw?.body_weight_kg,
-    isRecord(pcRaw?.answers) ? (pcRaw!.answers as Record<string, unknown>).body_weight_kg : null,
-  ]
-  const bodyWeightKg = bwCandidates.reduce<number | null>((acc, c) => {
-    if (acc !== null) return acc
-    const n = Number(c)
-    return Number.isFinite(n) && n >= 20 && n <= 300 ? n : null
-  }, null)
-
-  const sexRaw = String(opts.biologicalSex ?? sessionObj.biologicalSex ?? '').toLowerCase()
-  const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
-
-  const rpeNum = Number(opts.rpe)
-  const rpeValue = Number.isFinite(rpeNum) && rpeNum >= 1 && rpeNum <= 10 ? rpeNum : null
+  // Peso / sexo / RPE já vêm RESOLVIDOS por `sessionKcalInputs` — a ordem de
+  // precedência (check-in > perfil > default) mora lá, e só lá, para que as 7
+  // superfícies que estimam kcal não voltem a divergir entre si.
+  const bodyWeightKg = inputs.bodyWeightKg
+  const bioSex = inputs.biologicalSex
+  const rpeValue = inputs.rpe
 
   const execSec = Number(sessionObj.executionTotalSeconds ?? sessionObj.execution_total_seconds ?? 0) || 0
   const restSec = Number(sessionObj.restTotalSeconds ?? sessionObj.rest_total_seconds ?? 0) || 0
@@ -148,10 +130,9 @@ export function estimateSessionKcalBreakdown(session: unknown, opts: SessionKcal
 
 /**
  * Estimates calories burned for a completed session (strength + cardio), given
- * its saved session object (the parsed `workouts.notes` JSON). Returns 0 when
- * there's not enough data. Body weight / sex from the user profile take
- * precedence over the session's pre-checkin values.
+ * its saved session object (the parsed `workouts.notes` JSON) and os ingredientes
+ * resolvidos por `sessionKcalInputs`. Returns 0 when there's not enough data.
  */
-export function estimateSessionKcal(session: unknown, opts: SessionKcalOpts = {}): number {
-  return estimateSessionKcalBreakdown(session, opts).total
+export function estimateSessionKcal(session: unknown, inputs: SessionKcalInputs): number {
+  return estimateSessionKcalBreakdown(session, inputs).total
 }

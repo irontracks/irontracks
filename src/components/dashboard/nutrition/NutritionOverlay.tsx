@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { sessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 import { DEFAULT_GOALS, resolveDisplayGoals } from '@/lib/nutrition/displayGoals'
@@ -138,13 +139,15 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
         // Real per-session kcal from the saved session JSON (`notes`), using the
         // SAME MET model as the workout report — so this matches the "~X kcal" the
         // report shows, instead of a flat 300/session estimate.
-        const kcalBodyWeight = snapshot.profile?.bodyWeightKg ?? null
-        const kcalSex = snapshot.profile?.biologicalSex ?? null
+        // Ingredientes pelo leitor único: o RPE do pós-treino está DENTRO do
+        // JSON da sessão, então esta tela chega no mesmo número do relatório sem
+        // ir ao banco atrás do check-in (era a divergência de 744 × 698 kcal).
+        const kcalProfile = snapshot.profile ?? null
         let workoutCalories = 0
         for (const w of Array.isArray(sessionsRes.data) ? sessionsRes.data : []) {
           try {
             const notes = JSON.parse(String((w as { notes?: unknown }).notes ?? ''))
-            workoutCalories += estimateSessionKcal(notes, { bodyWeightKg: kcalBodyWeight, biologicalSex: kcalSex })
+            workoutCalories += estimateSessionKcal(notes, sessionKcalInputs(notes, kcalProfile))
           } catch { /* sem JSON de sessão → ignora este treino */ }
         }
 
@@ -163,7 +166,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
               let session: unknown = (w as { notes?: unknown }).notes
               if (typeof session === 'string') { try { session = JSON.parse(session) } catch { session = null } }
               if (!session || typeof session !== 'object') continue
-              const k = estimateSessionKcal(session, { bodyWeightKg: kcalBodyWeight, biologicalSex: kcalSex })
+              const k = estimateSessionKcal(session, sessionKcalInputs(session, kcalProfile))
               if (k > 0) kcals.push(k)
             }
             const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0

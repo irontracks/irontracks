@@ -13,6 +13,7 @@ import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
 import { isCardioExercise, getCardioSummary, type CardioSummary } from '@/utils/report/cardioSummary'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
+import { sessionKcalInputs, isSessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -117,11 +118,14 @@ export function buildReportData(
   // Modelo unificado: força (densidade de volume) + cardio (MET da modalidade).
   // O MESMO estimateSessionKcal do painel de nutrição/relatório React — antes o
   // PDF duplicava a extração inline e ignorava cardio (subestimava esteira/HIT).
-  const kcalBreakdown = estimateSessionKcalBreakdown(sessionObj, {
-    bodyWeightKg: typeof opts.bodyWeightKg === 'number' ? opts.bodyWeightKg : null,
-    biologicalSex: typeof opts.biologicalSex === 'string' ? opts.biologicalSex : null,
-    rpe: typeof opts.rpe === 'number' ? opts.rpe : null,
-  })
+  //
+  // Os INGREDIENTES vêm prontos da tela (`opts.kcalInputs`) sempre que ela os
+  // tem: assim o PDF não pode discordar do card que o usuário acabou de ver.
+  // Sem eles (chamada direta), resolve pelo mesmo leitor único.
+  const kcalInputs = isSessionKcalInputs(opts.kcalInputs)
+    ? opts.kcalInputs
+    : sessionKcalInputs(sessionObj, opts, { preCheckin: opts.preCheckin, postCheckin: opts.postCheckin })
+  const kcalBreakdown = estimateSessionKcalBreakdown(sessionObj, kcalInputs)
   // Override manual (kcalOverride) ou GPS (bike outdoor) mandam no total; nesse
   // caso não há breakdown de cardio pra rateio (distribui tudo por volume).
   const kcalOverrideValue = (() => {

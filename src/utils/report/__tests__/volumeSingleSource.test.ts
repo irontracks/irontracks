@@ -349,7 +349,11 @@ describe('source-guard — edição do histórico não deixa a sessão sem repor
   it('saveEdit recalcula o reportMeta antes de gravar', () => {
     const update = src.indexOf(".from('workouts').update({ name: editTitle")
     expect(update).toBeGreaterThan(-1)
-    const recalculo = src.indexOf('session.reportMeta = buildReportMetrics(session)')
+    // Casa a CHAMADA, não a assinatura exata: o guard antigo procurava
+    // `buildReportMetrics(session)` literal e ficaria cego no dia em que a
+    // função ganhasse um argumento — foi o que aconteceu ao passar o perfil
+    // para o rateio de kcal (12/08/2026).
+    const recalculo = src.search(/session\.reportMeta\s*=\s*buildReportMetrics\(\s*session\b/)
     expect(recalculo).toBeGreaterThan(-1)
     expect(recalculo).toBeLessThan(update) // antes do JSON.stringify(session)
   })

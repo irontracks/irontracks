@@ -13,6 +13,7 @@ import { logWarn, logError } from '@/lib/logger'
 import { notifyWorkoutFinished } from '@/lib/social/workoutNotifications'
 import { respondDbError } from '@/utils/api/dbError'
 import { buildPostCheckinRow } from './postCheckinRow'
+import { buildUserSnapshot, type ProfileFacts } from '@/lib/user/snapshot'
 import { env } from '@/utils/env'
 
 const LogEntrySchema = z
@@ -89,8 +90,15 @@ export async function POST(request: Request) {
         if (parsed && typeof parsed === 'object') previousSessionObj = parsed
       }
     } catch (e) { logError('api:workouts:finish:prev-session', e) }
+    // Perfil declarado: entra no rateio de kcal por exercício. Sem ele o rateio
+    // usaria o peso default enquanto o card do relatório usa o peso real, e as
+    // parcelas não somariam o total exibido. Leitura pelo leitor único.
+    let kcalProfile: ProfileFacts | null = null
     try {
-      sessionObj.reportMeta = buildReportMetrics(sessionObj, previousSessionObj)
+      kcalProfile = (await buildUserSnapshot(supabase, userId, ['profile'])).profile
+    } catch (e) { logError('api:workouts:finish:profile-snapshot', e) }
+    try {
+      sessionObj.reportMeta = buildReportMetrics(sessionObj, previousSessionObj, kcalProfile)
     } catch (e) { logError('api:workouts:finish:report-metrics', e) }
     try {
       const baseDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))

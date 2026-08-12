@@ -9,6 +9,7 @@ import { buildUserSnapshot } from '@/lib/user/snapshot'
 import { DEFAULT_GOALS, resolveDisplayGoals } from '@/lib/nutrition/displayGoals'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { sessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 
 export const dynamic = 'force-dynamic'
 
@@ -173,15 +174,14 @@ export default async function NutritionPage() {
         const trainedToday = rows.some((w) => toBrtKey((w as { date?: string }).date) === dateKey)
 
         if (!trainedToday) {
-          const bodyWeightKg = snapshot.profile?.bodyWeightKg ?? null
-          const biologicalSex = snapshot.profile?.biologicalSex ?? null
+          const kcalProfile = snapshot.profile ?? null
           const kcals: number[] = []
           for (const w of rows) {
             if (kcals.length >= 10) break
             let session: unknown = (w as { notes?: unknown }).notes
             if (typeof session === 'string') { try { session = JSON.parse(session) } catch { session = null } }
             if (!session || typeof session !== 'object') continue
-            const k = estimateSessionKcal(session, { bodyWeightKg, biologicalSex })
+            const k = estimateSessionKcal(session, sessionKcalInputs(session, kcalProfile))
             if (k > 0) kcals.push(k)
           }
           const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
