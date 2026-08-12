@@ -169,7 +169,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
           <button
             type="button"
             onClick={props.onClose}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
+            className="tap-44 w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
             aria-label="Fechar"
           >
@@ -183,7 +183,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
               <button
                 type="button"
                 onClick={() => setCursor((d) => addDays(d, view === 'month' ? -30 : -7))}
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
+                className="tap-44 w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                 aria-label="Anterior"
               >
@@ -199,7 +199,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
               <button
                 type="button"
                 onClick={() => setCursor((d) => addDays(d, view === 'month' ? 30 : 7))}
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
+                className="tap-44 w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                 aria-label="Próximo"
               >

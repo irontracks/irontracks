@@ -196,7 +196,7 @@ const SortableExercise = ({ ex, index, total, onMove, onDragDone }: {
                         type="button"
                         onClick={() => onMove(index, -1)}
                         disabled={index === 0}
-                        className="w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
+                        className="tap-44 w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
                         aria-label={`Mover ${String(ex?.name || 'exercício')} para cima`}
                     >
                         <ChevronUp size={16} />
@@ -205,7 +205,7 @@ const SortableExercise = ({ ex, index, total, onMove, onDragDone }: {
                         type="button"
                         onClick={() => onMove(index, 1)}
                         disabled={index === total - 1}
-                        className="w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
+                        className="tap-44 w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
                         aria-label={`Mover ${String(ex?.name || 'exercício')} para baixo`}
                     >
                         <ChevronDown size={16} />

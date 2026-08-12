@@ -1272,7 +1272,7 @@ export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: Setti
             <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
                     <div><div className="text-xs font-black uppercase tracking-widest text-yellow-500">Módulos</div><div className="text-white font-black text-lg truncate">Personalizar</div></div>
-                    <button type="button" onClick={onClose} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar">✕</button>
+                    <button type="button" onClick={onClose} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar">✕</button>
                 </div>
                 <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3">

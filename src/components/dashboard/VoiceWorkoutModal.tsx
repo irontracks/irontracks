@@ -203,7 +203,7 @@ function ConfirmedCard({
         <button
           type="button"
           onClick={onEdit}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+          className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors"
           aria-label="Editar"
         >
           <Pencil size={13} />
@@ -211,7 +211,7 @@ function ConfirmedCard({
         <button
           type="button"
           onClick={onRemove}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
           aria-label="Remover"
         >
           <Trash2 size={13} />
@@ -666,7 +666,7 @@ export default function VoiceWorkoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+            className="tap-44 w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
             aria-label="Voltar"
             title="Voltar"

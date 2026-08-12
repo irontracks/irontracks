@@ -225,7 +225,7 @@ export const Modals: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
-                                className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
+                                className="tap-44 w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
                                 style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 aria-label="Voltar"
                                 title="Voltar"

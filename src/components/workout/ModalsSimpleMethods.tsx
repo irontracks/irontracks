@@ -49,7 +49,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">Alta intensidade até a falha</div>
                                 <div className="text-xs text-neutral-400">Treine até a falha total • Opcional: forçadas e negativas</div>
                             </div>
-                            <button type="button" onClick={() => setHeavyDutyModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setHeavyDutyModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {heavyDutyModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(heavyDutyModal.error)}</div> : null}
@@ -103,7 +103,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">Hold no ponto de alongamento</div>
                                 <div className="text-xs text-neutral-400">Execute as reps e segure no ponto máximo de alongamento</div>
                             </div>
-                            <button type="button" onClick={() => setPontoZeroModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setPontoZeroModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {pontoZeroModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(pontoZeroModal.error)}</div> : null}
@@ -151,7 +151,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">Além da falha com ajuda</div>
                                 <div className="text-xs text-neutral-400">Treine até a falha + reps extras com auxílio do parceiro</div>
                             </div>
-                            <button type="button" onClick={() => setForcedRepsModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setForcedRepsModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {forcedRepsModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(forcedRepsModal.error)}</div> : null}
@@ -192,7 +192,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">Foco na fase excêntrica</div>
                                 <div className="text-xs text-neutral-400">Execute a descida lentamente para maximizar o estímulo</div>
                             </div>
-                            <button type="button" onClick={() => setNegativeRepsModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setNegativeRepsModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {negativeRepsModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(negativeRepsModal.error)}</div> : null}
@@ -233,7 +233,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">Reps completas + parciais</div>
                                 <div className="text-xs text-neutral-400">Complete as reps inteiras e continue com reps parciais até falha</div>
                             </div>
-                            <button type="button" onClick={() => setPartialRepsModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setPartialRepsModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {partialRepsModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(partialRepsModal.error)}</div> : null}
@@ -274,7 +274,7 @@ export function ModalsSimpleMethods() {
                                 <div className="text-white font-black text-lg">7 + 7 + 7 reps</div>
                                 <div className="text-xs text-neutral-400">Fase 1: ½ inferior • Fase 2: ½ superior • Fase 3: amplitude completa</div>
                             </div>
-                            <button type="button" onClick={() => setSistema21Modal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setSistema21Modal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                             {sistema21Modal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(sistema21Modal.error)}</div> : null}
@@ -323,7 +323,7 @@ export function ModalsSimpleMethods() {
                                     <div className="text-white font-black text-lg truncate">{desc.subtitle}</div>
                                     {desc.tip && <div className="text-xs text-neutral-400 mt-0.5">{desc.tip}</div>}
                                 </div>
-                                <button type="button" onClick={() => setGroupMethodModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                                <button type="button" onClick={() => setGroupMethodModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
                             <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
                                 {groupMethodModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(groupMethodModal.error)}</div> : null}

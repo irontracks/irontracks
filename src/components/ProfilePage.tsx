@@ -554,7 +554,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                     key={d}
                     type="button"
                     onClick={() => set('trainingFrequencyPerWeek', d)}
-                    className={`w-10 h-10 rounded-xl border text-sm font-black transition-all active:scale-95 ${draft.trainingFrequencyPerWeek === d
+                    className={`tap-44 w-10 h-10 rounded-xl border text-sm font-black transition-all active:scale-95 ${draft.trainingFrequencyPerWeek === d
                       ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
                       : 'bg-neutral-800/60 border-neutral-700/40 text-neutral-400 hover:border-neutral-600'}`}
                   >

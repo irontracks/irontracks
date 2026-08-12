@@ -278,7 +278,7 @@ export const VipTab: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={fetchList}
-                        className="w-9 h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
+                        className="tap-44 w-9 h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
                         title="Atualizar"
                         aria-label="Atualizar lista VIP"
                     >
@@ -419,7 +419,7 @@ export const VipTab: React.FC = () => {
                                     <button
                                         onClick={() => handleRevoke(item)}
                                         disabled={isRevoking}
-                                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-8 h-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
+                                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 tap-44 w-8 h-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
                                         title="Revogar VIP"
                                         aria-label={`Revogar VIP de ${item.name || item.email}`}
                                     >

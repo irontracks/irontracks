@@ -84,7 +84,7 @@ export function ModalsComplexMethods() {
                             <button
                                 type="button"
                                 onClick={() => setRestPauseModal(null)}
-                                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                                className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                 aria-label="Fechar"
                             >
                                 <X size={18} />
@@ -331,7 +331,7 @@ export function ModalsComplexMethods() {
                                 <button
                                     type="button"
                                     onClick={() => setDropSetModal(null)}
-                                    className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                                    className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                     aria-label="Fechar"
                                 >
                                     <X size={18} />
@@ -455,7 +455,7 @@ export function ModalsComplexMethods() {
                                     <div className="text-white font-black text-lg truncate">Etapas de remoção de carga</div>
                                     <div className="text-xs text-neutral-400">Remova carga progressivamente a cada etapa • {stages.length} etapas</div>
                                 </div>
-                                <button type="button" onClick={() => setStrippingModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                                <button type="button" onClick={() => setStrippingModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
                             <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {strippingModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(strippingModal.error)}</div> : null}
@@ -497,7 +497,7 @@ export function ModalsComplexMethods() {
                                     <div className="text-white font-black text-lg truncate">7 séries com pump intenso</div>
                                     <div className="text-xs text-neutral-400">Fascia Stretch Training • 7 blocos com descanso e alongamento</div>
                                 </div>
-                                <button type="button" onClick={() => setFst7Modal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                                <button type="button" onClick={() => setFst7Modal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
                             <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {fst7Modal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(fst7Modal.error)}</div> : null}
@@ -545,7 +545,7 @@ export function ModalsComplexMethods() {
                                     <div className="text-white font-black text-lg">Ondas de carga progressiva</div>
                                     <div className="text-xs text-neutral-400">Pesado → Médio → Ultra leve • repita por {waves.length} ondas</div>
                                 </div>
-                                <button type="button" onClick={() => setWaveModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
+                                <button type="button" onClick={() => setWaveModal(null)} className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
                             <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {waveModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(waveModal.error)}</div> : null}
@@ -625,7 +625,7 @@ export function ModalsComplexMethods() {
                             <button
                                 type="button"
                                 onClick={() => setClusterModal(null)}
-                                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                                className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
                                 aria-label="Fechar"
                             >
                                 <X size={18} />

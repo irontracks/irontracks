@@ -137,7 +137,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                         Ajustar treino · {d?.muscleLabel || muscleLabel}
                     </h4>
                 </div>
-                <button onClick={onClose} aria-label="Fechar" className="w-7 h-7 rounded-lg border border-neutral-700 text-neutral-400 hover:text-white transition flex items-center justify-center shrink-0">
+                <button onClick={onClose} aria-label="Fechar" className="tap-44 w-7 h-7 rounded-lg border border-neutral-700 text-neutral-400 hover:text-white transition flex items-center justify-center shrink-0">
                     <X className="w-4 h-4" />
                 </button>
             </div>

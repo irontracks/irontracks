@@ -47,7 +47,7 @@ export const CheckinsModal = ({
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+            className="tap-44 w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
             aria-label="Fechar"
           >
             <X size={18} />

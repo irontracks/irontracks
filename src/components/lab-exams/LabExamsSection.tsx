@@ -127,7 +127,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
                 </div>
               </div>
               <button onClick={() => setViewing(null)} aria-label="Fechar"
-                className="w-9 h-9 shrink-0 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center">
+                className="tap-44 w-9 h-9 shrink-0 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center">
                 <X className="w-5 h-5" />
               </button>
             </div>

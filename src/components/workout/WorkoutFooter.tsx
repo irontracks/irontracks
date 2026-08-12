@@ -163,7 +163,7 @@ export default function WorkoutFooter() {
             type="button"
             onClick={() => { togglePause() }}
             className={[
-              'w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
+              'tap-44 w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
               isPaused
                 ? 'bg-yellow-500 text-black'
                 : 'bg-neutral-800 border border-neutral-700 text-neutral-300',

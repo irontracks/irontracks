@@ -220,7 +220,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                         </div>
                     </div>
                     <button onClick={handleClose} disabled={stage === 'processing'} aria-label="Fechar"
-                        className="w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition disabled:opacity-40 flex items-center justify-center">
+                        className="tap-44 w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition disabled:opacity-40 flex items-center justify-center">
                         <X className="w-5 h-5" />
                     </button>
                 </div>

@@ -98,7 +98,7 @@ export const AdminPanelHeader = ({
             {isAdmin && <AdminNotificationBell onNavigate={handleNotifNavigate} />}
             <button
               onClick={() => onClose && onClose()}
-              className="w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
+              className="tap-44 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
               aria-label="Fechar painel"
             >
               <X size={18} className="font-bold" />

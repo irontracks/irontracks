@@ -350,7 +350,7 @@ export const VideosTab: React.FC = () => {
                         type="button"
                         onClick={() => void reviewAction(c.id, 'approve')}
                         disabled={actingOn === c.id}
-                        className="w-8 h-8 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 flex items-center justify-center transition-all disabled:opacity-50"
+                        className="tap-44 w-8 h-8 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 flex items-center justify-center transition-all disabled:opacity-50"
                         title="Aprovar este vídeo"
                         aria-label="Aprovar"
                       >
@@ -360,7 +360,7 @@ export const VideosTab: React.FC = () => {
                         type="button"
                         onClick={() => void reviewAction(c.id, 'reject')}
                         disabled={actingOn === c.id}
-                        className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 flex items-center justify-center transition-all disabled:opacity-50"
+                        className="tap-44 w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 flex items-center justify-center transition-all disabled:opacity-50"
                         title="Rejeitar este vídeo"
                         aria-label="Rejeitar"
                       >

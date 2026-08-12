@@ -121,7 +121,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
             onClick={onClose}
             aria-label="Voltar"
             title="Voltar"
-            className="w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center text-neutral-400 hover:text-white"
+            className="tap-44 w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center text-neutral-400 hover:text-white"
           >
             <ArrowLeft size={14} />
           </button>

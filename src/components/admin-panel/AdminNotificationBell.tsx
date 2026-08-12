@@ -153,7 +153,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
+        className="relative tap-44 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
         aria-label={`Notificações${unread > 0 ? ` (${unread} não lidas)` : ''}`}
       >
         <Bell size={18} />

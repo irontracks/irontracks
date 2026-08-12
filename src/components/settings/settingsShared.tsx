@@ -17,7 +17,7 @@ export const ToggleSwitch = ({ checked, onChange, disabled, label }: { checked: 
         aria-label={label ?? (checked ? 'Ativado' : 'Desativado')}
         disabled={disabled}
         onClick={onChange}
-        className="relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 border-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        className="relative flex-shrink-0 tap-44 w-12 h-6 rounded-full transition-all duration-300 border-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         style={checked
             ? { background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 12px rgba(234,179,8,0.4)' }
             : { background: 'rgba(60,60,60,0.8)' }

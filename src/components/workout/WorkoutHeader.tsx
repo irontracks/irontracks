@@ -78,7 +78,7 @@ export default function WorkoutHeader() {
                 <button aria-label="Mais opções"
                   type="button"
                   onClick={() => setOverflowOpen(v => !v)}
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"
+                  className="inline-flex items-center justify-center tap-44 w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"
                   title="Mais opções"
                 >
                   <MoreHorizontal size={16} />
