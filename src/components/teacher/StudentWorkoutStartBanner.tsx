@@ -71,7 +71,7 @@ export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: {
           className="rounded-2xl p-[1px] shadow-lg shadow-black/40"
           style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.4) 0%, rgba(255,255,255,0.05) 100%)' }}
         >
-          <div className="rounded-[15px] bg-neutral-900/95 px-3 py-2.5 flex items-center gap-2">
+          <div className="rounded-2xl bg-neutral-900/95 px-3 py-2.5 flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
               <Gamepad2 size={15} className="text-amber-400" />
             </div>

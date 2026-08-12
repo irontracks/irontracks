@@ -511,6 +511,53 @@ Custaram meia hora cada e vão custar de novo se a nota não disser:
   é margem estilística, não requisito. **A régua certa é o fundo MAIS CLARO**
   (depth-3), não o `#0a0a0a`.
 
+## Paleta: a cor quase-gêmea é a que corrói em silêncio (12/08/2026)
+
+Medido no produto (fora landing/marketing): **618 hex escritos à mão em 86 tons**
+contra os 14 da paleta. Metade fora dela. O que importa não é o volume — é o
+tipo: havia `#0f0f0f` contra o `#0f0f0e` oficial (Δ=1,7), `#141414` contra
+`#151514` (Δ=2), `#1a1a1a` contra `#1a1a18` (Δ=3). O olho não resolve essa
+diferença num fundo escuro: **alguém digitou de memória em vez de usar o token
+que já existia**. Sete cores apareciam nas DUAS grafias (maiúscula e minúscula),
+sinal de que ninguém copia de uma fonte única.
+
+O custo não é estético: no dia em que o dourado da marca mudar, ele muda nos 14
+lugares certos e continua velho nos outros 86.
+
+As 28 invisíveis (Δ<12) viraram a cor oficial. Guard em
+`__tests__/paletaSemGemeas.test.ts`, com distância ponderada de Riemersma —
+trava só Δ<12, porque acima disso proximidade pode ser decisão de design, e
+guard que opina sobre gosto é afrouxado na primeira semana. **Landing e
+`/comercial` ficam fora**: têm identidade própria (o `#F5B800` de lá não é
+deriva).
+
+## Hierarquia tipográfica: 723 → 677 (12/08/2026)
+
+Os 46 rótulos `text-xs font-black uppercase tracking-widest` que tinham COR
+intencional (34 dourados) estavam presos no peso 900 porque `t-meta` embute
+`color` — adotá-lo apagaria a cor. `t-meta-inherit` tem a mesma forma e não
+opina sobre cor. **Tipografia e cor são decisões separadas**; misturá-las na
+mesma utility foi o que travou o débito por uma semana.
+
+Continua sendo o maior débito de design: **89% do texto do app em peso 700+**
+(1430 `font-black` = 50%, 1098 `font-bold` = 39%, contra 279 de todos os pesos
+intermediários somados). Quando tudo pesa 900, nada pesa — é o motivo de a tela
+parecer flat com paleta e espaçamento bem resolvidos. O resto exige julgamento
+tela a tela, não script.
+
+## Raio: a regra escrita estava errada, não os 1400 usos (12/08/2026)
+
+`rounded-xl` 1400 · `lg` 489 · `2xl` 447 · `full` 447 · `3xl` 52. A regra antiga
+dizia "card = 2xl" e o app fazia outra coisa há tempos. Reescrever 1400 usos
+para casar com a regra seria refazer a cara do app sem olhos conferindo — então
+a **regra passou a descrever a prática** (documentada no `globals.css`), que é
+coerente: o raio cresce com a superfície. 12 raios arbitrários viraram o degrau
+mais próximo; só o `[2rem]` do hero do login ficou, por ser curva de arte.
+
+**Espaçamento e motion estão SAUDÁVEIS** — medidos no mesmo dia, para ninguém
+gastar auditoria: 13 ocorrências fora do grid de 4px em 350 arquivos, e 8
+durações de transição concentradas em 300/200/150ms. Não são frentes.
+
 ## Violeta é a cor da MÁQUINA — `lib/design/machineAccent` (12/08/2026)
 
 **Violeta = a máquina decidiu. Dourado = você decide.** Nada de violeta em

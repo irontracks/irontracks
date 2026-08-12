@@ -38,7 +38,7 @@ const GoldGradientBorder = ({ children, className = '' }: { children: React.Reac
     className={`rounded-2xl p-[1px] ${className}`}
     style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.4) 0%, rgba(255,255,255,0.05) 50%, rgba(234,179,8,0.15) 100%)' }}
   >
-    <div className="rounded-[15px] overflow-hidden h-full" style={{ background: 'rgba(15,15,15,0.98)' }}>
+    <div className="rounded-2xl overflow-hidden h-full" style={{ background: 'rgba(15,15,15,0.98)' }}>
       {children}
     </div>
   </div>
@@ -52,7 +52,7 @@ const Avatar = ({ photo, name, size = 44 }: { photo?: string | null; name: strin
       style={{
         width: size,
         height: size,
-        background: photo ? 'transparent' : 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+        background: photo ? 'transparent' : 'linear-gradient(135deg, #1a1a18 0%, #0a0a0a 100%)',
         boxShadow: '0 0 0 1.5px rgba(234,179,8,0.25), 0 4px 12px rgba(0,0,0,0.4)',
       }}
     >
@@ -228,7 +228,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
           )}
           <GoldGradientBorder>
             <div className="p-5">
-              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Comunidade</div>
+              <div className="t-meta-inherit text-xs text-yellow-500 mb-1">Comunidade</div>
               <div className="text-lg font-black text-white">Módulo desativado</div>
               <div className="text-sm text-neutral-400 mt-1">Ligue aqui para ver o feed, os stories e os desafios.</div>
               {/* Mandar o usuário procurar em Configurações → Módulos opcionais era
@@ -470,7 +470,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-black uppercase tracking-widest text-green-400">Treinando Agora</div>
+                        <div className="t-meta-inherit text-xs text-green-400">Treinando Agora</div>
                         <div className="text-[11px] text-neutral-400 truncate">
                           {trainingNowProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
                           {trainingNowIds.length > 3 && ` +${trainingNowIds.length - 3}`}

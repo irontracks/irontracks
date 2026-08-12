@@ -700,7 +700,7 @@ export default function TeacherManualTab() {
                 <div className="rounded-xl bg-neutral-800/60 border border-neutral-700/40 p-2 flex flex-col items-center gap-1.5">
                   <div className="bg-white rounded-lg p-1.5 w-16 h-16 grid grid-cols-4 gap-0.5">
                     {[1,0,1,1,0,1,0,1,1,0,1,0,0,1,1,0].map((v,i) => (
-                      <div key={i} className={`rounded-[1px] ${v ? 'bg-black' : 'bg-white'}`} />
+                      <div key={i} className={`rounded-sm ${v ? 'bg-black' : 'bg-white'}`} />
                     ))}
                   </div>
                   <div className="bg-neutral-700/50 rounded-lg px-2 py-1 text-[9px] text-neutral-400 text-center w-full">Copiar código</div>

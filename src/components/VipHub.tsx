@@ -379,7 +379,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   if (isLocked) {
     return (
       <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.4) 0%, rgba(255,255,255,0.04) 50%, rgba(234,179,8,0.15) 100%)' }}>
-        <div className="rounded-[15px] text-center overflow-hidden" style={{ background: 'rgba(15,15,15,0.98)' }}>
+        <div className="rounded-2xl text-center overflow-hidden" style={{ background: 'rgba(15,15,15,0.98)' }}>
 
           {/* Crown hero — full width, bleeds edge-to-edge */}
           <div className="relative w-full h-52 overflow-hidden">
@@ -392,9 +392,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               className="object-cover object-center scale-110"
             />
             {/* Bottom gradient fade into card */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-[#0f0f0f]/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0e] via-[#0f0f0e]/20 to-transparent" />
             {/* Top vignette */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f0f]/50 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f0e]/50 via-transparent to-transparent" />
             {/* VIP badge overlay */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2">
               <div className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.25em]" style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.4)', color: '#f59e0b' }}>
@@ -475,7 +475,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     <div className="space-y-4">
       {/* Header VIP Card */}
       <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.4) 0%, rgba(255,255,255,0.04) 50%, rgba(234,179,8,0.15) 100%)' }}>
-        <div className="rounded-[15px] p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 16px rgba(234,179,8,0.3)' }}>

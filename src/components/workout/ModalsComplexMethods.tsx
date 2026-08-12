@@ -75,7 +75,7 @@ export function ModalsComplexMethods() {
                     >
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3 flex-shrink-0">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{String(restPauseModal?.label || '').trim() === 'SST' ? 'SST' : 'Rest-P'}</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">{String(restPauseModal?.label || '').trim() === 'SST' ? 'SST' : 'Rest-P'}</div>
                                 <div className="text-white font-black text-lg truncate">Preencher minis</div>
                                 <div className="text-xs text-neutral-400 truncate">
                                     {Number(restPauseModal?.miniSets || 0)} minis • descanso {Number(restPauseModal?.pauseSec || 0)}s
@@ -324,7 +324,7 @@ export function ModalsComplexMethods() {
                         >
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{String(dropSetModal?.label || 'Drop')}</div>
+                                    <div className="t-meta-inherit text-xs text-yellow-500">{String(dropSetModal?.label || 'Drop')}</div>
                                     <div className="text-white font-black text-lg truncate">Preencher etapas</div>
                                     <div className="text-xs text-neutral-400 truncate">{Array.isArray(dropSetModal?.stages) ? dropSetModal.stages.length : 0} etapas</div>
                                 </div>
@@ -451,7 +451,7 @@ export function ModalsComplexMethods() {
                         <div ref={strippingRef} {...dialogProps('Etapas do Stripping')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Stripping</div>
+                                    <div className="t-meta-inherit text-xs text-yellow-500">Stripping</div>
                                     <div className="text-white font-black text-lg truncate">Etapas de remoção de carga</div>
                                     <div className="text-xs text-neutral-400">Remova carga progressivamente a cada etapa • {stages.length} etapas</div>
                                 </div>
@@ -493,7 +493,7 @@ export function ModalsComplexMethods() {
                         <div ref={fst7Ref} {...dialogProps('Séries do FST-7')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">FST-7</div>
+                                    <div className="t-meta-inherit text-xs text-yellow-500">FST-7</div>
                                     <div className="text-white font-black text-lg truncate">7 séries com pump intenso</div>
                                     <div className="text-xs text-neutral-400">Fascia Stretch Training • 7 blocos com descanso e alongamento</div>
                                 </div>
@@ -541,7 +541,7 @@ export function ModalsComplexMethods() {
                         <div ref={waveRef} {...dialogProps('Ondas da série')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Onda (Wave Loading)</div>
+                                    <div className="t-meta-inherit text-xs text-yellow-500">Onda (Wave Loading)</div>
                                     <div className="text-white font-black text-lg">Ondas de carga progressiva</div>
                                     <div className="text-xs text-neutral-400">Pesado → Médio → Ultra leve • repita por {waves.length} ondas</div>
                                 </div>
@@ -611,7 +611,7 @@ export function ModalsComplexMethods() {
                     >
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Cluster</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Cluster</div>
                                 <div className="text-white font-black text-lg truncate">Preencher blocos</div>
                                 <div className="text-xs text-neutral-400 truncate">
                                     {Array.isArray(clusterModal?.plannedBlocks) ? `${clusterModal.plannedBlocks.length} blocos` : 'Blocos'}

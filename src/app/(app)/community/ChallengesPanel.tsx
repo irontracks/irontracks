@@ -145,7 +145,7 @@ export default function ChallengesPanel({
       <div className="px-4 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div className="flex items-center gap-2">
           <Swords size={16} className="text-yellow-500" />
-          <span className="text-xs font-black uppercase tracking-widest text-yellow-500">Desafios</span>
+          <span className="t-meta-inherit text-xs text-yellow-500">Desafios</span>
         </div>
         {onClose && (
           <button aria-label="Fechar" type="button" onClick={onClose} className="text-neutral-400 hover:text-white">

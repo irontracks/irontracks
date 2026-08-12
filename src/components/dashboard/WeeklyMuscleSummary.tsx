@@ -130,7 +130,7 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
               <div>
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <Target size={13} className="text-yellow-500" />
-                  <h2 className="text-xs font-black uppercase tracking-widest text-yellow-500">Volume por músculo</h2>
+                  <h2 className="t-meta-inherit text-xs text-yellow-500">Volume por músculo</h2>
                 </div>
                 <div className="space-y-2.5">
                   {muscles.map((m) => (
@@ -155,7 +155,7 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
               <div>
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <Brain size={13} className="text-amber-400" />
-                  <h2 className="text-xs font-black uppercase tracking-widest text-amber-400">Análise da IA</h2>
+                  <h2 className="t-meta-inherit text-xs text-amber-400">Análise da IA</h2>
                 </div>
                 <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
                   {insights.summary.map((line, i) => (

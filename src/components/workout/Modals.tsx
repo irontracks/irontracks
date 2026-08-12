@@ -195,7 +195,7 @@ export default function Modals() {
           <div ref={postCheckinRef} {...dialogProps('Check-out pós-treino')} className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-out</div>
+                <div className="t-meta-inherit text-xs text-yellow-500">Check-out</div>
                 <div className="text-white font-black text-lg truncate">Pós-treino</div>
                 <div className="text-xs text-neutral-400 truncate">{String(workout?.title || 'Treino')}</div>
               </div>
@@ -737,7 +737,7 @@ export default function Modals() {
           >
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Cluster</div>
+                <div className="t-meta-inherit text-xs text-yellow-500">Cluster</div>
                 <div className="text-white font-black text-lg truncate">Preencher blocos</div>
                 <div className="text-xs text-neutral-400 truncate">
                   {Array.isArray(clusterModal?.plannedBlocks) ? `${clusterModal.plannedBlocks.length} blocos` : 'Blocos'}

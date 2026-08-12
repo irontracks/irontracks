@@ -673,7 +673,7 @@ export default function WorkoutWizardModal(props: Props) {
                   boxShadow: '0 0 20px rgba(234,179,8,0.2)',
                 }}
               >
-                <span className="flex items-center justify-center gap-2 rounded-[11px] px-5 py-3.5 font-black text-sm" style={{ background: 'linear-gradient(160deg, rgba(20,16,8,0.95), rgba(30,24,12,0.92))' }}>
+                <span className="flex items-center justify-center gap-2 rounded-lg px-5 py-3.5 font-black text-sm" style={{ background: 'linear-gradient(160deg, rgba(20,16,8,0.95), rgba(30,24,12,0.92))' }}>
                   {generating ? (
                     <Loader2 size={18} className="animate-spin text-yellow-400" />
                   ) : (

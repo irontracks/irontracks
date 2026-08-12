@@ -560,7 +560,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Check-in</div>
                                 <div className="text-white font-black text-lg truncate">Pré-treino</div>
                                 <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
                             </div>

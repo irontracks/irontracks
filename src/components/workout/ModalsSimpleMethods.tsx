@@ -45,7 +45,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Heavy Duty</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Heavy Duty</div>
                                 <div className="text-white font-black text-lg">Alta intensidade até a falha</div>
                                 <div className="text-xs text-neutral-400">Treine até a falha total • Opcional: forçadas e negativas</div>
                             </div>
@@ -64,7 +64,7 @@ export function ModalsSimpleMethods() {
                                 </div>
                             </div>
                             <div className="rounded-xl bg-neutral-800/40 border border-neutral-700/50 p-3 space-y-3">
-                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Opcional</div>
+                                <div className="t-meta-inherit text-xs text-neutral-400">Opcional</div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <div className="text-xs text-neutral-400">Reps Forçadas</div>
@@ -99,7 +99,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Ponto Zero</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Ponto Zero</div>
                                 <div className="text-white font-black text-lg">Hold no ponto de alongamento</div>
                                 <div className="text-xs text-neutral-400">Execute as reps e segure no ponto máximo de alongamento</div>
                             </div>
@@ -147,7 +147,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Repetições Forçadas</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Repetições Forçadas</div>
                                 <div className="text-white font-black text-lg">Além da falha com ajuda</div>
                                 <div className="text-xs text-neutral-400">Treine até a falha + reps extras com auxílio do parceiro</div>
                             </div>
@@ -188,7 +188,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Repetições Negativas</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Repetições Negativas</div>
                                 <div className="text-white font-black text-lg">Foco na fase excêntrica</div>
                                 <div className="text-xs text-neutral-400">Execute a descida lentamente para maximizar o estímulo</div>
                             </div>
@@ -229,7 +229,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Repetições Parciais</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Repetições Parciais</div>
                                 <div className="text-white font-black text-lg">Reps completas + parciais</div>
                                 <div className="text-xs text-neutral-400">Complete as reps inteiras e continue com reps parciais até falha</div>
                             </div>
@@ -270,7 +270,7 @@ export function ModalsSimpleMethods() {
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Sistema 21</div>
+                                <div className="t-meta-inherit text-xs text-yellow-500">Sistema 21</div>
                                 <div className="text-white font-black text-lg">7 + 7 + 7 reps</div>
                                 <div className="text-xs text-neutral-400">Fase 1: ½ inferior • Fase 2: ½ superior • Fase 3: amplitude completa</div>
                             </div>
@@ -319,7 +319,7 @@ export function ModalsSimpleMethods() {
                         <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{methodName}</div>
+                                    <div className="t-meta-inherit text-xs text-yellow-500">{methodName}</div>
                                     <div className="text-white font-black text-lg truncate">{desc.subtitle}</div>
                                     {desc.tip && <div className="text-xs text-neutral-400 mt-0.5">{desc.tip}</div>}
                                 </div>

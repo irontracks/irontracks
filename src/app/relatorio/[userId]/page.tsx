@@ -47,9 +47,9 @@ function parseLabValue(text: string, pattern: RegExp, decimal = false): number {
 // ─── Styles (inline string injected via <style>) ────────────────────────────
 const CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
-.rp{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;color:#fff;background:#09090b;min-height:100vh;padding:1.5rem 1rem 3rem}
+.rp{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;color:#fff;background:#0a0a0a;min-height:100vh;padding:1.5rem 1rem 3rem}
 .inner{max-width:780px;margin:0 auto}
-.hero{background:#0d0f11;border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:2rem 1.75rem 1.75rem;margin-bottom:1rem}
+.hero{background:#0f0f0e;border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:2rem 1.75rem 1.75rem;margin-bottom:1rem}
 .brand{display:flex;align-items:center;gap:6px;margin-bottom:1.75rem}
 .bi{font-size:14px;font-weight:500;letter-spacing:.12em;color:#fff}
 .bt{font-size:14px;font-weight:500;letter-spacing:.12em;color:#facc15}
@@ -59,12 +59,12 @@ const CSS = `
 .hn{font-size:28px;font-weight:500;line-height:1}
 .hm{font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px}
 .s3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.sc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:1.1rem .9rem;text-align:center;transition:border-color .2s,transform .15s;cursor:pointer;text-decoration:none;display:block}
+.sc{background:#151514;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:1.1rem .9rem;text-align:center;transition:border-color .2s,transform .15s;cursor:pointer;text-decoration:none;display:block}
 .sc:hover{border-color:rgba(250,204,21,0.45);transform:translateY(-2px)}
 .sv{font-size:26px;font-weight:500;color:#facc15;line-height:1}
 .sl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,0.4);margin-top:5px}
 .ss{font-size:10px;color:rgba(255,255,255,0.3);margin-top:3px}
-.sec{background:#0d0f11;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:1.5rem 1.75rem;margin-bottom:1rem}
+.sec{background:#0f0f0e;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:1.5rem 1.75rem;margin-bottom:1rem}
 .sh{display:flex;align-items:center;gap:9px;margin-bottom:1.25rem}
 .sn{width:24px;height:24px;border-radius:50%;background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#facc15;flex-shrink:0}
 .sn.r{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#f87171}
@@ -74,7 +74,7 @@ const CSS = `
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px}
 .g5{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
-.c{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:1rem 1.1rem;transition:all .2s;cursor:default}
+.c{background:#151514;border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:1rem 1.1rem;transition:all .2s;cursor:default}
 .c:hover{border-color:rgba(250,204,21,0.35);transform:translateY(-2px)}
 .c.gd{border-color:rgba(250,204,21,0.14)}
 .c.rd{border-color:rgba(239,68,68,0.18)}
@@ -82,7 +82,7 @@ const CSS = `
 .cv{font-size:20px;font-weight:500;line-height:1}
 .cv.g{color:#facc15}.cv.gr{color:#22c55e}.cv.r{color:#ef4444}.cv.o{color:#f97316}.cv.w{color:#fff}
 .cs{font-size:10px;color:rgba(255,255,255,0.3);margin-top:3px}
-.tl{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:.8rem .7rem;text-align:center;cursor:default;transition:all .2s}
+.tl{background:#151514;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:.8rem .7rem;text-align:center;cursor:default;transition:all .2s}
 .tl:hover{border-color:rgba(250,204,21,0.35);transform:translateY(-2px)}
 .tl.cur{border-color:rgba(250,204,21,0.3);background:rgba(250,204,21,0.03)}
 .tlt{display:inline-block;font-size:8px;font-weight:500;background:rgba(250,204,21,0.15);color:#facc15;border:1px solid rgba(250,204,21,0.3);padding:2px 6px;border-radius:20px;margin-bottom:4px;letter-spacing:.05em}
@@ -109,7 +109,7 @@ const CSS = `
 .pl{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;margin:2px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.09)}
 .pl.dp{background:rgba(239,68,68,0.09);color:#fca5a5;border-color:rgba(239,68,68,0.2)}
 .pl.rst{background:rgba(34,197,94,0.09);color:#86efac;border-color:rgba(34,197,94,0.18)}
-.dc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:.9rem 1rem;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
+.dc{background:#151514;border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:.9rem 1rem;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
 .dc:hover{border-color:rgba(250,204,21,0.35);transform:translateY(-2px)}
 .dcd{font-size:9px;font-weight:500;color:#facc15;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
 .dcn{font-size:11px;font-weight:500;margin-bottom:.45rem;line-height:1.3}
@@ -124,7 +124,7 @@ const CSS = `
 .pt{font-size:12px;font-weight:500;margin-bottom:3px}
 .pd{font-size:10px;color:rgba(255,255,255,0.45);line-height:1.55}
 .dlbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,0.3);margin:1rem 0 .55rem}
-.ft{background:#111114;border-radius:0 0 16px 16px;padding:1.5rem;text-align:center;margin-top:1rem}
+.ft{background:#151514;border-radius:0 0 16px 16px;padding:1.5rem;text-align:center;margin-top:1rem}
 .clist{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin-top:.9rem}
 .cta{background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.28);color:#facc15;padding:.5rem 1.1rem;border-radius:25px;font-size:11px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-block;font-family:inherit;transition:all .2s}
 .cta:hover{background:rgba(250,204,21,0.18);border-color:rgba(250,204,21,0.5)}

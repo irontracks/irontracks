@@ -333,7 +333,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Mapa muscular</div>
+            <div className="t-meta-inherit text-xs text-yellow-500">Mapa muscular</div>
             <div className="text-white font-black text-lg truncate">{weekLabel}</div>
             <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
               <span>
@@ -598,7 +598,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     <div className="bg-neutral-950 rounded-2xl border border-yellow-500/10 p-4">
                       <div className="flex items-center gap-2">
                         <Crown size={14} className="text-yellow-500" />
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Insights da IA</div>
+                        <div className="t-meta-inherit text-xs text-yellow-500">Insights da IA</div>
                       </div>
                       <div className="mt-2 text-xs text-neutral-400">Análise de desequilíbrios e recomendações personalizadas disponíveis no plano VIP.</div>
                       {props.onUpgrade && (
@@ -615,7 +615,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                   return (
                     <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
+                        <div className="t-meta-inherit text-xs text-yellow-500 flex items-center gap-2">
                           <Sparkles size={14} /> Insights da IA
                         </div>
                         {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
@@ -633,7 +633,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                         <div className="mt-4 space-y-2">
                           {insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
                             <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
-                              <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
+                              <div className="t-meta-inherit text-xs text-neutral-300">{String(a.type || 'Alerta')}</div>
                               <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
                               {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-400">{String(a.evidence || '').trim()}</div> : null}
                             </div>

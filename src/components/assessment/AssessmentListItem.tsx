@@ -123,7 +123,7 @@ function AiPlanSection({
     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4" ref={planAnchorRef}>
       <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+          <div className="t-meta-inherit text-xs text-yellow-500">Resumo Tático</div>
           {badge ? (
             <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
               {badge.text}
@@ -152,7 +152,7 @@ function AiPlanSection({
             if (!items) return null
             return (
               <div key={key}>
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">{label}</div>
+                <div className="t-meta-inherit text-xs text-yellow-500 mb-1">{label}</div>
                 <ul className={`text-sm ${key === 'warnings' ? 'text-neutral-300' : 'text-neutral-200'} space-y-1 list-disc list-inside`}>
                   {items}
                 </ul>

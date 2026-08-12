@@ -172,7 +172,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
 
     if (loading) {
         return (
-            <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden" style={{ background: '#090909' }}>
+            <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden" style={{ background: '#0a0a0a' }}>
                 <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                     <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
                     <div className="flex items-center gap-3">
@@ -196,7 +196,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
     const offlineUsers = users.filter(u => !isUserOnline(u.last_seen ?? null));
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
+        <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#0a0a0a' }}>
             {/* Header */}
             <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20 relative" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                 <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
@@ -252,7 +252,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                             <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(30,30,30,0.99)', color: 'rgba(234,179,8,0.8)' }}>{u.display_name?.[0]?.toUpperCase() || '?'}</div>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-green-500" style={{ borderColor: '#090909' }} />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-green-500" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
@@ -279,7 +279,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                             <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(24,24,24,0.99)', color: 'rgba(120,120,120,0.8)' }}>{u.display_name?.[0]?.toUpperCase() || '?'}</div>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-neutral-600" style={{ borderColor: '#090909' }} />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-neutral-600" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">

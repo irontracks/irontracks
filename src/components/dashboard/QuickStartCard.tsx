@@ -173,7 +173,7 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
             className="mb-3 rounded-2xl p-[1px]"
             style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.35) 0%, rgba(234,179,8,0.06) 60%, rgba(234,179,8,0.22) 100%)' }}
         >
-            <div className="rounded-[15px] p-4" style={{ background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)' }}>
+            <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)' }}>
                 {/* Corpo clicável: ver o treino antes de começar. Sem `onQuickView`
                     fica uma div — um botão que não faz nada é pior que texto. */}
                 <Corpo

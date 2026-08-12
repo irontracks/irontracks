@@ -178,7 +178,7 @@ export function TeacherStudentWorkout() {
         <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border border-yellow-500/20 rounded-2xl px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_6px_rgba(74,222,128,0.8)]" />
-            <span className="text-xs font-black uppercase tracking-widest text-green-400">Ao Vivo</span>
+            <span className="t-meta-inherit text-xs text-green-400">Ao Vivo</span>
             <span className="text-xs text-neutral-400 font-bold truncate">{workoutName}</span>
           </div>
           <button aria-label="Atualizar"

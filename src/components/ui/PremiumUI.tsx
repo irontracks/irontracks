@@ -62,7 +62,7 @@ export function GoldGradientBorder({
             style={{ background: gold.gradientSubtle, ...style }}
         >
             <div
-                className={`rounded-[15px] overflow-hidden h-full ${innerClassName}`}
+                className={`rounded-2xl overflow-hidden h-full ${innerClassName}`}
                 style={{ background: surface.card }}
             >
                 {children}
@@ -432,7 +432,7 @@ export function PremiumAvatar({
             style={{
                 width: size,
                 height: size,
-                background: photo ? 'transparent' : 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+                background: photo ? 'transparent' : 'linear-gradient(135deg, #1a1a18 0%, #0a0a0a 100%)',
                 boxShadow: ring ? '0 0 0 1.5px rgba(234,179,8,0.25), 0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.3)',
             }}
         >

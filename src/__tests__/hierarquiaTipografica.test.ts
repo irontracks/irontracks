@@ -29,6 +29,12 @@ const SRC = join(__dirname, '..')
 /**
  * Teto atual. Só pode DIMINUIR — nunca suba este número para fazer o CI passar.
  *
+ * 723 → 677 (12/08/2026): os 46 rótulos do mesmo formato que tinham COR
+ * intencional (34 em dourado, o resto em verde/vermelho/neutro) e por isso
+ * haviam ficado de fora. A trava era o `t-meta` embutir `color`: adotá-lo
+ * apagaria a cor. `t-meta-inherit` tem a mesma forma e não opina sobre cor —
+ * tipografia e cor são decisões separadas.
+ *
  * 800 → 723 (ago/2026): os 74 rótulos que usavam exatamente
  * `text-xs font-black uppercase tracking-widest text-neutral-400` viraram
  * `.t-meta text-xs`. A cor é a MESMA que o utilitário já define, então a troca
@@ -37,7 +43,7 @@ const SRC = join(__dirname, '..')
  * (amarelo, neutral-500) ficaram de fora de propósito: `.t-meta` embute
  * `color`, e aplicá-lo ali apagaria a cor intencional.
  */
-const TETO_PESO_900_EM_TEXTO_MIUDO = 723
+const TETO_PESO_900_EM_TEXTO_MIUDO = 677
 
 function arquivosTsx(dir: string, out: string[] = []): string[] {
     for (const entrada of readdirSync(dir)) {

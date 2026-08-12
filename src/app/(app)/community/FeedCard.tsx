@@ -133,7 +133,7 @@ function FeedCard({
         <div
           className="rounded-full overflow-hidden flex items-center justify-center w-full h-full"
           style={{
-            background: item.senderPhoto ? 'transparent' : 'linear-gradient(135deg, #1a1a1a, #0a0a0a)',
+            background: item.senderPhoto ? 'transparent' : 'linear-gradient(135deg, #1a1a18, #0a0a0a)',
             boxShadow: `0 0 0 1.5px ${cfg.color}40, 0 4px 12px rgba(0,0,0,0.4)`,
           }}
         >

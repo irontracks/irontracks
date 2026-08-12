@@ -418,7 +418,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 {showSuggestions && suggestions.length > 0 && (
                   <div
                     className="absolute z-10 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-lg"
-                    style={{ background: '#1a1a1a', border: '1px solid rgba(245,158,11,0.3)' }}
+                    style={{ background: '#1a1a18', border: '1px solid rgba(245,158,11,0.3)' }}
                   >
                     {suggestions.map((s, i) => (
                       <button
