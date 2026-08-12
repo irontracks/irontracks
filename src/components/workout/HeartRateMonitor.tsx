@@ -110,7 +110,7 @@ const HeartRateMonitor = memo(function HeartRateMonitor({ age = 30 }: Props) {
 
       {/* Zone badge */}
       <span
-        className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+        className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
         style={{ background: `${cfg.color}15`, color: cfg.color }}
       >
         {cfg.label}

@@ -126,7 +126,7 @@ const RecoveryScore = memo(function RecoveryScore() {
             <span className="text-xl font-bold tabular-nums" style={{ color: cfg.color }}>
               {score}
             </span>
-            <span className="text-[7px] uppercase tracking-wider text-neutral-400 font-medium">
+            <span className="text-[9px] uppercase tracking-wider text-neutral-400 font-medium">
               score
             </span>
           </div>
