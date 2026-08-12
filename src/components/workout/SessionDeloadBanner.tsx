@@ -4,6 +4,8 @@ import React from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import type { UnknownRecord } from './types';
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 /**
  * Descarga (deload) no escopo do TREINO.
@@ -48,6 +50,9 @@ export default function SessionDeloadBanner() {
   // Dispensar é só para esta montagem do treino — não persiste. Se o treino for
   // reaberto e o quadro continuar, o aviso volta (o dado não mudou).
   const [dispensado, setDispensado] = React.useState(false);
+  // Antes de qualquer `return null` deste componente: hook atrás de condicional
+  // faz o React contar hooks a menos no re-render (o teste do banner pegou).
+  const deloadModalRef = useFocusTrap(!!sessionDeloadModal, () => setSessionDeloadModal(null));
 
   const nomeDe = React.useCallback(
     (i: number) => String((exercises?.[i] as UnknownRecord)?.name ?? '').trim() || `Exercício ${i + 1}`,
@@ -202,8 +207,8 @@ export default function SessionDeloadBanner() {
       </div>
 
       {sessionDeloadModal ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center">
-          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center" {...backdropProps(() => setSessionDeloadModal(null), 'Fechar descarga')}>
+          <div ref={deloadModalRef} {...dialogProps('Descarga do treino')} className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl">
             <div className="text-lg font-bold text-white">Descarga do treino</div>
             <div className="mt-1 text-[13px] leading-snug text-neutral-400">
               Reduz {Math.round(sessionDeloadModal.suggestedPct * 100)}% da carga nos exercícios marcados.

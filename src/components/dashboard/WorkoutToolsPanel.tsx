@@ -2,6 +2,8 @@
 
 import { memo } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -38,20 +40,16 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
     setNormalizingExercises,
     setApplyingTitleRule,
 }: WorkoutToolsPanelProps) {
+    // O painel só é montado quando aberto — o trap vale enquanto ele existir.
+    const panelRef = useFocusTrap(true, onClose)
     return (
         <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-40"
-              role="button"
-              tabIndex={-1}
-              aria-label="Fechar ferramentas"
-              onClick={onClose}
-              onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
-            />
+            {/* Backdrop — `presentation`, não `button`: ele não é um controle,
+                e anunciá-lo como tal prometeria uma ação que o painel já tem. */}
+            <div className="fixed inset-0 z-40" {...backdropProps(onClose, 'Fechar ferramentas')} />
 
             {/* ── Premium Tools Panel ─────────────────────────────── */}
-            <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div ref={panelRef} {...dialogProps('Ferramentas do treino')} className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="rounded-3xl border border-white/10 bg-neutral-950/97 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden">
 
                     {/* Gold top shimmer */}

@@ -9,7 +9,8 @@ import { useStudentSubscription } from '@/hooks/useStudentSubscription'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { apiStudentBilling } from '@/lib/api/student-billing'
 import type { StudentCharge } from '@/lib/api/student-billing'
-import { backdropProps } from '@/utils/a11y/backdrop'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,8 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Montado só quando aberto: o trap vale enquanto o componente existir.
+  const dialogRef = useFocusTrap(true, onClose)
   const [copied, setCopied] = useState(false)
 
   useBackHandler(true, onClose)
@@ -98,7 +101,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
       className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
       {...backdropProps(() => onClose(), 'Fechar assinatura')}
     >
-      <div className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
+      <div ref={dialogRef} {...dialogProps('Assinatura do aluno')} className="relative w-full max-w-md bg-neutral-950 border border-neutral-800 rounded-t-2xl sm:rounded-2xl max-h-[95vh] flex flex-col overflow-hidden shadow-2xl">
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-neutral-800 flex-shrink-0">
           <div>

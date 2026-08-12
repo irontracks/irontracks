@@ -46,6 +46,7 @@ const NAO_E_JANELA: Record<string, string> = {
   'components/ActiveWorkout.tsx': 'a TELA do treino ativo — view de navegação, não janela sobre a página',
   'components/AdminPanelV2.tsx': 'painel administrativo em tela cheia',
   'components/ChatDirectScreen.tsx': 'tela de conversa',
+  'components/teacher-area/TeacherChatHost.tsx': 'só o CONTÊINER que monta o ChatDirectScreen em tela cheia — a superfície é a tela, e ela já está aqui',
   'components/ChatListScreen.tsx': 'tela de lista de conversas',
   'components/HistoryList.tsx': 'tela de histórico',
   'components/WorkoutReport.tsx': 'tela de relatório do treino',
@@ -68,18 +69,7 @@ const NAO_E_JANELA: Record<string, string> = {
 
 /** Janelas de verdade que ainda não têm a semântica. SÓ ENCOLHE. */
 const JANELA_PENDENTE = new Set([
-  'components/LoginScreen.tsx',
-  'components/NotificationCenter.tsx',
-  'components/ProgressPhotos.tsx',
-  'components/admin-panel/StudentWorkoutsTab.tsx',
-  'components/assessment/AssessmentButton.tsx',
-  'components/dashboard/WorkoutToolsPanel.tsx',
-  'components/lab-exams/LabExamsSection.tsx',
-  'components/student/StudentSubscriptionCard.tsx',
-  'components/teacher-area/TeacherAreaNav.tsx',
   'components/teacher-area/TeacherChatHost.tsx',
-  'components/vip/PeriodizationCreateModal.tsx',
-  'components/workout/SessionDeloadBanner.tsx',
 ])
 const listarTsx = (dir: string): string[] =>
   readdirSync(join(SRC, dir), { withFileTypes: true }).flatMap((e) =>

@@ -4,6 +4,8 @@ import React, { useCallback, useState } from 'react'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { apiVip } from '@/lib/api'
 import { NumericInput } from '@/components/ui/NumericInput'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 /**
  * Criador de periodização — o MESMO formulário nas duas telas que precisam dele.
@@ -156,11 +158,14 @@ export default function PeriodizationCreateModal({
     }
   }, [form, loading, onClose, onCreated])
 
+  // Antes do `return null`: hook atrás de condicional quebra a ordem de hooks.
+  const dialogRef = useFocusTrap(open, onClose)
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 pt-safe">
-      <div className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-3xl border border-neutral-800 bg-neutral-900">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 pt-safe" {...backdropProps(onClose)}>
+      <div ref={dialogRef} {...dialogProps('Criar periodização')} className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-3xl border border-neutral-800 bg-neutral-900">
         <div className="sticky top-0 z-10 bg-neutral-900 p-4 border-b border-neutral-800 flex items-center justify-between">
           <div className="font-black text-white">Criar periodização</div>
           <button type="button" onClick={onClose} className="rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-black text-white">

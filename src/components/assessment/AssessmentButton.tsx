@@ -6,6 +6,8 @@ import { AssessmentForm } from './AssessmentForm';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface AssessmentButtonProps {
   studentId: string;
@@ -21,6 +23,7 @@ export default function AssessmentButton({
   className = ''
 }: AssessmentButtonProps) {
   const [showForm, setShowForm] = useState(false);
+  const formRef = useFocusTrap(showForm, () => setShowForm(false));
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,8 +117,10 @@ export default function AssessmentButton({
 
   if (showForm) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pt-20" role="button" tabIndex={-1} aria-label="Fechar avaliação" onClick={() => setShowForm(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}>
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pt-20" {...backdropProps(() => setShowForm(false), 'Fechar avaliação')}>
         <div
+          ref={formRef}
+          {...dialogProps('Avaliação física')}
           className="max-w-4xl w-full max-h-[90vh] overflow-y-auto relative custom-scrollbar rounded-2xl border shadow-2xl"
           style={{
             background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',

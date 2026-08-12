@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { MoreHorizontal, Calendar } from 'lucide-react';
 import { TEACHER_PRIMARY_SECTIONS, TEACHER_MORE_SECTIONS, isMoreSection } from './teacherAreaSections';
+import { dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface Props {
     activeTab: string;
@@ -14,6 +16,10 @@ interface Props {
 /** Barra inferior da Área do professor: 4 seções fixas + botão "Mais". */
 export const TeacherAreaNav: React.FC<Props> = ({ activeTab, onSelect, onOpenSchedule }) => {
     const [moreOpen, setMoreOpen] = useState(false);
+    // Folha de ações que cobre a tela e fecha no Escape: é diálogo modal na
+    // prática. `role="menu"` exigiria `menuitem` em cada filho — meia
+    // implementação de menu mente mais para o leitor de tela do que dialog.
+    const moreRef = useFocusTrap(moreOpen, () => setMoreOpen(false));
     const moreActive = isMoreSection(activeTab);
 
     const pick = (key: string) => {
@@ -31,7 +37,7 @@ export const TeacherAreaNav: React.FC<Props> = ({ activeTab, onSelect, onOpenSch
                         aria-label="Fechar"
                         onClick={() => setMoreOpen(false)}
                     />
-                    <div className="absolute bottom-[72px] left-0 right-0 bg-neutral-900 border-t border-neutral-800 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-t-2xl">
+                    <div ref={moreRef} {...dialogProps('Mais opções')} className="absolute bottom-[72px] left-0 right-0 bg-neutral-900 border-t border-neutral-800 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-t-2xl">
                         <button
                             type="button"
                             onClick={() => { setMoreOpen(false); onOpenSchedule(); }}

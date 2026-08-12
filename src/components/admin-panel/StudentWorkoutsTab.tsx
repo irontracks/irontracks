@@ -11,6 +11,8 @@ import { apiAdmin } from '@/lib/api';
 import { safeEmailLike } from '@/utils/safePgFilter';
 import { ApplyWorkoutToStudentsModal } from './ApplyWorkoutToStudentsModal';
 import { eligibleStudentsForApply } from '@/lib/admin/eligibleStudents';
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 const WorkoutWizardModal = dynamic(
     () => import('@/components/dashboard/WorkoutWizardModal'),
@@ -53,6 +55,7 @@ export const StudentWorkoutsTab: React.FC = () => {
     } = useAdminPanel();
 
     const toolsRef = useRef<HTMLDivElement>(null);
+    const toolsPanelRef = useFocusTrap(toolsPanelOpen, () => setToolsPanelOpen(false));
     const [isSyncing, setIsSyncing] = useState(false);
     const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
     const [periodizationOpen, setPeriodizationOpen] = useState(false);
@@ -135,10 +138,10 @@ export const StudentWorkoutsTab: React.FC = () => {
                             {toolsPanelOpen && (
                                 <>
                                     {/* Backdrop */}
-                                    <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label="Fechar painel" onClick={() => setToolsPanelOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setToolsPanelOpen(false) }} />
+                                    <div className="fixed inset-0 z-40" {...backdropProps(() => setToolsPanelOpen(false), 'Fechar painel')} />
 
                                     {/* Dropdown panel */}
-                                    <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div ref={toolsPanelRef} {...dialogProps('Ferramentas do aluno')} className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                                         <div className="rounded-3xl border border-white/10 bg-neutral-950/97 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden">
 
                                             {/* Gold top shimmer */}

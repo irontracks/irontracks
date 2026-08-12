@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { NumericInput } from '@/components/ui/NumericInput'
-import { backdropProps } from '@/utils/a11y/backdrop'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface ProgressPhoto {
   id: string
@@ -132,6 +133,7 @@ interface UploadModalProps {
 }
 
 function UploadModal({ onClose, onUploaded }: UploadModalProps) {
+  const uploadRef = useFocusTrap(true, onClose)
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -208,8 +210,8 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[1600] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-neutral-950 rounded-3xl border border-neutral-800 overflow-hidden">
+    <div className="fixed inset-0 z-[1600] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4" {...backdropProps(onClose, 'Fechar envio de foto')}>
+      <div ref={uploadRef} {...dialogProps('Enviar foto de progresso')} className="w-full max-w-md bg-neutral-950 rounded-3xl border border-neutral-800 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
           <p className="font-black text-white">Nova foto de progresso</p>
@@ -341,6 +343,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
   const [filterKind, setFilterKind] = useState<ProgressPhoto['kind'] | 'all'>('all')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<ProgressPhoto | null>(null)
+  const lightboxRef = useFocusTrap(!!lightbox, () => setLightbox(null))
 
   useEffect(() => {
     fetch('/api/progress-photos')
@@ -562,7 +565,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
           className="fixed inset-0 z-[1700] bg-black/95 flex flex-col"
           {...backdropProps(() => setLightbox(null), 'Fechar foto')}
         >
-          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3">
+          <div ref={lightboxRef} {...dialogProps('Foto de progresso')} className="flex-shrink-0 flex items-center justify-between px-4 py-3">
             <div>
               <p className="font-bold text-white text-sm">{KIND_LABELS[lightbox.kind]} · {fmtDate(lightbox.date)}</p>
               {lightbox.weight_kg && <p className="text-xs text-yellow-500 font-bold">{lightbox.weight_kg}kg</p>}
