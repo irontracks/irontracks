@@ -66,6 +66,19 @@ export default function MuscleBalanceCard() {
   const unbalanced = data.imbalances.filter(i => !i.balanced)
   const balanced = data.imbalances.filter(i => i.balanced)
 
+  /**
+   * Os pares já mostram o volume de cada músculo que participa de um antagonista.
+   * Repetir esses mesmos números em chips logo abaixo gastava metade do card
+   * dizendo o que já estava dito (5 dos 6 chips, medido no aparelho). O bloco só
+   * acrescenta quando fala dos músculos que NÃO têm par — panturrilha, glúteos,
+   * abdômen. O filtro segue o mesmo critério do render dos pares (`total > 0`):
+   * par que não aparece na tela não pode esconder um músculo daqui.
+   */
+  const jaNosPares = new Set(
+    data.imbalances.filter(i => i.setsA + i.setsB > 0).flatMap(i => [i.muscleA, i.muscleB]),
+  )
+  const semPar = data.muscleVolume.filter(m => !jaNosPares.has(m.id)).slice(0, 6)
+
   return (
     <div
       className="rounded-2xl overflow-hidden"
@@ -149,11 +162,11 @@ export default function MuscleBalanceCard() {
           })}
 
           {/* Top muscles summary */}
-          {data.muscleVolume.length > 0 && (
+          {semPar.length > 0 && (
             <div className="pt-2 border-t border-white/5">
-              <p className="text-[10px] font-black text-white/55 uppercase tracking-widest mb-2">Mais treinados (séries)</p>
+              <p className="text-[10px] font-black text-white/55 uppercase tracking-widest mb-2">Sem par antagonista (séries)</p>
               <div className="flex flex-wrap gap-1.5">
-                {data.muscleVolume.slice(0, 6).map(m => (
+                {semPar.map(m => (
                   <span
                     key={m.id}
                     className="px-2 py-0.5 rounded-full text-[10px] font-bold"

@@ -79,3 +79,34 @@ describe('legibilidade dos metadados', () => {
     expect(CODIGO).not.toMatch(/text-amber-400\/70/)
   })
 })
+
+/**
+ * Segunda rodada, com o card inteiro visível no aparelho: os chips "Mais
+ * treinados (séries)" repetiam os números que as barras já mostravam — 5 dos 6,
+ * medido na tela. `docs/DESIGN_HIERARCHY.md`: um fato, um lugar. O bloco só
+ * acrescenta quando fala dos músculos SEM antagonista (panturrilha, glúteos).
+ */
+describe('chips — não repetem o que as barras já dizem', () => {
+  it('a lista é filtrada pelos músculos que já aparecem nos pares', () => {
+    expect(CODIGO, 'sem o filtro, o chip repete o número da barra logo acima')
+      .toMatch(/const semPar = data\.muscleVolume\.filter\(m => !jaNosPares\.has\(m\.id\)\)/)
+    expect(CODIGO, 'render cru da lista completa = a repetição de volta')
+      .not.toMatch(/data\.muscleVolume\.slice\(0, 6\)\.map/)
+  })
+
+  it('o filtro ignora pares que não chegam a ser desenhados', () => {
+    // O render pula par com `total === 0`; se o Set incluísse esses pares, um
+    // músculo sumiria dos DOIS lugares — pior que a repetição.
+    expect(CODIGO).toMatch(/data\.imbalances\.filter\(i => i\.setsA \+ i\.setsB > 0\)\.flatMap/)
+  })
+
+  it('o rótulo diz o que a lista virou', () => {
+    // "Mais treinados" descreveria um ranking que a lista filtrada não é mais.
+    expect(CODIGO).toMatch(/Sem par antagonista \(séries\)/)
+    expect(CODIGO).not.toMatch(/Mais treinados \(séries\)/)
+  })
+
+  it('o bloco some quando não sobra ninguém', () => {
+    expect(CODIGO).toMatch(/\{semPar\.length > 0 && \(/)
+  })
+})
