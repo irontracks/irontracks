@@ -465,25 +465,48 @@ voltar o `uppercase` do título), edite o arquivo e apague o guard correspondent
 em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
 caso, e é assim que ele avisa que a decisão está sendo revertida de propósito.
 
-## Débito ABERTO em design/a11y (fechado até 12/08/2026)
+## Débito ABERTO em design/a11y (atualizado 12/08/2026, pós-varredura)
 
-Lista curta do que **não** está feito, para não ser redescoberto nem refeito.
-Ordem de impacto:
+O que **não** está feito, para não ser redescoberto nem refeito:
 
-1. **12 janelas sem semântica** — `JANELA_PENDENTE` em
-   `src/__tests__/modalDialogRatchet.test.ts`. A triagem já foi feita: as 21
-   entradas de `NAO_E_JANELA` (splash, telas, `role="menu"`, barra do descanso)
-   **não devem** virar `dialog`. Padrão pronto em `workout/Modals.tsx`.
-2. **47 textos corridos em 9px** (ver piso tipográfico).
-3. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08.
-4. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram o
-   X corrigido e provado por TESTE, mas **nunca foram tocados na tela**. A
-   navegação por coordenadas no treino ativo é cara e arriscada (já concluiu
-   série e apagou outra por engano). Se for verificar, use o iPhone do dono: abrir
-   um exercício em Drop-Set e tocar no X **no centro do ícone**.
-5. **Ordem de foco e agrupamento nas telas logadas** — genuinamente bloqueado
-   daqui. Exige Accessibility Inspector (acesso negado 2×) ou o dono no iPhone.
-   **Não gaste tempo tentando VoiceOver no Simulador: ele não existe lá.**
+1. **54 usos de 9px em texto corrido** (23 arquivos). Não corrigidos: mexer no
+   corpo muda altura de linha e layout em 23 telas, e isso não se entrega sem
+   olhar cada uma. **Congelado por teto por arquivo** em
+   `__tests__/nonoPixelTextoCorrido.test.ts`, que só desce — o número vinha
+   CRESCENDO (47 → 54 em uma semana), porque o piso de 9px virou alvo por
+   gravidade. Em corpo, use 10–11px; 9px é para eyebrow label.
+2. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08 (não é design).
+3. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram
+   o X corrigido e provado por TESTE, mas nunca foram tocados na tela.
+4. **Ordem de foco e agrupamento nas telas logadas** — bloqueado daqui: exige
+   Accessibility Inspector (negado 2×) ou o dono no iPhone. **VoiceOver não
+   existe no Simulador.** As 11 janelas de ago/2026 têm a semântica provada por
+   guard e por tipo, não por leitor de tela real.
+
+### Fechado em 12/08/2026
+
+- **Janelas sem semântica** — 11 das 12 ganharam `dialogProps` + `useFocusTrap`
+  + `backdropProps` (PR #779). Sobra 1 em `JANELA_PENDENTE`. Backdrop com
+  `role="button"` virou `presentation`: o véu não é controle.
+- **Alvo de toque** (PR #778) — 90 botões abaixo de 44pt ganharam `.tap-44`,
+  que estende a área pelo `::after` **sem mover pixel**. Nenhum falhava o WCAG
+  2.5.8 (24×24): é ergonomia de academia, não conformidade. Guard novo, era a
+  única frente de design sem ratchet.
+
+### Duas frentes que a MEDIÇÃO derrubou — não reabrir
+
+Custaram meia hora cada e vão custar de novo se a nota não disser:
+
+- **"63% dos botões sem `active:`" NÃO é problema.** A regra global
+  `button:active { transform: scale(0.96) }` (`globals.css`) já atende os 1037;
+  quem tem `active:scale-*` na classe só sobrescreve (classe vence seletor de
+  elemento). Foi erro de método: medir a CLASSE em vez do comportamento
+  aplicado. Hoje há guard travando essa regra global.
+- **`text-white/50` NÃO fere o AA.** Medido sobre os quatro fundos do app:
+  5,33:1 na base e **5,21:1 no pior caso** (depth-3 `#1a1a18`). Quem reprova é
+  `/45` — 4,47:1 no depth-3 —, e o guard de contraste já o proíbe. O piso `/55`
+  é margem estilística, não requisito. **A régua certa é o fundo MAIS CLARO**
+  (depth-3), não o `#0a0a0a`.
 
 ## Violeta é a cor da MÁQUINA — `lib/design/machineAccent` (12/08/2026)
 
