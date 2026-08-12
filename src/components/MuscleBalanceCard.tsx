@@ -80,7 +80,7 @@ export default function MuscleBalanceCard() {
         <div className="flex items-center gap-2">
           <Scale size={14} className={unbalanced.length > 0 ? 'text-amber-400' : 'text-green-400'} />
           <span className="text-sm font-black text-white">Equilíbrio Muscular</span>
-          <span className="text-xs text-white/30">28 dias</span>
+          <span className="text-xs text-white/55">28 dias</span>
         </div>
         <div className="flex items-center gap-2">
           {unbalanced.length > 0 ? (
@@ -93,7 +93,7 @@ export default function MuscleBalanceCard() {
             </span>
           )}
           <svg
-            className={`w-3.5 h-3.5 text-white/30 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`w-3.5 h-3.5 text-white/50 transition-transform ${expanded ? 'rotate-180' : ''}`}
             viewBox="0 0 16 16" fill="none"
           >
             <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -108,34 +108,37 @@ export default function MuscleBalanceCard() {
             const total = im.setsA + im.setsB
             if (total === 0) return null
             const pctA = im.ratio
-            const pctB = 100 - im.ratio
             return (
-              <div key={`${im.muscleA}-${im.muscleB}`} className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className={`font-bold ${!im.balanced && im.setsA > im.setsB ? 'text-amber-400' : 'text-white/60'}`}>{im.labelA}</span>
-                  <span className={`font-bold ${!im.balanced && im.setsB > im.setsA ? 'text-amber-400' : 'text-white/60'}`}>{im.labelB}</span>
+              <div key={`${im.muscleA}-${im.muscleB}`} className="space-y-1.5">
+                {/* Número JUNTO do rótulo, fora da barra. Dentro dela o fundo muda com a
+                    própria proporção, então a legibilidade passava a depender do dado. */}
+                <div className="flex justify-between items-baseline text-xs">
+                  <span className={`font-bold ${!im.balanced && im.setsA > im.setsB ? 'text-amber-300' : 'text-white/60'}`}>
+                    {im.labelA} <span className="text-white font-black">{im.setsA}</span>
+                  </span>
+                  <span className={`font-bold ${!im.balanced && im.setsB > im.setsA ? 'text-amber-300' : 'text-white/60'}`}>
+                    <span className="text-white font-black">{im.setsB}</span> {im.labelB}
+                  </span>
                 </div>
-                <div className="relative h-5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                  {/* Left side (A) */}
-                  <div
-                    className="absolute left-0 top-0 h-full rounded-full transition-all"
-                    style={{
-                      width: `${pctA}%`,
-                      // Verde = par equilibrado; âmbar = qualquer desequilíbrio (atenção),
-                      // independente de qual lado domina.
-                      background: !im.balanced ? '#f59e0b' : '#22c55e',
-                    }}
-                  />
-                  {/* Center marker */}
-                  <div className="absolute left-1/2 top-0 h-full w-px" style={{ background: 'rgba(255,255,255,0.2)' }} />
-                  {/* Números = séries (unidade no cabeçalho "Mais treinados (séries)") */}
-                  <div className="absolute inset-0 flex items-center justify-between px-2 text-[9px] font-black">
-                    <span style={{ color: pctA > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsA}</span>
-                    <span style={{ color: pctB > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsB}</span>
+                <div className="relative py-1">
+                  <div className="relative h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                    {/* Left side (A) */}
+                    <div
+                      className="absolute left-0 top-0 h-full transition-all"
+                      style={{
+                        width: `${pctA}%`,
+                        // Verde = par equilibrado; âmbar = qualquer desequilíbrio (atenção),
+                        // independente de qual lado domina.
+                        background: !im.balanced ? '#f59e0b' : '#22c55e',
+                      }}
+                    />
                   </div>
+                  {/* Marcador dos 50% — a referência de leitura da barra. Fica FORA do
+                      overflow e ultrapassa a altura para não sumir sobre a tinta âmbar. */}
+                  <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2" style={{ background: 'rgba(255,255,255,0.45)' }} />
                 </div>
                 {!im.balanced && (
-                  <p className="text-[10px] text-amber-400/70">
+                  <p className="text-[11px] text-amber-300">
                     {im.setsA > im.setsB
                       ? `Adicione mais séries de ${im.labelB}`
                       : `Adicione mais séries de ${im.labelA}`}
@@ -148,7 +151,7 @@ export default function MuscleBalanceCard() {
           {/* Top muscles summary */}
           {data.muscleVolume.length > 0 && (
             <div className="pt-2 border-t border-white/5">
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2">Mais treinados (séries)</p>
+              <p className="text-[10px] font-black text-white/55 uppercase tracking-widest mb-2">Mais treinados (séries)</p>
               <div className="flex flex-wrap gap-1.5">
                 {data.muscleVolume.slice(0, 6).map(m => (
                   <span
