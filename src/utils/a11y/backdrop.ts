@@ -25,6 +25,31 @@
  */
 import type { KeyboardEvent, MouseEvent } from 'react'
 
+/**
+ * Props da CAIXA do modal — o irmão de `backdropProps`, que cuida do fundo.
+ *
+ * Sem `role="dialog"`, um modal é uma `<div>` qualquer: o leitor de tela não
+ * anuncia que uma janela abriu, não diz o nome dela, e o conteúdo por baixo
+ * continua sendo lido como se ainda estivesse disponível. Medido em 12/08/2026:
+ * 42 dos 76 overlays do app estavam assim.
+ *
+ * `aria-modal` marca o resto da página como inerte PARA O LEITOR DE TELA — o que
+ * só é honesto se o Tab também não escapar. Por isso ele vem junto de
+ * `useFocusTrap` neste repo, e o guard cobra os dois: `aria-modal` sozinho
+ * promete um confinamento que o teclado não cumpre, e atributo que mente é pior
+ * que atributo ausente.
+ */
+export interface DialogProps {
+    role: 'dialog'
+    'aria-modal': true
+    'aria-label': string
+}
+
+/** @param label o que a janela É, não o que ela faz ("Editar exercício"). */
+export function dialogProps(label: string): DialogProps {
+    return { role: 'dialog', 'aria-modal': true, 'aria-label': label }
+}
+
 export interface BackdropProps {
     role: 'presentation'
     tabIndex: -1

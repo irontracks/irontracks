@@ -25,7 +25,8 @@ import {
 import { UnknownRecord } from './types';
 import { ModalsSimpleMethods } from './ModalsSimpleMethods';
 import { ModalsComplexMethods } from './ModalsComplexMethods';
-import { backdropProps } from '@/utils/a11y/backdrop'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 const ExerciseSortRow = ({
   item,
@@ -144,6 +145,17 @@ export default function Modals() {
     saveClusterModal,
   } = useWorkoutContext();
 
+  /* Um trap por janela. `aria-modal` diz ao leitor de tela que o resto da página
+     está inerte; sem confinar o Tab junto, isso seria promessa falsa — daí os
+     dois virem sempre em par (ver `utils/a11y/backdrop`). O hook recebe o
+     `isOpen` como argumento, então pode ser chamado incondicionalmente. */
+  const postCheckinRef = useFocusTrap(!!postCheckinOpen, () => setPostCheckinOpen(false));
+  const deloadRef = useFocusTrap(!!deloadModal, () => setDeloadModal(null));
+  const addExerciseRef = useFocusTrap(!!addExerciseOpen, () => setAddExerciseOpen(false));
+  const editExerciseRef = useFocusTrap(!!editExerciseOpen, () => { setEditExerciseOpen(false); setEditExerciseIdx(null); });
+  const organizeRef = useFocusTrap(!!organizeOpen, requestCloseOrganize);
+  const clusterRef = useFocusTrap(!!clusterModal, () => setClusterModal(null));
+
   return (
     <>
       {/* Editor completo durante o treino ativo (cardio, métodos, apagar/reordenar).
@@ -180,7 +192,7 @@ export default function Modals() {
             if (typeof r === 'function') r(null);
           }}
         >
-          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={postCheckinRef} {...dialogProps('Check-out pós-treino')} className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-out</div>
@@ -305,6 +317,7 @@ export default function Modals() {
                         : 'Relatórios prontos.';
             return (
               <div
+                ref={deloadRef} {...dialogProps('Ajustar deload')}
                 className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -419,7 +432,7 @@ export default function Modals() {
 
       {addExerciseOpen && (
         <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar busca de exercícios" onClick={() => setAddExerciseOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setAddExerciseOpen(false) }}>
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={addExerciseRef} {...dialogProps('Adicionar exercício extra')} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
@@ -491,7 +504,7 @@ export default function Modals() {
 
       {editExerciseOpen && editExerciseIdx != null && (
         <div className="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar edição de exercício" onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { setEditExerciseOpen(false); setEditExerciseIdx(null); } }}>
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={editExerciseRef} {...dialogProps('Editar exercício')} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
@@ -650,7 +663,7 @@ export default function Modals() {
 
       {organizeOpen && (
         <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar organização" onClick={requestCloseOrganize} onKeyDown={(e) => { if (e.key === 'Escape') requestCloseOrganize() }}>
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div ref={organizeRef} {...dialogProps('Organizar exercícios')} className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
@@ -718,6 +731,7 @@ export default function Modals() {
           {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
         >
           <div
+                ref={clusterRef} {...dialogProps('Preencher blocos do cluster')}
             className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
