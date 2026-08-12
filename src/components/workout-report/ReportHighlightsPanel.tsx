@@ -2,6 +2,7 @@
 
 import React from 'react'
 import NextImage from 'next/image'
+import { classificarVariacaoVolume, rotuloVariacaoVolume } from '@/utils/report/volumeVariation'
 
 
 interface ReportHighlightsPanelProps {
@@ -55,22 +56,42 @@ export function ReportHighlightsPanel({
             </div>
           </div>
         )}
-        {volumeDeltaAbs !== 0 && currentVolume > 0 && (
-          <div className={`border rounded-xl p-3 flex flex-col gap-1 ${volumeDeltaAbs > 0
-            ? 'bg-green-500/10 border-green-500/30'
-            : 'bg-red-500/10 border-red-500/30'
-            }`}>
-            <div className={`text-2xl font-black ${volumeDeltaAbs > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {volumeDeltaAbs > 0 ? '+' : ''}{Math.round(volumeDeltaAbs).toLocaleString('pt-BR')} kg
-            </div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume vs anterior</div>
-            {Math.abs(volumeDelta) > 0 && (
-              <div className={`text-[10px] font-mono ${volumeDelta > 0 ? 'text-green-300' : 'text-red-300'}`}>
-                {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+        {/* Variação com ZONA NEUTRA. Antes qualquer negativo virava vermelho de
+            alarme, sem piso: uma sessão com 2 PRs exibia ao lado um bloco
+            vermelho de "−209 kg / −0,8%". E a mesma tela chamava "−30,9%" de
+            "semana normal" alguns blocos abaixo — dois julgamentos opostos da
+            mesma grandeza. O limiar e o raciocínio estão em
+            utils/report/volumeVariation.ts. */}
+        {volumeDeltaAbs !== 0 && currentVolume > 0 && (() => {
+          const classe = classificarVariacaoVolume(volumeDelta)
+          const caixa =
+            classe === 'alta' ? 'bg-green-500/10 border-green-500/30'
+              : classe === 'queda' ? 'bg-red-500/10 border-red-500/30'
+                : 'bg-neutral-800/60 border-neutral-700/60'
+          const numero =
+            classe === 'alta' ? 'text-green-400'
+              : classe === 'queda' ? 'text-red-400'
+                : 'text-white'
+          const pct =
+            classe === 'alta' ? 'text-green-300'
+              : classe === 'queda' ? 'text-red-300'
+                : 'text-neutral-400'
+          return (
+            <div className={`border rounded-xl p-3 flex flex-col gap-1 ${caixa}`}>
+              <div className={`text-2xl font-black ${numero}`}>
+                {volumeDeltaAbs > 0 ? '+' : ''}{Math.round(volumeDeltaAbs).toLocaleString('pt-BR')} kg
               </div>
-            )}
-          </div>
-        )}
+              <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                {rotuloVariacaoVolume(classe)}
+              </div>
+              {Math.abs(volumeDelta) > 0 && (
+                <div className={`text-[10px] font-mono ${pct}`}>
+                  {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+                </div>
+              )}
+            </div>
+          )
+        })()}
         {currentVolume > 0 && (
           <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
             <div className="text-2xl font-black text-white">{Math.round(currentVolume).toLocaleString('pt-BR')} kg</div>
