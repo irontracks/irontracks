@@ -96,14 +96,23 @@ export const AssessmentHeader = ({
             >
               + Nova Avaliação
             </button>
+            {/* Estes três atalhos usavam AZUL (Bioimpedância) e ROXO (Por Foto,
+                Laudos) como se fossem código de categoria. Não eram: o app tem
+                um accent só, o dourado, e a regra que essas cores sugeriam já
+                era contradita em outras telas — "Novo Treino: monte com
+                inteligência artificial" e "Treino Express: IA gera em segundos"
+                são DOURADOS, enquanto "Por Foto", que também é IA, era roxo.
+                Cor que só significa algo em uma tela não é sistema, é ruído.
+                A diferenciação continua onde ela de fato funciona: ícone e
+                rótulo. A hierarquia continua onde ela pertence: "Nova
+                Avaliação" é a única dourada, porque é a ação primária. */}
             {onAddBia ? (
               <button
                 onClick={onAddBia}
-                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border text-neutral-200 font-bold transition-all duration-300 hover:text-yellow-400 hover:border-yellow-500/40 active:scale-95 inline-flex items-center justify-center gap-2"
                 style={{
-                  background: 'rgba(59,130,246,0.08)',
-                  borderColor: 'rgba(59,130,246,0.30)',
-                  color: '#93c5fd',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderColor: 'rgba(255,255,255,0.08)',
                 }}
                 title="Registrar resultado da bioimpedância (PDF da farmácia/clínica)"
               >
@@ -114,11 +123,10 @@ export const AssessmentHeader = ({
             {onPhotoAssessment ? (
               <button
                 onClick={onPhotoAssessment}
-                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border text-neutral-200 font-bold transition-all duration-300 hover:text-yellow-400 hover:border-yellow-500/40 active:scale-95 inline-flex items-center justify-center gap-2"
                 style={{
-                  background: 'rgba(168,85,247,0.08)',
-                  borderColor: 'rgba(168,85,247,0.30)',
-                  color: '#d8b4fe',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderColor: 'rgba(255,255,255,0.08)',
                 }}
                 title="Avaliação por foto com laudo de IA (composição corporal)"
               >
@@ -129,11 +137,10 @@ export const AssessmentHeader = ({
             {onPhotoHistory ? (
               <button
                 onClick={onPhotoHistory}
-                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border text-neutral-200 font-bold transition-all duration-300 hover:text-yellow-400 hover:border-yellow-500/40 active:scale-95 inline-flex items-center justify-center gap-2"
                 style={{
-                  background: 'rgba(168,85,247,0.05)',
-                  borderColor: 'rgba(168,85,247,0.22)',
-                  color: '#c4b5fd',
+                  background: 'rgba(255,255,255,0.03)',
+                  borderColor: 'rgba(255,255,255,0.08)',
                 }}
                 title="Ver os laudos por foto já gerados"
               >

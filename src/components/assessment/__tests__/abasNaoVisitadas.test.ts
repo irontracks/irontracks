@@ -63,3 +63,41 @@ describe('proveniência do resumo semanal VIP', () => {
     expect(src).toMatch(/text-xl font-black text-white">\{trainedDays\}/)
   })
 })
+
+/**
+ * Um accent só — decidido em 11/08/2026 com base em evidência, não em gosto.
+ *
+ * As Avaliações usavam AZUL (Bioimpedância) e ROXO (Por Foto, Laudos) como se
+ * fossem categoria, e a VIP usava VERDE no ícone de Nutrição. O teste que
+ * decidiu: **a regra que essas cores sugeriam já era contradita pelo app**.
+ * Se roxo fosse "feature de IA", então "Novo Treino — monte com inteligência
+ * artificial" e "Treino Express — IA gera em segundos" seriam roxos. São
+ * dourados. E o verde da Nutrição não era condicional a `macrosEnabled`, ou
+ * seja, não comunicava "liberado" — era a única cor divergente entre quatro
+ * irmãos.
+ *
+ * Cor que só significa algo numa tela não é sistema, é ruído. A diferenciação
+ * ficou onde funciona (ícone e rótulo) e a hierarquia onde pertence (só a ação
+ * primária é dourada).
+ */
+describe('um accent só', () => {
+  it('as Avaliações não usam azul nem roxo como categoria', () => {
+    const src = readFileSync(join(SRC, 'assessment/AssessmentHeader.tsx'), 'utf8')
+    expect(src, 'azul é status/informação no sistema').not.toMatch(/rgba\(59,130,246/)
+    expect(src, 'roxo não existe na paleta do app').not.toMatch(/rgba\(168,85,247/)
+  })
+
+  it('a ação primária continua sendo a única dourada', () => {
+    const src = readFileSync(join(SRC, 'assessment/AssessmentHeader.tsx'), 'utf8')
+    expect(src).toMatch(/btn-gold-animated/)
+    expect(src).toMatch(/\+ Nova Avaliação/)
+  })
+
+  it('os quatro atalhos da VIP usam a mesma família de acento', () => {
+    const src = readFileSync(join(SRC, 'VipHub.tsx'), 'utf8')
+    const grade = /grid grid-cols-2 md:grid-cols-4[\s\S]{0,900}?\]\.map/.exec(src)?.[0] ?? ''
+    expect(grade).not.toBe('')
+    // verde é STATUS neste app; num ícone decorativo entre irmãos âmbar, destoa.
+    expect(grade).not.toMatch(/text-green-\d+/)
+  })
+})
