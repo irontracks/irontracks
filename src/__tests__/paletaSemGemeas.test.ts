@@ -58,11 +58,24 @@ const arquivos = ['src/components', 'src/app'].flatMap((raiz) =>
     .map((f) => `${raiz}/${f}`),
 ).filter((f) => !FORA_DO_PRODUTO.test(f))
 
+/**
+ * Só o código executável. Um hex citado em COMENTÁRIO — para explicar por que a
+ * cor saiu, ou para registrar o valor antigo numa migração — não pinta pixel
+ * nenhum, e acusá-lo faz o guard brigar com a própria documentação. Aconteceu
+ * em 13/08/2026: o comentário que explicava a troca do fundo do shell citava
+ * `#171717` e o teste reprovou o arquivo.
+ */
+const semComentarios = (src: string): string =>
+  src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+
 describe('paleta — nenhuma cor quase-gêmea', () => {
   it('nenhum hex a menos de 12 de distância de uma cor oficial', () => {
     const gemeas: string[] = []
     for (const rel of arquivos) {
-      const src = readFileSync(rel, 'utf8')
+      const src = semComentarios(readFileSync(rel, 'utf8'))
       for (const m of new Set(src.match(/#[0-9a-fA-F]{6}\b/g) ?? [])) {
         const hex = m.toLowerCase()
         if (PALETA.includes(hex)) continue
@@ -77,6 +90,13 @@ describe('paleta — nenhuma cor quase-gêmea', () => {
         'paleta (ou o token bg-depth-*). Manter as duas só duplica o custo do dia ' +
         'em que a paleta mudar.',
     ).toEqual([])
+  })
+
+  it('hex em comentário não é cor aplicada', () => {
+    const comentado = semComentarios('{/* antes era #171717 */}\nconst a = 1')
+    expect(comentado).not.toContain('#171717')
+    // …mas o hex em código continua visível para o guard
+    expect(semComentarios("background: '#171717'")).toContain('#171717')
   })
 
   it('a distância enxerga o que deve enxergar', () => {
