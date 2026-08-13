@@ -175,7 +175,14 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 {/* Conteúdo scrollable. pb-32 deixa espaço pro bottom tab
                     bar (que tem ~72px de altura incluindo safe area).
                     Sub-tabs aparecem com sticky-top dentro deste container. */}
-                <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-2 pb-32">
+                {/* `overflow-x-hidden` é obrigatório aqui, não estético. Os chips de
+                    sub-aba usam `-mx-4` para o fundo sticky sangrar até a borda —
+                    técnica correta —, mas sem travar o eixo X essa sangria vira
+                    scroll horizontal da PÁGINA: a lista de alunos deslizava para os
+                    lados enquanto se rolava para baixo, cortando os nomes ("...ncine
+                    Kokott"). A regra da casa: conteúdo largo rola dentro do próprio
+                    container, o corpo da página nunca. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pt-2 pb-32">
                     <AdminPanelSubTabs
                         category={activeCategory}
                         currentTab={tab}
