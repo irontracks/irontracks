@@ -28,6 +28,38 @@ interface NotificationCenterProps {
 // ─── Notification type config ─────────────────────────────────────────────────
 // Keys MUST match the `type` values emitted by the server. Aliases map legacy
 // names to the canonical entry so one server type rename doesn't break the UI.
+//
+// ⚠️ A COR RESPONDE "ISTO EXIGE ALGO DE MIM?", NÃO "QUE EVENTO É ESTE?"
+//
+// Até 13/08/2026 eram 23 tipos em 7 famílias de cor sem critério: `emerald`
+// cobria Meta/Online/Marco/Refeição e `green` cobria Treino/Aceito/Aceito, sem
+// nenhuma regra que explicasse a diferença. Cores distinguíveis (Δ=69) numa
+// distinção que não codificava nada — pior que cores iguais, porque prometem um
+// sistema e não entregam. E ninguém memoriza 7 códigos numa lista aberta uma vez
+// por dia.
+//
+// O TIPO do evento já está escrito no rótulo do card (PR, Streak, Meta, Treino).
+// Repetir isso em matiz é redundância que gasta os pigmentos de alarme e de ação.
+// O que a cor deve carregar é a FUNÇÃO — o que a notificação pede de você:
+//
+//   ACAO      dourado  → alguém espera uma resposta sua (aceitar, recusar)
+//   CONQUISTA verde    → algo bom se concretizou
+//   AVISO     vermelho → comunicado que não pode passar batido (ÚNICO vermelho)
+//   LEMBRETE  âmbar    → o app cutucando na hora certa
+//   SOCIAL    neutro   → movimento da rede; informativo, não acionável
+//
+// Ao adicionar um tipo novo, a pergunta é "o que isto exige do usuário?" — não
+// "que cor combina?". Guard em `__tests__/notificacaoPorFuncao.test.ts`.
+type Funcao = 'acao' | 'conquista' | 'aviso' | 'lembrete' | 'social'
+
+const ESTILO_POR_FUNCAO: Record<Funcao, { bg: string; border: string; dot: string }> = {
+    acao:      { bg: 'from-yellow-500/20 to-amber-600/10',  border: 'border-yellow-500/30',  dot: 'bg-yellow-400' },
+    conquista: { bg: 'from-green-500/20 to-emerald-600/10', border: 'border-green-500/30',   dot: 'bg-green-400' },
+    aviso:     { bg: 'from-red-500/20 to-red-600/10',       border: 'border-red-500/30',     dot: 'bg-red-400' },
+    lembrete:  { bg: 'from-amber-500/15 to-amber-600/5',    border: 'border-amber-500/25',   dot: 'bg-amber-400' },
+    social:    { bg: 'from-white/[0.06] to-white/[0.02]',   border: 'border-white/10',       dot: 'bg-neutral-400' },
+}
+
 type TypeConfig = {
     icon: React.ReactNode;
     bg: string;
@@ -36,99 +68,35 @@ type TypeConfig = {
     label: string;
 };
 
+/** Monta a config do tipo a partir da FUNÇÃO — cor nunca é escolhida à mão. */
+const tipo = (icon: React.ReactNode, label: string, funcao: Funcao): TypeConfig => ({
+    icon, label, ...ESTILO_POR_FUNCAO[funcao],
+})
+
 const TYPE_CONFIG: Record<string, TypeConfig> = {
-    friend_pr: {
-        icon: <Trophy size={15} />, bg: 'from-yellow-500/20 to-amber-600/10',
-        border: 'border-yellow-500/30', dot: 'bg-yellow-400', label: 'PR',
-    },
-    friend_streak: {
-        icon: <Flame size={15} />, bg: 'from-orange-500/20 to-red-500/10',
-        border: 'border-orange-500/30', dot: 'bg-orange-400', label: 'Streak',
-    },
-    friend_goal: {
-        icon: <Target size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
-        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Meta',
-    },
-    workout_finish: {
-        icon: <Dumbbell size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
-        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Treino',
-    },
-    workout_start: {
-        icon: <Activity size={15} />, bg: 'from-orange-500/20 to-orange-600/10',
-        border: 'border-orange-500/30', dot: 'bg-orange-400', label: 'Iniciou',
-    },
-    friend_online: {
-        icon: <Activity size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
-        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Online',
-    },
-    follow_request: {
-        icon: <UserPlus size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Seguir',
-    },
-    follow_accepted: {
-        icon: <UserPlus size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
-        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Aceito',
-    },
-    message: {
-        icon: <MessageSquare size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Mensagem',
-    },
-    broadcast: {
-        icon: <Megaphone size={15} />, bg: 'from-red-500/20 to-red-600/10',
-        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Aviso',
-    },
-    appointment: {
-        icon: <Calendar size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Agenda',
-    },
-    appointment_created: {
-        icon: <Calendar size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Agenda',
-    },
-    milestone: {
-        icon: <Star size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
-        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Marco',
-    },
-    story_posted: {
-        icon: <Camera size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Story',
-    },
-    story_like: {
-        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
-        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Curtiu',
-    },
-    like: {
-        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
-        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Curtiu',
-    },
-    story_reaction: {
-        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
-        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Reação',
-    },
-    challenge_created: {
-        icon: <Swords size={15} />, bg: 'from-amber-500/20 to-orange-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Desafio',
-    },
-    challenge_accepted: {
-        icon: <Swords size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
-        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Aceito',
-    },
-    challenge_declined: {
-        icon: <Swords size={15} />, bg: 'from-neutral-500/20 to-neutral-600/10',
-        border: 'border-neutral-500/30', dot: 'bg-neutral-400', label: 'Recusado',
-    },
-    meal_reminder: {
-        icon: <Utensils size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
-        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Refeição',
-    },
-    workout_reminder: {
-        icon: <Activity size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Lembrete',
-    },
-    default: {
-        icon: <Bell size={15} />, bg: 'from-neutral-700/40 to-neutral-800/20',
-        border: 'border-neutral-700/40', dot: 'bg-neutral-500', label: 'Info',
-    },
+    friend_pr: tipo(<Trophy size={15} />, 'PR', 'conquista'),
+    friend_streak: tipo(<Flame size={15} />, 'Streak', 'social'),
+    friend_goal: tipo(<Target size={15} />, 'Meta', 'conquista'),
+    workout_finish: tipo(<Dumbbell size={15} />, 'Treino', 'conquista'),
+    workout_start: tipo(<Activity size={15} />, 'Iniciou', 'social'),
+    friend_online: tipo(<Activity size={15} />, 'Online', 'social'),
+    follow_request: tipo(<UserPlus size={15} />, 'Seguir', 'acao'),
+    follow_accepted: tipo(<UserPlus size={15} />, 'Aceito', 'conquista'),
+    message: tipo(<MessageSquare size={15} />, 'Mensagem', 'acao'),
+    broadcast: tipo(<Megaphone size={15} />, 'Aviso', 'aviso'),
+    appointment: tipo(<Calendar size={15} />, 'Agenda', 'lembrete'),
+    appointment_created: tipo(<Calendar size={15} />, 'Agenda', 'lembrete'),
+    milestone: tipo(<Star size={15} />, 'Marco', 'conquista'),
+    story_posted: tipo(<Camera size={15} />, 'Story', 'social'),
+    story_like: tipo(<Heart size={15} />, 'Curtiu', 'social'),
+    like: tipo(<Heart size={15} />, 'Curtiu', 'social'),
+    story_reaction: tipo(<Heart size={15} />, 'Reação', 'social'),
+    challenge_created: tipo(<Swords size={15} />, 'Desafio', 'acao'),
+    challenge_accepted: tipo(<Swords size={15} />, 'Aceito', 'conquista'),
+    challenge_declined: tipo(<Swords size={15} />, 'Recusado', 'social'),
+    meal_reminder: tipo(<Utensils size={15} />, 'Refeição', 'lembrete'),
+    workout_reminder: tipo(<Activity size={15} />, 'Lembrete', 'lembrete'),
+    default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
 
 // Legacy aliases — map old server type names to the current config entry.
