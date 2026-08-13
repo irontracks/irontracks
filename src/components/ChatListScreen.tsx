@@ -130,6 +130,19 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
         return Number.isFinite(diff) ? diff < 5 * 60 * 1000 : false;
     };
 
+    /**
+     * Frase inteira de presença — nunca um prefixo colado num valor solto.
+     * `formatLastSeen` devolve "Nunca" e "Agora", e "Visto há Nunca" não é
+     * português. Quem monta a frase precisa conhecer os casos-limite dela.
+     */
+    const presencaLabel = (lastSeen: string | number | null) => {
+        const v = formatLastSeen(lastSeen)
+        if (v === 'Nunca') return 'Sem atividade recente'
+        if (v === 'Agora') return 'Visto agora'
+        if (v === '...') return ' '
+        return `Visto há ${v}`
+    }
+
     const formatLastSeen = (lastSeen: string | number | null) => {
         if (!lastSeen) return 'Nunca';
         if (!nowMs) return '...';
@@ -255,13 +268,14 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-green-500" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <h4 className="font-black text-white text-sm truncate">{u.display_name}</h4>
-                                        <span className="text-[11px] text-neutral-400 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
-                                    </div>
-                                    <p className="text-xs text-neutral-400 truncate">Toque para conversar</p>
+                                    <h4 className="font-bold text-white text-sm truncate">{u.display_name}</h4>
+                                    {/* Segunda linha carrega o FATO (presença), não uma instrução.
+                                        "Toque para conversar" era idêntico em todas as linhas: em
+                                        uma lista de 20 contatos, 20 repetições que não informam
+                                        nada e ocupam justamente onde caberia a prévia da conversa. */}
+                                    <p className="text-xs text-green-500/90 truncate">Online agora</p>
                                 </div>
-                                <MessageSquare size={16} className="text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <MessageSquare size={16} className="text-yellow-500/70 flex-shrink-0" />
                             </button>
                         ))}
                         {offlineUsers.length > 0 && (
@@ -282,13 +296,10 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-neutral-600" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <h4 className="font-black text-neutral-300 text-sm truncate">{u.display_name}</h4>
-                                        <span className="text-[11px] text-neutral-400 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
-                                    </div>
-                                    <p className="text-xs text-neutral-400 truncate">Toque para conversar</p>
+                                    <h4 className="font-bold text-neutral-300 text-sm truncate">{u.display_name}</h4>
+                                    <p className="text-xs text-neutral-400 truncate">{presencaLabel(u.last_seen ?? null)}</p>
                                 </div>
-                                <MessageSquare size={16} className="text-neutral-400 opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
+                                <MessageSquare size={16} className="text-neutral-600 flex-shrink-0" />
                             </button>
                         ))}
                     </div>
