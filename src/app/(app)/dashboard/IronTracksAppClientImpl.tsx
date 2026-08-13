@@ -1077,16 +1077,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 {/* Professor: host GLOBAL do chat 1:1 com aluno — abre o ChatDirectScreen
                     sobre qualquer tela quando o detalhe do aluno dispara o evento. */}
                 {isCoach && <TeacherChatHost user={user as AdminUser} />}
-                    {/* Fundo do shell = o MESMO do body (#0a0a0a). Até 13/08/2026 este
-                        container pintava `bg-neutral-900` (#171717) por cima, 2,8× mais
-                        claro — então as cinco abas viviam num fundo diferente do resto
-                        do app, e sair para Histórico/Configurações/Painel escurecia a
-                        tela sem motivo.
-
-                        ⚠️ O argumento é CONSISTÊNCIA, não legibilidade: medido, o card
-                        `rgba(255,255,255,0.03)` separa 1,048 sobre #0a0a0a e 1,063 sobre
-                        #171717 — praticamente igual. Quem quiser reverter, é esta linha. */}
-                    <div className="w-full bg-neutral-950 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                    <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour
