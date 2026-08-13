@@ -77,7 +77,7 @@ export const AdminPanelSubTabs = ({
                 setTab(key)
                 setSelectedStudent(null)
               }}
-              className={`shrink-0 inline-flex items-center gap-1.5 min-h-[36px] px-3.5 rounded-full border text-[11px] font-black uppercase tracking-wide whitespace-nowrap transition-all duration-200 active:scale-95 ${
+              className={`shrink-0 inline-flex items-center gap-1.5 tap-44 min-h-[36px] px-3.5 rounded-full border text-[11px] font-black uppercase tracking-wide whitespace-nowrap transition-all duration-200 active:scale-95 ${
                 isActive
                   ? 'bg-yellow-500 text-black border-yellow-400 shadow-md shadow-yellow-500/20'
                   : 'bg-white/[0.03] text-neutral-300 border-white/[0.08] hover:bg-white/[0.06] hover:text-white'

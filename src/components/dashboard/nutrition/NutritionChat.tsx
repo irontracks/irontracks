@@ -200,7 +200,7 @@ export default function NutritionChat({
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
+            className="inline-flex tap-44 h-9 w-9 items-center justify-center rounded-xl bg-neutral-900 text-neutral-300 hover:bg-neutral-800"
           >
             <X size={16} />
           </button>

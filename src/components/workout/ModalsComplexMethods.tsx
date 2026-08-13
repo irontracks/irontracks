@@ -157,7 +157,7 @@ export function ModalsComplexMethods() {
                                                 };
                                             });
                                         }}
-                                        className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                                        className="tap-44 min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                                     >
                                         Gerar minis
                                     </button>
@@ -562,7 +562,7 @@ export function ModalsComplexMethods() {
                                     <div className="t-meta text-xs">Nº de ondas</div>
                                     <div className="flex gap-2">
                                         {[1, 2, 3].map((n) => (
-                                            <button key={n} type="button" onClick={() => setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const cur = Array.isArray(prev.waves) ? (prev.waves as unknown[]) : []; const next = cur.length < n ? [...cur, ...Array.from({ length: n - cur.length }).map(() => ({ heavy: 3, medium: 5, ultra: 2 }))] : cur.slice(0, n); return { ...prev, waves: next }; })} className={`flex-1 min-h-[36px] rounded-lg text-xs font-black border transition-colors ${waves.length === n ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'}`}>{n}</button>
+                                            <button key={n} type="button" onClick={() => setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const cur = Array.isArray(prev.waves) ? (prev.waves as unknown[]) : []; const next = cur.length < n ? [...cur, ...Array.from({ length: n - cur.length }).map(() => ({ heavy: 3, medium: 5, ultra: 2 }))] : cur.slice(0, n); return { ...prev, waves: next }; })} className={`flex-1 tap-44 min-h-[36px] rounded-lg text-xs font-black border transition-colors ${waves.length === n ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'}`}>{n}</button>
                                         ))}
                                     </div>
                                 </div>
@@ -659,7 +659,7 @@ export function ModalsComplexMethods() {
                                                 return { ...prev, restsByGap, blocks, error: '' };
                                             });
                                         }}
-                                        className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                                        className="tap-44 min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                                     >
                                         Resetar pesos
                                     </button>
@@ -746,7 +746,7 @@ export function ModalsComplexMethods() {
                                                     };
                                                 });
                                             }}
-                                            className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                                            className="tap-44 min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                                         >
                                             Gerar blocos
                                         </button>

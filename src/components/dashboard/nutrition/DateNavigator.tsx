@@ -40,7 +40,7 @@ export default function DateNavigator({
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(currentDate, -1))}
-        className="h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition"
+        className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition"
         aria-label="Dia anterior"
       >
         <ChevronLeft size={16} className="text-neutral-300" />
@@ -50,7 +50,7 @@ export default function DateNavigator({
         type="button"
         onClick={() => !isToday && onDateChange(todayDate)}
         className={`
-          min-w-[140px] h-9 rounded-xl px-4 text-sm font-semibold tracking-tight transition
+          min-w-[140px] tap-44 h-9 rounded-xl px-4 text-sm font-semibold tracking-tight transition
           ${isToday
             ? 'bg-yellow-500/10 border border-yellow-500/25 text-yellow-400'
             : 'bg-neutral-900/60 border border-neutral-800/60 text-neutral-200 hover:bg-neutral-800/80'}
@@ -66,7 +66,7 @@ export default function DateNavigator({
         type="button"
         onClick={() => !isFuture && onDateChange(shiftDate(currentDate, 1))}
         disabled={isFuture}
-        className="h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition disabled:opacity-30"
+        className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition disabled:opacity-30"
         aria-label="Próximo dia"
       >
         <ChevronRight size={16} className="text-neutral-300" />

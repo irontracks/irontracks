@@ -305,7 +305,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
             <button
               onClick={() => toggleSetting(key)}
               aria-label={label}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings[key] ? 'bg-amber-500' : 'bg-white/10'}`}
+              className={`relative tap-44 h-6 w-11 rounded-full transition-colors ${settings[key] ? 'bg-amber-500' : 'bg-white/10'}`}
               role="switch"
               aria-checked={settings[key]}
             >

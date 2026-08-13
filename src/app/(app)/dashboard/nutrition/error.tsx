@@ -26,7 +26,7 @@ export default function NutritionError({
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="h-10 w-10 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-900 transition"
+            className="tap-44 h-10 w-10 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-900 transition"
             aria-label="Voltar"
           >
             <ArrowLeft size={18} />
@@ -48,14 +48,14 @@ export default function NutritionError({
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="h-10 px-4 rounded-xl text-sm font-bold text-neutral-400 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 transition"
+            className="tap-44 h-10 px-4 rounded-xl text-sm font-bold text-neutral-400 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 transition"
           >
             Voltar
           </button>
           <button
             type="button"
             onClick={reset}
-            className="h-10 px-4 rounded-xl text-sm font-black text-black bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 transition flex items-center gap-2"
+            className="tap-44 h-10 px-4 rounded-xl text-sm font-black text-black bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 transition flex items-center gap-2"
           >
             <RotateCcw size={14} />
             Tentar novamente

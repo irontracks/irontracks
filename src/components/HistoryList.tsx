@@ -146,7 +146,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                         </div>
                         <div className="flex items-center gap-2 justify-end shrink-0">
                             {!isReadOnly && historyItems.length > 0 && (
-                                <button type="button" onClick={toggleSelectionMode} className={`h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}>
+                                <button type="button" onClick={toggleSelectionMode} className={`tap-44 h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}>
                                     {isSelectionMode ? 'Cancelar' : 'Selecionar'}
                                 </button>
                             )}

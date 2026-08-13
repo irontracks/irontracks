@@ -101,7 +101,7 @@ export default function PlateCalculatorSheet({
               <button
                 type="button"
                 onClick={() => setScreen('calc')}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white flex-shrink-0"
+                className="tap-44 h-8 w-8 inline-flex items-center justify-center rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white flex-shrink-0"
                 aria-label="Voltar para a calculadora"
               >
                 <ArrowLeft size={16} />
@@ -117,7 +117,7 @@ export default function PlateCalculatorSheet({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white flex-shrink-0"
+            className="tap-44 h-8 w-8 inline-flex items-center justify-center rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white flex-shrink-0"
             aria-label="Fechar"
           >
             <X size={16} />
@@ -134,7 +134,7 @@ export default function PlateCalculatorSheet({
                     key={m}
                     type="button"
                     onClick={() => setMode(m)}
-                    className={`h-9 rounded-xl text-xs font-medium border transition-colors ${mode === m
+                    className={`tap-44 h-9 rounded-xl text-xs font-medium border transition-colors ${mode === m
                       ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-400'
                       : 'bg-neutral-900 border-neutral-800 text-neutral-400'
                       }`}
@@ -182,7 +182,7 @@ export default function PlateCalculatorSheet({
                             <button
                               type="button"
                               onClick={() => setTarget(String(result.below))}
-                              className="flex-1 h-10 rounded-lg bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold"
+                              className="flex-1 tap-44 h-10 rounded-lg bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold"
                             >
                               ↓ {fmt(result.below)} kg
                             </button>
@@ -191,7 +191,7 @@ export default function PlateCalculatorSheet({
                             <button
                               type="button"
                               onClick={() => setTarget(String(result.above))}
-                              className="flex-1 h-10 rounded-lg bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold"
+                              className="flex-1 tap-44 h-10 rounded-lg bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold"
                             >
                               ↑ {fmt(result.above)} kg
                             </button>
@@ -243,7 +243,7 @@ export default function PlateCalculatorSheet({
                               type="button"
                               aria-label={`Menos uma anilha de ${fmt(plate)} kg`}
                               onClick={() => setManual((m) => ({ ...m, [String(plate)]: Math.max(0, n - 1) }))}
-                              className="h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
+                              className="tap-44 h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
                               disabled={n <= 0}
                             >
                               <Minus size={14} />
@@ -253,7 +253,7 @@ export default function PlateCalculatorSheet({
                               type="button"
                               aria-label={`Mais uma anilha de ${fmt(plate)} kg`}
                               onClick={() => setManual((m) => ({ ...m, [String(plate)]: Math.min(max, n + 1) }))}
-                              className="h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
+                              className="tap-44 h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
                               disabled={n >= max}
                             >
                               <Plus size={14} />
@@ -322,7 +322,7 @@ export default function PlateCalculatorSheet({
                           aria-label={`Menos uma anilha de ${fmt(plate)} kg`}
                           onClick={() => set(units - 1)}
                           disabled={units <= 0}
-                          className="h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
+                          className="tap-44 h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center disabled:opacity-30"
                         >
                           <Minus size={14} />
                         </button>
@@ -331,7 +331,7 @@ export default function PlateCalculatorSheet({
                           type="button"
                           aria-label={`Mais uma anilha de ${fmt(plate)} kg`}
                           onClick={() => set(units + 1)}
-                          className="h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center"
+                          className="tap-44 h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 inline-flex items-center justify-center"
                         >
                           <Plus size={14} />
                         </button>
@@ -352,7 +352,7 @@ export default function PlateCalculatorSheet({
                     key={b}
                     type="button"
                     onClick={() => onSaveInventory(inventory.counts, b)}
-                    className={`h-10 px-4 rounded-xl text-sm font-semibold border transition-colors ${inventory.barWeightKg === b
+                    className={`tap-44 h-10 px-4 rounded-xl text-sm font-semibold border transition-colors ${inventory.barWeightKg === b
                       ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-400'
                       : 'bg-neutral-900 border-neutral-800 text-neutral-400'
                       }`}

@@ -115,7 +115,7 @@ export default function MothersDayModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full min-h-[40px] rounded-xl font-bold text-neutral-400 hover:text-white text-xs transition-colors"
+            className="w-full tap-44 min-h-[40px] rounded-xl font-bold text-neutral-400 hover:text-white text-xs transition-colors"
           >
             Mais tarde
           </button>

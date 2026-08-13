@@ -559,7 +559,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         <div className="relative">
                             <button
                                 onClick={() => setShowExportMenu(v => !v)}
-                                className="min-h-[36px] flex items-center gap-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
+                                className="tap-44 min-h-[36px] flex items-center gap-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
                             >
                                 {isGenerating ? (
                                     <svg className="size-3.5 animate-spin text-yellow-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -641,7 +641,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         <button
                             type="button"
                             onClick={() => { setShowExportMenu(false); setShowStory(true); }}
-                            className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
+                            className="tap-44 min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
                             <span className="text-xs uppercase tracking-widest">Story</span>
                         </button>

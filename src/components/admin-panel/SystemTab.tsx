@@ -424,7 +424,7 @@ export const SystemTab: React.FC = () => {
                         type="button"
                         onClick={loadGrantHistory}
                         disabled={grantHistoryLoading}
-                        className="min-h-[36px] px-3 py-2 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                        className="tap-44 min-h-[36px] px-3 py-2 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
                     >
                         {grantHistoryLoading ? 'Atualizando...' : 'Atualizar'}
                     </button>

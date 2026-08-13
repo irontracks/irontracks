@@ -90,7 +90,7 @@ export default function SessionDeloadBanner() {
           aria-pressed={workoutDeloadEnabled}
           aria-label={`Descarga do treino: ${workoutDeloadEnabled ? 'ligada' : 'desligada'}`}
           className={[
-            'shrink-0 inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 transition-colors active:scale-95',
+            'shrink-0 inline-flex tap-44 h-9 items-center gap-1.5 rounded-xl border px-3 transition-colors active:scale-95',
             workoutDeloadEnabled
               ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
               : 'border-neutral-800 bg-neutral-900 text-neutral-400',
@@ -192,7 +192,7 @@ export default function SessionDeloadBanner() {
                 onClick={() => setPctEscolhida(v)}
                 aria-pressed={ativo}
                 className={[
-                  'min-h-[32px] flex-1 rounded-lg border px-1 text-[12px] font-bold transition-colors active:scale-95',
+                  'tap-44 min-h-[32px] flex-1 rounded-lg border px-1 text-[12px] font-bold transition-colors active:scale-95',
                   ativo
                     ? 'border-amber-400 bg-amber-500/25 text-amber-100'
                     : 'border-amber-500/25 text-amber-200/70',

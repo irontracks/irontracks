@@ -53,7 +53,7 @@ export function FailureToggle({ exIdx, setIdx, compact = false, extraPatch }: {
         // `tracking-widest` + `font-black`: em caixa alta a palavra ficava larga
         // e pesada demais para o tamanho do botão.
         'shrink-0 inline-flex items-center justify-center gap-1 rounded-lg font-bold uppercase tracking-wide whitespace-nowrap border transition-colors',
-        compact ? 'h-9 w-9 text-[11px]' : 'h-7 px-2.5 text-[10px]',
+        compact ? 'tap-44 h-9 w-9 text-[11px]' : 'h-7 px-2.5 text-[10px]',
         failed
           ? 'text-red-300 bg-red-500/15 border-red-500/40'
           : 'text-neutral-400 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',

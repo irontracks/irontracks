@@ -203,7 +203,7 @@ export const ReportAiSection = ({
                                         type="button"
                                         onClick={onApplyProgression}
                                         disabled={applyState.status === 'loading'}
-                                        className="min-h-[36px] px-3 py-1.5 rounded-full bg-black text-white text-[11px] font-bold uppercase tracking-wide flex items-center gap-2 disabled:opacity-60"
+                                        className="tap-44 min-h-[36px] px-3 py-1.5 rounded-full bg-black text-white text-[11px] font-bold uppercase tracking-wide flex items-center gap-2 disabled:opacity-60"
                                     >
                                         {applyState.status === 'loading' ? (
                                             <Loader2 size={14} className="animate-spin" />

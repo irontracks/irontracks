@@ -36,7 +36,7 @@ export default function NutritionConsoleShell({
           <button
             type="button"
             onClick={goBack}
-            className="h-10 w-10 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-900 transition"
+            className="tap-44 h-10 w-10 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-900 transition"
             aria-label="Voltar"
           >
             <ArrowLeft size={18} />

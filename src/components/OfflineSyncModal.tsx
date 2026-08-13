@@ -198,7 +198,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
                                   await refresh()
                                 }
                               }}
-                              className="h-9 px-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 disabled:opacity-60"
+                              className="tap-44 h-9 px-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 disabled:opacity-60"
                             >
                               Retry
                             </button>
@@ -220,7 +220,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
                                   await alert('Janela de reporte aberta. Obrigado!', 'Reportar')
                                 } catch { }
                               }}
-                              className="h-9 w-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center"
+                              className="tap-44 h-9 w-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center"
                               title="Reportar"
                             >
                               <Bug size={16} />

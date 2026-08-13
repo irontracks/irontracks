@@ -219,7 +219,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                                 <button
                                                     onClick={correlate}
                                                     disabled={correlationLoading}
-                                                    className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
+                                                    className="inline-flex items-center gap-1.5 tap-44 min-h-[36px] px-3 rounded-lg border text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
                                                     style={{ background: 'rgba(168,85,247,0.06)', borderColor: 'rgba(168,85,247,0.25)', color: '#c4b5fd' }}
                                                 >
                                                     {correlationLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -358,14 +358,14 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                                     <p className="text-[13px] text-neutral-300 flex-1">Apagar esta avaliação e suas fotos?</p>
                                                     <button
                                                         onClick={() => setConfirmingDelete(null)}
-                                                        className="min-h-[36px] px-3 rounded-lg border border-neutral-700 text-neutral-300 text-sm font-bold hover:border-neutral-500 transition"
+                                                        className="tap-44 min-h-[36px] px-3 rounded-lg border border-neutral-700 text-neutral-300 text-sm font-bold hover:border-neutral-500 transition"
                                                     >
                                                         Cancelar
                                                     </button>
                                                     <button
                                                         onClick={() => handleDelete(a.id)}
                                                         disabled={deleting}
-                                                        className="min-h-[36px] px-3 rounded-lg text-sm font-black text-white transition disabled:opacity-50"
+                                                        className="tap-44 min-h-[36px] px-3 rounded-lg text-sm font-black text-white transition disabled:opacity-50"
                                                         style={{ background: 'rgba(239,68,68,0.9)' }}
                                                     >
                                                         Apagar

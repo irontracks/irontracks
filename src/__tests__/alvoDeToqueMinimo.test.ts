@@ -45,11 +45,26 @@ const tagsDeBotao = (src: string): string[] => {
   return tags
 }
 
-/** Caixa fixa abaixo de 44px (11 no grid de 4px do Tailwind). */
+/**
+ * Caixa fixa abaixo de 44px.
+ *
+ * ⚠️ A primeira versão só olhava `w-N h-N` CASADOS e ficou cega para 155
+ * botões — mais que os 90 que ela pegou. As pílulas de período do Histórico
+ * (`min-h-[36px]`) e os botões de relatório (`h-8`) definem só a ALTURA, que é
+ * a dimensão que o polegar erra, e passavam batido. Dois chegavam a 20px, abaixo
+ * do mínimo de 24 do WCAG 2.5.8. Guard que cobre metade dos casos dá a sensação
+ * de proteção sem entregá-la.
+ */
 const caixaPequena = (tag: string): boolean => {
   const wh = /\bw-(\d+)\s+h-(\d+)\b/.exec(tag)
-  if (!wh) return false
-  return Number(wh[1]) < 11 || Number(wh[2]) < 11
+  if (wh) return Number(wh[1]) < 11 || Number(wh[2]) < 11
+  const h = /\bh-(\d+)\b/.exec(tag)
+  if (h) return Number(h[1]) < 11
+  const hpx = /\bh-\[(\d+)px\]/.exec(tag)
+  if (hpx) return Number(hpx[1]) < 44
+  const minh = /\bmin-h-\[(\d+)px\]/.exec(tag)
+  if (minh) return Number(minh[1]) < 44
+  return false
 }
 
 const temAlvoAmpliado = (tag: string): boolean =>
@@ -77,6 +92,15 @@ describe('alvo de toque mínimo de 44pt', () => {
     const src = '<button onClick={() => f()} className="w-8 h-8">x</button>'
     expect(tagsDeBotao(src)).toHaveLength(1)
     expect(caixaPequena(tagsDeBotao(src)[0])).toBe(true)
+  })
+
+  it('enxerga altura sozinha, não só a caixa quadrada', () => {
+    // O buraco que deixou 155 botões passarem — inclusive dois de 20px.
+    expect(caixaPequena('<button className="min-h-[36px] px-3 rounded-full">7d</button>')).toBe(true)
+    expect(caixaPequena('<button className="h-8 px-3 rounded-lg">Semanal</button>')).toBe(true)
+    expect(caixaPequena('<button className="h-[20px] w-[20px]">x</button>')).toBe(true)
+    expect(caixaPequena('<button className="h-11 px-4">ok</button>')).toBe(false)
+    expect(caixaPequena('<button className="px-4 py-3">sem altura fixa</button>')).toBe(false)
   })
 
   it('o guard reprova de verdade quando falta a classe', () => {

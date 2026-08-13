@@ -318,7 +318,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             <button
                                                 onClick={() => removeExercise(index)}
                                                 aria-label="Remover exercício"
-                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                className="tap-44 h-8 w-8 flex items-center justify-center rounded-lg text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -355,7 +355,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     />
                                                     <button
                                                         onClick={() => updateExercise(index, 'duplicate', true)}
-                                                        className="shrink-0 h-10 w-10 bg-white/[0.04] border border-white/[0.06] hover:bg-yellow-500 hover:text-black hover:border-yellow-500 text-neutral-400 rounded-xl flex items-center justify-center transition-colors"
+                                                        className="shrink-0 tap-44 h-10 w-10 bg-white/[0.04] border border-white/[0.06] hover:bg-yellow-500 hover:text-black hover:border-yellow-500 text-neutral-400 rounded-xl flex items-center justify-center transition-colors"
                                                         title="Duplicar Série"
                                                         aria-label="Duplicar série"
                                                     >

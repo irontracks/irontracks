@@ -174,7 +174,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
                         type="button"
                         onClick={() => gerarProtocolo(viewing.id)}
                         disabled={gerando}
-                        className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-4 text-[13px] font-black text-black transition-transform active:scale-95 disabled:opacity-60"
+                        className="mt-3 inline-flex tap-44 min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-4 text-[13px] font-black text-black transition-transform active:scale-95 disabled:opacity-60"
                       >
                         {gerando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         {gerando ? 'Gerando…' : 'Gerar protocolo'}

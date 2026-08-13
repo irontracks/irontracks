@@ -100,7 +100,7 @@ export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: {
               type="button"
               aria-label="Dispensar"
               onClick={() => dismiss(a.userId)}
-              className="h-7 w-7 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 flex items-center justify-center shrink-0"
+              className="tap-44 h-7 w-7 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 flex items-center justify-center shrink-0"
             >
               <X size={15} />
             </button>

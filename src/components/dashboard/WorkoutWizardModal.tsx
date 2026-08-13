@@ -778,7 +778,7 @@ export default function WorkoutWizardModal(props: Props) {
             <button
               type="button"
               onClick={goBack}
-              className="min-h-[42px] px-4 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 font-bold text-xs uppercase tracking-wider hover:bg-neutral-800 inline-flex items-center gap-1.5 transition-all active:scale-95"
+              className="tap-44 min-h-[42px] px-4 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 font-bold text-xs uppercase tracking-wider hover:bg-neutral-800 inline-flex items-center gap-1.5 transition-all active:scale-95"
             >
               <ChevronLeft size={14} />
               Voltar
@@ -804,7 +804,7 @@ export default function WorkoutWizardModal(props: Props) {
               <button
                 type="button"
                 onClick={goNext}
-                className="min-h-[42px] px-5 py-2.5 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-wider hover:bg-yellow-400 inline-flex items-center gap-1.5 transition-all active:scale-95"
+                className="tap-44 min-h-[42px] px-5 py-2.5 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-wider hover:bg-yellow-400 inline-flex items-center gap-1.5 transition-all active:scale-95"
               >
                 Continuar
                 <ChevronRight size={14} />
@@ -814,7 +814,7 @@ export default function WorkoutWizardModal(props: Props) {
               <button
                 type="button"
                 onClick={props.onClose}
-                className="min-h-[42px] px-4 py-2.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-300 font-bold text-xs hover:bg-neutral-700 transition-all active:scale-95"
+                className="tap-44 min-h-[42px] px-4 py-2.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-300 font-bold text-xs hover:bg-neutral-700 transition-all active:scale-95"
               >
                 Fechar
               </button>

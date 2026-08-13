@@ -47,7 +47,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                         aria-label="Mais opções"
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
-                        className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-colors"
+                        className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-colors"
                     >
                         <MoreVertical size={18} />
                     </button>
@@ -77,7 +77,7 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
                     type="button"
                     onClick={onCancel}
                     aria-label="Fechar editor"
-                    className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-colors"
+                    className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-colors"
                     title="Fechar"
                 >
                     <X size={16} />

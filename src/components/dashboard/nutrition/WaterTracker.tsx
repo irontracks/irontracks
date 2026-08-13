@@ -75,7 +75,7 @@ export default function WaterTracker({
             type="button"
             onClick={() => addWater(ml)}
             disabled={busy}
-            className="flex-1 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 active:scale-95 transition disabled:opacity-50"
+            className="flex-1 tap-44 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 active:scale-95 transition disabled:opacity-50"
           >
             +{ml}ml
           </button>
@@ -84,7 +84,7 @@ export default function WaterTracker({
           type="button"
           onClick={removeWater}
           disabled={busy || current <= 0}
-          className="h-9 w-9 grid place-items-center rounded-xl bg-neutral-800/60 border border-neutral-700/50 text-xs text-neutral-400 hover:bg-neutral-700/60 active:scale-95 transition disabled:opacity-30"
+          className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-800/60 border border-neutral-700/50 text-xs text-neutral-400 hover:bg-neutral-700/60 active:scale-95 transition disabled:opacity-30"
           aria-label="Remover 250ml"
         >
           −

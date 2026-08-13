@@ -33,7 +33,7 @@ export function HelpHint({ title, text, tooltip, className, forceVisible }: Help
           await alert(text, title);
         } catch {}
       }}
-      className={`h-5 w-5 inline-flex items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/40 text-[11px] font-black text-neutral-300 hover:text-yellow-500 hover:border-yellow-500/40 hover:bg-neutral-900 active:scale-95 transition-all ${visibilityClass} ${className || ''}`}
+      className={`tap-44 h-5 w-5 inline-flex items-center justify-center rounded-full border border-neutral-700 bg-neutral-900/40 text-[11px] font-black text-neutral-300 hover:text-yellow-500 hover:border-yellow-500/40 hover:bg-neutral-900 active:scale-95 transition-all ${visibilityClass} ${className || ''}`}
     >
       ?
     </button>

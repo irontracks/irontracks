@@ -58,7 +58,7 @@ export function MuscleMapSection({ data, status, gender = 'male' }: Props) {
                         onClick={() => setView('front')}
                         className={
                             view === 'front'
-                                ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                                ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                                 : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                         }
                     >
@@ -69,7 +69,7 @@ export function MuscleMapSection({ data, status, gender = 'male' }: Props) {
                         onClick={() => setView('back')}
                         className={
                             view === 'back'
-                                ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                                ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                                 : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                         }
                     >

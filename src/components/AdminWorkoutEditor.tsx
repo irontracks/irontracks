@@ -143,7 +143,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         />
                                         <button aria-label="Duplicar exercício"
                                             onClick={() => updateExercise(idx, 'duplicate', true)}
-                                            className="h-[20px] w-[20px] bg-white rounded-full flex items-center justify-center shadow-lg active:scale-90 flex-shrink-0"
+                                            className="tap-44 h-[20px] w-[20px] bg-white rounded-full flex items-center justify-center shadow-lg active:scale-90 flex-shrink-0"
                                             title="Duplicar Exercício"
                                         >
                                             <Plus size={12} className="text-black" />

@@ -56,7 +56,7 @@ export function HistorySummaryCard({
                                 key={opt.key}
                                 type="button"
                                 onClick={() => onRangeChange(opt.key)}
-                                className={`min-h-[36px] px-3 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30' : 'bg-neutral-900/80 border border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}
+                                className={`tap-44 min-h-[36px] px-3 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30' : 'bg-neutral-900/80 border border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}
                             >
                                 {opt.label}
                             </button>
@@ -99,14 +99,14 @@ export function HistorySummaryCard({
                         <button
                             type="button"
                             onClick={() => onOpenReport('week')}
-                            className="h-8 px-3 rounded-lg bg-yellow-500/10 text-yellow-500 text-[11px] font-black uppercase tracking-wider hover:bg-yellow-500/20 transition-all duration-300 active:scale-95 border border-yellow-500/20"
+                            className="tap-44 h-8 px-3 rounded-lg bg-yellow-500/10 text-yellow-500 text-[11px] font-black uppercase tracking-wider hover:bg-yellow-500/20 transition-all duration-300 active:scale-95 border border-yellow-500/20"
                         >
                             Semanal
                         </button>
                         <button
                             type="button"
                             onClick={() => onOpenReport('month')}
-                            className="h-8 px-3 rounded-lg bg-neutral-800/80 text-neutral-300 text-[11px] font-black uppercase tracking-wider hover:bg-neutral-800 transition-all duration-300 active:scale-95 border border-neutral-700/50"
+                            className="tap-44 h-8 px-3 rounded-lg bg-neutral-800/80 text-neutral-300 text-[11px] font-black uppercase tracking-wider hover:bg-neutral-800 transition-all duration-300 active:scale-95 border border-neutral-700/50"
                         >
                             Mensal
                         </button>

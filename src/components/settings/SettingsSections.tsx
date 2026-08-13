@@ -1232,7 +1232,7 @@ export function SettingsGymGeofenceSection({
             <button
                 type="button"
                 onClick={onOpenAppSettings}
-                className="mt-2 min-h-[36px] w-full px-3 py-2 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200"
+                className="mt-2 tap-44 min-h-[36px] w-full px-3 py-2 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200"
             >
                 Gerenciar permissão de localização em Ajustes do iOS
             </button>

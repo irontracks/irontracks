@@ -346,7 +346,7 @@ export default function Modals() {
                   <button
                     type="button"
                     onClick={() => setDeloadModal(null)}
-                    className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                    className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
                     aria-label="Fechar"
                   >
                     <X size={16} />
@@ -441,7 +441,7 @@ export default function Modals() {
               <button aria-label="Fechar"
                 type="button"
                 onClick={() => setAddExerciseOpen(false)}
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
               >
                 <X size={16} />
               </button>
@@ -514,7 +514,7 @@ export default function Modals() {
                 type="button"
                 onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
                 aria-label="Fechar editor de exercício"
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
               >
                 <X size={16} />
               </button>
@@ -673,7 +673,7 @@ export default function Modals() {
               <button aria-label="Fechar"
                 type="button"
                 onClick={requestCloseOrganize}
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                className="tap-44 h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
               >
                 <X size={16} />
               </button>
@@ -779,7 +779,7 @@ export default function Modals() {
                         return { ...prev, restsByGap, blocks, error: '' };
                       });
                     }}
-                    className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                    className="tap-44 min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                   >
                     Resetar pesos
                   </button>
@@ -866,7 +866,7 @@ export default function Modals() {
                           };
                         });
                       }}
-                      className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                      className="tap-44 min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
                     >
                       Gerar blocos
                     </button>
