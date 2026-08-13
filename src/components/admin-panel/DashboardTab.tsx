@@ -10,7 +10,21 @@ import {
     Legend,
     ArcElement
 } from 'chart.js';
-import { Users, UserCheck, UserX, AlertTriangle, Clock, Zap, ArrowRight, UserPlus, Dumbbell, Crown } from 'lucide-react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowRight,
+    CheckCircle2,
+    Clock,
+    Crown,
+    Dumbbell,
+    UserCheck,
+    UserCog,
+    UserPlus,
+    UserX,
+    Users,
+    Zap,
+} from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { useTeacherPlan } from '@/hooks/useTeacherPlan';
 import dynamic from 'next/dynamic';
@@ -59,6 +73,8 @@ export const DashboardTab: React.FC = () => {
         teachersList,
         dashboardCharts,
         coachInboxItems,
+        prioritiesItems,
+        fetchPriorities,
         setSelectedStudent,
         setHistoryOpen,
         setShowRegisterModal,
@@ -66,6 +82,8 @@ export const DashboardTab: React.FC = () => {
     } = useAdminPanel();
 
     const planState = useTeacherPlan();
+
+
 
     const qtdPendentes = usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length;
     const temPendentes = qtdPendentes > 0;
@@ -100,8 +118,59 @@ export const DashboardTab: React.FC = () => {
         return () => { cancelled = true; };
     }, [isAdmin, supabase]);
 
+    // A fila de triagem é carregada AQUI, no Início — não mais só quando alguém
+    // encontra "Mais → Prioridades". Ela é a informação mais acionável do
+    // painel inteiro (alunos em risco, com nome e sobrenome), e estava a dois
+    // toques de distância enquanto a primeira tela mostrava totais que não
+    // pedem ação nenhuma.
+    useEffect(() => {
+        if (!isAdmin && !isTeacher) return;
+        void fetchPriorities();
+        // uma vez por abertura do painel: a fila não muda a cada render
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin, isTeacher]);
+
+    const emRisco = Array.isArray(prioritiesItems) ? prioritiesItems.length : 0;
+    const semProfessor = Math.max(0, dashboardCharts.totalStudents - usersList.filter(u => !!u?.teacher_id).length);
+
+    /**
+     * O que EXIGE decisão, em ordem de custo de ignorar.
+     * Aluno em risco vem antes de solicitação porque churn é dinheiro saindo;
+     * solicitação é dinheiro esperando na porta.
+     */
+    const pendencias = [
+        emRisco > 0 && {
+            chave: 'risco',
+            icone: <AlertCircle size={18} className="text-red-400" />,
+            cor: 'red' as const,
+            titulo: emRisco === 1 ? '1 aluno precisa de atenção' : `${emRisco} alunos precisam de atenção`,
+            desc: 'Sem treino registrado ou em risco de sair',
+            ir: () => setTab('priorities'),
+        },
+        isAdmin && pendingRequests > 0 && {
+            chave: 'solicitacoes',
+            icone: <UserPlus size={18} className="text-amber-400" />,
+            cor: 'amber' as const,
+            titulo: pendingRequests === 1 ? '1 solicitação aguardando' : `${pendingRequests} solicitações aguardando`,
+            desc: 'Revisar e aprovar acesso',
+            ir: () => setTab('requests'),
+        },
+        isAdmin && semProfessor > 0 && {
+            chave: 'sem-professor',
+            icone: <UserCog size={18} className="text-amber-400" />,
+            cor: 'amber' as const,
+            titulo: semProfessor === 1 ? '1 aluno sem professor' : `${semProfessor} alunos sem professor`,
+            desc: 'Atribuir para alguém acompanhar',
+            ir: () => setTab('students'),
+        },
+    ].filter(Boolean) as Array<{ chave: string; icone: React.ReactNode; cor: 'red' | 'amber'; titulo: string; desc: string; ir: () => void }>;
+
     const chartOptions = {
         responsive: true,
+        // O Chart.js mantém proporção 2:1 por padrão, então o canvas NÃO
+        // preenchia o container de 250px e sobrava metade do card em branco.
+        // O vazio não era decisão de layout — era default de biblioteca.
+        maintainAspectRatio: false,
         plugins: {
             // Legenda DESLIGADA de propósito. Os dois gráficos que usam estas
             // opções têm UM dataset ("Alunos") com um array de cores — uma cor
@@ -134,6 +203,7 @@ export const DashboardTab: React.FC = () => {
 
     const doughnutOptions = {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'right' as const, labels: { color: '#e5e5e5', font: { size: 11, weight: 'bold' as const } } }
         },
@@ -159,35 +229,48 @@ export const DashboardTab: React.FC = () => {
                 </p>
             </div>
 
-            {/* ── CTA dinâmico — Solicitações pendentes ───────────────────────
-                Aparece SÓ quando há pendência real, e some sozinho quando
-                não tem nada. Toca → vai direto pra tela de solicitações.
-            */}
-            {isAdmin && pendingRequests > 0 && (
-                <button
-                    type="button"
-                    onClick={() => setTab('requests')}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl border transition-all active:scale-[0.99] hover:bg-amber-500/[0.06]"
-                    style={{
-                        background: 'rgba(245,158,11,0.06)',
-                        borderColor: 'rgba(245,158,11,0.25)',
-                    }}
-                >
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center shrink-0">
-                        <UserPlus size={18} className="text-amber-400" />
+            {/* ── PRECISA DE VOCÊ ────────────────────────────────────────────
+                O painel abria com 49 alunos / 7 professores — números que não
+                pedem ação — enquanto os alunos em risco ficavam a dois toques,
+                atrás de "Mais → Prioridades". Um painel de gestão deve começar
+                pelo que custa caro ignorar; totais servem para conferir, não
+                para decidir, e por isso desceram para o fim.
+
+                Cada linha é um destino, não um aviso: leva direto para a tela
+                que resolve. E o bloco SOME quando não há pendência — estado
+                vazio de card cheio ocupa espaço nobre para dizer "nada aqui". */}
+            {pendencias.length > 0 && (
+                <div className="rounded-2xl border overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}>
+                    <div className="px-4 pt-3.5 pb-2">
+                        <p className="t-meta text-[10px]">Precisa de você</p>
                     </div>
-                    <div className="flex-1 text-left min-w-0">
-                        <p className="text-sm font-black text-white">
-                            {pendingRequests === 1
-                                ? '1 solicitação aguardando'
-                                : `${pendingRequests} solicitações aguardando`}
-                        </p>
-                        <p className="text-xs text-neutral-400 mt-0.5">
-                            Toque pra revisar e aprovar
-                        </p>
-                    </div>
-                    <ArrowRight size={18} className="text-amber-400 shrink-0" />
-                </button>
+                    {pendencias.map((p, i) => (
+                        <button
+                            key={p.chave}
+                            type="button"
+                            onClick={p.ir}
+                            className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-white/[0.06] hover:bg-white/[0.03] ${i > 0 ? 'border-t border-white/5' : ''}`}
+                        >
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${p.cor === 'red' ? 'bg-red-500/10 border-red-500/25' : 'bg-amber-500/10 border-amber-500/25'}`}>
+                                {p.icone}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-white truncate">{p.titulo}</p>
+                                <p className="text-xs text-neutral-400 truncate mt-0.5">{p.desc}</p>
+                            </div>
+                            <ArrowRight size={18} className="text-neutral-400 shrink-0" />
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Tudo em dia: uma linha, não um card. Ausência de trabalho não
+                merece o mesmo peso visual que trabalho pendente. */}
+            {pendencias.length === 0 && (isAdmin || isTeacher) && (
+                <p className="text-xs text-neutral-400 flex items-center gap-1.5 px-1">
+                    <CheckCircle2 size={13} className="text-green-500/70" />
+                    Nada pendente por aqui.
+                </p>
             )}
 
             {/* KPI Cards */}
@@ -465,16 +548,16 @@ export const DashboardTab: React.FC = () => {
             {/* Gráficos Admin */}
             {isAdmin && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
-                        <h3 className="font-black text-white text-lg mb-6">Distribuição por Professor</h3>
-                        <div className="h-[250px] w-full">
+                    <div className="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                        <h3 className="font-black text-white text-base mb-4">Distribuição por Professor</h3>
+                        <div className="h-[210px] w-full">
                             <Bar data={dashboardCharts.teacherDistribution.data} options={chartOptions} />
                         </div>
                     </div>
 
-                    <div className="bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
-                        <h3 className="font-black text-white text-lg mb-6">Status dos Alunos</h3>
-                        <div className="h-[250px] w-full">
+                    <div className="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                        <h3 className="font-black text-white text-base mb-4">Status dos Alunos</h3>
+                        <div className="h-[210px] w-full">
                             <Bar data={dashboardCharts.statusDistribution.data} options={chartOptions} />
                         </div>
                     </div>
