@@ -3,6 +3,7 @@ import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, Chevron
 import { useAdminPanel } from './AdminPanelContext';
 import { apiAdmin } from '@/lib/api';
 import { NumericInput } from '@/components/ui/NumericInput';
+import { trialStatus, trialStatusLabel, type VigenteRaw } from '@/lib/vip/trialStatus'
 
 export const SystemTab: React.FC = () => {
     const {
@@ -61,6 +62,14 @@ export const SystemTab: React.FC = () => {
             })
             .filter(Boolean) as Array<{ key: string; id: string; email: string; label: string }>;
     }, [usersList]);
+
+    /** Data do log em pt-BR. ISO cru ("2026-06-22T16:00:33.837594+00:00") é
+     *  linha de banco, não interface — ninguém lê microssegundo e fuso. */
+    const formatarData = (iso: string): string => {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
 
     const loadGrantHistory = useCallback(async () => {
         setGrantHistoryLoading(true);
@@ -390,7 +399,7 @@ export const SystemTab: React.FC = () => {
                             <div key={g.id} className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-sm text-neutral-200">
                                 <div className="min-w-0">
                                     <div className="text-xs text-neutral-400">{g.email || g.user_id}</div>
-                                    <div className="font-semibold text-white">{g.plan_id.replace('vip_', 'VIP ').toUpperCase()} · {g.days} dia(s)</div>
+                                    <div className="font-semibold text-white">{g.plan_id.replace('vip_', 'VIP ').toUpperCase()} · {g.days === 1 ? '1 dia' : `${g.days} dias`}</div>
                                 </div>
                                 <button
                                     type="button"
@@ -441,10 +450,26 @@ export const SystemTab: React.FC = () => {
                             const email = String(meta?.email || r?.actor_email || '').trim();
                             const createdAt = String(r?.created_at || '');
                             const label = String(r?.entity_id || '').trim();
+                            const estado = trialStatus(r?.vigente as VigenteRaw | null);
+                            // Verde só para o que está de pé; expirado e revogado
+                            // são FATOS, não erros — neutro, sem alarme falso.
+                            const corEstado =
+                                estado.tipo === 'ativo' || estado.tipo === 'sem-prazo'
+                                    ? 'text-green-400'
+                                    : 'text-neutral-400';
                             return (
-                                <div key={`${idx}-${label}-${createdAt}`} className="rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-sm text-neutral-200">
-                                    <div className="text-xs text-neutral-400">{createdAt}</div>
-                                    <div className="font-semibold text-white">{email || label} · {plan} · {days} dia(s)</div>
+                                <div key={`${idx}-${label}-${createdAt}`} className="rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2.5 text-sm text-neutral-200">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        {/* O que está VALENDO vem primeiro: é a pergunta
+                                            que se faz ao abrir esta lista. Quanto foi
+                                            concedido é histórico, e desceu de nível. */}
+                                        <span className={`font-black ${corEstado}`}>{trialStatusLabel(estado)}</span>
+                                        <span className="text-[11px] text-neutral-400 shrink-0">{formatarData(createdAt)}</span>
+                                    </div>
+                                    <div className="font-semibold text-white truncate mt-0.5">{email || label}</div>
+                                    <div className="text-xs text-neutral-400 mt-0.5">
+                                        {plan} · {days === 1 ? '1 dia concedido' : `${days} dias concedidos`}
+                                    </div>
                                 </div>
                             );
                         })}
