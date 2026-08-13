@@ -80,7 +80,7 @@ export default function UserProfileModal({
           <button aria-label="Fechar"
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+            className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <X size={16} />

@@ -640,7 +640,7 @@ export default function MarketplaceClient() {
     <div className="min-h-screen bg-neutral-950 text-white pb-safe-extra">
       {/* Header */}
       <div className="bg-neutral-950 sticky top-0 z-10 px-4 py-4 pt-safe flex items-center border-b border-neutral-900/50 backdrop-blur-md bg-neutral-950/80">
-        <button onClick={goBack} aria-label="Voltar" className="w-10 h-10 flex items-center justify-center hover:bg-neutral-900 rounded-xl transition-colors text-white">
+        <button onClick={goBack} aria-label="Voltar" className="tap-44 w-10 h-10 flex items-center justify-center hover:bg-neutral-900 rounded-xl transition-colors text-white">
           <ArrowLeft size={24} />
         </button>
         <div className="flex-1 text-center font-black text-lg pr-10 tracking-tight">

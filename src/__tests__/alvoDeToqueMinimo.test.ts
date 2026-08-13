@@ -20,13 +20,27 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const ROOT = join('src', 'components')
+/**
+ * ⚠️ AS DUAS raízes. O guard nasceu varrendo só `src/components` e ficou cego
+ * para `src/app`, onde vivem páginas inteiras — Agenda, Comunidade, Marketplace.
+ * Foram 15 botões, achados só quando a auditoria chegou na Agenda a olho.
+ *
+ * É o TERCEIRO buraco deste mesmo guard: primeiro ele só via `w-N h-N` casados
+ * (155 escaparam por altura sozinha), depois só varria uma pasta. O padrão do
+ * erro é sempre o mesmo — o guard nasce cobrindo o caso que motivou a escrevê-lo
+ * e é tratado como se cobrisse a classe inteira. Ao escrever um guard, a
+ * pergunta não é "ele pega o meu caso?", é "onde ele NÃO olha?".
+ */
+const RAIZES = [join('src', 'components'), join('src', 'app')]
 
 /** Botões cujo alvo pequeno é intencional e não pode crescer. Só encolhe. */
 const NAO_E_ALVO_DE_DEDO: Record<string, string> = {}
 
-const arquivos = readdirSync(ROOT, { recursive: true, encoding: 'utf8' })
-  .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__'))
+const arquivos = RAIZES.flatMap((raiz) =>
+  readdirSync(raiz, { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__'))
+    .map((f) => join(raiz, f)),
+)
 
 /** Extrai a tag de abertura completa, respeitando chaves/parênteses aninhados. */
 const tagsDeBotao = (src: string): string[] => {
@@ -75,7 +89,7 @@ describe('alvo de toque mínimo de 44pt', () => {
     const infratores: string[] = []
     for (const rel of arquivos) {
       if (NAO_E_ALVO_DE_DEDO[rel]) continue
-      const src = readFileSync(join(ROOT, rel), 'utf8')
+      const src = readFileSync(rel, 'utf8')
       for (const tag of tagsDeBotao(src)) {
         if (caixaPequena(tag) && !temAlvoAmpliado(tag)) infratores.push(rel)
       }
@@ -130,7 +144,7 @@ describe('alvo de toque mínimo de 44pt', () => {
   it('a allowlist não guarda entrada morta — ela só encolhe', () => {
     const mortas = Object.keys(NAO_E_ALVO_DE_DEDO).filter((rel) => {
       try {
-        return !tagsDeBotao(readFileSync(join(ROOT, rel), 'utf8')).some(caixaPequena)
+        return !tagsDeBotao(readFileSync(rel, 'utf8')).some(caixaPequena)
       } catch {
         return true
       }

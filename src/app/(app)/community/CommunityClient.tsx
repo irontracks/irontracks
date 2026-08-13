@@ -124,7 +124,7 @@ function ToggleButton({
         type="button"
         aria-label={label}
         onClick={() => userSettingsApi.updateSetting(settingKey, !isOn)}
-        className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 ${isOn ? 'bg-yellow-500' : 'bg-neutral-700'}`}
+        className={`relative flex-shrink-0 tap-44 w-12 h-6 rounded-full transition-all duration-300 ${isOn ? 'bg-yellow-500' : 'bg-neutral-700'}`}
         style={isOn ? { boxShadow: '0 0 12px rgba(234,179,8,0.4)' } : {}}
       >
         <span
@@ -272,7 +272,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   <button
                     type="button"
                     onClick={() => { try { if (typeof window !== 'undefined' && window.history.length > 1) router.back(); else router.push('/dashboard') } catch { router.push('/dashboard') } }}
-                    className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center transition-all hover:bg-white/5"
+                    className="tap-44 w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center transition-all hover:bg-white/5"
                     style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
                     aria-label="Voltar"
                   >
@@ -300,7 +300,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
               <button
                 type="button"
                 onClick={() => setCommunitySettingsOpen(true)}
-                className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center transition-all hover:bg-white/5"
+                className="tap-44 w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center transition-all hover:bg-white/5"
                 style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
                 aria-label="Configurações da Comunidade"
               >
@@ -388,7 +388,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                 <button
                   type="button"
                   onClick={() => setCommunitySettingsOpen(false)}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                  className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                   aria-label="Fechar"
                 >
