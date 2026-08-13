@@ -10,6 +10,7 @@ import { mediaKindFromUrl } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { apiSocial } from '@/lib/api'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 
 const MAX_VIDEO_SECONDS = 60
 const PHOTO_SECONDS = 15
@@ -922,19 +923,19 @@ export default function StoryViewer({
                 {viewersOpen && viewers.map((v) => (
                   <div key={String((v as Record<string, unknown>).viewerId ?? "")} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden">
-                      {(v as Record<string, unknown>).photoUrl ? <Image src={String((v as Record<string, unknown>).photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((v as Record<string, unknown>).displayName || ""))}</div>}
+                      {(v as Record<string, unknown>).photoUrl ? <Image src={String((v as Record<string, unknown>).photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(publicDisplayName((v as Record<string, unknown>).displayName))}</div>}
                     </div>
-                    <span className="text-xs font-bold text-white flex-1">{String((v as Record<string, unknown>).displayName || 'Usuário')}</span>
+                    <span className="text-xs font-bold text-white flex-1">{publicDisplayName((v as Record<string, unknown>).displayName)}</span>
                     <span className="text-[10px] text-neutral-400">{formatAgo((v as Record<string, unknown>).viewedAt as string)}</span>
                   </div>
                 ))}
                 {commentsOpen && comments.map((c) => (
                   <div key={String((c as Record<string, unknown>).id ?? "")} className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden shrink-0">
-                      {(c as Record<string, unknown>).user && typeof (c as Record<string, unknown>).user === 'object' && ((c as Record<string, Record<string, unknown>>).user?.photoUrl) ? <Image src={String((c as Record<string, Record<string, unknown>>).user.photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((c as Record<string, Record<string, unknown>>).user?.displayName || ''))}</div>}
+                      {(c as Record<string, unknown>).user && typeof (c as Record<string, unknown>).user === 'object' && ((c as Record<string, Record<string, unknown>>).user?.photoUrl) ? <Image src={String((c as Record<string, Record<string, unknown>>).user.photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(publicDisplayName((c as Record<string, Record<string, unknown>>).user?.displayName))}</div>}
                     </div>
                     <div>
-                      <div className="text-xs font-black text-white">{String((c as Record<string, Record<string, unknown>>).user?.displayName || 'Usuário')}</div>
+                      <div className="text-xs font-black text-white">{publicDisplayName((c as Record<string, Record<string, unknown>>).user?.displayName)}</div>
                       <div className="text-xs text-neutral-300">{String((c as Record<string, unknown>).body || '')}</div>
                     </div>
                   </div>

@@ -21,6 +21,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { apiChat, apiStorage } from '@/lib/api'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 
 interface ChatUser {
     uid: string
@@ -736,17 +737,17 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                             width={36}
                             height={36}
                             className="w-10 h-10 rounded-full object-cover ring-2 ring-yellow-500/20"
-                            alt={otherUser?.displayName || resolvedOtherUserName}
+                            alt={publicDisplayName(otherUser?.displayName || resolvedOtherUserName)}
                         />
                     ) : (
                         <div className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center font-black text-white ring-2 ring-yellow-500/20">
-                            {otherUser?.displayName?.[0] || resolvedOtherUserName?.[0] || '?'}
+                            {publicDisplayName(otherUser?.displayName || resolvedOtherUserName)[0] || '?'}
                         </div>
                     )}
 
                     <div className="min-w-0 text-center">
                         <h3 className="font-black tracking-tight text-white truncate max-w-[56vw] mx-auto">
-                            {otherUser?.displayName || resolvedOtherUserName || 'Usuário'}
+                            {publicDisplayName(otherUser?.displayName || resolvedOtherUserName)}
                         </h3>
                         <div className="flex items-center justify-center gap-1.5 text-[11px]">
                             {isUserOnline() ? (
@@ -777,7 +778,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     <div className="text-center py-10 text-neutral-400">
                         <div className="text-lg mb-2">💬</div>
                         <p className="font-semibold">Comece a conversa</p>
-                        <p className="text-sm">Envie uma mensagem para {otherUser?.displayName || otherUserName}</p>
+                        <p className="text-sm">Envie uma mensagem para {publicDisplayName(otherUser?.displayName || otherUserName)}</p>
                     </div>
                 ) : (
                     <>
@@ -799,11 +800,11 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                 width={32}
                                                 height={32}
                                                 className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 object-cover self-end mb-1"
-                                                alt={String(senderObj.display_name ?? 'Usuário')}
+                                                alt={publicDisplayName(senderObj.display_name)}
                                             />
                                         ) : (
                                             <div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center font-black text-[10px] self-end mb-1">
-                                                {String(senderObj?.display_name ?? '?')[0] || '?'}
+                                                {publicDisplayName(senderObj?.display_name)[0] || '?'}
                                             </div>
                                         )
                                     )}
@@ -814,7 +815,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                         } ${message._sendStatus === 'sending' ? 'opacity-70' : ''} ${message._sendStatus === 'failed' ? 'ring-1 ring-red-500/50' : ''}`}>
                                         {!isMyMessage && (
                                             <p className="text-[10px] font-bold text-neutral-400 mb-1">
-                                                {String(senderObj?.display_name ?? 'Usuário')}
+                                                {publicDisplayName(senderObj?.display_name)}
                                             </p>
                                         )}
                                         {(() => {
