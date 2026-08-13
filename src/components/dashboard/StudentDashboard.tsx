@@ -624,7 +624,7 @@ export default function StudentDashboard(props: Props) {
                       }}
                       className={
                         workoutsTab === 'normal'
-                          ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                          ? 'flex-1 tap-44 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
                           : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
                       }
                     >
@@ -641,7 +641,7 @@ export default function StudentDashboard(props: Props) {
                       }}
                       className={
                         workoutsTab === 'periodized'
-                          ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                          ? 'flex-1 tap-44 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
                           : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
                       }
                     >
@@ -666,7 +666,7 @@ export default function StudentDashboard(props: Props) {
                       onClick={() => setShowArchived((v) => !v)}
                       className={
                         showArchived
-                          ? 'flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
+                          ? 'flex-1 min-w-[120px] tap-44 min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
                           : 'flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
                       }
                     >
@@ -687,14 +687,14 @@ export default function StudentDashboard(props: Props) {
                       setEditListOpen(true)
                       setToolsOpen(false)
                     }}
-                    className="flex-1 min-w-[120px] min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                    className="flex-1 min-w-[120px] tap-44 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
                   >
                     <span className="inline-flex items-center gap-1.5"><ListOrdered size={13} /> Organizar</span>
                   </button>
                   <div className="relative flex-1 min-w-[120px]">
                     <button
                       onClick={() => setToolsOpen((v) => !v)}
-                      className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                      className="w-full tap-44 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
                       aria-expanded={toolsOpen}
                     >
                       <span className="inline-flex items-center gap-1.5"><Wrench size={13} /> Ferramentas</span>
@@ -777,7 +777,7 @@ export default function StudentDashboard(props: Props) {
                             setPeriodizedWorkouts([])
                             setPeriodizedError('')
                           }}
-                          className="ml-2 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                          className="ml-2 tap-44 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
                         >
                           Tentar novamente
                         </button>

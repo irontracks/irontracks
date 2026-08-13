@@ -383,7 +383,7 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
             pickFile();
           }}
           disabled={uploading}
-          className="w-full min-h-[38px] inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 active:scale-95 transition-transform disabled:opacity-60"
+          className="w-full tap-44 min-h-[38px] inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 active:scale-95 transition-transform disabled:opacity-60"
           title={uploading ? (processing ? 'Montando vídeo...' : 'Enviando...') : 'Enviar vídeo ao professor'}
           aria-label={uploading ? (processing ? 'Montando vídeo' : 'Enviando vídeo ao professor') : 'Enviar vídeo ao professor'}
         >
@@ -424,7 +424,7 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
             pickFile();
           }}
           disabled={uploading}
-          className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 disabled:opacity-60"
+          className="tap-44 h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 disabled:opacity-60"
           title={uploading ? (processing ? 'Montando vídeo...' : 'Enviando...') : 'Enviar vídeo ao professor'}
           aria-label={uploading ? (processing ? 'Montando vídeo' : 'Enviando vídeo ao professor') : 'Enviar vídeo ao professor'}
         >

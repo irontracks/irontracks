@@ -358,7 +358,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 e.stopPropagation()
                 setExpanded((v) => !v)
               }}
-              className="text-neutral-400 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
+              className="text-neutral-400 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors tap-44 min-h-[40px] min-w-[40px] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
             >
               <motion.span className="inline-flex" animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                 <ChevronDown size={18} />
@@ -405,7 +405,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     }}
                     className={
                       period === 'day'
-                        ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                        ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                         : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                     }
                   >
@@ -419,7 +419,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     }}
                     className={
                       period === 'week'
-                        ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                        ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                         : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                     }
                   >
@@ -448,7 +448,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                   }}
                   className={
                     view === 'front'
-                      ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                      ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                       : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                   }
                 >
@@ -462,7 +462,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                   }}
                   className={
                     view === 'back'
-                      ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                      ? 'tap-44 min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
                       : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
                   }
                 >
@@ -498,7 +498,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     prefillWizard()
                   }}
                   disabled={!props.onOpenWizard || state.status === 'loading' || weakMuscles.length === 0}
-                  className="min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-60 inline-flex items-center gap-2"
+                  className="tap-44 min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-60 inline-flex items-center gap-2"
                 >
                   <Wand2 size={16} />
                   Criar treino
@@ -605,7 +605,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                         <button
                           type="button"
                           onClick={props.onUpgrade}
-                          className="mt-3 w-full min-h-[36px] rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
+                          className="mt-3 w-full tap-44 min-h-[36px] rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
                         >
                           <Crown size={12} /> Assinar VIP
                         </button>

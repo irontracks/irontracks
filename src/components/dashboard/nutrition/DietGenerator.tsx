@@ -224,7 +224,7 @@ export default function DietGenerator({
               type="button"
               onClick={generate}
               disabled={busy || num(goals.calories) <= 0}
-              className="h-10 w-full rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-500/20 hover:from-yellow-300 hover:to-amber-400 active:scale-[0.98] transition disabled:opacity-40"
+              className="tap-44 h-10 w-full rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-500/20 hover:from-yellow-300 hover:to-amber-400 active:scale-[0.98] transition disabled:opacity-40"
             >
               {busy ? 'Gerando...' : plan ? '↻ Gerar outra' : '✨ Gerar dieta'}
             </button>
@@ -256,7 +256,7 @@ export default function DietGenerator({
                       onClick={() => setScope(s)}
                       disabled={!!savedPlanId}
                       aria-pressed={scope === s}
-                      className={`h-8 flex-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
+                      className={`tap-44 h-8 flex-1 rounded-lg text-[11px] font-bold transition disabled:opacity-40 ${
                         scope === s ? 'bg-yellow-500/20 text-yellow-300' : 'text-neutral-400 hover:text-white'
                       }`}
                     >
@@ -276,7 +276,7 @@ export default function DietGenerator({
                   type="button"
                   onClick={savePlan}
                   disabled={saving || !!savedPlanId}
-                  className={`h-10 w-full rounded-xl text-sm font-bold transition active:scale-[0.98] ${
+                  className={`tap-44 h-10 w-full rounded-xl text-sm font-bold transition active:scale-[0.98] ${
                     savedPlanId
                       ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                       : 'bg-white/[0.06] border border-white/[0.1] text-white hover:bg-white/[0.1] disabled:opacity-50'
@@ -352,7 +352,7 @@ export default function DietGenerator({
                             type="button"
                             onClick={() => applyMeal(meal, idx)}
                             disabled={applied || applyingIdx !== null}
-                            className={`mt-3 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
+                            className={`mt-3 tap-44 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
                               applied
                                 ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                                 : 'bg-white/[0.06] border border-white/[0.08] text-white hover:bg-white/[0.1] disabled:opacity-50'

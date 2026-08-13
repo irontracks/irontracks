@@ -212,7 +212,7 @@ export default function AIExerciseSwap({
           e.stopPropagation()
           fetchAlternatives()
         }}
-        className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-amber-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+        className="tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-amber-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
         title="Trocar exercício (AI)"
         aria-label="Sugerir exercícios alternativos"
       >

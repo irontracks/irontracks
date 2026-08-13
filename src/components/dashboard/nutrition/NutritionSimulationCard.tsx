@@ -111,7 +111,7 @@ export default function NutritionSimulationCard({
           type="button"
           onClick={onLog}
           disabled={logging || logged}
-          className="mt-3 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-4 text-sm font-black text-black transition hover:bg-yellow-400 disabled:opacity-60"
+          className="mt-3 inline-flex tap-44 min-h-[40px] w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 px-4 text-sm font-black text-black transition hover:bg-yellow-400 disabled:opacity-60"
         >
           {logged ? (
             <>

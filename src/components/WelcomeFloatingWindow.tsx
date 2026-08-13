@@ -101,7 +101,7 @@ export default function WelcomeFloatingWindow({ user, onClose }: WelcomeFloating
                     <div className="mt-5">
                         <button
                             onClick={handleClose}
-                            className="w-full h-10 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors shadow-lg shadow-yellow-500/10"
+                            className="w-full tap-44 h-10 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors shadow-lg shadow-yellow-500/10"
                         >
                             <Sparkles size={14} />
                             Explorar Agora

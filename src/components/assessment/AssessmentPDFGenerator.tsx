@@ -199,7 +199,7 @@ export default function AssessmentPDFGenerator({
         disabled={isGenerating}
         title="Gerar PDF da avaliação"
         aria-label="Gerar PDF da avaliação"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95 disabled:opacity-60"
+        className="inline-flex tap-44 h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95 disabled:opacity-60"
       >
         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
       </button>

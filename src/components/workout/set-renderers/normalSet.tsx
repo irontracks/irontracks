@@ -634,7 +634,7 @@ const NormalSetInner = ({
           <button
             type="button"
             onClick={onComplete}
-            className={`inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
+            className={`inline-flex items-center justify-center gap-1 tap-44 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
             {/* Mesmo rótulo dos demais métodos (Concluir/Feito). O lado não precisa
@@ -716,7 +716,7 @@ const NormalSetInner = ({
               onClick={() => toggleNotes(key)}
               className={
                 isNotesOpen || hasNotes
-                  ? 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 text-[11px] font-bold'
+                  ? 'inline-flex items-center gap-1.5 tap-44 h-7 px-2.5 rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 text-[11px] font-bold'
                   : 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 text-[11px] font-bold hover:text-yellow-500'
               }
             >
@@ -753,7 +753,7 @@ const NormalSetInner = ({
               aria-label={`Série ${setIdx + 1} – ${typeMeta.label}. Mantenha pressionado para mudar tipo.`}
               {...longPressHandlers}
               className={[
-                'h-7 inline-flex items-center justify-center rounded-lg text-[11px] font-black tracking-tight border transition-colors select-none touch-none',
+                'tap-44 h-7 inline-flex items-center justify-center rounded-lg text-[11px] font-black tracking-tight border transition-colors select-none touch-none',
                 typeMeta.badgeClass,
               ].join(' ')}
               style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
@@ -768,7 +768,7 @@ const NormalSetInner = ({
               onClick={() => toggleNotes(key)}
               className={
                 isNotesOpen || hasAnyNote
-                  ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
                   : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
             >
@@ -817,7 +817,7 @@ const NormalSetInner = ({
               type="button"
               onClick={handleComplete}
               className={[
-                'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                'inline-flex items-center justify-center gap-1 tap-44 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
                   // Pendente em gold: este é o botão mais tocado do app (18×

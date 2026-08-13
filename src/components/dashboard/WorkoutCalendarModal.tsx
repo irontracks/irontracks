@@ -192,7 +192,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
               <button
                 type="button"
                 onClick={() => setCursor(startOfDay(new Date()))}
-                className="min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                className="tap-44 min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
               >
                 Hoje
               </button>
@@ -215,7 +215,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                 onClick={() => setView('week')}
                 className={
                   view === 'week'
-                    ? 'min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                    ? 'tap-44 min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
                     : 'min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800'
                 }
               >
@@ -226,7 +226,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                 onClick={() => setView('month')}
                 className={
                   view === 'month'
-                    ? 'min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                    ? 'tap-44 min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
                     : 'min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800'
                 }
               >

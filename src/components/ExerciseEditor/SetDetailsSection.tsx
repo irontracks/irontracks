@@ -195,7 +195,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                                 list.splice(dIdx, 1)
                                                 updateConfig(list)
                                             }}
-                                            className="h-9 w-9 bg-depth-1 border border-white/[0.06] rounded-lg text-neutral-300 hover:text-red-400 hover:border-red-400/40 transition-colors"
+                                            className="tap-44 h-9 w-9 bg-depth-1 border border-white/[0.06] rounded-lg text-neutral-300 hover:text-red-400 hover:border-red-400/40 transition-colors"
                                             aria-label={`Remover drop ${dIdx + 1}`}
                                         >
                                             <Trash2 size={14} className="mx-auto" />

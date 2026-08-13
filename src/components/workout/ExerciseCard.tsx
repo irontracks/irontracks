@@ -559,7 +559,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                   } catch { }
                 }
               }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+              className="tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
               title="Ver vídeo"
               aria-label="Ver vídeo"
             >
@@ -591,7 +591,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                 await openDeloadModal(ex, exIdx);
               }}
               className={[
-                'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+                'tap-44 h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
                 // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
                 // seta sem texto no meio de outros ícones, e no celular não há hover
                 // pra revelar o `title` — ninguém descobria que ali morava o deload.
@@ -615,7 +615,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               } catch { }
               toggleLinkWeights(exIdx);
             }}
-            className={`h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0 ${linkedWeightExercises?.has(exIdx)
+            className={`tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0 ${linkedWeightExercises?.has(exIdx)
               ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
               : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
               }`}
@@ -632,7 +632,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                 setCurrentExerciseIdx(exIdx);
                 setPlateCalcOpen(true);
               }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+              className="tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
               title="Calculadora de anilhas"
               aria-label="Calculadora de anilhas"
             >
@@ -650,7 +650,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               setCurrentExerciseIdx(exIdx);
               await openEditExercise(exIdx);
             }}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+            className="tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
             title="Editar exercício"
             aria-label="Editar exercício"
           >
@@ -667,7 +667,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               }
             }}
             className={[
-              'h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+              'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0',
               deleteConfirmIdx === exIdx
                 ? 'bg-red-500/15 border-red-500/40 text-red-400'
                 : 'bg-neutral-900 border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10',

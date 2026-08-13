@@ -419,7 +419,7 @@ export function AssessmentListItem({
           <button
             onClick={() => onToggleDetails(assessmentId)}
             type="button"
-            className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition-colors active:scale-95"
+            className="inline-flex tap-44 min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition-colors active:scale-95"
             style={{
               background: isSelected ? 'rgba(234,179,8,0.12)' : 'rgba(255,255,255,0.03)',
               borderColor: isSelected ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
@@ -435,7 +435,7 @@ export function AssessmentListItem({
               type="button"
               onClick={() => onOpenPlanModal(assessment)}
               disabled={!!aiPlanState?.loading}
-              className="inline-flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-3 text-sm font-black text-black transition-transform active:scale-95 disabled:opacity-60"
+              className="inline-flex tap-44 min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 px-3 text-sm font-black text-black transition-transform active:scale-95 disabled:opacity-60"
             >
               <Sparkles className="w-4 h-4" />
               {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
@@ -460,7 +460,7 @@ export function AssessmentListItem({
               onClick={() => onEdit(assessmentId)}
               title="Editar avaliação"
               aria-label="Editar avaliação"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95"
+              className="inline-flex tap-44 h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-white hover:border-neutral-700 active:scale-95"
             >
               <Edit3 className="w-4 h-4" />
             </button>
@@ -472,14 +472,14 @@ export function AssessmentListItem({
                 type="button"
                 onClick={() => onDelete(assessmentId)}
                 disabled={deletingId === assessmentId}
-                className="min-h-[40px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition-colors hover:bg-red-500 active:scale-95 disabled:opacity-60"
+                className="tap-44 min-h-[40px] rounded-xl bg-red-600 px-3 text-sm font-bold text-white transition-colors hover:bg-red-500 active:scale-95 disabled:opacity-60"
               >
                 {deletingId === assessmentId ? '…' : 'Excluir'}
               </button>
               <button
                 type="button"
                 onClick={() => onConfirmDelete(null)}
-                className="min-h-[40px] rounded-xl border border-neutral-700 px-3 text-sm font-bold text-neutral-400 transition-colors hover:text-white active:scale-95"
+                className="tap-44 min-h-[40px] rounded-xl border border-neutral-700 px-3 text-sm font-bold text-neutral-400 transition-colors hover:text-white active:scale-95"
               >
                 Não
               </button>
@@ -490,7 +490,7 @@ export function AssessmentListItem({
               onClick={() => onConfirmDelete(assessmentId)}
               title="Excluir avaliação"
               aria-label="Excluir avaliação"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
+              className="inline-flex tap-44 h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900/60 text-neutral-400 transition-colors hover:text-red-400 hover:border-red-500/40 active:scale-95"
             >
               <Trash2 className="w-4 h-4" />
             </button>

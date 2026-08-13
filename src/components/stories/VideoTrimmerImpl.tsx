@@ -78,7 +78,7 @@ export default function VideoTrimmerImpl({ duration, value, onChange, onPreview,
           type="button"
           onClick={togglePreview}
           disabled={!onPreview || safeDuration <= 0}
-          className="h-9 px-3 rounded-lg bg-neutral-800 text-neutral-200 hover:bg-neutral-700 disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
+          className="tap-44 h-9 px-3 rounded-lg bg-neutral-800 text-neutral-200 hover:bg-neutral-700 disabled:opacity-50 flex items-center gap-2 text-xs font-bold"
         >
           {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           {isPlaying ? 'Pausar' : 'Preview'}

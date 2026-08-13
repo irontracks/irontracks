@@ -192,7 +192,7 @@ export default function PrescribedDietPlan({
                         type="button"
                         onClick={() => applyMeal(meal, idx)}
                         disabled={applied || applyingIdx !== null}
-                        className={`mt-3 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
+                        className={`mt-3 tap-44 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
                           applied
                             ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                             : 'bg-white/[0.06] border border-white/[0.08] text-white hover:bg-white/[0.1] disabled:opacity-50'

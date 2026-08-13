@@ -105,7 +105,7 @@ export const BodyPhotoCorrelationView: React.FC<{
                                 {adjustable ? (
                                     <button
                                         onClick={() => setOpenGap(open ? null : l.muscleGroup)}
-                                        className="mt-2 inline-flex items-center gap-1.5 min-h-[32px] px-2.5 rounded-lg border text-[12px] font-bold transition active:scale-95"
+                                        className="mt-2 inline-flex items-center gap-1.5 tap-44 min-h-[32px] px-2.5 rounded-lg border text-[12px] font-bold transition active:scale-95"
                                         style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
                                     >
                                         <Wrench className="w-3.5 h-3.5" />

@@ -585,7 +585,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               key={m.key}
               type="button"
               onClick={() => setMode(m.key)}
-              className="flex-1 min-h-[36px] px-1.5 py-1.5 rounded-lg text-center transition-all active:scale-[0.97]"
+              className="flex-1 tap-44 min-h-[36px] px-1.5 py-1.5 rounded-lg text-center transition-all active:scale-[0.97]"
               style={mode === m.key
                 ? { background: 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.06))', border: '1px solid rgba(234,179,8,0.3)', boxShadow: '0 2px 8px rgba(234,179,8,0.1)' }
                 : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }

@@ -964,7 +964,7 @@ export default function NutritionMixer({
               onClick={() => setGoalsOpen(v => !v)}
               aria-expanded={goalsOpen}
               aria-label={goalsOpen ? 'Fechar edição de metas' : 'Editar metas de macronutrientes'}
-              className={`relative inline-flex items-center gap-1.5 h-9 px-3 rounded-full border text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200 active:scale-95 touch-manipulation
+              className={`relative inline-flex items-center gap-1.5 tap-44 h-9 px-3 rounded-full border text-[11px] font-bold uppercase tracking-[0.12em] transition-all duration-200 active:scale-95 touch-manipulation
                 before:absolute before:-inset-2 before:content-['']
                 ${goalsOpen
                   ? 'bg-yellow-500 border-yellow-500 text-black'
@@ -1036,7 +1036,7 @@ export default function NutritionMixer({
               )}
               {goalsError && <div className="text-xs text-red-400">{goalsError}</div>}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setGoalsOpen(false)} className="h-10 px-3 rounded-lg text-xs text-neutral-400 hover:text-white transition">Cancelar</button>
+                <button type="button" onClick={() => setGoalsOpen(false)} className="tap-44 h-10 px-3 rounded-lg text-xs text-neutral-400 hover:text-white transition">Cancelar</button>
                 <button type="button" onClick={saveGoals} disabled={goalsSaving} className="h-11 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 disabled:opacity-50 active:scale-95 transition">
                   {goalsSaving ? '...' : 'Salvar'}
                 </button>
@@ -1049,7 +1049,7 @@ export default function NutritionMixer({
           <div className="text-sm font-semibold text-white">Macros no plano Pro</div>
           <div className="mt-1 text-xs text-neutral-400">Ative para acompanhar proteína, carbo e gordura.</div>
           {!hideVipCtas && (
-            <button type="button" onClick={() => (window.location.href = '/marketplace')} className="mt-3 h-9 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 active:scale-95 transition">
+            <button type="button" onClick={() => (window.location.href = '/marketplace')} className="mt-3 tap-44 h-9 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 active:scale-95 transition">
               Ver planos
             </button>
           )}

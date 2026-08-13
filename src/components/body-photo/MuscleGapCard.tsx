@@ -222,7 +222,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                         <button
                                                             onClick={() => openPicker(s)}
                                                             disabled={done}
-                                                            className="inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-lg border text-[12px] font-bold transition active:scale-95 disabled:opacity-60"
+                                                            className="inline-flex items-center gap-1 tap-44 min-h-[32px] px-2.5 rounded-lg border text-[12px] font-bold transition active:scale-95 disabled:opacity-60"
                                                             style={done
                                                                 ? { background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80' }
                                                                 : { background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
@@ -250,7 +250,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                         type="button"
                                                                         onClick={() => setConfirmTarget(null)}
                                                                         disabled={saving}
-                                                                        className="flex-1 min-h-[40px] rounded-lg border border-neutral-700 text-neutral-300 text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
+                                                                        className="flex-1 tap-44 min-h-[40px] rounded-lg border border-neutral-700 text-neutral-300 text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
                                                                     >
                                                                         Não
                                                                     </button>
@@ -258,7 +258,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                         type="button"
                                                                         onClick={confirmAdd}
                                                                         disabled={saving}
-                                                                        className="flex-1 min-h-[40px] rounded-lg text-black text-[13px] font-black transition active:scale-95 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                                                                        className="flex-1 tap-44 min-h-[40px] rounded-lg text-black text-[13px] font-black transition active:scale-95 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                                                                         style={{ background: '#d8b4fe' }}
                                                                     >
                                                                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -278,7 +278,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                                         key={w.id}
                                                                         onClick={() => chooseWorkout(w)}
                                                                         disabled={saving}
-                                                                        className={`w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left transition disabled:opacity-50 ${MACHINE_ACCENT.hoverBorder}`}
+                                                                        className={`w-full flex items-center justify-between gap-2 tap-44 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left transition disabled:opacity-50 ${MACHINE_ACCENT.hoverBorder}`}
                                                                     >
                                                                         <span className="text-[13px] text-neutral-200 truncate">{w.name}</span>
                                                                         <span className="text-[11px] text-neutral-400 shrink-0">{w.exerciseCount} ex.</span>
