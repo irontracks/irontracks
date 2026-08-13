@@ -19,7 +19,6 @@ import {
     Crown,
     Dumbbell,
     UserCheck,
-    UserCog,
     UserPlus,
     UserX,
     Users,
@@ -131,7 +130,13 @@ export const DashboardTab: React.FC = () => {
     }, [isAdmin, isTeacher]);
 
     const emRisco = Array.isArray(prioritiesItems) ? prioritiesItems.length : 0;
-    const semProfessor = Math.max(0, dashboardCharts.totalStudents - usersList.filter(u => !!u?.teacher_id).length);
+
+    // ⚠️ "Alunos sem professor" NÃO entra aqui, e a medição é o motivo: 26 dos
+    // 55 alunos (47%) não têm professor, e 7 estão assim há mais de 90 dias —
+    // o mais antigo desde dezembro. Isso não é pendência, é a característica de
+    // quem baixou o app e treina sozinho. Como alerta, ficaria aceso para
+    // sempre, e um bloco que sempre tem item deixa de ser lido. Se o número
+    // interessar, ele é MÉTRICA (vive com os totais), não tarefa.
 
     /**
      * O que EXIGE decisão, em ordem de custo de ignorar.
@@ -154,14 +159,6 @@ export const DashboardTab: React.FC = () => {
             titulo: pendingRequests === 1 ? '1 solicitação aguardando' : `${pendingRequests} solicitações aguardando`,
             desc: 'Revisar e aprovar acesso',
             ir: () => setTab('requests'),
-        },
-        isAdmin && semProfessor > 0 && {
-            chave: 'sem-professor',
-            icone: <UserCog size={18} className="text-amber-400" />,
-            cor: 'amber' as const,
-            titulo: semProfessor === 1 ? '1 aluno sem professor' : `${semProfessor} alunos sem professor`,
-            desc: 'Atribuir para alguém acompanhar',
-            ir: () => setTab('students'),
         },
     ].filter(Boolean) as Array<{ chave: string; icone: React.ReactNode; cor: 'red' | 'amber'; titulo: string; desc: string; ir: () => void }>;
 
