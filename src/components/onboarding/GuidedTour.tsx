@@ -172,14 +172,17 @@ export default function GuidedTour({
             </button>
           </div>
 
-          {/* Progress dots */}
-          <div className="flex items-center justify-center gap-1.5 pb-2 pt-1">
+          {/* Progress dots — INDICADOR, não controle.
+              Eram botões de 6px com 12px entre centros: dar-lhes os 44pt da HIG
+              criaria 32px de sobreposição entre vizinhos, e o toque acionaria o
+              passo errado. Alvo pequeno demais promete uma interação que o dedo
+              não consegue cumprir — e alvo sobreposto é pior que alvo nenhum.
+              Quem navega são o "Próximo" e o swipe; o contador "1 / 5" acima
+              carrega a informação para o leitor de tela. */}
+          <div className="flex items-center justify-center gap-1.5 pb-2 pt-1" aria-hidden="true">
             {safeSteps.map((_, i) => (
-              <button
+              <div
                 key={i}
-                type="button"
-                onClick={() => setIdx(i)}
-                aria-label={`Ir para passo ${i + 1}`}
                 className="rounded-full transition-all duration-300"
                 style={{
                   width: i === idx ? 20 : 6,
