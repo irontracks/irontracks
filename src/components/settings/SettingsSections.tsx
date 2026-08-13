@@ -115,7 +115,7 @@ export function SettingsProfileSection({ draft, setValue, userId, userPhotoURL, 
     ]
     return (
         <SectionCard>
-            <SectionHeader icon={User} label="Perfil" color="#f59e0b" />
+            <SectionHeader icon={User} label="Perfil" />
             <div className="space-y-3">
                 {/* Avatar */}
                 <div className="flex items-center gap-4 pb-3 border-b border-neutral-700/60">
@@ -187,7 +187,7 @@ export function SettingsAppearanceSection({ draft, setValue }: SettingsSectionPr
     const density = String(draft?.dashboardDensity || 'comfortable')
     return (
         <SectionCard>
-            <SectionHeader icon={Palette} label="Aparência" color="#fbbf24" />
+            <SectionHeader icon={Palette} label="Aparência" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -209,7 +209,7 @@ export function SettingsWorkoutNamesSection({ draft, setValue }: SettingsSection
     const programTitleStartDay = String(draft?.programTitleStartDay || 'monday')
     return (
         <SectionCard>
-            <SectionHeader icon={CalendarDays} label="Nomes de treinos" color="#f97316" />
+            <SectionHeader icon={CalendarDays} label="Nomes de treinos" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -242,7 +242,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
     const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Layers} label="Modo do App" color="#f59e0b" />
+            <SectionHeader icon={Layers} label="Modo do App" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -303,7 +303,7 @@ export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew, onOpenPr
     const whatsNewRemind24h = Boolean(draft?.whatsNewRemind24h ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Wrench} label="Ferramentas" color="#f43f5e" />
+            <SectionHeader icon={Wrench} label="Ferramentas" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Novos Recordes</div><div className="text-xs text-neutral-400">Mostra o card de PRs recentes no dashboard.</div></div>
@@ -357,7 +357,7 @@ export function SettingsWorkoutSection({ draft, setValue }: SettingsSectionProps
     const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Dumbbell} label="Treino" color="#10b981" />
+            <SectionHeader icon={Dumbbell} label="Treino" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Unidades</div><div className="text-xs text-neutral-400">Peso padrão para cargas.</div></div>
@@ -387,7 +387,7 @@ export function SettingsSoundSection({ draft, setValue }: SettingsSectionProps) 
     const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
     return (
         <SectionCard>
-            <SectionHeader icon={Volume2} label="Som" color="#eab308" />
+            <SectionHeader icon={Volume2} label="Som" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Sons do App</div><div className="text-xs text-neutral-400">Notificações e feedback sonoro.</div></div>
@@ -418,7 +418,7 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
     const restTimerAutoStart = Boolean(draft?.restTimerAutoStart ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Timer} label="Timer" color="#fbbf24" />
+            <SectionHeader icon={Timer} label="Timer" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">START automático</div><div className="text-xs text-neutral-400">Inicia a próxima série ao terminar o descanso.</div></div>
@@ -472,7 +472,7 @@ export function SettingsPrivacySection({ draft, setValue }: SettingsSectionProps
     const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Lock} label="Privacidade" color="#ef4444" />
+            <SectionHeader icon={Lock} label="Privacidade" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Receber mensagens diretas</div><div className="text-xs text-neutral-400">Permite que outros iniciem conversas diretas com você.</div></div>
@@ -573,7 +573,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
 
     return (
         <SectionCard>
-            <SectionHeader icon={Bell} label="Notificações" color="#f59e0b" />
+            <SectionHeader icon={Bell} label="Notificações" />
             <div className="space-y-3">
                 {/* Master switch for lock-screen pushes */}
                 <div
@@ -1245,7 +1245,7 @@ export function SettingsSecuritySection({ draft, setValue }: SettingsSectionProp
     const requireBiometricsOnStartup = Boolean(draft?.requireBiometricsOnStartup ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Lock} label="Segurança" color="#14b8a6" />
+            <SectionHeader icon={Lock} label="Segurança" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Solicitar Biometria</div><div className="text-xs text-neutral-400">Exige Face ID ou Touch ID ao abrir o app.</div></div>
