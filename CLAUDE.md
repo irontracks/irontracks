@@ -564,6 +564,40 @@ mover pixel. A auditoria do Painel usou `role=admin` TEMPORÁRIO na conta de
 teste (`djmkbrasil`), revertido para `teacher` na mesma sessão e conferido na
 fonte.
 
+## O CTA dourado tem DUAS formas — e a terceira é improviso (13/08/2026)
+
+Medido, contando só `<button>`:
+
+| forma | usos | o que é |
+|---|---|---|
+| `bg-yellow-500 text-black` | **184** | o CTA padrão do app |
+| `.btn-gold-animated` | 19 | utility NOMEADA (gradiente animado, `gold-flow`) |
+| `linear-gradient` inline | **29** em 22 arquivos | digitado à mão, sem nome e sem regra |
+
+Os 19 não são problema: a utility está no `globals.css`, tem nome, e quem a usa
+escolhe um comportamento — a animação puxa o olho para o momento de conversão
+(entrar, salvar a primeira avaliação, criar o primeiro treino). **Use com
+parcimônia: se tudo pulsa, nada pulsa.**
+
+Os 29 são a mesma deriva das cores quase-gêmeas — não quebram nada hoje, e no
+dia em que o dourado da marca mudar, ele muda em 184 lugares e continua velho
+em 29. Congelados por teto por arquivo em `__tests__/ctaDouradoFormas.test.ts`,
+que só desce. **Precisa de um tratamento novo? Vira utility com nome — improviso
+não vira sistema.**
+
+**Não foram reescritos de propósito:** trocar 29 gradientes por sólido mudaria o
+visual de 29 botões em 22 telas de uma vez, sem ninguém olhando. Mesma escolha
+do teto de 9px em texto corrido.
+
+### A pergunta que originou isso, e a resposta que a medição deu
+
+O dono perguntou se as abas (Avaliações, Comunidade, Nutrição, VIP) precisavam
+ser padronizadas, e suspeitou que a **VIP** tivesse fundo e cards invertidos.
+Medido: **a VIP é das mais alinhadas ao padrão** (eyebrow + título à esquerda,
+grade 2×2). O que estava errado era o FUNDO DO SHELL por baixo de todas elas
+(#171717 contra o #0a0a0a do body) — corrigido no #798. A relação card/fundo
+nunca esteve invertida.
+
 ## A paleta REAL do app (medida em 13/08/2026, não a documentada)
 
 Contagem por família em `src/`, para acabar com a discussão sobre o que "está
