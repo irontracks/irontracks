@@ -146,7 +146,7 @@ export default function GuidedTour({
         <div
           className="rounded-t-[28px] overflow-hidden select-none"
           style={{
-            background: 'linear-gradient(160deg, #1a1500 0%, #0d0d0d 40%)',
+            background: 'linear-gradient(160deg, #1a1500 0%, #0f0f0e 40%)',
             boxShadow: '0 -12px 48px rgba(0,0,0,0.85), 0 0 0 1px rgba(234,179,8,0.18), inset 0 1px 0 rgba(234,179,8,0.25)',
           }}
         >
@@ -221,7 +221,7 @@ export default function GuidedTour({
                         priority
                       />
                       {/* Bottom gradient fade into card */}
-                      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0d0d0d] to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0f0f0e] to-transparent" />
                     </div>
                   ) : (
                     <div

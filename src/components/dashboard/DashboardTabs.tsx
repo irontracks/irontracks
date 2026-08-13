@@ -90,7 +90,7 @@ export const DashboardTabs = memo(({
           style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)' }}
         >
           <div
-            className="rounded-[14px] p-1 flex gap-0.5 sm:gap-1 relative"
+            className="rounded-xl p-1 flex gap-0.5 sm:gap-1 relative"
             style={{
               background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)',
               backdropFilter: 'blur(20px)',

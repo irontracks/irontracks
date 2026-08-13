@@ -74,7 +74,7 @@ export function EditWorkoutListModal({
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
+            <div className="t-meta-inherit text-xs text-yellow-500">Treinos</div>
             <div id="edit-list-title" className="text-white font-black text-lg truncate">Organizar</div>
             <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
             <div className="text-[11px] text-yellow-500/80 mt-0.5">Os dias (SEG, TER…) acompanham a ordem.</div>

@@ -135,7 +135,7 @@ export const ReportSummaryCards = memo(({
                         <div className="w-6 h-6 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center">
                             <MapPin size={12} className="text-green-400" />
                         </div>
-                        <div className="text-xs font-black uppercase tracking-widest text-green-400/80">Cardio GPS</div>
+                        <div className="t-meta-inherit text-xs text-green-400/80">Cardio GPS</div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-green-950/20 p-4 rounded-xl border border-green-500/15">

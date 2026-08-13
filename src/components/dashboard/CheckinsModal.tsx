@@ -41,7 +41,7 @@ export const CheckinsModal = ({
       <div ref={focusTrapRef} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-ins</div>
+            <div className="t-meta-inherit text-xs text-yellow-500">Check-ins</div>
             <div id="checkins-title" className="text-white font-black text-lg truncate">Histórico</div>
             <div className="text-xs text-neutral-400">Tendências, alertas e sugestões.</div>
           </div>
@@ -155,7 +155,7 @@ export const CheckinsModal = ({
                   <div className="mb-4 space-y-3">
                     {alerts.length > 0 && (
                       <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                        <div className="text-xs font-black uppercase tracking-widest text-red-300 mb-2">Alertas</div>
+                        <div className="t-meta-inherit text-xs text-red-300 mb-2">Alertas</div>
                         <ul className="space-y-1">
                           {alerts.map((a) => (
                             <li key={a}>{a}</li>
@@ -165,7 +165,7 @@ export const CheckinsModal = ({
                     )}
                     {suggestions.length > 0 && (
                       <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-300 mb-2">Sugestões</div>
+                        <div className="t-meta-inherit text-xs text-yellow-300 mb-2">Sugestões</div>
                         <ul className="space-y-1">
                           {suggestions.map((s) => (
                             <li key={s}>{s}</li>

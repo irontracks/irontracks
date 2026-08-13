@@ -36,6 +36,18 @@
   color: var(--color-neutral-400);
 }
 
+/* Mesma FORMA do `t-meta`, sem opinar sobre cor.
+   Existe porque `t-meta` embute `color: neutral-400`, e por isso os rótulos
+   com cor intencional (dourado de destaque, verde de sucesso) ficaram presos
+   no peso 900: adotar `t-meta` apagaria a cor. Tipografia e cor são decisões
+   separadas — esta utility trata só da primeira, e a segunda continua na
+   classe de cor que o componente já traz. */
+@utility t-meta-inherit {
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @theme {
   --animate-fade-in: fadeIn 0.5s ease-out;
   --animate-slide-up: slideUp 0.3s ease-out;
@@ -543,6 +555,24 @@ body {
 .text-title-md   { font-size: clamp(1rem, 2.5vw, 1.25rem); line-height: 1.2; }
 .text-title-sm   { font-size: clamp(0.8125rem, 2vw, 0.9375rem); line-height: 1.3; }
 .text-body-lg    { font-size: clamp(0.875rem, 2vw, 1rem); line-height: 1.5; }
+
+/* ── Escala de raio — o que o app FAZ, medido em 12/08/2026 ──────────
+   A regra antiga dizia "card = rounded-2xl". A prática é outra: xl 1400 usos,
+   lg 489, 2xl 447, full 447, 3xl 52. O xl domina com o triplo do 2xl.
+
+   Reescrever 1400 usos para casar com a regra seria refazer a cara do app sem
+   um par de olhos conferindo. Então a regra passa a descrever a prática, que é
+   coerente por si — o raio cresce com a superfície:
+
+     sm/lg  → detalhe interno (tag, divisor, item de lista)
+     xl     → PADRÃO: input, botão, chip, célula de série
+     2xl    → card
+     3xl    → modal, sheet, painel que sobe
+     full   → pílula, avatar, badge redondo
+
+   Raio arbitrário (`rounded-[15px]`) não entra: 12 deles viraram o degrau mais
+   próximo. Ficou só o `[2rem]` do hero do login, que é curva de arte, não de
+   sistema. ── */
 
 /* ── #17 Dark Mode Depth Tokens — layered backgrounds ─────────── */
 /* Use these for visual depth hierarchy between card layers          */

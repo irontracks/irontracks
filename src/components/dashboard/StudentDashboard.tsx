@@ -511,7 +511,7 @@ export default function StudentDashboard(props: Props) {
               >
                 {/* Inner card */}
                 <span
-                  className="relative z-10 flex items-center gap-4 rounded-[15px] px-5 py-4"
+                  className="relative z-10 flex items-center gap-4 rounded-2xl px-5 py-4"
                   style={{
                     background: 'linear-gradient(160deg, rgba(20,16,8,0.95) 0%, rgba(30,24,12,0.92) 50%, rgba(20,16,8,0.95) 100%)',
                   }}

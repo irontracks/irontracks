@@ -34,7 +34,7 @@ function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: s
       <div className="w-7 h-7 rounded-lg bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center">
         <Icon size={13} className="text-yellow-400" />
       </div>
-      <h3 className="text-xs font-black uppercase tracking-widest text-yellow-400">{title}</h3>
+      <h3 className="t-meta-inherit text-xs text-yellow-400">{title}</h3>
     </div>
   )
 }

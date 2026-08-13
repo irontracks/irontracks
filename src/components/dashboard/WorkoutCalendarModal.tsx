@@ -162,7 +162,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
       <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="cal-modal-title" className="w-full max-w-3xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Calendário</div>
+            <div className="t-meta-inherit text-xs text-yellow-500">Calendário</div>
             <div id="cal-modal-title" className="text-white font-black text-lg truncate">Treinos realizados</div>
             <div className="text-xs text-neutral-400">Clique em um dia para ver os treinos.</div>
           </div>

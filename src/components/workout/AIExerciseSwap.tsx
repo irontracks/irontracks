@@ -104,7 +104,7 @@ export default function AIExerciseSwap({
     >
       <div
         role="none"
-        style={{ width: '100%', maxWidth: '28rem', maxHeight: '80vh', background: '#171717', border: '1px solid #262626', borderRadius: '1rem 1rem 0 0', overflow: 'hidden' }}
+        style={{ width: '100%', maxWidth: '28rem', maxHeight: '80vh', background: '#151514', border: '1px solid #262626', borderRadius: '1rem 1rem 0 0', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

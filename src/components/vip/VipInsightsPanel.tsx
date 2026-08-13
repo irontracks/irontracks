@@ -162,7 +162,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
 
   return (
     <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(245,158,11,0.08) 100%)' }}>
-      <div className="rounded-[15px] p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
+      <div className="rounded-2xl p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#fbbf24' }}>Insights</div>

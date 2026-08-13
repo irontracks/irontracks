@@ -103,7 +103,7 @@ export default function UserProfileModal({
               <div
                 className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: p?.photoUrl ? 'transparent' : 'linear-gradient(135deg, #1a1a1a, #0a0a0a)',
+                  background: p?.photoUrl ? 'transparent' : 'linear-gradient(135deg, #1a1a18, #0a0a0a)',
                   boxShadow: '0 0 0 2px rgba(234,179,8,0.3), 0 8px 24px rgba(0,0,0,0.5)',
                 }}
               >
@@ -150,7 +150,7 @@ export default function UserProfileModal({
             {/* Recent PRs */}
             {data.recentPRs.length > 0 && (
               <div>
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2 flex items-center gap-1.5">
+                <div className="t-meta-inherit text-xs text-yellow-500 mb-2 flex items-center gap-1.5">
                   <Trophy size={12} />
                   PRs Recentes
                 </div>

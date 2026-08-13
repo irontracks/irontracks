@@ -186,7 +186,7 @@ export const ReportAiSection = ({
 
                             <div className="mt-4">
                                 {aiState?.cached ? (
-                                    <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-yellow-400">
+                                    <div className="inline-flex items-center gap-2 t-meta-inherit text-xs text-yellow-400">
                                         <Check size={14} /> Salvo no histórico
                                     </div>
                                 ) : (
@@ -245,7 +245,7 @@ export const ReportAiSection = ({
                                 <div className="flex items-center gap-2 mb-3">
                                     <span className="text-base">🩹</span>
                                     <div>
-                                        <div className="text-xs font-black uppercase tracking-widest text-red-400">Dor &amp; Recuperação</div>
+                                        <div className="t-meta-inherit text-xs text-red-400">Dor &amp; Recuperação</div>
                                         <div className="text-[11px] text-red-300/70">Sugestões da IA com base nas observações de dor reportadas</div>
                                     </div>
                                 </div>

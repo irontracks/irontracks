@@ -309,7 +309,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         const reason = String(ai?.rating_reason || ai?.ratingReason || ai?.reason || '').trim();
         return (
             <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-4">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Avaliação da IA</div>
+                <div className="t-meta-inherit text-xs text-yellow-500 mb-2">Avaliação da IA</div>
                 <div className="flex items-center gap-3">
                     <div className="flex items-center text-[20px] leading-none tracking-[0.25em] text-yellow-400">
                         {Array.from({ length: 5 }).map((_, i) => (

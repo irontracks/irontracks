@@ -327,7 +327,7 @@ export default function HeaderActionsMenu({
             className="w-[min(18rem,calc(100vw-2rem))] rounded-2xl overflow-hidden animate-dropdown-in"
             style={{
               ...dropdownStyle,
-              background: 'linear-gradient(160deg, #161200 0%, #0c0c0c 25%)',
+              background: 'linear-gradient(160deg, #161200 0%, #0a0a0a 25%)',
               boxShadow:
                 '0 32px 64px -12px rgba(0,0,0,0.95), 0 0 0 1px rgba(234,179,8,0.18), inset 0 1px 0 rgba(234,179,8,0.22)',
             }}

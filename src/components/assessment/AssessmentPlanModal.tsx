@@ -87,7 +87,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
         <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+              <div className="t-meta-inherit text-xs text-yellow-500">Resumo Tático</div>
               {badge ? (
                 <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
                   {badge.text}
@@ -116,7 +116,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
                     if (!items) return null
                     return (
                       <div key={key}>
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">{label}</div>
+                        <div className="t-meta-inherit text-xs text-yellow-500 mb-1">{label}</div>
                         <ul className={`text-sm ${textClass} space-y-1 list-disc list-inside`}>
                           {items}
                         </ul>

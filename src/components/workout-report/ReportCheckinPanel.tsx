@@ -22,7 +22,7 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pré</div>
+                    <div className="t-meta-inherit text-xs text-yellow-500">Pré</div>
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Energia</div>
@@ -56,7 +56,7 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                 </div>
 
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pós</div>
+                    <div className="t-meta-inherit text-xs text-yellow-500">Pós</div>
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">RPE</div>
@@ -83,7 +83,7 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
             </div>
             {recommendations.length ? (
                 <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-300">Recomendações</div>
+                    <div className="t-meta-inherit text-xs text-neutral-300">Recomendações</div>
                     <div className="mt-2 space-y-1 text-sm text-neutral-200">
                         {recommendations.map((r) => (
                             <div key={r}>{r}</div>

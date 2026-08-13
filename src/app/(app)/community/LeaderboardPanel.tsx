@@ -173,7 +173,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
                 <div
                   className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: entry.photoUrl ? 'transparent' : 'linear-gradient(135deg, #1a1a1a, #0a0a0a)',
+                    background: entry.photoUrl ? 'transparent' : 'linear-gradient(135deg, #1a1a18, #0a0a0a)',
                     boxShadow: entry.isMe ? '0 0 0 1.5px rgba(234,179,8,0.4)' : '0 0 0 1px rgba(255,255,255,0.06)',
                   }}
                 >
