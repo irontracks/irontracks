@@ -130,6 +130,7 @@ export const DashboardTab: React.FC = () => {
     }, [isAdmin, isTeacher]);
 
     const emRisco = Array.isArray(prioritiesItems) ? prioritiesItems.length : 0;
+    const semProfessor = Math.max(0, dashboardCharts.totalStudents - usersList.filter(u => !!u?.teacher_id).length);
 
     // ⚠️ "Alunos sem professor" NÃO entra aqui, e a medição é o motivo: 26 dos
     // 55 alunos (47%) não têm professor, e 7 estão assim há mais de 90 dias —
@@ -287,6 +288,15 @@ export const DashboardTab: React.FC = () => {
                     <div className="text-2xl font-black text-white ml-1 group-hover:text-yellow-400 transition-colors">
                         {dashboardCharts.totalStudents}
                     </div>
+                    {/* Quantos treinam sem coach — 47% da base hoje. Vive AQUI,
+                        colado ao total que ele divide, e não no bloco de
+                        pendências: é característica da base, não tarefa. Como
+                        alerta ficaria aceso para sempre (ver #795). */}
+                    {isAdmin && semProfessor > 0 && (
+                        <p className="text-[11px] text-neutral-400 ml-1 mt-1">
+                            {semProfessor} sem professor
+                        </p>
+                    )}
                 </button>
 
                 {isAdmin && (
