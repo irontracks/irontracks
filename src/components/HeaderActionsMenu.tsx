@@ -78,6 +78,19 @@ function IconBox({ children, gold = false }: { children: React.ReactNode; gold?:
 const NOVO_BADGE =
   'text-[10px] font-bold bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 rounded-full px-2 py-0.5 leading-none'
 
+/**
+ * Item do menu.
+ *
+ * ⚠️ `gold` significa UMA coisa: **há algo vivo aqui agora** (não lido, pendente).
+ * Ele não marca categoria nem convida para nada. Até 12/08/2026 marcava as três
+ * coisas ao mesmo tempo — 5 itens dourados, 4 deles fixos (professor, painel,
+ * agenda, cobranças) e um convite ("Ver tour") — e o único dourado que carregava
+ * informação perecível, o de mensagem não lida, ficava indistinguível do resto.
+ * Quando um sinal significa três coisas, não significa nenhuma.
+ *
+ * Pertencimento a "área de coach" é comunicado pelo AGRUPAMENTO (os divisores já
+ * separam o bloco), que faz o trabalho sem gastar o pigmento da ação primária.
+ */
 function MenuItem({
   icon,
   label,
@@ -381,35 +394,31 @@ export default function HeaderActionsMenu({
                   {/* Área do professor: pra TODO coach (teacher e admin). O admin ainda
                       tem o "Painel de Controle" (painel completo) logo abaixo. */}
                   <MenuItem
-                    icon={<LayoutDashboard size={14} className="text-yellow-400" />}
+                    icon={<LayoutDashboard size={14} className="text-neutral-400" />}
                     label="Área do professor"
-                    gold
                     data-tour="menu-coach-tools"
                     onClick={() => { onOpenTeacherArea?.(); close() }}
                   />
                   {user?.role === 'admin' && (
                     <MenuItem
-                      icon={<Command size={14} className="text-yellow-400" />}
+                      icon={<Command size={14} className="text-neutral-400" />}
                       label="Painel de Controle"
-                      gold
                       onClick={() => { onOpenAdmin?.(); close() }}
                     />
                   )}
                   <MenuItem
-                    icon={<Calendar size={14} className="text-yellow-400" />}
+                    icon={<Calendar size={14} className="text-neutral-400" />}
                     label="Agenda"
-                    gold
                     onClick={() => { onOpenSchedule?.(); close() }}
                   />
                   {!hideVipCtas && (
                     <MenuItem
-                      icon={<CreditCard size={14} className="text-yellow-400" />}
+                      icon={<CreditCard size={14} className="text-neutral-400" />}
                       // Matches the "COBRANÇAS" tab label inside the Admin
                       // Panel. The previous "Carteira" label created a
                       // same-destination-different-name inconsistency that
                       // surfaced during the UI audit.
                       label="Cobranças"
-                      gold
                       onClick={() => { onOpenWallet?.(); close() }}
                     />
                   )}
@@ -455,9 +464,8 @@ export default function HeaderActionsMenu({
               />
 
               <MenuItem
-                icon={<Sparkles size={14} className="text-yellow-400" />}
+                icon={<Sparkles size={14} className="text-neutral-400" />}
                 label="Ver tour"
-                gold
                 data-tour="menu-tour"
                 onClick={() => { onOpenTour?.(); close() }}
               />
