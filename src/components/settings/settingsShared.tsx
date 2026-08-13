@@ -27,6 +27,25 @@ export const ToggleSwitch = ({ checked, onChange, disabled, label }: { checked: 
     </button>
 )
 
+/**
+ * Cabeçalho de seção das Configurações.
+ *
+ * ⚠️ A cor é UMA — o âmbar do sistema. Até 12/08/2026 cada uma das 11 seções
+ * escolhia a sua, e três roubavam sinal semântico: Privacidade em `#ef4444`
+ * (a cor de ERRO do app), Treino em `#10b981` (verde de sucesso, e nem o verde
+ * da paleta) e Ferramentas em `#f43f5e`, que não existe na paleta. Fora essas,
+ * sete das onze eram variações do mesmo âmbar — a codificação por cor nem
+ * codificava.
+ *
+ * E não codificaria: numa lista vertical vê-se uma seção por vez, sem
+ * comparação lado a lado, então matiz não distingue nada. Quem distingue é o
+ * ÍCONE e o RÓTULO. Cor decorativa aqui só gasta os pigmentos que precisam
+ * significar erro e sucesso em outro lugar — o mesmo defeito que a paleta de
+ * macros já corrigiu.
+ *
+ * A prop `color` continua existindo para quem precisar de exceção deliberada,
+ * mas as Configurações não usam nenhuma.
+ */
 export const SectionHeader = ({ icon: Icon, label, color }: { icon: React.FC<{ size?: number; className?: string }>; label: string; color?: string }) => {
     const accent = color || '#f59e0b'
     return (
