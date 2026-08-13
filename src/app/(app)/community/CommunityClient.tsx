@@ -13,6 +13,7 @@ import type { FeedItem } from './FeedCard'
 import UserProfileModal from './UserProfileModal'
 import LeaderboardPanel from './LeaderboardPanel'
 import ChallengesPanel from './ChallengesPanel'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 
 type CommunityTab = 'feed' | 'follow' | 'ranking' | 'challenges'
 
@@ -472,13 +473,13 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                       <div className="flex-1 min-w-0">
                         <div className="t-meta-inherit text-xs text-green-400">Treinando Agora</div>
                         <div className="text-[11px] text-neutral-400 truncate">
-                          {trainingNowProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
+                          {trainingNowProfiles.slice(0, 3).map((p) => publicDisplayName(safeString(p.display_name)).split(' ')[0]).join(', ')}
                           {trainingNowIds.length > 3 && ` +${trainingNowIds.length - 3}`}
                         </div>
                       </div>
                       <div className="flex -space-x-2">
                         {trainingNowProfiles.slice(0, 4).map((p) => (
-                          <Avatar key={p.id} photo={p.photo_url} name={safeString(p.display_name)} size={28} />
+                          <Avatar key={p.id} photo={p.photo_url} name={publicDisplayName(safeString(p.display_name))} size={28} />
                         ))}
                       </div>
                     </div>

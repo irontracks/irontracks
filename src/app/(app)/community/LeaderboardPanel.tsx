@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Trophy, Dumbbell, Flame, Loader2, RotateCw } from 'lucide-react'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 
 type RankingCategory = 'workouts' | 'volume' | 'streak'
 
@@ -187,7 +188,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
                 {/* Name */}
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-black truncate ${entry.isMe ? 'text-yellow-500' : 'text-white'}`}>
-                    {entry.displayName}
+                    {publicDisplayName(entry.displayName)}
                     {entry.isMe && <span className="text-[10px] text-yellow-600 ml-1.5">(você)</span>}
                   </div>
                 </div>

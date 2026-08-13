@@ -261,7 +261,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                 <div className="relative flex-shrink-0">
                                     <div className="w-11 h-11 rounded-full overflow-hidden" style={{ boxShadow: '0 0 0 1.5px rgba(234,179,8,0.25)' }}>
                                         {u.photo_url ? (
-                                            <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={u.display_name || 'Usuário'} loading="lazy" />
+                                            <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={publicDisplayName(u.display_name)} loading="lazy" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(30,30,30,0.99)', color: 'rgba(234,179,8,0.8)' }}>{publicDisplayName(u.display_name)[0]?.toUpperCase() || '?'}</div>
                                         )}
@@ -289,7 +289,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                 <div className="relative flex-shrink-0">
                                     <div className="w-11 h-11 rounded-full overflow-hidden" style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.08)' }}>
                                         {u.photo_url ? (
-                                            <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={u.display_name || 'Usuário'} loading="lazy" />
+                                            <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={publicDisplayName(u.display_name)} loading="lazy" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(24,24,24,0.99)', color: 'rgba(120,120,120,0.8)' }}>{publicDisplayName(u.display_name)[0]?.toUpperCase() || '?'}</div>
                                         )}
