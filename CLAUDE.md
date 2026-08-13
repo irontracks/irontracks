@@ -511,6 +511,45 @@ Custaram meia hora cada e vão custar de novo se a nota não disser:
   é margem estilística, não requisito. **A régua certa é o fundo MAIS CLARO**
   (depth-3), não o `#0a0a0a`.
 
+## A paleta REAL do app (medida em 13/08/2026, não a documentada)
+
+Contagem por família em `src/`, para acabar com a discussão sobre o que "está
+na paleta":
+
+| família | usos | papel de facto |
+|---|---|---|
+| neutral | 5628 | texto e superfície — a base |
+| yellow | 2507 | **a marca**: ação primária, destaque |
+| red | 786 | erro, destrutivo **e curtida** (coração — convenção universal, 8 usos de `text-red-400`) |
+| amber | 399 | irmã do yellow, usada de forma intercambiável |
+| green | 317 | sucesso |
+| emerald | 230 | **segundo verde, em 55 arquivos** |
+| orange | 94 | alerta intermediário, macro gordura |
+| violet | 25 | a cor da MÁQUINA (ver seção própria) |
+| blue/sky/rose/teal/lime | < 15 cada | pontuais |
+
+**`emerald` não estava na paleta documentada e tem 230 usos.** Não é deriva de
+um componente: é família estabelecida. Antes de "corrigir" emerald para green
+em algum lugar, saiba que criaria inconsistência com os outros 54 arquivos — a
+nota é que estava desatualizada, não o código.
+
+**O vermelho tem DOIS papéis legítimos**: erro/destrutivo e coração de curtida.
+O segundo é convenção universal e o app já o segue. Não confundir com vermelho
+decorativo, que é o que a tela de Configurações fazia e foi corrigido.
+
+### Central de Notificações: 23 tipos, 7 famílias, zero critério
+
+Diagnóstico de 13/08/2026, **não corrigido — exige decisão de taxonomia**:
+`emerald` cobre Meta/Online/Marco/Refeição e `green` cobre Treino/Aceito/Aceito.
+São cores distinguíveis (Δ=69), mas a distinção não codifica nada: não há regra
+que explique por que "Meta" é de um verde e "Treino" de outro. É ruído com
+aparência de sistema — pior que cores iguais, porque promete significado.
+
+Ninguém memoriza 7 códigos de cor numa lista aberta uma vez por dia, e o
+**rótulo textual já está no card** (PR, Streak, Meta, Treino…) fazendo o
+trabalho. Se for mexer, agrupe por FUNÇÃO (conquista · atividade · social ·
+aviso · neutro), não por tipo de evento.
+
 ## Paleta: a cor quase-gêmea é a que corrói em silêncio (12/08/2026)
 
 Medido no produto (fora landing/marketing): **618 hex escritos à mão em 86 tons**
