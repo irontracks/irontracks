@@ -484,7 +484,7 @@ export default function SchedulePage() {
               type="button"
               onClick={() => shiftWeek(-1)}
               aria-label="Semana anterior"
-              className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
+              className="tap-44 w-9 h-9 -ml-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
             >
               <ChevronLeft size={18} />
             </button>
@@ -495,7 +495,7 @@ export default function SchedulePage() {
               type="button"
               onClick={() => shiftWeek(1)}
               aria-label="Próxima semana"
-              className="w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
+              className="tap-44 w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-neutral-400 hover:text-white active:scale-95 transition"
             >
               <ChevronRight size={18} />
             </button>
@@ -613,7 +613,7 @@ export default function SchedulePage() {
                         type="button"
                         onClick={() => handleEditAppointment(item)}
                         aria-label={`Editar ${item.title}`}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
+                        className="tap-44 w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
                       >
                         <Pencil size={15} />
                       </button>
@@ -621,7 +621,7 @@ export default function SchedulePage() {
                         type="button"
                         onClick={() => setDeleteTarget(item)}
                         aria-label={`Excluir ${item.title}`}
-                        className="w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition"
+                        className="tap-44 w-9 h-9 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -670,7 +670,7 @@ export default function SchedulePage() {
                   type="button"
                   onClick={handleCloseModal}
                   aria-label="Fechar"
-                  className="w-9 h-9 shrink-0 -mr-1 flex items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
+                  className="tap-44 w-9 h-9 shrink-0 -mr-1 flex items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
                 >
                   <X size={18} />
                 </button>

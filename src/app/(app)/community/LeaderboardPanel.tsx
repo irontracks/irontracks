@@ -127,7 +127,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
             type="button"
             onClick={() => load()}
             aria-label="Tentar atualizar novamente"
-            className="flex-shrink-0 flex items-center justify-center w-9 h-9 -my-2 -mr-1 rounded-lg text-yellow-500 transition-colors"
+            className="flex-shrink-0 flex items-center justify-center tap-44 w-9 h-9 -my-2 -mr-1 rounded-lg text-yellow-500 transition-colors"
           >
             <RotateCw size={14} />
           </button>

@@ -224,7 +224,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <h3 className="font-bold text-white">Completar Perfil</h3>
-                            <button type="button" onClick={() => setShowCompleteProfile(false)} className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setShowCompleteProfile(false)} className="tap-44 w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Nome de Exibição</label>
                         <input value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500" />
@@ -446,7 +446,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 flex justify-between items-center border-b border-neutral-800">
                             <h3 className="font-bold text-white">Notificações</h3>
-                            <button type="button" onClick={() => setShowNotifCenter(false)} className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
+                            <button type="button" onClick={() => setShowNotifCenter(false)} className="tap-44 w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <div className="p-4 relative">
                             <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
