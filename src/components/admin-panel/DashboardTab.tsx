@@ -66,10 +66,19 @@ export const DashboardTab: React.FC = () => {
     } = useAdminPanel();
 
     const planState = useTeacherPlan();
+
+    const qtdPendentes = usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length;
+    const temPendentes = qtdPendentes > 0;
     const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-    // Saudação contextual — primeiro nome se disponível, fallback genérico.
-    const firstName = String(user?.name ?? user?.email ?? '').split(/[ @]/)[0] || '';
+    // Saudação contextual — o MESMO nome que o cabeçalho da Área do Professor
+    // mostra dois centímetros acima (`displayName`). Antes começava por
+    // `user.name`, que costuma vir vazio, e caía no e-mail: a tela dizia
+    // "DJ MK Brasil" no topo e "Bom dia, djmkbrasil" logo abaixo. Handle
+    // técnico não é como alguém se chama.
+    const firstName = String(
+        user?.displayName ?? user?.name ?? user?.email ?? '',
+    ).split(/[ @]/)[0] || '';
     const greeting = greetingForNowBrt();
 
     // CTA dinâmico de solicitações pendentes. Busca quando admin abre o
@@ -94,12 +103,32 @@ export const DashboardTab: React.FC = () => {
     const chartOptions = {
         responsive: true,
         plugins: {
-            legend: { position: 'bottom' as const, labels: { color: '#e5e5e5', font: { size: 11, weight: 'bold' as const } } },
+            // Legenda DESLIGADA de propósito. Os dois gráficos que usam estas
+            // opções têm UM dataset ("Alunos") com um array de cores — uma cor
+            // por barra. O Chart.js desenha a legenda com a PRIMEIRA cor do
+            // array, então ela afirmava "verde = Alunos" enquanto o verde
+            // significa "Pago" e as outras barras eram amarela, vermelha e
+            // cinza. Legenda que descreve errado é pior que legenda nenhuma.
+            //
+            // O que a cor codifica já está rotulado no eixo X, abaixo de cada
+            // barra. Se um dia estes gráficos ganharem uma SEGUNDA série, aí a
+            // legenda volta a ter função — e a ligar de novo.
+            legend: { display: false },
             title: { display: false }
         },
         scales: {
             x: { ticks: { color: '#a3a3a3', font: { size: 10, weight: 'bold' as const } }, grid: { color: '#262626' } },
-            y: { ticks: { color: '#a3a3a3', font: { size: 10, weight: 'bold' as const } }, grid: { color: '#262626' } }
+            // `beginAtZero` NÃO é preferência: numa barra, o comprimento É o
+            // dado. Sem isto o Chart.js escolhia a escala pelo intervalo dos
+            // valores e o eixo começava em 10 — com 23 e 26 alunos, uma barra
+            // aparecia mais do que o dobro da outra. Truncar a base de um
+            // gráfico de barra distorce a leitura, e num painel de decisão
+            // isso é pior que não ter gráfico.
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#a3a3a3', font: { size: 10, weight: 'bold' as const }, precision: 0 },
+                grid: { color: '#262626' },
+            }
         }
     };
 
@@ -222,14 +251,18 @@ export const DashboardTab: React.FC = () => {
                     className="rounded-2xl p-4 text-left transition-all duration-200 hover:bg-white/[0.04] active:scale-95 cursor-pointer group"
                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
                 >
+                    {/* O vermelho acende com a PENDÊNCIA, não com a categoria.
+                        Com zero pendentes — que é a boa notícia — o card ficava
+                        vermelho do mesmo jeito, e o alerta perdia o sentido:
+                        cor de alarme que está sempre ligada não alarma ninguém. */}
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors">
-                            <UserX size={18} className="text-red-500" />
+                        <div className={`p-2 rounded-lg transition-colors ${temPendentes ? 'bg-red-500/10 group-hover:bg-red-500/20' : 'bg-white/5'}`}>
+                            <UserX size={18} className={temPendentes ? 'text-red-500' : 'text-neutral-400'} />
                         </div>
-                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-red-400 transition-colors">Pendentes</span>
+                        <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${temPendentes ? 'text-neutral-400 group-hover:text-red-400' : 'text-neutral-400'}`}>Pendentes</span>
                     </div>
-                    <div className="text-2xl font-black text-white ml-1 group-hover:text-red-400 transition-colors">
-                        {usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length}
+                    <div className={`text-2xl font-black ml-1 transition-colors ${temPendentes ? 'text-red-400' : 'text-white'}`}>
+                        {qtdPendentes}
                     </div>
                 </button>
             </div>
