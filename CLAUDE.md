@@ -511,6 +511,59 @@ Custaram meia hora cada e vão custar de novo se a nota não disser:
   é margem estilística, não requisito. **A régua certa é o fundo MAIS CLARO**
   (depth-3), não o `#0a0a0a`.
 
+## Varredura do MENU — 9 PRs, 13/08/2026 (etapa FECHADA)
+
+Auditadas as nove telas do menu do avatar. O que ficou de lição vale mais que
+as correções: **em seis das nove, o defeito não era feiúra — era um sinal que
+tinha parado de significar.**
+
+| tela | o que estava errado | PR |
+|---|---|---|
+| Menu | dourado dizia categoria + estado + convite ao mesmo tempo | #783 |
+| Configurações | 11 seções, 11 cores; Privacidade em `#ef4444` (a cor de ERRO) | #784 |
+| Histórico | pílulas e botões abaixo de 44pt | #785 |
+| Notificações | 23 tipos em 7 famílias sem critério — **diagnosticado, não corrigido** | #786 |
+| Conversas | "Toque para conversar" repetido em toda linha; e-mail alheio como título | #787, #791 |
+| Agenda | nada — é a melhor tela do app | #788 |
+| Ver tour | dots de 6px que prometiam navegação | #789 |
+| Área do professor · Painel | saudação com handle, alarme aceso com zero, gráfico truncado | #790 |
+| Cobranças | **não existe no iOS** (`hideVipCtas = isIosNative()`, política da Apple) | — |
+
+### As três regras que saíram daqui
+
+1. **Cor semântica não marca categoria.** Aconteceu três vezes em telas
+   diferentes: dourado (menu), vermelho (Configurações), vermelho de novo
+   (Pendentes com zero). Categoria se comunica por AGRUPAMENTO e RÓTULO — que
+   já existiam nos três casos. Gastar o pigmento do alarme em decoração deixa o
+   app sem como alarmar.
+2. **Alvo pequeno demais nem sempre se resolve ampliando.** Os dots do tour
+   tinham 12px entre centros: dar-lhes 44pt criaria 32px de sobreposição, e o
+   toque acionaria o passo errado. Quando não há espaço, a saída é deixar de
+   prometer interação (`aria-hidden` + navegação em quem tem tamanho).
+3. **Guard nasce cobrindo o caso que o motivou.** O de alvo de toque teve TRÊS
+   buracos: só via `w-N h-N` casados (155 escaparam por altura), só varria
+   `src/components` (mais 15 em `src/app`), e nunca viu `style` inline (os dots).
+   Ao escrever guard, a pergunta não é "pega o meu caso?" — é **"onde ele NÃO
+   olha?"**.
+
+### Decisões que ficaram com o dono (não são falta de tempo)
+
+- Taxonomia das 23 notificações: agrupar por FUNÇÃO (conquista · atividade ·
+  social · aviso · neutro) em vez de por evento.
+- Conversas mostra CONTATOS, não conversas: falta prévia da última mensagem,
+  horário e não-lidas. Exige dados que a tela não busca.
+- Área do Professor e Painel de Controle mostram quase a mesma tela (dividem o
+  `DashboardTab`) — dois destinos de menu para conteúdo sobreposto.
+
+### Verificado no aparelho (13/08, pós-deploy)
+
+Menu com só Notificações dourado · "Bom dia, DJ" (era "djmkbrasil") · Pendentes
+com ícone neutro em zero · Conversas com "Visto há 1h/2h/3h…" por linha ·
+Histórico **idêntico** ao de antes, provando que os alvos de 44pt entraram sem
+mover pixel. A auditoria do Painel usou `role=admin` TEMPORÁRIO na conta de
+teste (`djmkbrasil`), revertido para `teacher` na mesma sessão e conferido na
+fonte.
+
 ## A paleta REAL do app (medida em 13/08/2026, não a documentada)
 
 Contagem por família em `src/`, para acabar com a discussão sobre o que "está

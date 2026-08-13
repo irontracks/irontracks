@@ -10,6 +10,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 
 interface ChatUser {
     id: string;
@@ -262,13 +263,13 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                         {u.photo_url ? (
                                             <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={u.display_name || 'Usuário'} loading="lazy" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(30,30,30,0.99)', color: 'rgba(234,179,8,0.8)' }}>{u.display_name?.[0]?.toUpperCase() || '?'}</div>
+                                            <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(30,30,30,0.99)', color: 'rgba(234,179,8,0.8)' }}>{publicDisplayName(u.display_name)[0]?.toUpperCase() || '?'}</div>
                                         )}
                                     </div>
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-green-500" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-white text-sm truncate">{u.display_name}</h4>
+                                    <h4 className="font-bold text-white text-sm truncate">{publicDisplayName(u.display_name)}</h4>
                                     {/* Segunda linha carrega o FATO (presença), não uma instrução.
                                         "Toque para conversar" era idêntico em todas as linhas: em
                                         uma lista de 20 contatos, 20 repetições que não informam
@@ -290,13 +291,13 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                         {u.photo_url ? (
                                             <Image src={u.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={u.display_name || 'Usuário'} loading="lazy" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(24,24,24,0.99)', color: 'rgba(120,120,120,0.8)' }}>{u.display_name?.[0]?.toUpperCase() || '?'}</div>
+                                            <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(24,24,24,0.99)', color: 'rgba(120,120,120,0.8)' }}>{publicDisplayName(u.display_name)[0]?.toUpperCase() || '?'}</div>
                                         )}
                                     </div>
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-neutral-600" style={{ borderColor: '#0a0a0a' }} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-neutral-300 text-sm truncate">{u.display_name}</h4>
+                                    <h4 className="font-bold text-neutral-300 text-sm truncate">{publicDisplayName(u.display_name)}</h4>
                                     <p className="text-xs text-neutral-400 truncate">{presencaLabel(u.last_seen ?? null)}</p>
                                 </div>
                                 <MessageSquare size={16} className="text-neutral-600 flex-shrink-0" />
