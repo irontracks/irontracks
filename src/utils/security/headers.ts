@@ -24,7 +24,12 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
     `font-src 'self' https://fonts.gstatic.com data:`,
     `img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co https://*.supabase.in https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org`,
     `media-src 'self' blob: https://*.supabase.co https://*.supabase.in https://res.cloudinary.com`,
-    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com https://api.cloudinary.com https://itunes.apple.com`,
+    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com https://*.basemaps.cartocdn.com https://tile.openstreetmap.org https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://vitals.vercel-insights.com https://api.cloudinary.com https://itunes.apple.com https://res.cloudinary.com`,
+    // `res.cloudinary.com` entrou em 14/08/2026 pela SEGUNDA janela de
+    // relatorios (4 eventos em 13/08): o preloader do StoryViewer faz fetch
+    // com `Range: bytes=0-0` para aquecer as proximas midias, e story em
+    // Cloudinary cai no connect-src (img/media ja liberavam a EXIBICAO; o
+    // PRELOAD e uma conexao). Guard: __tests__/cspConnectSrc.test.ts
     // `api.cloudinary.com` e `itunes.apple.com` entraram em 12/08/2026 pelos
     // RELATÓRIOS, não por leitura de código: foram as duas unicas violacoes da
     // primeira janela em Report-Only (16 eventos, 24 h). A primeira e o

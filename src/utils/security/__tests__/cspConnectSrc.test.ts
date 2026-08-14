@@ -38,6 +38,13 @@ describe('origens confirmadas pelos relatórios', () => {
     expect(CONNECT).toContain('https://itunes.apple.com')
   })
 
+  it('a entrega do Cloudinary está liberada (preload de stories)', () => {
+    // 2ª janela (14/08/2026): o preloader do StoryViewer conecta em
+    // res.cloudinary.com para aquecer as próximas mídias — img/media já
+    // liberavam a EXIBIÇÃO, mas preload é conexão.
+    expect(CONNECT).toContain('https://res.cloudinary.com')
+  })
+
   it('quem chama essas origens ainda existe no código', () => {
     // Allowlist não pode sobreviver ao consumidor: origem liberada sem chamador
     // é permissão de graça. Se um destes sumir, a entrada sai do header.
@@ -46,6 +53,9 @@ describe('origens confirmadas pelos relatórios', () => {
       .toContain('itunes.apple.com')
     expect(readFileSync(join(SRC, 'app/layout.tsx'), 'utf8'))
       .toContain('api.cloudinary.com')
+    // res.cloudinary.com: o chamador é o preload do StoryViewer.
+    expect(readFileSync(join(SRC, 'components/stories/StoryViewer.tsx'), 'utf8'))
+      .toMatch(/Range: 'bytes=0-0'/)
   })
 })
 
