@@ -27,10 +27,13 @@ npm --version
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 npm ci --no-audit --no-fund
 
-# O archive roda com -disableAutomaticPackageResolution e confere o
-# Package.resolved por originHash — que VARIA entre toolchains. O resolved
-# commitado (gerado na máquina local) reprovou no runner mesmo em dia
-# (run #1729, lido via ASC API). Regenerar AQUI, com o toolchain do
-# runner, faz o hash bater por construção. Package.swift pina versões
-# exatas, então o resultado é determinístico.
+# O runner liga GLOBALMENTE o "only use versions from resolved file" — até o
+# próprio `xcodebuild -resolvePackageDependencies` recusa lockfile cujo
+# originHash não bate (run #1730: exit 74 DENTRO deste script; runs
+# #1728/#1729 idem no archive). E o originHash varia entre toolchains
+# (local: Xcode 26.5), então lockfile commitado nunca satisfaz o runner.
+# Destravamento documentado: desligar as defaults e deixar o archive
+# resolver — determinístico, o Package.swift pina versões exatas.
+defaults write com.apple.dt.Xcode IDEPackageOnlyUseVersionsFromResolvedFile -bool NO
+defaults write com.apple.dt.Xcode IDEDisableAutomaticPackageResolution -bool NO
 xcodebuild -project ios/App/App.xcodeproj -scheme App -resolvePackageDependencies
