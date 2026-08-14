@@ -253,6 +253,11 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .select('id, plan_id, status, current_period_end')
     .eq('user_id', userId)
     .in('status', ['active', 'past_due', 'trialing'])
+    // Linha sem plano NÃO é VIP: a assinatura recorrente de PROFESSOR mora
+    // nesta tabela com plan_id NULL (tier em metadata.tier_key — migration
+    // 20260814150500). Sem este filtro, a linha de professor mais recente
+    // "roubaria" o limit(1) e derrubaria para free um VIP legado válido.
+    .not('plan_id', 'is', null)
     .or(`current_period_end.is.null,current_period_end.gte.${nowIso}`)
     .order('created_at', { ascending: false })
     .limit(1)

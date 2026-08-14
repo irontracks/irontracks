@@ -22,7 +22,7 @@ function makeSupabase(data: {
 }) {
   const from = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {}
-    for (const m of ['select', 'eq', 'in', 'lte', 'or', 'order', 'limit']) chain[m] = vi.fn(() => chain)
+    for (const m of ['select', 'eq', 'in', 'lte', 'or', 'not', 'order', 'limit']) chain[m] = vi.fn(() => chain)
     chain.single = vi.fn(async () => (table === 'profiles'
       ? { data: data.role !== undefined ? { role: data.role } : null }
       : { data: null }))

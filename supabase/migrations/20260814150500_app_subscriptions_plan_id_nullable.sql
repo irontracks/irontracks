@@ -1,0 +1,15 @@
+-- C1 (auditoria de cobranças 2026-08-14): a assinatura recorrente de PROFESSOR
+-- é persistida em app_subscriptions com o tier em metadata.tier_key — as chaves
+-- de teacher_tiers ('starter'/'pro'/'elite') não existem em app_plans, então a
+-- FK plan_id → app_plans(id) não pode ser satisfeita por elas. Com NOT NULL na
+-- coluna, o insert falhava com 23503, o supabase-js devolvia { error } sem
+-- lançar (o catch da rota nunca rodava) e a resposta saía ok:true com o link
+-- do Mercado Pago — o professor podia concluir o pagamento sem NENHUMA linha
+-- local para o webhook reconciliar. Produção tem ZERO assinaturas recorrentes
+-- de professor por causa disso.
+--
+-- plan_id vira NULLABLE. A FK permanece (linhas VIP continuam validadas contra
+-- app_plans); o resolvedor VIP (utils/vip/limits.ts) ignora linhas sem plano no
+-- fallback legado, então uma assinatura de professor nunca entra na resolução
+-- de VIP.
+alter table public.app_subscriptions alter column plan_id drop not null;
