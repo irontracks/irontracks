@@ -1077,7 +1077,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 {/* Professor: host GLOBAL do chat 1:1 com aluno — abre o ChatDirectScreen
                     sobre qualquer tela quando o detalhe do aluno dispara o evento. */}
                 {isCoach && <TeacherChatHost user={user as AdminUser} />}
-                    <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                    {/* `bg-depth-2` (#151514), não `neutral-900` (#171717) nem o `#0a0a0a` do body.
+
+                        Medido, porque a primeira tentativa (#0a0a0a, PR #798) deixou o app
+                        "todo preto" — os cards perderam o chão e passaram a flutuar:
+
+                          fundo      chão p/ card 3%   salto ao sair da aba
+                          #171717         1,075              1,104
+                          #151514         1,072              1,083   ← aqui
+                          #0a0a0a         1,051              1,000   (o que quebrou)
+
+                        Mantém o apoio que o card precisa (0,3% de diferença do que havia)
+                        e encurta o salto de luminância para as telas cheias. É token do
+                        design system, não valor avulso. Reverter: volte para
+                        `bg-neutral-900`. */}
+                    <div className="w-full bg-depth-2 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour
