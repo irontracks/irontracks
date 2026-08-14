@@ -1,10 +1,28 @@
+/**
+ * POST /api/marketplace/webhooks/asaas
+ *
+ * Auditoria de cobranças 14/08/2026 (C2/C3):
+ *  - O header oficial do Asaas é `asaas-access-token` (o authToken configurado
+ *    no painel/API deles chega NELE). O handler aceitava só `x-webhook-secret`,
+ *    um nome que o Asaas nunca envia — com o canal configurado, TODO evento
+ *    legítimo levaria 401. O header legado continua aceito por compat.
+ *  - O upsert de entitlement usava onConflict 'provider,provider_subscription_id',
+ *    que NÃO tem índice único correspondente (o índice real é
+ *    user_id,provider,provider_subscription_id) → PostgreSQL 42P10 em toda
+ *    execução, erro engolido e evento marcado como processado.
+ *  - Agora TODA escrita de efeito confere { error }; falha grava
+ *    processing_error na linha do evento (processed_at fica NULL) e responde
+ *    500 — o Asaas pausa a fila e reenvia. Dedup virou ledger de verdade:
+ *    duplicata só é descartada se a entrega anterior CONCLUIU (processed_at);
+ *    senão reprocessa sobre a mesma linha.
+ */
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { cacheDelete } from '@/utils/cache'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logError } from '@/lib/logger'
 import { env } from '@/utils/env'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
@@ -55,7 +73,9 @@ export async function POST(req: Request) {
   }
 
   const secret = env.asaas.webhookSecret.trim()
-  const provided = (req.headers.get('x-webhook-secret') || '').trim()
+  // Header oficial do Asaas primeiro; o nome legado fica por compat com
+  // qualquer chamador interno antigo.
+  const provided = (req.headers.get('asaas-access-token') || req.headers.get('x-webhook-secret') || '').trim()
   if (!secret) {
     return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })
   }
@@ -86,6 +106,22 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient()
 
+  // Falha de efeito: grava processing_error na linha do evento (processed_at
+  // fica NULL — a reentrega REPROCESSA) e responde 500 para o Asaas reenviar.
+  const failEvent = async (eventRowId: string | null, scope: string, error: unknown) => {
+    logError(scope, error)
+    if (eventRowId) {
+      try {
+        await admin
+          .from('asaas_webhook_events')
+          .update({ processing_error: (error as { message?: string })?.message ?? String(error) })
+          .eq('id', eventRowId)
+      } catch { /* best-effort: o 500 abaixo já provoca a reentrega */ }
+    }
+    return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 })
+  }
+
+  let eventRowId: string | null = null
   try {
     const { data: inserted, error: insertErr } = await admin
       .from('asaas_webhook_events')
@@ -102,13 +138,29 @@ export async function POST(req: Request) {
       const code = (insertErr as unknown as { code?: string })?.code
       const msg = insertErr.message || ''
       if (code === '23505' || msg.toLowerCase().includes('duplicate')) {
-        return NextResponse.json({ ok: true, deduped: true })
+        // Duplicata só é descartável se a entrega anterior CONCLUIU. Se o
+        // processamento anterior morreu no meio (processed_at NULL), o retry
+        // do Asaas é a única chance de terminar o trabalho — reprocessa
+        // sobre a mesma linha em vez de responder deduped.
+        const { data: prior } = await admin
+          .from('asaas_webhook_events')
+          .select('id, processed_at')
+          .eq('asaas_event_id', eventId)
+          .maybeSingle()
+        if (!prior?.id || prior.processed_at) {
+          return NextResponse.json({ ok: true, deduped: true })
+        }
+        eventRowId = String(prior.id)
+      } else {
+        return NextResponse.json({ ok: false, error: msg }, { status: 400 })
       }
-      return NextResponse.json({ ok: false, error: msg }, { status: 400 })
+    } else {
+      eventRowId = inserted?.id ? String(inserted.id) : null
     }
 
     if (!paymentId) {
-      await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
+      const { error } = await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', eventRowId)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:mark-processed', error)
       return NextResponse.json({ ok: true, processed: false })
     }
 
@@ -123,112 +175,131 @@ export async function POST(req: Request) {
     if (payment?.paymentDate) updates.paid_at = payment.paymentDate
     if (payment?.confirmedDate && !updates.paid_at) updates.paid_at = payment.confirmedDate
 
-    const { data: payRow } = await admin
+    const { data: payRow, error: mpPayErr } = await admin
       .from('marketplace_payments')
       .update(updates)
       .eq('asaas_payment_id', paymentId)
       .select('id, subscription_id')
       .maybeSingle()
+    if (mpPayErr) return failEvent(eventRowId, 'asaas_webhook:marketplace-payment', mpPayErr)
 
-    const { data: appPayRow } = payRow
-      ? { data: null as Record<string, unknown> | null }
+    const { data: appPayRow, error: appPayErr } = payRow
+      ? { data: null as Record<string, unknown> | null, error: null }
       : await admin
         .from('app_payments')
         .update(updates)
         .eq('asaas_payment_id', paymentId)
         .select('id, subscription_id')
         .maybeSingle()
+    if (appPayErr) return failEvent(eventRowId, 'asaas_webhook:app-payment', appPayErr)
     if (!payRow?.id && !appPayRow?.id) {
-      await admin.from('app_payments').update(updates).eq('provider', 'asaas').eq('provider_payment_id', paymentId)
+      const { error } = await admin.from('app_payments').update(updates).eq('provider', 'asaas').eq('provider_payment_id', paymentId)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:app-payment-by-provider', error)
     }
 
     const subStatus = mapSubscriptionStatusFromPayment(paymentStatus)
     const subTargetId = subscriptionId
     if (subTargetId) {
-      await admin
+      const { error } = await admin
         .from('marketplace_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('asaas_subscription_id', subTargetId)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:marketplace-sub', error)
     } else if (payRow?.subscription_id) {
-      await admin
+      const { error } = await admin
         .from('marketplace_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('id', payRow.subscription_id)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:marketplace-sub-by-payment', error)
     }
 
     if (subTargetId) {
-      await admin
-        .from('app_subscriptions')
-        .update({ status: subStatus, updated_at: new Date().toISOString() })
-        .eq('asaas_subscription_id', subTargetId)
-      await admin
-        .from('app_subscriptions')
-        .update({ status: subStatus, updated_at: new Date().toISOString() })
-        .eq('provider', 'asaas')
-        .eq('provider_subscription_id', subTargetId)
+      {
+        const { error } = await admin
+          .from('app_subscriptions')
+          .update({ status: subStatus, updated_at: new Date().toISOString() })
+          .eq('asaas_subscription_id', subTargetId)
+        if (error) return failEvent(eventRowId, 'asaas_webhook:app-sub-legacy', error)
+      }
+      {
+        const { error } = await admin
+          .from('app_subscriptions')
+          .update({ status: subStatus, updated_at: new Date().toISOString() })
+          .eq('provider', 'asaas')
+          .eq('provider_subscription_id', subTargetId)
+        if (error) return failEvent(eventRowId, 'asaas_webhook:app-sub', error)
+      }
     } else if ((appPayRow as Record<string, unknown>)?.subscription_id) {
-      await admin
+      const { error } = await admin
         .from('app_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('id', (appPayRow as Record<string, unknown>)?.subscription_id)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:app-sub-by-payment', error)
     }
 
     if (subTargetId) {
-      try {
-        const { data: subRow } = await admin
-          .from('app_subscriptions')
-          .select('user_id, plan_id, status, asaas_subscription_id, asaas_customer_id, current_period_start, current_period_end')
-          .eq('asaas_subscription_id', subTargetId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (subRow?.user_id) {
-          await admin
-            .from('user_entitlements')
-            .upsert(
-              {
-                user_id: subRow.user_id,
-                plan_id: subRow.plan_id,
-                status: subStatus,
-                provider: 'asaas',
-                provider_customer_id: subRow.asaas_customer_id || null,
-                provider_subscription_id: subRow.asaas_subscription_id || subTargetId,
-                current_period_start: subRow.current_period_start || null,
-                current_period_end: subRow.current_period_end || null,
-                valid_from: subRow.current_period_start || new Date().toISOString(),
-                valid_until: subRow.current_period_end || null,
-                metadata: { updated_by: 'asaas_webhook', asaas_event_id: eventId || null, asaas_payment_id: paymentId || null },
-              },
-              { onConflict: 'provider,provider_subscription_id' },
-            )
+      const { data: subRow, error: subReadErr } = await admin
+        .from('app_subscriptions')
+        .select('user_id, plan_id, status, asaas_subscription_id, asaas_customer_id, current_period_start, current_period_end')
+        .eq('asaas_subscription_id', subTargetId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      // Leitura falhou ≠ assinatura não existe: sem gate aqui, o entitlement
+      // (o ACESSO do usuário) seria pulado em silêncio num hiccup do banco.
+      if (subReadErr) return failEvent(eventRowId, 'asaas_webhook:sub-read', subReadErr)
+      if (subRow?.user_id) {
+        const { error: entErr } = await admin
+          .from('user_entitlements')
+          .upsert(
+            {
+              user_id: subRow.user_id,
+              plan_id: subRow.plan_id,
+              status: subStatus,
+              provider: 'asaas',
+              provider_customer_id: subRow.asaas_customer_id || null,
+              provider_subscription_id: subRow.asaas_subscription_id || subTargetId,
+              current_period_start: subRow.current_period_start || null,
+              current_period_end: subRow.current_period_end || null,
+              valid_from: subRow.current_period_start || new Date().toISOString(),
+              valid_until: subRow.current_period_end || null,
+              metadata: { updated_by: 'asaas_webhook', asaas_event_id: eventId || null, asaas_payment_id: paymentId || null },
+            },
+            // O índice único REAL é (user_id, provider, provider_subscription_id).
+            // O alvo antigo 'provider,provider_subscription_id' não tem
+            // constraint correspondente → 42P10 em toda execução (C3).
+            { onConflict: 'user_id,provider,provider_subscription_id' },
+          )
+        if (entErr) return failEvent(eventRowId, 'asaas_webhook:entitlement', entErr)
 
-          // Invalidate VIP caches so the user sees the new status immediately
-          try {
-            await Promise.all([
-              cacheDelete(`vip:access:${subRow.user_id}`),
-              cacheDelete(`dashboard:bootstrap:${subRow.user_id}`),
-            ])
-          } catch (cacheErr) { logWarn('asaas_webhook', 'Failed to invalidate VIP cache', cacheErr) }
-        }
-      } catch (e) { logWarn('asaas_webhook', 'Failed to upsert user_entitlements', e) }
+        // Invalidate VIP caches so the user sees the new status immediately
+        try {
+          await Promise.all([
+            cacheDelete(`vip:access:${subRow.user_id}`),
+            cacheDelete(`dashboard:bootstrap:${subRow.user_id}`),
+          ])
+        } catch (cacheErr) { logWarn('asaas_webhook', 'Failed to invalidate VIP cache', cacheErr) }
+      }
     }
 
-    await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
+    {
+      const { error } = await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', eventRowId)
+      if (error) return failEvent(eventRowId, 'asaas_webhook:mark-processed', error)
+    }
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    try {
-      await admin
-        .from('asaas_webhook_events')
-        .insert({
-          asaas_event_id: eventId,
-          event_type: eventType || null,
-          payment_id: paymentId,
-          payload: body,
-          processing_error: (e as { message?: string })?.message ?? String(e),
-          processed_at: new Date().toISOString(),
-        })
-    } catch (logErr) { logWarn('asaas_webhook', 'Failed to log webhook error event', logErr) }
-
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    // processed_at fica NULL de propósito: o catch antigo marcava o evento
+    // como processado ao registrar o erro — enterrando o evento (a reentrega
+    // levava deduped e o pagamento se perdia).
+    logError('asaas_webhook', e)
+    if (eventRowId) {
+      try {
+        await admin
+          .from('asaas_webhook_events')
+          .update({ processing_error: (e as { message?: string })?.message ?? String(e) })
+          .eq('id', eventRowId)
+      } catch (logErr) { logWarn('asaas_webhook', 'Failed to record webhook error', logErr) }
+    }
+    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
   }
 }
