@@ -205,7 +205,12 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-[25] bg-neutral-950 overflow-y-auto overscroll-none"
+      // `bg-depth-2` (#151514), o MESMO chão do shell do dashboard. A Nutrição
+      // não vive dentro do shell — ela é um overlay `fixed` por cima dele —, e
+      // por isso era a única das cinco abas com fundo preto: trocar de aba
+      // acendia e apagava a tela. Salto medido antes: 1,083, o mesmo que o #802
+      // encurtou entre o shell e as telas cheias e que passou despercebido aqui.
+      className="fixed inset-x-0 bottom-0 z-[25] bg-depth-2 overflow-y-auto overscroll-none"
       style={{ top: 'calc(4rem + env(safe-area-inset-top) + 64px)' }}
     >
       {/* `pt-7` (28px), não `pt-4`. O overlay começa EXATAMENTE onde a barra de
