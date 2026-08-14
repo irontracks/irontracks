@@ -44,11 +44,13 @@ test.describe('Push Notifications', () => {
 })
 
 test.describe('Storage — Admin', () => {
-    test('POST /api/storage/ensure-bucket rejects unauthenticated requests (not 500)', async ({ request }) => {
+    // SEC-06 (auditoria 2026-08-13): a rota ensure-bucket permitia a qualquer
+    // usuário logado tornar o bucket chat-media público. Foi removida; este
+    // teste trava a remoção — se a rota voltar a responder, é regressão.
+    test('POST /api/storage/ensure-bucket não existe mais (rota removida)', async ({ request }) => {
         const res = await request.post('/api/storage/ensure-bucket', { data: {} }).catch(() => null)
         if (!res) return
-        expect(res.status()).not.toBe(500)
-        expect(res.status()).not.toBe(401)
+        expect(res.status()).toBe(404)
     })
 })
 

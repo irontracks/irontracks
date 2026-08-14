@@ -57,8 +57,14 @@ export async function POST(request: Request) {
 
     const b = await admin.storage.getBucket(bucket)
     if (!b?.data) {
+      // public: false SEMPRE — a migration 20260711220000 tornou o chat-media
+      // privado (leitura via proxy autorizado). Auditoria 2026-08-13 (SEC-06):
+      // este fallback recriava o bucket como público, desfazendo a migration;
+      // a rota irmã ensure-bucket, que qualquer usuário logado podia usar para
+      // reverter o bucket a público via updateBucket, foi REMOVIDA — não a
+      // recrie. Guard: __tests__/chatMediaBucketPrivate.test.ts
       await admin.storage.createBucket(bucket, {
-        public: true,
+        public: false,
         fileSizeLimit: '50MB',
         allowedMimeTypes: CHAT_MEDIA_MIME,
       })
