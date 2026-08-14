@@ -12,7 +12,7 @@ import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
-import { dailyMuscleMapGenerationConfig } from '@/utils/ai/routeContracts'
+import { DAILY_MUSCLE_MAP_LIMITS, dailyMuscleMapGenerationConfig } from '@/utils/ai/routeContracts'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -268,7 +268,12 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
     const second = AiExerciseMuscleMapSchema.safeParse(adapted)
     aiData = second.success ? second.data : { exercises: [] }
   }
+  // Teto pós-parse (DAILY_MUSCLE_MAP_LIMITS): o maxItems saiu do
+  // responseSchema porque 60×12 aninhados estouravam o limite de estados do
+  // Gemini (400 too-many-states). Guard: muscleMapSchemaStates.test.ts
   const exercises = aiData.exercises
+    .slice(0, DAILY_MUSCLE_MAP_LIMITS.exercises)
+    .map((e) => ({ ...e, muscles: e.muscles.slice(0, DAILY_MUSCLE_MAP_LIMITS.musclesPerExercise) }))
   return normalizeAiExerciseMap({ exercises })
 }
 
