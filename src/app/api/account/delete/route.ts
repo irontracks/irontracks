@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -111,10 +112,46 @@ export async function POST(req: Request) {
 
     await safeDelete(admin.from('user_settings').delete().eq('user_id', userId))
 
-    try {
-      await admin.auth.admin.deleteUser(userId)
-    } catch {
+    // SEC-02 (auditoria 2026-08-13): o SDK devolve { error } em falha esperada
+    // — NÃO lança —, então o catch vazio antigo nunca via nada e a rota
+    // respondia "excluída" com a conta ainda ativa no Auth. Sucesso só depois
+    // de o Auth confirmar; falha vira 500 genérico + evento em audit_events
+    // ("fulano foi excluído?" precisa de resposta meses depois — log e Sentry
+    // expiram, o banco não). Guard: __tests__/deleteAuthVerified.test.ts
+    const audit = async (action: string, metadata: Record<string, unknown>) => {
+      try {
+        await admin.from('audit_events').insert({
+          actor_id: userId,
+          actor_email: user.email ?? null,
+          actor_role: 'user',
+          action,
+          entity_type: 'account',
+          entity_id: userId,
+          metadata,
+        })
+      } catch (e: unknown) {
+        logError('account:delete:audit', e, { userId, action })
+      }
     }
+
+    let authError: unknown = null
+    try {
+      const { error } = await admin.auth.admin.deleteUser(userId)
+      if (error) authError = error
+    } catch (e: unknown) {
+      authError = e
+    }
+
+    if (authError) {
+      logError('account:delete:auth', authError, { userId })
+      await audit('account_delete_auth_failed', {
+        message: getErrorMessage(authError),
+        status: (authError as { status?: number })?.status ?? null,
+      })
+      return NextResponse.json({ ok: false, error: 'auth_delete_failed' }, { status: 500 })
+    }
+
+    await audit('account_deleted', {})
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
