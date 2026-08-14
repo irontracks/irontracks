@@ -10,9 +10,14 @@ const read = (rel: string) => fs.readFileSync(path.join(repoRoot, rel), 'utf8')
 const assign = read('src/app/api/admin/students/assign-teacher/route.ts')
 assert.ok(/teacher_user_id\s*!==\s*auth\.user\.id/.test(assign) && /status:\s*403/.test(assign), 'assign-teacher: professor deve ser barrado ao atribuir a outro professor')
 
-// L9 — ensure-bucket: rate-limit
-const ensure = read('src/app/api/storage/ensure-bucket/route.ts')
-assert.ok(/checkRateLimitAsync/.test(ensure), 'ensure-bucket deve ter rate-limit')
+// L9 — ensure-bucket: a rota foi REMOVIDA (SEC-06, auditoria 2026-08-13).
+// Ela deixava qualquer usuário logado tornar o bucket chat-media público via
+// updateBucket com service-role; o rate-limit (guard L9 original) não corrigia
+// a autorização. Guard completo: src/app/api/storage/__tests__/chatMediaBucketPrivate.test.ts
+assert.ok(
+  !fs.existsSync(path.join(repoRoot, 'src/app/api/storage/ensure-bucket')),
+  'ensure-bucket não pode voltar: qualquer usuário logado tornava o chat-media público'
+)
 
 // L3 — userContext: instrução anti prompt-injection
 const ctx = read('src/utils/ai/userContext.ts')

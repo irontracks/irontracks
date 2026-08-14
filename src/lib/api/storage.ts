@@ -15,10 +15,6 @@ export interface SignedUploadResult {
   [key: string]: unknown
 }
 
-export interface EnsureBucketResult {
-  ok: boolean
-}
-
 export interface PrepareVideoResult {
   ok: boolean
   videoId?: string
@@ -31,10 +27,6 @@ export const apiStorage = {
   /** Get a signed upload URL for a given storage path */
   getSignedUpload: (path: string, contentType?: string) =>
     apiPost<SignedUploadResult>('/api/storage/signed-upload', { path, contentType }),
-
-  /** Ensure a storage bucket exists */
-  ensureBucket: (name: string) =>
-    apiPost<EnsureBucketResult>('/api/storage/ensure-bucket', { name }),
 
   /** Prepare an execution video record before upload */
   prepareExecutionVideo: (payload: {
