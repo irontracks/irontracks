@@ -87,19 +87,26 @@ export const swapGenerationConfig = () => ({
 // As DUAS rotas declaram o MESMO `AiExerciseMuscleMapSchema` localmente — um
 // contrato só serve as duas, e o guard de paridade impede que alguém mude o Zod
 // de uma sem perceber que a outra (e este espelho) existem.
+// ⚠️ SEM maxItems DE PROPÓSITO (14/08/2026): 60×12 aninhados estouravam o
+// limite de estados do structured output — o Gemini respondia 400
+// INVALID_ARGUMENT ("too many states for serving") e o muscle-map semanal
+// falhava para todo VIP (11 eventos em 4 dias nos runtime logs). Medido
+// contra a API real: COM maxItems → 400; SEM → 200. O teto voltou para o
+// pós-parse via DAILY_MUSCLE_MAP_LIMITS (mesma doutrina do maxLength no
+// CLAUDE.md: structured output não é o juiz — o normalizador é).
+export const DAILY_MUSCLE_MAP_LIMITS = { exercises: 60, musclesPerExercise: 12 } as const
+
 export const DAILY_MUSCLE_MAP_RESPONSE_SCHEMA = {
     type: 'OBJECT',
     properties: {
         exercises: {
             type: 'ARRAY',
-            maxItems: 60,
             items: {
                 type: 'OBJECT',
                 properties: {
                     name: STR,
                     muscles: {
                         type: 'ARRAY',
-                        maxItems: 12,
                         items: {
                             type: 'OBJECT',
                             properties: {
