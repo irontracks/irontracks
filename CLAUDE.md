@@ -1365,3 +1365,52 @@ MUDO desde 24/07 (59 eventos; as 3 chaves não existem no repo — é service
 account do console do Firebase, só o dono gera). Restante da auditoria não
 atacado: ATS iOS (SEC-09, exige build + aparelho físico), E2E/SAST no CI,
 sprint de performance (PERF-01…08), `pg_trgm` fora do schema public.
+
+## Auditoria de COBRANÇAS 2026-08-14 — fechada no mesmo dia (PRs #821–#828)
+
+Relatório + verificação achado-a-achado + fechamento em
+`Relatorio/auditoria-cobrancas-2026-08-14.md` (ler o FECHAMENTO antes de mexer
+em billing). O que fica de regra para esta área:
+
+- **O supabase-js NÃO lança em erro de escrita** — devolve `{ error }`. Foi a
+  causa-raiz de metade da auditoria (professor recorrente "ok:true" sem linha,
+  webhooks respondendo 200 com o banco falhando). Em rota de dinheiro, toda
+  escrita destrutura `{ error }` e falha vira retry do provedor (500/503) —
+  nunca 200.
+- **Status gravado tem que existir no CHECK do banco.** O webhook RevenueCat
+  escrevia `canceled`/`expired` (não existem em `app_subscriptions_status_check`
+  → 23514) e, com o dedup marcado ANTES das escritas, o evento morria no retry
+  (`200 deduped`). Vocabulário: subs `pending/active/past_due/cancelled/inactive`,
+  entitlements idem + `trialing/revoked`. Guard de teste trava isso.
+- **Dedup de webhook tem DOIS modos de falha**: duplicata (200) ≠ backend de
+  dedup fora (503 + Retry-After, o provedor reenvia). E falha de escrita depois
+  de marcar o dedup LIBERA a chave (`cacheSetNxStatus` em `utils/cache.ts`).
+  No Asaas o dedup é ledger na própria tabela de eventos: duplicata só é
+  descartada se a entrega anterior CONCLUIU (`processed_at`).
+- **Janela de plano vem do PROVEDOR, nunca de `new Date()`** —
+  `date_approved`/`next_payment_date`/`expiration_at_ms`. Reentrega recomputa a
+  MESMA validade; "agora + intervalo" fazia cada reentrega estender o plano.
+- **`CANCELLATION` (RevenueCat) = auto-renew desligado**, acesso até
+  `expiration_at_ms` (`cancel_at_period_end`); só reembolso
+  (`cancel_reason=CUSTOMER_SUPPORT`) corta na hora. `BILLING_ISSUE` = `past_due`
+  (o resolvedor aceita) + grace period. Só `EXPIRATION` encerra.
+- **O entitlement `valid_until=null` de produção é INTENCIONAL** (conta do
+  Apple App Review, `metadata.lifetime_grant: true`) — NÃO expirar; o webhook
+  não toca em linha com `lifetime_grant` e não cria entitlement ativo sem
+  expiração (vitalício é concessão manual).
+- **Assinatura recorrente de PROFESSOR** mora em `app_subscriptions` com
+  `plan_id NULL` (tier em `metadata.tier_key`; as chaves de `teacher_tiers` não
+  existem em `app_plans`). O resolvedor VIP exclui linhas sem plano do fallback.
+- **Checkout MP**: tentativa local PRIMEIRO, `X-Idempotency-Key` = id da
+  tentativa, e falha do POST reconcilia via
+  `findRecentPendingPaymentByReference` antes de desistir (timeout ≠ não criou).
+- **A CLI da Vercel desta máquina NÃO alcança o projeto** `app-iron-tracks`
+  (está logada em outra conta; o projeto vive no time "djmk's projects" —
+  mesmo o MCP dessa conta não tem tool de env var). Env var nova = dono no
+  painel.
+
+**Pendências (dono):** `ASAAS_WEBHOOK_SECRET` na Vercel + webhook no painel
+Asaas (o código já aceita o header oficial `asaas-access-token`; sonda com
+credencial inválida deve virar 401 — hoje 500 `webhook_not_configured`) ·
+decisão A11 (Google Play Billing vs remover checkout externo no Android) ·
+sandbox ponta a ponta (Apple/MP/Asaas).
