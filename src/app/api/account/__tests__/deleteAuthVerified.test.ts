@@ -23,10 +23,16 @@ type AuditRow = Record<string, unknown>
 
 function makeAdminMock(deleteUserResult: { data: unknown; error: unknown } | 'throws') {
   const auditInserts: AuditRow[] = []
+  const deletedTables: string[] = []
+  const sweptBuckets: string[] = []
   const from = vi.fn().mockImplementation((table: string) => {
     const chain: Record<string, unknown> = {}
     const self = vi.fn().mockReturnValue(chain)
-    for (const m of ['select', 'delete', 'eq', 'or', 'in', 'limit']) chain[m] = self
+    for (const m of ['select', 'eq', 'or', 'in', 'limit']) chain[m] = self
+    chain.delete = vi.fn().mockImplementation(() => {
+      deletedTables.push(table)
+      return chain
+    })
     chain.insert = vi.fn().mockImplementation((row: AuditRow) => {
       if (table === 'audit_events') auditInserts.push(row)
       return chain
@@ -36,13 +42,22 @@ function makeAdminMock(deleteUserResult: { data: unknown; error: unknown } | 'th
       resolve({ data: [], error: null })
     return chain
   })
+  const storage = {
+    from: vi.fn().mockImplementation((bucket: string) => ({
+      list: vi.fn(async () => {
+        sweptBuckets.push(bucket)
+        return { data: [], error: null }
+      }),
+      remove: vi.fn(async () => ({ data: [], error: null })),
+    })),
+  }
   const deleteUser =
     deleteUserResult === 'throws'
       ? vi.fn(async () => {
           throw new Error('fetch failed')
         })
       : vi.fn(async () => deleteUserResult)
-  return { from, auth: { admin: { deleteUser } }, auditInserts, deleteUser }
+  return { from, storage, auth: { admin: { deleteUser } }, auditInserts, deletedTables, sweptBuckets, deleteUser }
 }
 
 async function callRoute(admin: ReturnType<typeof makeAdminMock>) {
@@ -108,5 +123,31 @@ describe('exclusão de conta confere o Auth (SEC-02, auditoria 2026-08-13)', () 
     expect(body.ok).toBe(true)
     expect(status).toBe(200)
     expect(admin.auditInserts.map((r) => r.action)).toContain('account_deleted')
+  })
+
+  it('fiação SEC-03: todo passo manual do catálogo executa delete, e ANTES do deleteUser', async () => {
+    const { MANUAL_DELETE_STEPS } = await import('@/lib/account/userDataCatalog')
+    const admin = makeAdminMock({ data: { user: { id: 'user-1' } }, error: null })
+    let deletadasAntesDoAuth: string[] = []
+    admin.deleteUser.mockImplementation(async () => {
+      deletadasAntesDoAuth = [...admin.deletedTables]
+      return { data: { user: { id: 'user-1' } }, error: null }
+    })
+    await callRoute(admin)
+    for (const step of MANUAL_DELETE_STEPS) {
+      expect(deletadasAntesDoAuth, `passo manual '${step.table}' não rodou antes do deleteUser`).toContain(step.table)
+    }
+    // error_reports é RESTRICT: sem esse delete o Auth falha para quem já reportou erro.
+    expect(deletadasAntesDoAuth).toContain('error_reports')
+    expect(deletadasAntesDoAuth).toContain('access_requests')
+  })
+
+  it('fiação SEC-03: os buckets com prefixo do usuário são varridos', async () => {
+    const { USER_PREFIX_BUCKETS } = await import('@/lib/account/userDataCatalog')
+    const admin = makeAdminMock({ data: { user: { id: 'user-1' } }, error: null })
+    await callRoute(admin)
+    for (const bucket of USER_PREFIX_BUCKETS) {
+      expect(admin.sweptBuckets, `bucket '${bucket}' não foi varrido`).toContain(bucket)
+    }
   })
 })

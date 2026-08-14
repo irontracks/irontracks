@@ -52,8 +52,8 @@ const DEBITO: readonly string[] = [
   'lib/social/workoutNotifications.ts',
   // Administrativo (LGPD, painel do professor/admin): leem a linha inteira de
   // propósito — exportar/apagar/inspecionar não é "resolver um fato do usuário".
-  'app/api/account/delete/route.ts',
-  'app/api/account/export/route.ts',
+  // (account/delete e account/export SAÍRAM em 14/08/2026: viraram motores
+  //  dirigidos pelo catálogo SEC-03 e não citam mais a tabela literalmente.)
   'app/api/admin/students/settings/route.ts',
   'app/api/admin/teachers/inbox/route.ts',
   'app/api/teacher/inbox/feed/route.ts',
