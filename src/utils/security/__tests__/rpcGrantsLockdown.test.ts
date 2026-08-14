@@ -44,6 +44,7 @@ describe('classe: função nova em migration precisa fechar EXECUTE', () => {
     const AUDITADAS = [
         '20260802120000_patch_active_session_logs_rpc.sql',
         '20260802180000_telemetry_monthly_rollup.sql',
+        '20260814095031_harden_increment_counter_v2.sql',
     ]
 
     it('as migrations que criam função têm lockdown correspondente', () => {
@@ -52,7 +53,14 @@ describe('classe: função nova em migration precisa fechar EXECUTE', () => {
             const criadas = [...sql.matchAll(/create or replace function public\.(\w+)/g)].map((m) => m[1])
             expect(criadas.length, `${arquivo} deveria criar função`).toBeGreaterThan(0)
             for (const fn of criadas) {
-                expect(LOCKDOWN_SQL, `${fn} criada em ${arquivo} sem revoke de anon`).toContain(fn)
+                // O revoke pode morar no lockdown compartilhado (leva de 02/08)
+                // ou na PRÓPRIA migration (autocontida, padrão desde 14/08) —
+                // o que não pode é não existir em lugar nenhum.
+                const autocontida = sql.includes(`revoke all on function public.${fn}`)
+                expect(
+                    LOCKDOWN_SQL.includes(fn) || autocontida,
+                    `${fn} criada em ${arquivo} sem revoke de anon (nem no lockdown compartilhado, nem na própria migration)`
+                ).toBe(true)
             }
         }
     })
