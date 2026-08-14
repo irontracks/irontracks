@@ -14,6 +14,19 @@ import { cacheDelete } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Auditoria de cobranças 14/08/2026 (A7) — três correções:
+ *  1. O cancelamento local só acontece DEPOIS de o provedor confirmar (ou de a
+ *     consulta mostrar que já está cancelado lá). Antes, a falha era só logada
+ *     e o app dizia "assinatura cancelada" enquanto o MP/Asaas seguia cobrando.
+ *  2. O período JÁ PAGO fica de pé: o entitlement não é revogado — o resolvedor
+ *     corta sozinho quando valid_until passar. O cancelamento só garante que a
+ *     janela é FINITA (valid_until NULL ganha o fim do período, ou agora).
+ *  3. Escopo por assinatura: só os entitlements DESTA assinatura
+ *     (provider + provider_subscription_id) são tocados — antes o cancelamento
+ *     revogava todos os entitlements ativos do usuário, de qualquer provedor.
+ */
+
 const ZodBodySchema = z
   .object({
     planId: z.string().optional(),
@@ -75,7 +88,19 @@ export async function POST(req: Request) {
           path: `/preapproval/${encodeURIComponent(providerSubId)}`,
           body: { status: 'cancelled' },
         })
-      } catch (e) { logError('api:subscriptions:cancel-active:mercadopago', e) }
+      } catch (e) {
+        // O PUT pode falhar porque a preapproval JÁ está cancelada lá — nesse
+        // caso o estado local pode avançar. Qualquer outra situação aborta:
+        // marcar cancelado local com o provedor ainda cobrando é o pior estado.
+        const already = await mercadopagoRequest<{ status?: string }>({
+          method: 'GET',
+          path: `/preapproval/${encodeURIComponent(providerSubId)}`,
+        }).then((p) => String(p?.status || '').toLowerCase() === 'cancelled').catch(() => false)
+        if (!already) {
+          logError('api:subscriptions:cancel-active:mercadopago', e)
+          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
+        }
+      }
     }
 
     if (provider === 'asaas' && (providerSubId || asaasSubId)) {
@@ -86,33 +111,67 @@ export async function POST(req: Request) {
           path: `/subscriptions/${encodeURIComponent(target)}`,
           body: { status: 'INACTIVE' },
         })
-      } catch (e) { logError('api:subscriptions:cancel-active:asaas', e) }
+      } catch (e) {
+        const already = await asaasRequest<{ status?: string; deleted?: boolean }>({
+          method: 'GET',
+          path: `/subscriptions/${encodeURIComponent(target)}`,
+        }).then((s) => s?.deleted === true || ['INACTIVE', 'EXPIRED'].includes(String(s?.status || '').toUpperCase())).catch(() => false)
+        if (!already) {
+          logError('api:subscriptions:cancel-active:asaas', e)
+          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
+        }
+      }
     }
 
-    await admin
-      .from('app_subscriptions')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-        metadata: {
-          ...(sub?.metadata && typeof sub.metadata === 'object' ? sub.metadata : {}),
-          cancellation: { at: new Date().toISOString(), by: 'user', reason: 'cancel_active_subscription' },
-        },
-      })
-      .eq('id', sub.id)
+    {
+      const { error: subUpdErr } = await admin
+        .from('app_subscriptions')
+        .update({
+          status: 'cancelled',
+          cancel_at_period_end: true,
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...(sub?.metadata && typeof sub.metadata === 'object' ? sub.metadata : {}),
+            cancellation: { at: new Date().toISOString(), by: 'user', reason: 'cancel_active_subscription' },
+          },
+        })
+        .eq('id', sub.id)
+      if (subUpdErr) return respondDbError('subscriptions:cancel-active:mark', subUpdErr)
+    }
 
-    // R2#7: Also revoke user_entitlements so VIP access is removed immediately
-    // Without this, the user retains VIP until valid_until expires naturally
-    try {
-      await admin
+    // O período pago continua valendo: nada de status='cancelled' nem
+    // valid_until=agora nos entitlements. Só se garante janela FINITA nos
+    // entitlements DESTA assinatura — valid_until NULL viraria acesso eterno
+    // depois de cancelar a cobrança.
+    if (providerSubId || asaasSubId) {
+      const entKey = providerSubId || asaasSubId
+      const { data: ents, error: entReadErr } = await admin
         .from('user_entitlements')
-        .update({ status: 'cancelled', valid_until: new Date().toISOString() })
+        .select('id, valid_until, current_period_end')
         .eq('user_id', user.id)
+        .eq('provider', provider)
+        .eq('provider_subscription_id', entKey)
         .in('status', ['active', 'trialing', 'past_due'])
-    } catch (e) { logError('api:subscriptions:cancel-active:revoke-entitlements', e) }
+      if (entReadErr) {
+        // Não-fatal: a cobrança externa já parou (provedor confirmou). Loga
+        // para reconciliação — o pior caso é um valid_until NULL sobreviver.
+        logError('api:subscriptions:cancel-active:ent-read', entReadErr)
+      }
+      for (const ent of ents ?? []) {
+        if (ent.valid_until) continue // janela finita: expira sozinha
+        const { error: entUpdErr } = await admin
+          .from('user_entitlements')
+          .update({
+            valid_until: ent.current_period_end || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ent.id)
+        if (entUpdErr) logError('api:subscriptions:cancel-active:ent-close', entUpdErr)
+      }
+    }
 
-    // Sem isto o cache (vip:access TTL 30s / bootstrap) manteria o VIP "ativo" por até
-    // 30s após o cancelamento — contradizendo o "removed immediately" acima.
+    // Sem isto o cache (vip:access TTL 30s / bootstrap) atrasaria em até 30s o
+    // reflexo do cancelamento (cancel_at_period_end, janela fechada).
     await Promise.all([
       cacheDelete(`vip:access:${user.id}`).catch(() => {}),
       cacheDelete(`dashboard:bootstrap:${user.id}`).catch(() => {}),

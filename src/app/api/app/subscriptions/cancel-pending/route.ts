@@ -53,6 +53,11 @@ export async function POST(req: Request) {
     const providerSubId = String(sub?.provider_subscription_id || '').trim()
     const asaasSubId = String(sub?.asaas_subscription_id || '').trim()
 
+    // A7 (auditoria 14/08/2026): o cancelamento local só acontece DEPOIS de o
+    // provedor confirmar (ou de a consulta mostrar que já está cancelado lá).
+    // Antes a falha era só logada e o registro local virava 'cancelled' com a
+    // preapproval ainda VIVA no provedor — o usuário podia autorizar depois e
+    // ser cobrado por uma assinatura que o app diz não existir.
     if (provider === 'mercadopago' && providerSubId) {
       try {
         await mercadopagoRequest({
@@ -60,7 +65,16 @@ export async function POST(req: Request) {
           path: `/preapproval/${encodeURIComponent(providerSubId)}`,
           body: { status: 'cancelled' },
         })
-      } catch (e) { logError('api:subscriptions:cancel-pending:mercadopago', e) }
+      } catch (e) {
+        const already = await mercadopagoRequest<{ status?: string }>({
+          method: 'GET',
+          path: `/preapproval/${encodeURIComponent(providerSubId)}`,
+        }).then((p) => String(p?.status || '').toLowerCase() === 'cancelled').catch(() => false)
+        if (!already) {
+          logError('api:subscriptions:cancel-pending:mercadopago', e)
+          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
+        }
+      }
     }
 
     if (provider === 'asaas' && (providerSubId || asaasSubId)) {
@@ -71,10 +85,19 @@ export async function POST(req: Request) {
           path: `/subscriptions/${encodeURIComponent(target)}`,
           body: { status: 'INACTIVE' },
         })
-      } catch (e) { logError('api:subscriptions:cancel-pending:asaas', e) }
+      } catch (e) {
+        const already = await asaasRequest<{ status?: string; deleted?: boolean }>({
+          method: 'GET',
+          path: `/subscriptions/${encodeURIComponent(target)}`,
+        }).then((s) => s?.deleted === true || ['INACTIVE', 'EXPIRED'].includes(String(s?.status || '').toUpperCase())).catch(() => false)
+        if (!already) {
+          logError('api:subscriptions:cancel-pending:asaas', e)
+          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
+        }
+      }
     }
 
-    await admin
+    const { error: subUpdErr } = await admin
       .from('app_subscriptions')
       .update({
         status: 'cancelled',
@@ -85,6 +108,7 @@ export async function POST(req: Request) {
         },
       })
       .eq('id', sub.id)
+    if (subUpdErr) return respondDbError('subscriptions:cancel-pending:mark', subUpdErr)
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
   } catch (e: unknown) {
