@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
-import { mercadopagoRequest } from '@/lib/mercadopago'
+import { mercadopagoRequest, findRecentPendingPaymentByReference } from '@/lib/mercadopago'
 import { buildVipReference } from '@/utils/billing/mercadopagoWebhookRules'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -183,15 +183,28 @@ export async function POST(req: Request) {
         method: 'POST',
         path: '/v1/payments',
         body: paymentBody,
+        // A8 (auditoria 14/08/2026): chave ESTÁVEL por tentativa (a linha de
+        // assinatura pendente criada acima) — sem ela o helper gerava UUID
+        // aleatório e um retry do mesmo attempt podia abrir um segundo PIX.
+        idempotencyKey: String(subRow.id),
       })
     } catch (mpErr: unknown) {
-      // Rollback: cancel the subscription so the user can retry without hitting 'pending_subscription_exists'
-      try {
-        await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', subRow.id)
-      } catch (rollbackErr) { logWarn('checkout:rollback', 'Failed to cancel pending subscription after MP error', { subId: subRow.id, error: rollbackErr }) }
-      logError('checkout', 'MercadoPago payment creation failed', { userId: user.id, planId: plan.id, error: getErrorMessage(mpErr) })
-      // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
-      return NextResponse.json({ ok: false, error: 'mercadopago_payment_failed' }, { status: 502 })
+      // Resultado INCERTO: num timeout o MP pode ter criado a cobrança mesmo
+      // assim. Antes do rollback, procura um pagamento pendente recente desta
+      // referência — achou, segue com ele (nenhum segundo PIX; nenhuma
+      // cobrança órfã que o usuário paga sem o app saber).
+      const recovered = await findRecentPendingPaymentByReference(buildVipReference(user.id, String(plan.id)))
+      if (recovered) {
+        payment = recovered
+      } else {
+        // Rollback: cancel the subscription so the user can retry without hitting 'pending_subscription_exists'
+        try {
+          await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', subRow.id)
+        } catch (rollbackErr) { logWarn('checkout:rollback', 'Failed to cancel pending subscription after MP error', { subId: subRow.id, error: rollbackErr }) }
+        logError('checkout', 'MercadoPago payment creation failed', { userId: user.id, planId: plan.id, error: getErrorMessage(mpErr) })
+        // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
+        return NextResponse.json({ ok: false, error: 'mercadopago_payment_failed' }, { status: 502 })
+      }
     }
 
     const providerPaymentId = String(payment?.id || '').trim()
