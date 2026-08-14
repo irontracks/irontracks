@@ -92,12 +92,6 @@ export async function POST(req: Request) {
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
     const pixKey = env.mercadopago.pixKey.trim() || undefined
     const baseUrl = resolveBaseUrl(req)
-    const externalRef = buildStudentPlanReference({
-      teacherUserId: String(sub.teacher_user_id),
-      planId: String(plan.id),
-      studentUserId: user.id,
-      subscriptionId: String(subscription_id),
-    })
 
     // A8 (auditoria 14/08/2026): a TENTATIVA nasce no banco ANTES do provedor.
     // O id dela vira a X-Idempotency-Key do POST, e uma falha de persistência
@@ -127,7 +121,12 @@ export async function POST(req: Request) {
         transaction_amount: amount,
         description: `${String((plan as Record<string, unknown>).name ?? 'Plano')} — Mensalidade`,
         payment_method_id: 'pix',
-        external_reference: externalRef,
+        external_reference: buildStudentPlanReference({
+          teacherUserId: String(sub.teacher_user_id),
+          planId: String(plan.id),
+          studentUserId: user.id,
+          subscriptionId: String(subscription_id),
+        }),
         notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
         payer: {
           email: user.email || undefined,
@@ -153,7 +152,12 @@ export async function POST(req: Request) {
       // antes de desistir, procura um pagamento pendente recente desta
       // assinatura. Achou → segue com ele (nenhum segundo PIX). Não achou →
       // marca a tentativa como failed e devolve erro.
-      const recovered = await findRecentPendingPaymentByReference(externalRef)
+      const recovered = await findRecentPendingPaymentByReference(buildStudentPlanReference({
+        teacherUserId: String(sub.teacher_user_id),
+        planId: String(plan.id),
+        studentUserId: user.id,
+        subscriptionId: String(subscription_id),
+      }))
       if (!recovered) {
         await admin.from('student_charges').update({ status: 'failed' }).eq('id', attempt.id)
         logError('student_charge', 'MercadoPago falhou', { userId: user.id, subscriptionId: subscription_id, error: getErrorMessage(mpErr) })
