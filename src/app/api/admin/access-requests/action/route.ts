@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn } from '@/lib/logger'
 import { safeEmailLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -327,6 +327,6 @@ export async function POST(req: Request) {
 
   } catch (e: unknown) {
     logError('error', 'Access Action Error:', e)
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:access-requests:action', e)
   }
 }

@@ -24,11 +24,11 @@
  *   6. notification billing_issue → "Plano ativado (simulação)"
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { logInfo, logWarn } from '@/lib/logger'
@@ -167,6 +167,6 @@ export async function POST(req: Request) {
       plan_valid_until: end.toISOString(),
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:simulate-teacher-payment', e)
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 import { cacheGet, cacheSet } from '@/utils/cache'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
@@ -50,6 +50,6 @@ export async function GET(req: Request) {
     await cacheSet(cacheKey, payload, 120)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:marketplace:health', e)
   }
 }

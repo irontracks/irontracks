@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
+import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,10 +70,10 @@ export async function POST(request: Request) {
     const { data: b2 } = await admin.storage.getBucket(bucket)
 
     const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(safe.path)
-    if (error || !data) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed to sign' }, { status: 400 })
+    if (error || !data) return respondDbError('storage:social-stories:signed-upload', error)
 
     return NextResponse.json({ ok: true, bucket, path: safe.path, token: data.token, bucketLimitBytes: b2?.file_size_limit ?? null })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:storage:social-stories:signed-upload', e)
   }
 }

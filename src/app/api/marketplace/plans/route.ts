@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { cacheDelete, cacheGet, cacheSet } from '@/utils/cache'
 
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:marketplace:plans', e)
   }
 }
 
@@ -103,6 +103,6 @@ export async function POST(req: Request) {
     await cacheDelete('marketplace:plans:all')
     return NextResponse.json({ ok: true, plan: data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:marketplace:plans', e)
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
 
-import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
@@ -114,9 +114,6 @@ export async function GET() {
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json(
-      { ok: false, error: getErrorMessage(e) ? String(getErrorMessage(e)) : String(e), where: 'api/diagnostics/iron-rank' },
-      { status: 500 }
-    )
+    return respondInternalError('api:diagnostics:iron-rank', e)
   }
 }

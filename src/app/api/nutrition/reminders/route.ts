@@ -5,9 +5,9 @@
  * Replaces the user's reminder schedule (upsert).
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +36,7 @@ export async function GET(_req: Request) {
     if (error) throw new Error(error.message)
     return NextResponse.json({ ok: true, reminders: data || [] })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:nutrition:reminders', e)
   }
 }
 
@@ -77,6 +77,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:nutrition:reminders', e)
   }
 }

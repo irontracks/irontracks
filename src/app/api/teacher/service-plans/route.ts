@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +42,7 @@ export async function GET() {
     if (error) return respondDbError('teacher:service_plans:list', error)
     return NextResponse.json({ ok: true, plans: data ?? [] })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:service-plans', e)
   }
 }
 
@@ -66,6 +66,6 @@ export async function POST(req: Request) {
     if (error) return respondDbError('teacher:service_plans:create', error)
     return NextResponse.json({ ok: true, plan: data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:service-plans', e)
   }
 }

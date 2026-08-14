@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { safeEmailLike } from '@/utils/safePgFilter'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -44,6 +44,6 @@ export async function POST() {
     await admin.from('profiles').update({ role: 'teacher' }).eq('id', user.id)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teachers:accept', e)
   }
 }

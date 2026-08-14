@@ -14,12 +14,12 @@
  * e lê o arquivo via signed URL curta (rota `bia-attachment/signed-url`).
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(safe.path)
     if (error || !data) {
       return NextResponse.json(
-        { ok: false, error: getErrorMessage(error) || 'failed to sign' },
+        { ok: false, error: 'failed_to_sign' },
         { status: 400 },
       )
     }
@@ -125,6 +125,6 @@ export async function POST(request: Request) {
       bucketLimitBytes: FILE_LIMIT_BYTES,
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:assessment:bia-attachment:signed-upload', e)
   }
 }

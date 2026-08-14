@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { env } from '@/utils/env'
 import { resolveCanonicalItems } from '@/utils/ai/exerciseCanonicalizeShared'
@@ -292,6 +292,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, map }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return respondInternalError('api:exercises:canonicalize', e)
   }
 }

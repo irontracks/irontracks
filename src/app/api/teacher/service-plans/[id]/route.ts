@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!data) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
     return NextResponse.json({ ok: true, plan: data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:service-plans:[id]', e)
   }
 }
 
@@ -70,6 +70,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (error) return respondDbError('teacher:service_plan:delete', error)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:service-plans:[id]', e)
   }
 }

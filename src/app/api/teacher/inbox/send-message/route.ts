@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const runtime = 'nodejs'
@@ -58,6 +58,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, channel_id: channelId }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
-    return jsonError(500, getErrorMessage(e))
+    return respondInternalError('api:teacher:inbox:send-message', e)
   }
 }

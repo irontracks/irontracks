@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +14,6 @@ export async function GET() {
     const { data } = await admin.from('students').select('status').eq('user_id', user.id).maybeSingle()
     return NextResponse.json({ ok: true, status: data?.status ?? null })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:students:me:status', e)
   }
 }

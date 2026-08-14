@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -37,6 +37,6 @@ export async function POST(req: Request) {
     if (error) return respondDbError('social:stories:view', error)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:social:stories:view', e)
   }
 }

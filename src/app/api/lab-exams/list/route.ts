@@ -9,9 +9,9 @@
  * num endpoint de detalhe sob demanda).
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import type { LabExam } from '@/types/labExam'
 
@@ -53,6 +53,6 @@ export async function GET(request: Request) {
     if (error) return respondDbError('lab-exams:list', error)
     return NextResponse.json({ ok: true, exams: (data || []) as unknown as LabExam[] })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:lab-exams:list', e)
   }
 }

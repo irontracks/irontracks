@@ -10,6 +10,7 @@
  * Protected by CRON_SECRET header.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { dequeueStoryJobs, getQueueDepth, type StoryJobPayload } from '@/lib/queue/storyQueue'
 import { logError, logInfo, logWarn } from '@/lib/logger'
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, processed: jobs.length, results, remaining })
     } catch (e: unknown) {
         logError('StoryWorker', 'Worker error', e)
-        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+        return respondInternalError('api:jobs:process-story', e)
     }
 }
 

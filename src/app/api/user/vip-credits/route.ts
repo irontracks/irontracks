@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getWeeklyResetStart } from '@/utils/vip/weekReset'
 import { NextResponse } from 'next/server'
-import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -75,6 +75,6 @@ export async function GET() {
 
   } catch (error: unknown) {
     logError('error', 'Error fetching VIP credits:', error)
-    return NextResponse.json({ ok: false, error: getErrorMessage(error) }, { status: 500 })
+    return respondDbError('user:vip-credits', error, 500)
   }
 }

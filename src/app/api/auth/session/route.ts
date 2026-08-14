@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -64,6 +64,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
     logError('api:auth:session', e)
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:auth:session', e)
   }
 }

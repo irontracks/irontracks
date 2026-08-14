@@ -8,12 +8,12 @@
  * mintada aqui (admin) após checagem de acesso. Foto de corpo nunca é pública.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent, listCoachedStudentIds } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { pickBodyFatReference, type AssessmentBodyFatRow } from '@/utils/bodyPhoto/bodyFatCrossCheck'
 import { filterVisibleAssessments } from '@/utils/bodyPhoto/listAccess'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto } from '@/types/bodyPhotoAssessment'
 
@@ -121,6 +121,6 @@ export async function GET(request: Request) {
         const withThumbs = list.map((a) => ({ ...a, thumbnailUrl: thumbByAssessment.get(a.id) ?? null }))
         return NextResponse.json({ ok: true, assessments: withThumbs })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+        return respondInternalError('api:body-photo:assessments', e)
     }
 }

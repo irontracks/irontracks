@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
@@ -6,7 +8,6 @@ import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, s
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isAllowedStoryPath, validateStoryPayload } from '@/lib/social/storyValidation'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { enqueueStoryJob, guessMediaType } from '@/lib/queue/storyQueue'
 import { cacheDeletePattern } from '@/utils/cache'
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
           .maybeSingle()
         if (existing?.id) return NextResponse.json({ ok: true, data: existing, idempotent: true })
       }
-      return NextResponse.json({ ok: false, error: getErrorMessage(insertRes.error) || 'failed' }, { status: 400 })
+      return respondDbError('social:stories:create', insertRes.error)
     }
     if (!data?.id) return NextResponse.json({ ok: false, error: 'failed' }, { status: 400 })
 
@@ -171,6 +172,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:social:stories:create', e)
   }
 }

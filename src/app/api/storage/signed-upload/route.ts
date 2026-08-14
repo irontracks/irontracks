@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { canUploadToChatMediaPath, isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 const BodySchema = z
   .object({
@@ -75,6 +75,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, path: safe.path, token: data.token })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:storage:signed-upload', e)
   }
 }

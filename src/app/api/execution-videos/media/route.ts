@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 
 export const runtime = 'nodejs'
@@ -68,6 +68,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, url: signed.signedUrl }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
-    return jsonError(500, getErrorMessage(e))
+    return respondInternalError('api:execution-videos:media', e)
   }
 }

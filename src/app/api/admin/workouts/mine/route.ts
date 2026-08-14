@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createClient } from '@/utils/supabase/server'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 // No body/params to validate
@@ -35,6 +35,6 @@ export async function GET(req: Request) {
     if (error) return respondDbError('admin:workouts:mine', error)
     return NextResponse.json({ ok: true, rows: data || [] })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:workouts:mine', e)
   }
 }

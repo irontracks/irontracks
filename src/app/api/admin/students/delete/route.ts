@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, resolveRoleByUser } from '@/utils/auth/route'
@@ -237,6 +238,6 @@ export async function POST(req: Request) {
             storage_objects_deleted: storageObjects.length,
         })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+        return respondInternalError('api:admin:students:delete', e)
     }
 }

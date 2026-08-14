@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +25,6 @@ export async function GET() {
     if (error) return respondDbError('admin:workouts:templates-list', error)
     return NextResponse.json({ ok: true, rows: data || [] })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:workouts:templates-list', e)
   }
 }

@@ -8,10 +8,10 @@
  * Secured by a shared secret in CRON_SECRET env var.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { logError } from '@/lib/logger'
 
@@ -121,6 +121,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, sent, total: userIds.length, missed })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:nutrition:reminders:trigger', e)
   }
 }

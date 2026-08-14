@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { getUpstashConfig } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
@@ -47,6 +47,6 @@ export async function GET() {
 
         return NextResponse.json({ ok: true, online_users: result })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+        return respondInternalError('api:social:presence:list', e)
     }
 }

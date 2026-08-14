@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { USER_DATA_CATALOG, type ExportOwn, type ExportVia } from '@/lib/account/userDataCatalog'
 
@@ -133,6 +133,6 @@ export async function GET(req: Request) {
       skipped,
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:account:export', e)
   }
 }

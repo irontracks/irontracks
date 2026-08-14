@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       .eq('id', storyId)
       .maybeSingle()
 
-    if (error || !story?.media_path) return new Response(getErrorMessage(error) || 'not_found', { status: 404 })
+    if (error || !story?.media_path) return new Response('not_found', { status: 404 })
     if (story?.is_deleted) return new Response('not_found', { status: 404 })
     if (story?.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) return new Response('not_found', { status: 404 })
 
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
     await cacheSet(cacheKey, { redirectUrl, contentType: headers.get('Content-Type') }, 300)
     return new Response(null, { status: 307, headers })
   } catch (e: unknown) {
-    return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
+    return respondInternalError('api:social:stories:media', e)
   }
 }
 
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
       .eq('id', storyId)
       .maybeSingle()
 
-    if (error || !story?.media_path) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'not_found' }, { status: 404 })
+    if (error || !story?.media_path) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     // Security: verify follow relationship (same check as GET handler)
     const authorId = String(story?.author_id || '').trim()
@@ -158,6 +158,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:social:stories:media', e)
   }
 }

@@ -13,13 +13,13 @@
  * Rate limit: 30 req/min por usuário (vários arquivos por exame).
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { LAB_EXAM_ALLOWED_MIMES, LAB_EXAM_MAX_FILE_BYTES, LAB_EXAM_MAX_FILES } from '@/types/labExam'
 
@@ -114,6 +114,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, path: signed.path, token: signed.token, storagePath: path })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:lab-exams:signed-upload', e)
   }
 }

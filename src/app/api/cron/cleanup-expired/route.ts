@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { extractStoragePathFromPublicUrl } from '@/utils/storage/publicUrlPath'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isCronAuthorized } from '@/utils/cron/auth'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
@@ -130,6 +130,6 @@ export async function GET(req: Request) {
 
   return NextResponse.json(result)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:cron:cleanup-expired', e)
   }
 }
