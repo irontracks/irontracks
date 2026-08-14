@@ -26,3 +26,11 @@ npm --version
 
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 npm ci --no-audit --no-fund
+
+# O archive roda com -disableAutomaticPackageResolution e confere o
+# Package.resolved por originHash — que VARIA entre toolchains. O resolved
+# commitado (gerado na máquina local) reprovou no runner mesmo em dia
+# (run #1729, lido via ASC API). Regenerar AQUI, com o toolchain do
+# runner, faz o hash bater por construção. Package.swift pina versões
+# exatas, então o resultado é determinístico.
+xcodebuild -project ios/App/App.xcodeproj -scheme App -resolvePackageDependencies
