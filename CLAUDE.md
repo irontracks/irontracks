@@ -1409,8 +1409,16 @@ em billing). O que fica de regra para esta área:
   mesmo o MCP dessa conta não tem tool de env var). Env var nova = dono no
   painel.
 
-**Pendências (dono):** `ASAAS_WEBHOOK_SECRET` na Vercel + webhook no painel
-Asaas (o código já aceita o header oficial `asaas-access-token`; sonda com
-credencial inválida deve virar 401 — hoje 500 `webhook_not_configured`) ·
-decisão A11 (Google Play Billing vs remover checkout externo no Android) ·
-sandbox ponta a ponta (Apple/MP/Asaas).
+**Asaas foi DESCONTINUADO pelo dono (14/08/2026)** — os provedores ativos são
+Apple (RevenueCat) e Mercado Pago. **Não configurar `ASAAS_WEBHOOK_SECRET`**:
+sem o secret o webhook responde 500 fail-closed e o canal fica morto por
+desenho — é o estado desejado. Banco conferido no mesmo dia: zero entitlements
+Asaas, zero eventos, e a única assinatura Asaas (conta de teste, vencida desde
+abril) já foi cancelada na reconciliação. O código Asaas (webhook,
+`lib/asaas.ts`, branches nos cancelamentos, colunas `asaas_*`) é LEGADO com
+guards verdes — a REMOÇÃO é tarefa própria, não foi feita; quem for removê-la
+varre também `marketplace_payments`/`marketplace_subscriptions` e o
+`app_subscriptions_provider_check` antes de mexer.
+
+**Pendências (dono):** decisão A11 (Google Play Billing vs remover checkout
+externo no Android) · sandbox ponta a ponta (Apple + Mercado Pago).
