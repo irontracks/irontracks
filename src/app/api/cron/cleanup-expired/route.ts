@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { logWarn } from '@/lib/logger'
+import { extractStoragePathFromPublicUrl } from '@/utils/storage/publicUrlPath'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -14,26 +14,6 @@ const chunk = <T,>(arr: T[], size: number) => {
   return out
 }
 
-const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
-  const url = String(publicUrl || '').trim()
-  if (!url) return null
-  try {
-    const u = new URL(url)
-    const marker = `/storage/v1/object/public/${bucket}/`
-    const idx = u.pathname.indexOf(marker)
-    if (idx >= 0) {
-      const p = u.pathname.slice(idx + marker.length)
-      return decodeURIComponent(p).replace(/^\/+/, '')
-    }
-    const alt = `/${bucket}/`
-    const idx2 = u.pathname.indexOf(alt)
-    if (idx2 >= 0) {
-      const p = u.pathname.slice(idx2 + alt.length)
-      return decodeURIComponent(p).replace(/^\/+/, '')
-    }
-  } catch (e) { logWarn('cron:cleanup-expired', 'silenced', e) }
-  return null
-}
 
 const ContentSchema = z
   .object({
