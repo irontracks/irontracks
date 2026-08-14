@@ -17,6 +17,16 @@
  *     sem entitlement.
  *  7. teacher_plan aprovado → linha de professor ativa; estornado → volta pra free.
  *  8. Evento de tipo desconhecido → 200 `ignored`, sem escrita de acesso.
+ *
+ * Auditoria de cobranças 14/08/2026 (A4/A5/A6):
+ *  9.  (A4) Falha de escrita financeira → 500, para o MP REENVIAR. O supabase-js
+ *      devolve `{ error }` sem lançar; antes a falha saía como 200 e o evento
+ *      era dado por entregue com o plano não concedido.
+ *  10. (A5) Janelas ancoradas em datas do PROVEDOR (date_approved /
+ *      next_payment_date) — reentrega recomputa a MESMA validade. As asserções
+ *      são de ISO EXATO: implementação baseada em "agora" reprova.
+ *  11. (A6) Estorno revoga SÓ o benefício do pagamento estornado (entitlement
+ *      `payment:<id>` + assinatura vinculada), nunca tudo do usuário.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import crypto from 'crypto'
@@ -63,8 +73,14 @@ type Captures = { writes: Array<Write> }
  * leitura por id só devolve dado quando o id BATE, e todo write registra o
  * filtro usado, para o teste poder afirmar em QUEM se escreveu.
  */
-function makeAdmin(rows: Record<string, unknown> = {}) {
+type FailOp = { table: string; op: Write['op']; code?: string }
+
+function makeAdmin(rows: Record<string, unknown> = {}, failOps: FailOp[] = []) {
   const captures: Captures = { writes: [] }
+  const failFor = (table: string, op: Write['op']) => {
+    const hit = failOps.find((f) => f.table === table && f.op === op)
+    return hit ? { message: 'forced-failure', code: hit.code ?? 'XXXXX' } : null
+  }
 
   const from = vi.fn((table: string) => {
     const filters: Record<string, unknown> = {}
@@ -96,11 +112,11 @@ function makeAdmin(rows: Record<string, unknown> = {}) {
 
     chain.insert = vi.fn(async (payload: Record<string, unknown>) => {
       captures.writes.push({ table, op: 'insert', payload, filters: { ...filters } })
-      return { error: null }
+      return { error: failFor(table, 'insert') }
     })
     chain.upsert = vi.fn(async (payload: Record<string, unknown>) => {
       captures.writes.push({ table, op: 'upsert', payload, filters: { ...filters } })
-      return { error: null }
+      return { error: failFor(table, 'upsert') }
     })
     chain.update = vi.fn((payload: Record<string, unknown>) => {
       const write: Write = { table, op: 'update', payload, filters: {} }
@@ -111,7 +127,7 @@ function makeAdmin(rows: Record<string, unknown> = {}) {
       term.select = vi.fn(() => term)
       term.maybeSingle = vi.fn(async () => ({ data: null, error: null }))
       ;(term as unknown as PromiseLike<unknown>).then = ((resolve: (v: unknown) => unknown) =>
-        resolve({ error: null })) as PromiseLike<unknown>['then']
+        resolve({ error: failFor(table, 'update') })) as PromiseLike<unknown>['then']
       return term
     })
 
@@ -273,19 +289,209 @@ describe('webhook MP — VIP por pagamento', () => {
     expect(writesTo(captures, 'user_entitlements')).toHaveLength(0)
   })
 
-  it.each(['refunded', 'charged_back', 'cancelled'])('%s revoga entitlement e cancela assinatura', async (status) => {
+  // (A6) Estorno ESCOPADO: revoga o entitlement `payment:<id>` e a assinatura
+  // VINCULADA ao pagamento (via app_payments.subscription_id) — nunca "tudo do
+  // usuário". Os filtros capturados são a prova: um revoke user-wide não teria
+  // provider_subscription_id/id no alvo e reprova aqui.
+  it.each(['refunded', 'charged_back', 'cancelled'])('%s revoga SÓ o benefício do pagamento estornado', async (status) => {
     const { client, captures } = makeAdmin({
       app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+      app_payments: { id: 'payrow-1', provider: 'mercadopago', provider_payment_id: DATA_ID, subscription_id: 'sub-9' },
+      app_subscriptions: { id: 'sub-9', user_id: 'user-1', provider: 'mercadopago', provider_subscription_id: 'presub-9', status: 'active' },
     })
     vi.mocked(createAdminClient).mockReturnValue(client)
     vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ status }))
 
     await POST(post(paymentEvent))
 
-    const ent = writesTo(captures, 'user_entitlements').find((w) => w.op === 'update')
-    expect(ent?.payload).toMatchObject({ status: 'revoked' })
-    const sub = writesTo(captures, 'app_subscriptions').find((w) => w.payload.status === 'cancelled')
-    expect(sub).toBeTruthy()
+    // 1) o entitlement do PRÓPRIO pagamento, pelo alvo exato
+    const entRevokes = writesTo(captures, 'user_entitlements').filter((w) => w.op === 'update')
+    expect(entRevokes.length).toBeGreaterThan(0)
+    for (const w of entRevokes) expect(w.payload).toMatchObject({ status: 'revoked' })
+    expect(entRevokes.some((w) => w.filters.provider_subscription_id === `payment:${DATA_ID}`)).toBe(true)
+
+    // 2) a assinatura VINCULADA (id exato), nunca um cancelamento user-wide
+    const subCancels = writesTo(captures, 'app_subscriptions').filter((w) => w.payload.status === 'cancelled')
+    expect(subCancels.length).toBeGreaterThan(0)
+    for (const w of subCancels) expect(w.filters.id).toBe('sub-9')
+
+    // 3) o entitlement da cadeia da assinatura também cai, pelo alvo exato
+    expect(entRevokes.some((w) => w.filters.provider_subscription_id === 'presub-9')).toBe(true)
+  })
+
+  it('estorno sem assinatura vinculada NÃO cancela assinatura nenhuma (e não derruba outras)', async () => {
+    const { client, captures } = makeAdmin({
+      app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+      // sem linha em app_payments → não há vínculo
+      app_subscriptions: { id: 'sub-outra', user_id: 'user-1', provider: 'mercadopago', provider_subscription_id: 'presub-outra', status: 'active' },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ status: 'refunded' }))
+
+    await POST(post(paymentEvent))
+
+    const subCancels = writesTo(captures, 'app_subscriptions').filter((w) => w.payload.status === 'cancelled')
+    expect(subCancels).toHaveLength(0)
+    // o entitlement do pagamento ainda é revogado (alvo exato)
+    const entRevokes = writesTo(captures, 'user_entitlements').filter((w) => w.op === 'update')
+    expect(entRevokes.some((w) => w.filters.provider_subscription_id === `payment:${DATA_ID}`)).toBe(true)
+  })
+})
+
+describe('webhook MP — falha de escrita responde 500 para o provedor reenviar (A4)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('upsert do entitlement VIP falhando → 500 (antes: 200 e o VIP se perdia)', async () => {
+    const { client } = makeAdmin({
+      app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+    }, [{ table: 'user_entitlements', op: 'upsert' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment())
+
+    expect((await POST(post(paymentEvent))).status).toBe(500)
+  })
+
+  it('ativação da assinatura do aluno falhando → 500', async () => {
+    const { client } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 30, price_cents: 9990 } },
+    }, [{ table: 'student_subscriptions', op: 'update' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: 'student_plan:prof-1:plano-1:aluno-1:assinatura-1' }))
+
+    expect((await POST(post(paymentEvent))).status).toBe(500)
+  })
+
+  it('ativação do plano do professor falhando → 500', async () => {
+    const { client } = makeAdmin({
+      teacher_tiers: { price_cents: 9990, currency: 'BRL' },
+    }, [{ table: 'teachers', op: 'update' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: 'teacher_plan:user-prof:pro' }))
+
+    expect((await POST(post(paymentEvent))).status).toBe(500)
+  })
+
+  it('falha no LOG do evento não barra o dinheiro (telemetria ≠ gate) → 200 e grant segue', async () => {
+    const { client, captures } = makeAdmin({
+      app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+    }, [{ table: 'mercadopago_webhook_events', op: 'insert' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment())
+
+    const res = await POST(post(paymentEvent))
+
+    expect(res.status).toBe(200)
+    expect(writesTo(captures, 'user_entitlements')).toHaveLength(1)
+  })
+
+  it('log duplicado (23505, reentrega) segue processando — efeitos são idempotentes', async () => {
+    const { client, captures } = makeAdmin({
+      app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+    }, [{ table: 'mercadopago_webhook_events', op: 'insert', code: '23505' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment())
+
+    const res = await POST(post(paymentEvent))
+
+    expect(res.status).toBe(200)
+    expect(writesTo(captures, 'user_entitlements')).toHaveLength(1)
+  })
+})
+
+describe('webhook MP — janelas ancoradas no PROVEDOR (A5)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  // As asserções são de ISO EXATO derivado de date_approved: uma implementação
+  // que recalcule a partir de "agora" produz outra data e reprova — é a prova
+  // de que reentrega do mesmo pagamento converge em vez de ESTENDER o plano.
+  const APPROVED_AT = '2026-08-01T12:00:00.000Z'
+
+  it('VIP: valid_until = date_approved + intervalo do plano', async () => {
+    const { client, captures } = makeAdmin({
+      app_plans: { id: 'plan-1', interval: 'month', price_cents: 9990, currency: 'BRL' },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ date_approved: APPROVED_AT }))
+
+    await POST(post(paymentEvent))
+
+    const ent = writesTo(captures, 'user_entitlements').find((w) => w.op === 'upsert')
+    expect(ent?.payload.valid_from).toBe(APPROVED_AT)
+    expect(ent?.payload.valid_until).toBe('2026-09-01T12:00:00.000Z')
+  })
+
+  it('aluno: expires_at = date_approved + duração do plano', async () => {
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 90, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: 'student_plan:prof-1:plano-1:aluno-1:assinatura-1', date_approved: APPROVED_AT }))
+
+    await POST(post(paymentEvent))
+
+    const sub = writesTo(captures, 'student_subscriptions').find((w) => w.op === 'update')
+    expect(sub?.payload.started_at).toBe(APPROVED_AT)
+    expect(sub?.payload.expires_at).toBe('2026-10-30T12:00:00.000Z') // +90 dias exatos
+  })
+
+  it('professor: plan_valid_until = date_approved + 1 mês', async () => {
+    const { client, captures } = makeAdmin({ teacher_tiers: { price_cents: 9990, currency: 'BRL' } })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: 'teacher_plan:user-prof:pro', date_approved: '2026-08-05T10:00:00.000Z' }))
+
+    await POST(post(paymentEvent))
+
+    const t = writesTo(captures, 'teachers').find((w) => w.op === 'update')
+    expect(t?.payload.plan_valid_until).toBe('2026-09-05T10:00:00.000Z')
+  })
+})
+
+describe('webhook MP — preapproval (assinatura recorrente)', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  const PRESUB = 'presub-1'
+  const preapprovalEvent = { type: 'preapproval', data: { id: PRESUB } }
+  const postPreapproval = () => post(preapprovalEvent, { signature: sign(PRESUB) })
+
+  it('VIP recorrente autorizado: valid_until = next_payment_date do provedor', async () => {
+    const { client, captures } = makeAdmin({
+      app_subscriptions: { id: 'sub-1', user_id: 'user-1', plan_id: 'plan-1', provider: 'mercadopago', provider_subscription_id: PRESUB, metadata: {} },
+      app_plans: { id: 'plan-1', interval: 'month' },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue({ id: PRESUB, status: 'authorized', next_payment_date: '2026-09-10T09:00:00.000Z' })
+
+    const res = await POST(postPreapproval())
+
+    expect(res.status).toBe(200)
+    const ent = writesTo(captures, 'user_entitlements').find((w) => w.op === 'upsert')
+    expect(ent?.payload).toMatchObject({ user_id: 'user-1', status: 'active', provider: 'mercadopago' })
+    expect(ent?.payload.valid_until).toBe('2026-09-10T09:00:00.000Z')
+  })
+
+  it('professor recorrente autorizado: plan_valid_until = next_payment_date', async () => {
+    const { client, captures } = makeAdmin({
+      app_subscriptions: { id: 'sub-1', user_id: 'user-prof', plan_id: null, provider: 'mercadopago', provider_subscription_id: PRESUB, metadata: { scope: 'teacher_plan_recurring', tier_key: 'pro' } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue({ id: PRESUB, status: 'authorized', next_payment_date: '2026-09-10T09:00:00.000Z' })
+
+    await POST(postPreapproval())
+
+    const t = writesTo(captures, 'teachers').find((w) => w.op === 'update')
+    expect(t?.payload).toMatchObject({ plan_tier_key: 'pro', plan_status: 'active' })
+    expect(t?.payload.plan_valid_until).toBe('2026-09-10T09:00:00.000Z')
+  })
+
+  it('falha no upsert do entitlement recorrente → 500 (A4)', async () => {
+    const { client } = makeAdmin({
+      app_subscriptions: { id: 'sub-1', user_id: 'user-1', plan_id: 'plan-1', provider: 'mercadopago', provider_subscription_id: PRESUB, metadata: {} },
+      app_plans: { id: 'plan-1', interval: 'month' },
+    }, [{ table: 'user_entitlements', op: 'upsert' }])
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue({ id: PRESUB, status: 'authorized', next_payment_date: '2026-09-10T09:00:00.000Z' })
+
+    expect((await POST(postPreapproval())).status).toBe(500)
   })
 })
 
