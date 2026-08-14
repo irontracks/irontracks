@@ -5,7 +5,9 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown, Star, AlertTriangle, ChevronRight, Sparkles, Calendar } from 'lucide-react'
-import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
+import { Purchases, CustomerInfo, PurchasesOfferings } from '@revenuecat/purchases-capacitor'
+import { ensureRevenueCatIdentity } from '@/lib/iap/revenuecatIdentity'
+import { iapPackageForPlan } from '@/lib/iap/packageForPlan'
 import { isIosNative as getIsIosNative } from '@/utils/platform'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { apiBilling, ApiError } from '@/lib/api'
@@ -247,7 +249,10 @@ export default function MarketplaceClient() {
         ).trim()
         if (apiKey) {
           try {
-            await Purchases.configure({ apiKey, appUserID: user.id })
+            // A10: configure uma vez por sessão + logIn na troca de conta —
+            // configurar de novo a cada mount misturava identidades quando
+            // duas contas usavam o mesmo aparelho.
+            await ensureRevenueCatIdentity(apiKey, user.id)
             setIapConfigured(true)
           } catch (e: unknown) {
             // Falha ao configurar o RevenueCat → sem IAP no device → Sentry.
@@ -330,16 +335,13 @@ export default function MarketplaceClient() {
     loadIapState()
   }, [checkoutOpen, isIosNative, loadIapState, selectedPlan])
 
-  const getIapPackageForPlan = useCallback((offerings: PurchasesOfferings | null, plan: AppPlan | null) => {
-    if (!offerings || !plan) return null
-    const current = offerings.current
-    const pkgs: PurchasesPackage[] = Array.isArray(current?.availablePackages) ? current.availablePackages : []
-    if (!pkgs.length) return null
-    const exact = pkgs.find((p) => String(p?.product?.identifier || '').trim() === plan.id)
-    if (exact) return exact
-    const loose = pkgs.find((p) => String(p?.product?.identifier || '').includes(plan.id))
-    return loose || pkgs[0]
-  }, [])
+  // A9: correspondência exata/contains e FALHA FECHADO — o fallback antigo
+  // ("primeiro pacote da lista") podia cobrar o plano errado num offering
+  // incompleto (lib/iap/packageForPlan).
+  const getIapPackageForPlan = useCallback(
+    (offerings: PurchasesOfferings | null, plan: AppPlan | null) => iapPackageForPlan(offerings, plan?.id),
+    [],
+  )
 
   // Valida a assinatura no backend (sync RevenueCat). Após a compra, o RevenueCat pode
   // levar alguns segundos pra propagar o entitlement, e o sync devolve 402
