@@ -37,6 +37,7 @@
 import { updateSession } from '@/utils/supabase/middleware'
 import { NextRequest, NextResponse } from 'next/server'
 import { applySecurityHeaders, buildCspHeader } from '@/utils/security/headers'
+import { evaluateOriginGuard, originGuardEnforced } from '@/utils/security/originGuard'
 
 /**
  * Modo bloqueante só quando explicitamente ligado. O default seguro é relatar:
@@ -45,6 +46,44 @@ import { applySecurityHeaders, buildCspHeader } from '@/utils/security/headers'
 const cspEnforced = () => String(process.env.CSP_ENFORCE || '').toLowerCase() === 'true'
 
 export async function middleware(request: NextRequest) {
+  // ── Guarda de origem para /api/ (SEC-08, auditoria 2026-08-13) ─────────────
+  // Branch próprio e BARATO: comparação de headers, zero rede — o motivo de
+  // /api/ ficar fora do resto do middleware era o getUser() do updateSession,
+  // e ele CONTINUA fora deste caminho. Nasce em modo RELATÓRIO (mesma doutrina
+  // do CSP): mismatch vira console.error (retido nos runtime logs da Vercel) e
+  // a requisição segue; bloquear exige ORIGIN_GUARD_ENFORCE=true na Vercel,
+  // depois de uma janela limpa. Guard: utils/security/__tests__/originGuard.test.ts
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    try {
+      const verdict = evaluateOriginGuard({
+        method: request.method,
+        origin: request.headers.get('origin'),
+        requestHost: request.nextUrl.host,
+        hasSessionCookie: request.cookies.getAll().some((c) => c.name.startsWith('sb-')),
+        hasAuthorizationHeader: Boolean(request.headers.get('authorization')),
+      })
+      if (verdict.action === 'mismatch') {
+        console.error(
+          '[origin-guard]',
+          JSON.stringify({
+            kind: verdict.kind,
+            originHost: verdict.originHost,
+            host: request.nextUrl.host,
+            method: request.method,
+            path: request.nextUrl.pathname,
+            enforced: originGuardEnforced(),
+          })
+        )
+        if (originGuardEnforced()) {
+          return NextResponse.json({ ok: false, error: 'origin_mismatch' }, { status: 403 })
+        }
+      }
+    } catch {
+      // O que roda em toda chamada de API não pode ter caminho que lance.
+    }
+    return NextResponse.next()
+  }
+
   try {
     const hostname = request.nextUrl.hostname
     if (hostname === 'www.irontracks.com.br') {
@@ -79,11 +118,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // `/api/` fora do matcher de propósito: `updateSession` faz um `getUser()`
-    // (ida à rede) por request, e ligá-lo em 258 rotas de API somaria latência
-    // a cada chamada sem ganho — elas já autenticam por conta própria (252 das
-    // 258 verificadas; as outras 6 são públicas por desenho ou usam outro
-    // mecanismo). O objetivo aqui é renovar a sessão em NAVEGAÇÃO.
+    // NAVEGAÇÃO: renovação de sessão + CSP. `updateSession` faz um `getUser()`
+    // (ida à rede) por request — por isso este matcher continua SEM /api/:
+    // as 258 rotas autenticam por conta própria (252 verificadas; as outras 6
+    // são públicas por desenho ou usam outro mecanismo).
     '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml|auth).*)',
+    // API: SÓ a guarda de origem (SEC-08) — comparação de headers, sem rede.
+    // O branch de /api/ no topo do middleware retorna antes do updateSession.
+    '/api/:path*',
   ],
 }
