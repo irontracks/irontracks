@@ -174,22 +174,25 @@ export const cacheDeletePattern = async (pattern: string): Promise<void> => {
 }
 
 /**
- * Atomically sets a key only if it does not exist (NX semantics).
+ * Atomically sets a key only if it does not exist (NX semantics), distinguindo
+ * DUPLICATA de INDISPONIBILIDADE — os dois exigem respostas diferentes de um
+ * webhook: duplicata → 200 (já processado); Upstash fora → 503 + Retry-After
+ * (o provedor reenvia). O antigo boolean colapsava os dois em `false` e o
+ * webhook da RevenueCat respondia `200 deduped` durante um outage — todo evento
+ * daquela janela era descartado com cara de sucesso (auditoria 14/08/2026, A3).
  *
  * Returns:
- *  - `true`  → key was newly set (this request "owns" it)
- *  - `false` → key already existed **OR** Upstash is unavailable
- *
- * **Fail-closed design**: when the Redis backend is offline we return `false`
- * (deny / treat as duplicate). This prevents double-processing during Upstash
- * outages at the cost of rejecting the first request in that window.
- * Callers should respond with HTTP 503 + `Retry-After` so the client retries.
+ *  - `'set'`         → chave criada agora (este request "possui" o evento)
+ *  - `'exists'`      → duplicata real (a chave já existia)
+ *  - `'unavailable'` → Upstash ausente/fora/erro — o caller decide (webhooks: 503)
  */
-export const cacheSetNx = async (key: string, value: string, ttlSeconds: number): Promise<boolean> => {
+export type CacheSetNxResult = 'set' | 'exists' | 'unavailable'
+
+export const cacheSetNxStatus = async (key: string, value: string, ttlSeconds: number): Promise<CacheSetNxResult> => {
   const cfg = getUpstashConfig()
   if (!cfg) {
-    logWarn('cache', `cacheSetNx: Upstash not configured — returning false (fail-closed) for key=${key}`)
-    return false
+    logWarn('cache', `cacheSetNxStatus: Upstash not configured — returning 'unavailable' for key=${key}`)
+    return 'unavailable'
   }
 
   try {
@@ -201,14 +204,25 @@ export const cacheSetNx = async (key: string, value: string, ttlSeconds: number)
       }
     )
     if (!res.ok) {
-      logWarn('cache', `cacheSetNx: Upstash returned HTTP ${res.status} for key=${key} — returning false (fail-closed)`)
-      return false
+      logWarn('cache', `cacheSetNxStatus: Upstash returned HTTP ${res.status} for key=${key} — returning 'unavailable'`)
+      return 'unavailable'
     }
     const json = await res.json().catch(() => null)
     const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
-    return result === 'OK'
+    return result === 'OK' ? 'set' : 'exists'
   } catch (e) {
-    logWarn('cache', `cacheSetNx: network error for key=${key} — returning false (fail-closed)`, e)
-    return false
+    logWarn('cache', `cacheSetNxStatus: network error for key=${key} — returning 'unavailable'`, e)
+    return 'unavailable'
   }
 }
+
+/**
+ * Variante boolean legada de cacheSetNxStatus.
+ *
+ * **Fail-closed design**: `false` tanto para duplicata quanto para Upstash fora
+ * — previne processamento duplo durante outage ao custo de rejeitar o primeiro
+ * request da janela. Caminhos onde perder o evento é inaceitável (webhooks de
+ * pagamento) devem usar `cacheSetNxStatus` e responder 503 em 'unavailable'.
+ */
+export const cacheSetNx = async (key: string, value: string, ttlSeconds: number): Promise<boolean> =>
+  (await cacheSetNxStatus(key, value, ttlSeconds)) === 'set'
