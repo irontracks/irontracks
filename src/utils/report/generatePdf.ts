@@ -1,4 +1,5 @@
 import { logError } from '@/lib/logger'
+import { escapeHtml } from '@/utils/escapeHtml'
 
 interface AssessmentFormData {
   assessment_date?: string | null
@@ -88,9 +89,13 @@ function buildAssessmentHtml(
   const data = formData && typeof formData === 'object' ? formData : {}
   const metrics = results && typeof results === 'object' ? results : {}
 
-  const name = String(studentName || 'Aluno').trim() || 'Aluno'
+  // SEC-01 (auditoria 2026-08-13): tudo que chega ao HTML do relatório é
+  // escapado NA ATRIBUIÇÃO — o documento vai a document.write(), então um
+  // nome/observação com <img onerror> executava script na janela nova.
+  // Guard: __tests__/generatePdfXss.test.ts
+  const name = escapeHtml(String(studentName || 'Aluno').trim() || 'Aluno')
   const dateRaw = data?.assessment_date ?? new Date().toISOString().split('T')[0]
-  const date = typeof dateRaw === 'string' && dateRaw ? dateRaw : new Date().toISOString().split('T')[0]
+  const date = escapeHtml(typeof dateRaw === 'string' && dateRaw ? dateRaw : new Date().toISOString().split('T')[0])
 
   const weight = Number.parseFloat(String(data?.weight ?? '0').replace(',', '.')) || 0
   const height = Number.parseFloat(String(data?.height ?? '0').replace(',', '.')) || 0
@@ -118,12 +123,12 @@ function buildAssessmentHtml(
 
   const bmr = Number(metrics?.bmr ?? 0) || 0
   const bmi = Number(metrics?.bmi ?? 0) || 0
-  const bmiClassification = String(metrics?.bmiClassification || '')
-  const bodyFatClassification = String(metrics?.bodyFatClassification || '')
+  const bmiClassification = escapeHtml(String(metrics?.bmiClassification || ''))
+  const bodyFatClassification = escapeHtml(String(metrics?.bodyFatClassification || ''))
   const leanMass = Number(metrics?.leanMass ?? 0) || 0
   const fatMass = Number(metrics?.fatMass ?? 0) || 0
 
-  const observations = String(data?.observations || '')
+  const observations = escapeHtml(String(data?.observations || ''))
 
   // Helper: resolve bilateral average or direct value
   const avgField = (direct: string, left: string, right: string): number => {
