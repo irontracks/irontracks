@@ -74,7 +74,16 @@ export const checkRateLimit = (key: string, max: number, windowMs: number): Rate
       '[rateLimit] Running in in-memory mode (no Upstash). ' +
       'Rate limits are per-instance and will not protect against distributed abuse. ' +
       'Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN to enable distributed rate limiting.'
-    logWarn('rateLimit', msg)
+    // SEC-10 (auditoria 2026-08-13): em produção este fallback tem que GRITAR —
+    // logWarn é no-op em prod e a Vercel só retém nível error, então o modo
+    // memória rodava invisível (medido em 14/08: 0 registros do aviso em 23 h
+    // de logs). Com logError, uma instância em modo memória aparece nos
+    // runtime logs e no Sentry na primeira requisição limitada.
+    if (process.env.NODE_ENV === 'production') {
+      logError('rateLimit:memory-fallback', new Error(msg))
+    } else {
+      logWarn('rateLimit', msg)
+    }
   }
 
   const now = Date.now()
