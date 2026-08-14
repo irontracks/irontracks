@@ -44,4 +44,13 @@ describe('getVipPlanLimits — app_subscriptions fallback filtra expiração', (
   it('mantém o filtro de status ativo junto do de expiração (defesa em camadas)', () => {
     expect(appSubBlock).toMatch(/\.in\(\s*['"]status['"],\s*\[[^\]]*['"]active['"]/)
   })
+
+  // C1 (auditoria 14/08/2026): a assinatura recorrente de PROFESSOR mora em
+  // app_subscriptions com plan_id NULL (tier em metadata.tier_key — migration
+  // 20260814150500). Linha sem plano NÃO é VIP; sem o filtro, a linha de
+  // professor mais recente rouba o limit(1) e derruba para free um VIP legado
+  // válido que estivesse atrás dela.
+  it('exclui linhas sem plano (assinatura de professor nunca entra na resolução VIP)', () => {
+    expect(appSubBlock).toMatch(/\.not\(\s*['"]plan_id['"],\s*['"]is['"],\s*null\s*\)/)
+  })
 })

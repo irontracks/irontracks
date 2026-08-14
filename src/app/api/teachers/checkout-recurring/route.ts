@@ -154,47 +154,44 @@ export async function POST(req: Request) {
     }
 
     // Persist pending subscription locally so the webhook can reconcile.
-    try {
-      await admin
-        .from('app_subscriptions')
-        .insert({
-          user_id: user.id,
-          plan_id: planId,                          // teacher tier key (NOT app_plans FK)
-          provider: 'mercadopago',
-          provider_subscription_id: subscriptionId,
-          status: 'pending',
-          metadata: {
-            scope: 'teacher_plan_recurring',
-            tier_key: planId,
-            plan_name: plan.name,
-            init_point: initPoint,
-            mercadopago: { raw: preapproval },
-          },
-        })
-    } catch (e) {
-      // app_subscriptions has a FK to app_plans, which DOES NOT contain teacher
-      // tier keys. Some deployments allow null; if FK fails, retry with
-      // metadata.tier_key only. The webhook handler joins via
-      // provider_subscription_id, so plan_id being null is OK.
-      logWarn('teacher_checkout_recurring', 'Initial insert failed, retrying without plan_id FK', e)
+    //
+    // C1 (auditoria 14/08/2026): plan_id levava a chave do TIER de professor
+    // ('starter'/'pro'/'elite'), mas a coluna tem FK para app_plans (só planos
+    // vip_*) e era NOT NULL — o insert falhava com 23503, o supabase-js devolve
+    // { error } SEM lançar (o catch nunca rodava) e a rota respondia ok:true
+    // com o link do MP: o professor pagava e o webhook não achava assinatura
+    // nenhuma. Hoje plan_id vai NULL (migration 20260814150500) e o tier vive
+    // em metadata.tier_key — de onde o webhook de preapproval já lê. Falhou a
+    // persistência? A preapproval é CANCELADA no MP (compensação) e o cliente
+    // recebe erro: entregar link de pagamento sem linha local é cobrança órfã.
+    const { error: persistErr } = await admin
+      .from('app_subscriptions')
+      .insert({
+        user_id: user.id,
+        plan_id: null,
+        provider: 'mercadopago',
+        provider_subscription_id: subscriptionId,
+        status: 'pending',
+        metadata: {
+          scope: 'teacher_plan_recurring',
+          tier_key: planId,
+          plan_name: plan.name,
+          init_point: initPoint,
+          mercadopago: { raw: preapproval },
+        },
+      })
+    if (persistErr) {
+      logError('teacher_checkout_recurring', 'Persistência local falhou — cancelando a preapproval (compensação)', { userId: user.id, planId, error: persistErr.message })
       try {
-        await admin
-          .from('app_subscriptions')
-          .insert({
-            user_id: user.id,
-            plan_id: null as unknown as string,
-            provider: 'mercadopago',
-            provider_subscription_id: subscriptionId,
-            status: 'pending',
-            metadata: {
-              scope: 'teacher_plan_recurring',
-              tier_key: planId,
-              plan_name: plan.name,
-              init_point: initPoint,
-              mercadopago: { raw: preapproval },
-            },
-          })
-      } catch (e2) { logWarn('teacher_checkout_recurring', 'Retry insert also failed', e2) }
+        await mercadopagoRequest({
+          method: 'PUT',
+          path: `/preapproval/${encodeURIComponent(subscriptionId)}`,
+          body: { status: 'cancelled' },
+        })
+      } catch (cancelErr) {
+        logError('teacher_checkout_recurring', 'Compensação também falhou — preapproval órfã no MP, cancelar manualmente', { userId: user.id, subscriptionId, error: getErrorMessage(cancelErr) })
+      }
+      return NextResponse.json({ ok: false, error: 'persistencia_falhou' }, { status: 500 })
     }
 
     return NextResponse.json({
