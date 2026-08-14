@@ -3,7 +3,7 @@ import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { mercadopagoRequest } from '@/lib/mercadopago'
+import { mercadopagoRequest, findRecentPendingPaymentByReference } from '@/lib/mercadopago'
 import { buildStudentPlanReference } from '@/utils/billing/mercadopagoWebhookRules'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -92,6 +92,34 @@ export async function POST(req: Request) {
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
     const pixKey = env.mercadopago.pixKey.trim() || undefined
     const baseUrl = resolveBaseUrl(req)
+    const externalRef = buildStudentPlanReference({
+      teacherUserId: String(sub.teacher_user_id),
+      planId: String(plan.id),
+      studentUserId: user.id,
+      subscriptionId: String(subscription_id),
+    })
+
+    // A8 (auditoria 14/08/2026): a TENTATIVA nasce no banco ANTES do provedor.
+    // O id dela vira a X-Idempotency-Key do POST, e uma falha de persistência
+    // acontece antes de existir cobrança no MP. A ordem antiga (MP primeiro,
+    // insert depois) deixava, num insert falhado, uma cobrança órfã que o
+    // aluno podia pagar sem o app ter registro nenhum.
+    const { data: attempt, error: attemptErr } = await admin
+      .from('student_charges')
+      .insert({
+        subscription_id,
+        teacher_user_id: sub.teacher_user_id,
+        student_user_id: user.id,
+        plan_id: plan.id as string,
+        amount_cents: Math.round(amount * 100),
+        status: 'created',
+        provider: 'mercadopago',
+      })
+      .select('id')
+      .single()
+    if (attemptErr || !attempt?.id) {
+      return respondDbError('student:charge:attempt', attemptErr ?? { message: 'attempt_insert_failed' } as never)
+    }
 
     let payment: Record<string, unknown>
     try {
@@ -99,12 +127,7 @@ export async function POST(req: Request) {
         transaction_amount: amount,
         description: `${String((plan as Record<string, unknown>).name ?? 'Plano')} — Mensalidade`,
         payment_method_id: 'pix',
-        external_reference: buildStudentPlanReference({
-          teacherUserId: String(sub.teacher_user_id),
-          planId: String(plan.id),
-          studentUserId: user.id,
-          subscriptionId: String(subscription_id),
-        }),
+        external_reference: externalRef,
         notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
         payer: {
           email: user.email || undefined,
@@ -119,11 +142,25 @@ export async function POST(req: Request) {
           transaction_data: { bank_info: { pix: { key: pixKey, key_type: 'EVP' } } },
         }
       }
-      payment = await mercadopagoRequest<Record<string, unknown>>({ method: 'POST', path: '/v1/payments', body: paymentBody })
+      payment = await mercadopagoRequest<Record<string, unknown>>({
+        method: 'POST',
+        path: '/v1/payments',
+        body: paymentBody,
+        idempotencyKey: String(attempt.id),
+      })
     } catch (mpErr: unknown) {
-      logError('student_charge', 'MercadoPago falhou', { userId: user.id, subscriptionId: subscription_id, error: getErrorMessage(mpErr) })
-      // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
-      return NextResponse.json({ ok: false, error: 'pagamento_falhou' }, { status: 502 })
+      // Resultado INCERTO (timeout depois de o MP criar a cobrança é real):
+      // antes de desistir, procura um pagamento pendente recente desta
+      // assinatura. Achou → segue com ele (nenhum segundo PIX). Não achou →
+      // marca a tentativa como failed e devolve erro.
+      const recovered = await findRecentPendingPaymentByReference(externalRef)
+      if (!recovered) {
+        await admin.from('student_charges').update({ status: 'failed' }).eq('id', attempt.id)
+        logError('student_charge', 'MercadoPago falhou', { userId: user.id, subscriptionId: subscription_id, error: getErrorMessage(mpErr) })
+        // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
+        return NextResponse.json({ ok: false, error: 'pagamento_falhou' }, { status: 502 })
+      }
+      payment = recovered
     }
 
     const poi = (payment?.point_of_interaction ?? {}) as Record<string, unknown>
@@ -131,14 +168,8 @@ export async function POST(req: Request) {
 
     const { data: charge, error: chargeErr } = await admin
       .from('student_charges')
-      .insert({
-        subscription_id,
-        teacher_user_id: sub.teacher_user_id,
-        student_user_id: user.id,
-        plan_id: plan.id as string,
-        amount_cents: Math.round(amount * 100),
+      .update({
         status: String(payment?.status ?? 'pending'),
-        provider: 'mercadopago',
         provider_payment_id: String(payment?.id ?? '').trim() || null,
         pix_qr_code: tx?.qr_code_base64 ? String(tx.qr_code_base64) : null,
         pix_payload: tx?.qr_code ? String(tx.qr_code) : null,
@@ -146,10 +177,11 @@ export async function POST(req: Request) {
         due_date: toDateOnly(payment?.date_of_expiration ? String(payment.date_of_expiration) : null),
         raw: payment,
       })
+      .eq('id', attempt.id)
       .select('id, status, amount_cents, pix_qr_code, pix_payload, invoice_url, due_date')
       .single()
 
-    if (chargeErr) return respondDbError('student:charge:insert', chargeErr)
+    if (chargeErr) return respondDbError('student:charge:persist', chargeErr)
     return NextResponse.json({ ok: true, charge })
   } catch (e: unknown) {
     return respondInternalError('api:student:charge', e)

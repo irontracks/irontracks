@@ -68,3 +68,31 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
 
   return (json as T)
 }
+
+/**
+ * Reconciliação pós-timeout (auditoria 14/08/2026, A8): procura um pagamento
+ * PENDENTE e RECENTE com a external_reference dada. Quando o POST /v1/payments
+ * estoura em timeout, o Mercado Pago pode ter criado a cobrança mesmo assim —
+ * desistir sem olhar deixa um PIX órfão que o cliente pode pagar sem o app
+ * saber; tentar de novo às cegas cria um SEGUNDO PIX para a mesma compra.
+ * Falha da própria busca devolve null (o caller decide o rollback).
+ */
+export async function findRecentPendingPaymentByReference(
+  externalReference: string,
+  maxAgeMs = 15 * 60_000,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await mercadopagoRequest<{ results?: Array<Record<string, unknown>> }>({
+      method: 'GET',
+      path: `/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&sort=date_created&criteria=desc`,
+    })
+    for (const p of res?.results ?? []) {
+      if (String(p?.status || '').toLowerCase() !== 'pending') continue
+      const created = new Date(String(p?.date_created || '')).getTime()
+      if (Number.isFinite(created) && Date.now() - created <= maxAgeMs) return p
+    }
+    return null
+  } catch {
+    return null
+  }
+}
