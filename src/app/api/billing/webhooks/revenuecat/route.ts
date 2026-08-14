@@ -5,10 +5,25 @@
  * Events: INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, etc.
  *
  * Docs: https://www.revenuecat.com/docs/integrations/webhooks
+ *
+ * Semântica corrigida na auditoria de cobranças de 14/08/2026:
+ *  - CANCELLATION = auto-renew DESLIGADO, não expiração. O cliente pagou até
+ *    expiration_at_ms e mantém acesso até lá (cancel_at_period_end=true). A
+ *    exceção é reembolso (cancel_reason=CUSTOMER_SUPPORT), que corta na hora.
+ *  - BILLING_ISSUE = retry/grace period, não expiração. Vira past_due (o
+ *    resolvedor VIP aceita past_due) e, com grace_period_expiration_at_ms, a
+ *    janela anda até o fim do grace. Revogar aqui tirava VIP de quem o retry
+ *    da Apple ainda ia cobrar.
+ *  - EXPIRATION é o único evento que encerra o acesso.
+ * Os statuses gravados PRECISAM existir nos CHECKs do banco: o código antigo
+ * escrevia 'canceled'/'expired' (que não existem em app_subscriptions_status_check),
+ * o update falhava com 23514 e — com o dedup já marcado — o evento se perdia de
+ * vez. É por isso que produção tinha assinaturas Apple presas em 'active' com o
+ * período vencido.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { cacheDelete, cacheSetNx } from '@/utils/cache'
+import { cacheDelete, cacheSetNxStatus } from '@/utils/cache'
 import { env } from '@/utils/env'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { waitUntil } from '@vercel/functions'
@@ -84,6 +99,10 @@ interface RevenueCatEvent {
   product_id: string
   entitlement_ids?: string[]
   expiration_at_ms?: number
+  cancel_reason?: string
+  grace_period_expiration_at_ms?: number | null
+  original_transaction_id?: string
+  event_timestamp_ms?: number
   [key: string]: unknown
 }
 
@@ -102,13 +121,74 @@ const ACTIVE_EVENTS = new Set([
   'PRODUCT_CHANGE',
 ])
 
-const INACTIVE_EVENTS = new Set([
-  'CANCELLATION',
-  'EXPIRATION',
-  'BILLING_ISSUE',
-])
+// Statuses permitidos pelos CHECKs do banco (app_subscriptions_status_check /
+// user_entitlements_status_check). Qualquer valor fora daqui falha com 23514.
+type SubStatus = 'active' | 'past_due' | 'cancelled' | 'inactive'
+type EntStatus = 'active' | 'past_due' | 'cancelled' | 'inactive'
+
+type Decision = {
+  kind: 'grant' | 'schedule_cancel' | 'refund_revoke' | 'past_due' | 'expire'
+  subStatus: SubStatus
+  entStatus: EntStatus
+  /** null = não tocar em cancel_at_period_end */
+  cancelAtPeriodEnd: boolean | null
+  /** null = não tocar na janela (valid_until/current_period_end) */
+  windowIso: string | null
+}
+
+function decideEffect(eventType: string, event: RevenueCatEvent): Decision | null {
+  const expiresMs = event.expiration_at_ms ?? null
+  const windowIso = expiresMs && Number.isFinite(expiresMs) ? new Date(expiresMs).toISOString() : null
+
+  if (ACTIVE_EVENTS.has(eventType)) {
+    return { kind: 'grant', subStatus: 'active', entStatus: 'active', cancelAtPeriodEnd: false, windowIso }
+  }
+  if (eventType === 'CANCELLATION') {
+    // CUSTOMER_SUPPORT = reembolso: o dinheiro voltou, o acesso cai junto.
+    if (String(event.cancel_reason || '').trim().toUpperCase() === 'CUSTOMER_SUPPORT') {
+      return { kind: 'refund_revoke', subStatus: 'cancelled', entStatus: 'cancelled', cancelAtPeriodEnd: true, windowIso: null }
+    }
+    // Auto-renew desligado: acesso segue até o fim do período pago; o
+    // resolvedor corta sozinho quando valid_until passar.
+    return { kind: 'schedule_cancel', subStatus: 'active', entStatus: 'active', cancelAtPeriodEnd: true, windowIso }
+  }
+  if (eventType === 'BILLING_ISSUE') {
+    const graceMs = event.grace_period_expiration_at_ms ?? null
+    const graceIso = graceMs && Number.isFinite(graceMs) ? new Date(graceMs).toISOString() : null
+    return { kind: 'past_due', subStatus: 'past_due', entStatus: 'past_due', cancelAtPeriodEnd: null, windowIso: graceIso }
+  }
+  if (eventType === 'EXPIRATION') {
+    return { kind: 'expire', subStatus: 'inactive', entStatus: 'inactive', cancelAtPeriodEnd: false, windowIso }
+  }
+  return null
+}
+
+function metaOf(row: { metadata?: unknown } | null | undefined): Record<string, unknown> {
+  return row?.metadata && typeof row.metadata === 'object' ? (row.metadata as Record<string, unknown>) : {}
+}
+
+/**
+ * Evento fora de ordem: se a linha já registrou um evento MAIS NOVO
+ * (event_timestamp_ms), um evento antigo reentregue não pode rebobinar o estado
+ * (auditoria 14/08/2026, A6 — "evento antigo atinge a assinatura mais nova").
+ */
+function isStaleForRow(rowMeta: Record<string, unknown>, eventMs: number | null): boolean {
+  if (eventMs === null) return false
+  const prev = Number(rowMeta.event_timestamp_ms)
+  return Number.isFinite(prev) && eventMs < prev
+}
+
+/**
+ * A linha pertence a OUTRA cadeia de compra (original_transaction_id diferente).
+ * Um CANCELLATION/EXPIRATION da assinatura antiga não pode derrubar a recompra.
+ */
+function isForeignChain(rowMeta: Record<string, unknown>, oti: string): boolean {
+  const stored = String(rowMeta.original_transaction_id || '').trim()
+  return Boolean(oti && stored && stored !== oti)
+}
 
 export async function POST(request: NextRequest) {
+  let dedupKey: string | null = null
   try {
     // ── Rate limit per source IP ───────────────────────────────────────────
     // 60 req/min/IP — comfortable for legitimate RevenueCat retries (they
@@ -151,190 +231,272 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Replay protection ───────────────────────────────────────────────────
-    // RevenueCat includes a unique `id` on every event. cacheSetNx returns
-    // true the first time we see that id; on a replay it returns false and
-    // we short-circuit. The TTL (7 days) covers RevenueCat's retry window
-    // with a healthy margin. Fail-closed: if Upstash is down, cacheSetNx
-    // returns false → we treat as duplicate (RevenueCat will retry).
+    // RevenueCat inclui um `id` único em todo evento. O dedup tem DOIS modos de
+    // falha com respostas distintas (A3 da auditoria de 14/08/2026):
+    //  - 'exists' → duplicata real → 200 deduped;
+    //  - 'unavailable' (Upstash fora) → 503 + Retry-After, para a RevenueCat
+    //    REENVIAR. O código antigo respondia 200 deduped no outage — toda
+    //    compra da janela era descartada com cara de sucesso.
+    // E se o processamento falhar DEPOIS de marcar a chave, ela é liberada no
+    // fim do handler — senão o retry levaria `200 deduped` e o evento se
+    // perderia para sempre.
     const eventId = String((event as Record<string, unknown>).id ?? '').trim()
     if (!eventId) {
       // Real RevenueCat events always have an id; reject the rest to keep
       // the dedup path watertight.
       return NextResponse.json({ ok: false, error: 'missing_event_id' }, { status: 400 })
     }
-    const isFresh = await cacheSetNx(`webhook:revenuecat:event:${eventId}`, '1', 7 * 24 * 60 * 60)
-    if (!isFresh) {
-      logWarn('webhook:revenuecat', 'Replay or dedup-on-outage', { eventId, type: event.type })
+    dedupKey = `webhook:revenuecat:event:${eventId}`
+    const dedup = await cacheSetNxStatus(dedupKey, '1', 7 * 24 * 60 * 60)
+    if (dedup === 'unavailable') {
+      logWarn('webhook:revenuecat', 'Dedup indisponível (Upstash fora) — 503 para retry', { eventId, type: event.type })
+      return NextResponse.json(
+        { ok: false, error: 'dedup_unavailable' },
+        { status: 503, headers: { 'Retry-After': '60' } },
+      )
+    }
+    if (dedup === 'exists') {
+      logWarn('webhook:revenuecat', 'Replay dedupado', { eventId, type: event.type })
       return NextResponse.json({ ok: true, deduped: true })
     }
 
-    const userId = String(event.app_user_id).trim()
-    const productId = String(event.product_id || '').trim()
-    const dbPlanId = resolveDbPlanId(productId)
-    const eventType = String(event.type).toUpperCase()
-    const expiresMs = event.expiration_at_ms ?? null
-    const expiresDate = expiresMs && Number.isFinite(expiresMs)
-      ? new Date(expiresMs).toISOString()
-      : null
-
-    // Determine target status based on event type
-    let targetStatus: 'active' | 'canceled' | 'expired' | null = null
-    if (ACTIVE_EVENTS.has(eventType)) {
-      targetStatus = 'active'
-    } else if (INACTIVE_EVENTS.has(eventType)) {
-      if (eventType === 'CANCELLATION') {
-        targetStatus = 'canceled'
-      } else {
-        targetStatus = 'expired'
-      }
+    const res = await processEvent(event)
+    if (res.status >= 500) {
+      await cacheDelete(dedupKey).catch(() => {})
     }
+    return res
+  } catch (e: unknown) {
+    logError('webhook:revenuecat', e)
+    if (dedupKey) await cacheDelete(dedupKey).catch(() => {})
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  }
+}
 
-    // Skip events we don't handle (TEST, SUBSCRIBER_ALIAS, etc.)
-    if (!targetStatus) {
-      return NextResponse.json({ ok: true, skipped: true })
+async function processEvent(event: RevenueCatEvent): Promise<NextResponse> {
+  const userId = String(event.app_user_id).trim()
+  const productId = String(event.product_id || '').trim()
+  const dbPlanId = resolveDbPlanId(productId)
+  const eventType = String(event.type).toUpperCase()
+
+  const decision = decideEffect(eventType, event)
+  // Skip events we don't handle (TEST, SUBSCRIBER_ALIAS, TRANSFER, etc.)
+  if (!decision) {
+    return NextResponse.json({ ok: true, skipped: true })
+  }
+
+  const oti = String(event.original_transaction_id || '').trim()
+  const eventMsRaw = Number(event.event_timestamp_ms)
+  const eventMs = Number.isFinite(eventMsRaw) ? eventMsRaw : null
+
+  // L4: para eventos de ATIVAÇÃO, confirma o entitlement direto na API da
+  // RevenueCat antes de conceder VIP. Defesa em profundidade: se o
+  // WEBHOOK_AUTH_KEY vazar, um atacante não consegue forjar um INITIAL_PURCHASE
+  // pra app_user_id arbitrário (a API não confirmaria). null (sem secret key /
+  // API fora) → segue, pra não bloquear grant legítimo num outage.
+  if (decision.kind === 'grant') {
+    const verified = await revenuecatHasActiveEntitlement(userId)
+    if (verified === false) {
+      logWarn('webhook:revenuecat', 'Ativação NÃO confirmada pela API RevenueCat — grant negado', { userId, eventId: event.id, type: eventType })
+      return NextResponse.json({ ok: true, skipped: 'not_verified' })
     }
+  }
 
-    // L4: para eventos de ATIVAÇÃO, confirma o entitlement direto na API da
-    // RevenueCat antes de conceder VIP. Defesa em profundidade: se o
-    // WEBHOOK_AUTH_KEY vazar, um atacante não consegue forjar um INITIAL_PURCHASE
-    // pra app_user_id arbitrário (a API não confirmaria). null (sem secret key /
-    // API fora) → segue, pra não bloquear grant legítimo num outage.
-    if (targetStatus === 'active') {
-      const verified = await revenuecatHasActiveEntitlement(userId)
-      if (verified === false) {
-        logWarn('webhook:revenuecat', 'Ativação NÃO confirmada pela API RevenueCat — grant negado', { userId, eventId, type: eventType })
-        return NextResponse.json({ ok: true, skipped: 'not_verified' })
-      }
-    }
+  const admin = createAdminClient()
 
-    const admin = createAdminClient()
+  // Resolve o plano contra app_plans. Há FK (user_entitlements.plan_id e
+  // app_subscriptions.plan_id → app_plans.id): gravar um plan_id inexistente lança
+  // 23503, então resolveDbPlanId (só transformação de string) NÃO basta. Tenta o
+  // productId cru e o dbPlanId normalizado (mesma lógica do /revenuecat/sync).
+  let resolvedPlanId: string | null = null
+  for (const candidate of [...new Set([productId, dbPlanId].filter(Boolean))]) {
+    const { data: plan, error: planErr } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
+    // Erro de query (hiccup do DB, não "SKU desconhecido") → logWarn pra distinguir do
+    // alerta unmapped-plan no diagnóstico. Não interrompe: tenta o próximo candidato.
+    if (planErr) logWarn('webhook:revenuecat', 'app_plans lookup failed', { candidate, error: planErr.message })
+    if (plan?.id) { resolvedPlanId = plan.id; break }
+  }
 
-    // Resolve o plano contra app_plans. Há FK (user_entitlements.plan_id e
-    // app_subscriptions.plan_id → app_plans.id): gravar um plan_id inexistente lança
-    // 23503, então resolveDbPlanId (só transformação de string) NÃO basta. Tenta o
-    // productId cru e o dbPlanId normalizado (mesma lógica do /revenuecat/sync).
-    let resolvedPlanId: string | null = null
-    for (const candidate of [...new Set([productId, dbPlanId].filter(Boolean))]) {
-      const { data: plan, error: planErr } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
-      // Erro de query (hiccup do DB, não "SKU desconhecido") → logWarn pra distinguir do
-      // alerta unmapped-plan no diagnóstico. Não interrompe: tenta o próximo candidato.
-      if (planErr) logWarn('webhook:revenuecat', 'app_plans lookup failed', { candidate, error: planErr.message })
-      if (plan?.id) { resolvedPlanId = plan.id; break }
-    }
+  // Evento ATIVO com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
+  // mapeado). Gravar linha NOVA com esse plan_id violaria a FK (23503 → 500 em loop): por
+  // isso os INSERTs abaixo só rodam com resolvedPlanId. Os UPDATEs usam plan_id
+  // condicional e RENOVAM a JANELA de uma assinatura/entitlement existente sem tocar no
+  // plano. O alerta PÓS-bloco distingue renovação-ok (warn) do órfão sem linha (error).
+  const unmappedActive = decision.kind === 'grant' && !resolvedPlanId
+  let renewedExistingEnt = false
 
-    // Evento ATIVO com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
-    // mapeado). Gravar linha NOVA com esse plan_id violaria a FK (23503 → 500 em loop): por
-    // isso os INSERTs abaixo só rodam com resolvedPlanId. Os UPDATEs usam plan_id
-    // condicional e RENOVAM a JANELA (valid_until) de uma assinatura/entitlement existente
-    // sem tocar no plano — mas se o plano gravado tiver saído de app_plans o TIER cai pra
-    // free em getVipPlanLimits (renova a janela, não o benefício). O alerta PÓS-bloco
-    // distingue renovação-ok (warn) do órfão sem linha (error). Responde 200, sem retry.
-    const unmappedActive = targetStatus === 'active' && !resolvedPlanId
-    let renewedExistingEnt = false
+  const meta = {
+    provider: 'revenuecat',
+    product_identifier: productId,
+    event_type: eventType,
+    entitlement_ids: event.entitlement_ids || [],
+    ...(oti ? { original_transaction_id: oti } : {}),
+    ...(eventMs !== null ? { event_timestamp_ms: eventMs } : {}),
+    webhook_processed_at: new Date().toISOString(),
+  }
 
-    // The app_subscriptions.provider CHECK constraint allows a fixed set of
-    // values: asaas / stripe / apple / google / manual / admin / mercadopago.
-    // RevenueCat is an intermediary over Apple IAP — the source of truth is
-    // Apple — so we persist the subscription row with provider='apple'. The
-    // fact that the event came through RevenueCat is preserved in metadata
-    // (`metadata.provider = 'revenuecat'` and `product_identifier`).
-    //
-    // Previously this code used provider='revenuecat' directly, which was
-    // rejected by the CHECK constraint at INSERT time and the handler
-    // returned 500 — meaning no real iOS purchase could ever create an
-    // app_subscriptions row in production. user_entitlements was fine
-    // because that block (further below) already used 'apple'.
-
-    // Find existing iOS/RC subscription for this user (new 'apple' rows
-    // plus any legacy rows still tagged 'revenuecat' before this fix)
-    const { data: existing } = await admin
+  // The app_subscriptions.provider CHECK constraint allows a fixed set of
+  // values: asaas / stripe / apple / google / manual / admin / mercadopago.
+  // RevenueCat is an intermediary over Apple IAP — the source of truth is
+  // Apple — so we persist the subscription row with provider='apple'.
+  //
+  // Seleção da linha (A6): prefere a linha da MESMA cadeia de compra
+  // (metadata.original_transaction_id); só cai na "mais recente" quando a cadeia
+  // não está registrada (linhas antigas, de antes deste campo existir).
+  let existing: { id: string; status?: string; metadata?: unknown } | null = null
+  let subMatchedByChain = false
+  if (oti) {
+    const { data } = await admin
       .from('app_subscriptions')
-      .select('id, status')
+      .select('id, status, metadata')
+      .eq('user_id', userId)
+      .in('provider', ['apple', 'revenuecat'])
+      .contains('metadata', { original_transaction_id: oti })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (data?.id) { existing = data; subMatchedByChain = true }
+  }
+  if (!existing) {
+    const { data } = await admin
+      .from('app_subscriptions')
+      .select('id, status, metadata')
       .eq('user_id', userId)
       .in('provider', ['apple', 'revenuecat'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    existing = data ?? null
+  }
 
-    const meta = {
-      provider: 'revenuecat',
-      product_identifier: productId,
-      event_type: eventType,
-      entitlement_ids: event.entitlement_ids || [],
-      webhook_processed_at: new Date().toISOString(),
+  let subSkipReason: string | null = null
+  if (existing?.id) {
+    const rowMeta = metaOf(existing)
+    if (isStaleForRow(rowMeta, eventMs)) {
+      subSkipReason = 'stale_event'
+    } else if (decision.kind !== 'grant' && !subMatchedByChain && isForeignChain(rowMeta, oti)) {
+      // Cancelamento/expiração de uma cadeia antiga não derruba a recompra que
+      // hoje é dona da linha. Compra nova (grant) pode assumir a linha.
+      subSkipReason = 'foreign_chain'
     }
+  }
 
-    if (existing?.id) {
-      const { error } = await admin
-        .from('app_subscriptions')
-        .update({
-          // Só sobrescreve o plano quando resolvido; num evento inativo com plano não
-          // resolvido, mantém o plan_id existente (evita FK 23503).
-          ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
-          status: targetStatus,
-          current_period_end: expiresDate,
-          cancel_at_period_end: targetStatus === 'canceled',
-          metadata: meta,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
-      if (error) {
-        return respondDbError('revenuecat:webhook:subscription-update', error, 500)
-      }
-    } else if (targetStatus === 'active' && resolvedPlanId) {
-      // Só cria assinatura nova em ativação COM plano resolvido (senão FK 23503). Ativação
-      // sem plano resolvido já foi alertada acima e não cria linha nova.
-      const { error } = await admin
-        .from('app_subscriptions')
-        .insert({
-          user_id: userId,
-          plan_id: resolvedPlanId,
-          status: 'active',
-          provider: 'apple',
-          current_period_start: new Date().toISOString(),
-          current_period_end: expiresDate,
-          cancel_at_period_end: false,
-          metadata: meta,
-        })
-      if (error) {
-        return respondDbError('revenuecat:webhook:subscription-insert', error, 500)
-      }
+  if (existing?.id && !subSkipReason) {
+    const { error } = await admin
+      .from('app_subscriptions')
+      .update({
+        // Só sobrescreve o plano quando resolvido; num evento com plano não
+        // resolvido, mantém o plan_id existente (evita FK 23503).
+        ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
+        status: decision.subStatus,
+        // Janela: só quando o evento trouxe uma data. Escrever null aqui
+        // criava assinatura "sem prazo" que o fallback legado trata como
+        // ilimitada — mesma classe do bug do valid_until no entitlement.
+        ...(decision.windowIso !== null ? { current_period_end: decision.windowIso } : {}),
+        ...(decision.cancelAtPeriodEnd !== null ? { cancel_at_period_end: decision.cancelAtPeriodEnd } : {}),
+        metadata: { ...metaOf(existing), ...meta },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+    if (error) {
+      return respondDbError('revenuecat:webhook:subscription-update', error, 500)
     }
+  } else if (!existing?.id && decision.kind === 'grant' && resolvedPlanId && decision.windowIso) {
+    // Só cria assinatura nova em ativação COM plano resolvido e COM janela —
+    // linha nova sem current_period_end viraria acesso sem prazo no fallback.
+    const { error } = await admin
+      .from('app_subscriptions')
+      .insert({
+        user_id: userId,
+        plan_id: resolvedPlanId,
+        status: 'active',
+        provider: 'apple',
+        current_period_start: new Date().toISOString(),
+        current_period_end: decision.windowIso,
+        cancel_at_period_end: false,
+        metadata: meta,
+      })
+    if (error) {
+      return respondDbError('revenuecat:webhook:subscription-insert', error, 500)
+    }
+  } else if (!existing?.id && decision.kind === 'grant' && resolvedPlanId && !decision.windowIso) {
+    // C5: ativação sem expiration_at_ms não cria linha — seria acesso sem prazo
+    // por acidente. Vitalício de verdade é concessão manual (metadata.lifetime_grant).
+    logError('webhook:revenuecat:active-sem-expiracao', new Error('ativação sem expiration_at_ms — não criei assinatura; se for vitalício de verdade, conceda manualmente'), { userId, productId, eventType })
+  }
 
-    // Sync to user_entitlements (primary VIP resolution table)
-    // provider must be 'apple' (RevenueCat is an intermediary for Apple IAP)
-    // status mapping: active→active, canceled→cancelled, expired→inactive
-    // UPDATE renova/ajusta a linha existente sem tocar no plano quando não resolvido
-    // (plan_id condicional) — cobre a renovação de SKU não mapeado. INSERT (linha nova) só
-    // roda em ativação COM plano resolvido, evitando FK 23503. Ativação não mapeada sem
-    // linha prévia já foi alertada acima.
-    {
-      const entStatus = targetStatus === 'active' ? 'active' : targetStatus === 'canceled' ? 'cancelled' : 'inactive'
-      const { data: existingEnt } = await admin
+  // Sync to user_entitlements (primary VIP resolution table)
+  // provider must be 'apple' (RevenueCat is an intermediary for Apple IAP).
+  // Seleção (A6): prefere o entitlement do MESMO produto (as linhas Apple são
+  // chaveadas por provider_subscription_id=productId); fallback: mais recente.
+  let entSkipReason: string | null = null
+  {
+    let existingEnt: { id: string; metadata?: unknown } | null = null
+    let entMatchedByProduct = false
+    if (productId) {
+      const { data } = await admin
         .from('user_entitlements')
-        .select('id')
+        .select('id, metadata')
+        .eq('user_id', userId)
+        .eq('provider', 'apple')
+        .eq('provider_subscription_id', productId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (data?.id) { existingEnt = data; entMatchedByProduct = true }
+    }
+    if (!existingEnt) {
+      const { data } = await admin
+        .from('user_entitlements')
+        .select('id, metadata')
         .eq('user_id', userId)
         .eq('provider', 'apple')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
+      existingEnt = data ?? null
+    }
 
-      if (existingEnt?.id) {
-        renewedExistingEnt = true
-        const { error: entUpdErr } = await admin
-          .from('user_entitlements')
-          .update({
-            ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
-            status: entStatus,
-            // Num evento ativo SEM expiração (RENEWAL malformado) não sobrescreve a janela
-            // com null — valid_until=null resolveria como VIP vitalício. Mantém o valor.
-            ...((targetStatus === 'active' && expiresDate === null) ? {} : { valid_until: expiresDate, current_period_end: expiresDate }),
-            metadata: meta,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingEnt.id)
-        if (entUpdErr) logError('webhook:revenuecat:entitlement-update', entUpdErr, { userId, productId, eventType })
-      } else if (targetStatus === 'active' && resolvedPlanId) {
+    if (existingEnt?.id) {
+      const entMeta = metaOf(existingEnt)
+      if (entMeta.lifetime_grant === true) {
+        // Grant vitalício é decisão ADMINISTRATIVA (ex.: conta do App Review) —
+        // o webhook não rebaixa nem data uma concessão dessas. Ver auditoria
+        // 14/08/2026 (C5): o único valid_until=null de produção é intencional.
+        entSkipReason = 'lifetime_grant'
+        logWarn('webhook:revenuecat', 'Entitlement lifetime_grant — evento ignorado para a linha', { userId, productId, eventType })
+      } else if (isStaleForRow(entMeta, eventMs)) {
+        entSkipReason = 'stale_event'
+      } else if (decision.kind !== 'grant' && !entMatchedByProduct && isForeignChain(entMeta, oti)) {
+        entSkipReason = 'foreign_chain'
+      }
+    }
+
+    if (existingEnt?.id && !entSkipReason) {
+      renewedExistingEnt = true
+      const { error: entUpdErr } = await admin
+        .from('user_entitlements')
+        .update({
+          ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
+          status: decision.entStatus,
+          // Janela: só quando o evento trouxe data. Num evento ativo SEM
+          // expiração (RENEWAL malformado), não sobrescreve com null —
+          // valid_until=null resolveria como VIP vitalício.
+          ...(decision.windowIso !== null ? { valid_until: decision.windowIso, current_period_end: decision.windowIso } : {}),
+          metadata: { ...metaOf(existingEnt), ...meta },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingEnt.id)
+      if (entUpdErr) {
+        // Tabela PRIMÁRIA do VIP: falha aqui não pode virar 200 (o provedor não
+        // reenviaria). 500 → dedup liberado no handler → retry reprocessa.
+        return respondDbError('revenuecat:webhook:entitlement-update', entUpdErr, 500)
+      }
+    } else if (!existingEnt?.id && decision.kind === 'grant' && resolvedPlanId) {
+      if (!decision.windowIso) {
+        // C5: entitlement ativo sem expiração = VIP vitalício por acidente.
+        logError('webhook:revenuecat:entitlement-sem-expiracao', new Error('ativação sem expiration_at_ms — entitlement não criado; vitalício exige concessão manual (metadata.lifetime_grant)'), { userId, productId, eventType })
+      } else {
         const { error: entInsErr } = await admin
           .from('user_entitlements')
           .insert({
@@ -344,61 +506,61 @@ export async function POST(request: NextRequest) {
             provider: 'apple',
             provider_subscription_id: productId,
             valid_from: new Date().toISOString(),
-            valid_until: expiresDate,
+            valid_until: decision.windowIso,
             current_period_start: new Date().toISOString(),
-            current_period_end: expiresDate,
+            current_period_end: decision.windowIso,
             metadata: meta,
           })
         // 23505 = já existe (re-entrega/corrida do MESMO usuário): idempotente, ok.
-        // Qualquer OUTRO erro era ENGOLIDO em silêncio (200 OK mascarava a falha do
-        // VIP na tabela primária) — agora loga (→ Sentry). O bug crítico (colisão
-        // ENTRE usuários pelo SKU) foi fechado pela migration que incluiu user_id.
         if (entInsErr && (entInsErr as { code?: string }).code !== '23505') {
-          logError('webhook:revenuecat:entitlement-insert', entInsErr, { userId, productId, eventType })
+          return respondDbError('revenuecat:webhook:entitlement-insert', entInsErr, 500)
         }
       }
     }
-
-    // Alerta do SKU não mapeado, com nível conforme o desfecho: renovação da JANELA de uma
-    // linha existente = warn (funcionou; só falta mapear o SKU pro tier resolver certo);
-    // ativação de usuário SEM linha prévia = error (órfão, precisa de grant manual). Evita
-    // ruído de erro no Sentry a cada renovação legítima de um SKU não mapeado.
-    if (unmappedActive) {
-      if (renewedExistingEnt) {
-        logWarn('webhook:revenuecat', 'active event with SKU not in app_plans — existing entitlement window renewed; map the SKU so the tier resolves', { userId, productId, dbPlanId, eventType })
-      } else {
-        logError('webhook:revenuecat:unmapped-plan', new Error('active event with SKU not in app_plans and no existing entitlement — manual grant required'), { userId, productId, dbPlanId, eventType })
-      }
-    }
-
-    // Invalidate VIP caches
-    await Promise.all([
-      cacheDelete(`vip:access:${userId}`).catch(() => {}),
-      cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
-    ])
-
-    // Read-only addition: notify the user when RevenueCat reports a billing
-    // failure. Does not modify the billing flow — only piggybacks on the
-    // existing webhook to surface a self push.
-    if (eventType === 'BILLING_ISSUE') {
-      waitUntil(
-        insertNotifications([{
-          user_id: userId,
-          recipient_id: userId,
-          sender_id: userId,
-          type: 'billing_issue',
-          title: 'Falha no pagamento',
-          message: 'Não conseguimos cobrar sua assinatura. Atualize seus dados pra manter o VIP.',
-          is_read: false,
-          metadata: { event_type: eventType, product_id: productId },
-        }]).catch(() => { }),
-      )
-    }
-
-    return NextResponse.json({ ok: true, event: eventType, status: targetStatus })
-  } catch (e: unknown) {
-    logError('webhook:revenuecat', e)
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
+
+  // Alerta do SKU não mapeado, com nível conforme o desfecho: renovação da JANELA de uma
+  // linha existente = warn (funcionou; só falta mapear o SKU pro tier resolver certo);
+  // ativação de usuário SEM linha prévia = error (órfão, precisa de grant manual). Evita
+  // ruído de erro no Sentry a cada renovação legítima de um SKU não mapeado.
+  if (unmappedActive) {
+    if (renewedExistingEnt) {
+      logWarn('webhook:revenuecat', 'active event with SKU not in app_plans — existing entitlement window renewed; map the SKU so the tier resolves', { userId, productId, dbPlanId, eventType })
+    } else {
+      logError('webhook:revenuecat:unmapped-plan', new Error('active event with SKU not in app_plans and no existing entitlement — manual grant required'), { userId, productId, dbPlanId, eventType })
+    }
+  }
+
+  // Invalidate VIP caches
+  await Promise.all([
+    cacheDelete(`vip:access:${userId}`).catch(() => {}),
+    cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
+  ])
+
+  // Read-only addition: notify the user when RevenueCat reports a billing
+  // failure. Does not modify the billing flow — only piggybacks on the
+  // existing webhook to surface a self push.
+  if (eventType === 'BILLING_ISSUE') {
+    waitUntil(
+      insertNotifications([{
+        user_id: userId,
+        recipient_id: userId,
+        sender_id: userId,
+        type: 'billing_issue',
+        title: 'Falha no pagamento',
+        message: 'Não conseguimos cobrar sua assinatura. Atualize seus dados pra manter o VIP.',
+        is_read: false,
+        metadata: { event_type: eventType, product_id: productId },
+      }]).catch(() => { }),
+    )
+  }
+
+  return NextResponse.json({
+    ok: true,
+    event: eventType,
+    action: decision.kind,
+    status: decision.subStatus,
+    ...(subSkipReason ? { sub_skipped: subSkipReason } : {}),
+    ...(entSkipReason ? { ent_skipped: entSkipReason } : {}),
+  })
 }
