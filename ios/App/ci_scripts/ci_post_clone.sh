@@ -27,6 +27,13 @@ npm --version
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 npm ci --no-audit --no-fund
 
+# O postinstall (patch-ios.mjs) SE PULA quando CI está setado — guarda feita
+# para a Vercel, mas o Xcode Cloud seta CI=TRUE e é o único CI que PRECISA
+# do patch: sem ele, o apple-sign-in de node_modules pede capacitor-swift-pm
+# 7.x e a resolução conflita com o purchases-capacitor (8.x) — run #1731.
+# Invocação explícita com o ambiente de CI desarmado só para este comando.
+env -u CI -u VERCEL -u VERCEL_ENV -u NEXT_PUBLIC_VERCEL_ENV node scripts/patch-ios.mjs
+
 # O runner liga GLOBALMENTE o "only use versions from resolved file" — até o
 # próprio `xcodebuild -resolvePackageDependencies` recusa lockfile cujo
 # originHash não bate (run #1730: exit 74 DENTRO deste script; runs
