@@ -1313,3 +1313,55 @@ transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
 
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
+
+## Auditoria 2026-08-13 — fechada em 14/08/2026 (PRs #805–#819)
+
+O relatório vive em `Relatorio/auditoria-ponta-a-ponta-2026-08-13.md`; a
+conferência achado-a-achado e as correções são a sessão de 14/08. **Fase 1
+completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
+
+| Achado | PR | Estado |
+|---|---|---|
+| SEC-06 bucket chat-media | #805 | rota `ensure-bucket` REMOVIDA (não tinha chamador) |
+| SEC-01 XSS relatório | #806 | escape na atribuição + guard 5 payloads × 5 campos |
+| SEC-02 delete sem conferir Auth | #807 | `deleteUser` verificado + `account_deleted`/`_delete_auth_failed` em audit_events |
+| SEC-03 catálogo LGPD | #808 | `lib/account/userDataCatalog.ts` dirige export E delete (ver abaixo) |
+| SEC-05 erro cru em resposta | #809 | `respondInternalError` (requestId) em 111 rotas + guard classe inteira |
+| SEC-04 SECURITY DEFINER | #811 | migrations APLICADAS `20260814095015/31`; advisors 41→16 WARN |
+| SEC-07/10/11 | #812 | connect-src + rate limit auto-reportável + npm audit 0 |
+| Mapa muscular VIP quebrado | #813 | `maxItems` aninhado estourava o Gemini (400 desde 10/08) |
+| SEC-08 guarda de origem | #814 | middleware, MODO RELATÓRIO (ver abaixo) |
+| Xcode Cloud sempre vermelho | #815–#819 | verde no run #1732 (ver abaixo) |
+
+**Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
+1. **CSP**: janela limpa de 24 h após o deploy de 14/08 (#812 acrescentou
+   `res.cloudinary.com` ao connect-src — o preloader do StoryViewer) →
+   `CSP_ENFORCE=true` na Vercel. SQL da janela na seção do middleware acima.
+2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só LOGA
+   (`[origin-guard]` nos runtime logs, kind `cross-origin`|`missing-origin`).
+   Janela limpa (especialmente `missing-origin` zerado) →
+   `ORIGIN_GUARD_ENFORCE=true` na Vercel. Função pura em
+   `utils/security/originGuard.ts`; bearer/webhook/cron passam SEMPRE.
+
+**Catálogo LGPD (`lib/account/userDataCatalog.ts`) — ler ANTES de mexer em
+export/delete de conta.** Fatos medidos que ele carrega: a maioria das
+tabelas CASCATEIA no `deleteUser`; `error_reports` é ON DELETE RESTRICT (sem
+o delete manual dela, a exclusão de quem já reportou erro FALHA — foi bug
+vivo); storage nunca cascateia; tabela nova sem decisão no catálogo reprova
+no guard — o vermelho é o pedido de decisão.
+
+**Xcode Cloud — o workflow 'App | Default' (push na main, só Archive) ficou
+verde depois de 4 bloqueios em cadeia**, todos diagnosticados pela ASC API
+(a chave do repo lê builds/issues — não precisa do painel web):
+`ios/App/ci_scripts/ci_post_clone.sh` instala Node + `npm ci`, desliga as
+defaults `IDEPackage*` (o originHash do Package.resolved VARIA entre
+toolchains — lockfile commitado nunca satisfaz o runner) e roda o
+`patch-ios.mjs` com `env -u CI` — o patch SE PULA quando `CI` está setado
+(guarda para a Vercel) e o Xcode Cloud seta `CI=TRUE`. Guard:
+`src/__tests__/xcodeCloudCiScript.test.ts`.
+
+**Pendências com dono definido:** FCM sem env vars na Vercel → push Android
+MUDO desde 24/07 (59 eventos; as 3 chaves não existem no repo — é service
+account do console do Firebase, só o dono gera). Restante da auditoria não
+atacado: ATS iOS (SEC-09, exige build + aparelho físico), E2E/SAST no CI,
+sprint de performance (PERF-01…08), `pg_trgm` fora do schema public.
