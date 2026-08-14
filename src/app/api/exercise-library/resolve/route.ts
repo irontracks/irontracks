@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 
 import { requireUser } from '@/utils/auth/route'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 const NameValueSchema = z.union([z.string().min(1), z.number().min(0)])
@@ -57,6 +57,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, videos })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return respondInternalError('api:exercise-library:resolve', e)
   }
 }

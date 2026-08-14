@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
@@ -189,7 +190,8 @@ export async function POST(req: Request) {
         await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', subRow.id)
       } catch (rollbackErr) { logWarn('checkout:rollback', 'Failed to cancel pending subscription after MP error', { subId: subRow.id, error: rollbackErr }) }
       logError('checkout', 'MercadoPago payment creation failed', { userId: user.id, planId: plan.id, error: getErrorMessage(mpErr) })
-      return NextResponse.json({ ok: false, error: getErrorMessage(mpErr) || 'mercadopago_payment_failed' }, { status: 502 })
+      // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
+      return NextResponse.json({ ok: false, error: 'mercadopago_payment_failed' }, { status: 502 })
     }
 
     const providerPaymentId = String(payment?.id || '').trim()
@@ -243,6 +245,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, subscription: subRow, payment: payRow || null })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:app:checkout', e)
   }
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const runtime = 'nodejs'
@@ -67,6 +67,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'Erro interno.' }, { status: 500 })
+    return respondInternalError('api:auth:recovery-code', e)
   }
 }

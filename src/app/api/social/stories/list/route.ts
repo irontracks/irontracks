@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseSearchParams } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
@@ -266,6 +266,6 @@ export async function GET(req: Request) {
     await cacheSet(cacheKey, payload, 10)
     return NextResponse.json(payload, { headers: { 'cache-control': 'private, no-store' } })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:social:stories:list', e)
   }
 }

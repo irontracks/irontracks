@@ -23,9 +23,9 @@
  *               que só faz UPDATE/DELETE silencioso)
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -199,6 +199,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, crons: results })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:crons-status', e)
   }
 }

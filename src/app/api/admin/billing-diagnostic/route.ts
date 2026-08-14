@@ -20,6 +20,7 @@
  * Read-only and idempotent. Safe to call repeatedly. Admin-only.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { mercadopagoRequest } from '@/lib/mercadopago'
@@ -199,6 +200,6 @@ export async function GET() {
     })
   } catch (e) {
     logError('admin:billing-diagnostic', e)
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:billing-diagnostic', e)
   }
 }

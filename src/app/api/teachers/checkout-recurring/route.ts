@@ -15,6 +15,7 @@
  * Both flows coexist; the user chooses which they prefer in the Upgrade modal.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -142,7 +143,8 @@ export async function POST(req: Request) {
       })
     } catch (mpErr: unknown) {
       logError('teacher_checkout_recurring', 'MercadoPago Preapproval failed', { userId: user.id, planId, error: getErrorMessage(mpErr) })
-      return NextResponse.json({ ok: false, error: getErrorMessage(mpErr) || 'pagamento_falhou' }, { status: 502 })
+      // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
+      return NextResponse.json({ ok: false, error: 'pagamento_falhou' }, { status: 502 })
     }
 
     const subscriptionId = String(preapproval?.id ?? '').trim()
@@ -203,6 +205,6 @@ export async function POST(req: Request) {
       amount,
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teachers:checkout-recurring', e)
   }
 }

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
 import { buildSlimHistoryRow } from '@/utils/history/slimHistoryRow'
@@ -127,6 +127,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:workouts:history', e)
   }
 }

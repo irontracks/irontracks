@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer, requireUser } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonBody } from '@/utils/zod'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { respondDbError } from '@/utils/api/dbError'
@@ -189,6 +189,6 @@ export async function POST(
     )
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:control:[studentId]', e)
   }
 }

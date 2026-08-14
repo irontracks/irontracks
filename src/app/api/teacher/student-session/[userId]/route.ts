@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -69,7 +69,7 @@ export async function GET(
 
     return NextResponse.json({ ok: true, session: session ?? null })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:student-session:[userId]', e)
   }
 }
 
@@ -147,6 +147,6 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teacher:student-session:[userId]', e)
   }
 }

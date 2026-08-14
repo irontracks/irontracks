@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheDeletePattern } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -91,6 +91,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true, id: savedId || workoutId })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return respondInternalError('api:workouts:update', e)
   }
 }

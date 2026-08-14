@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -118,6 +118,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, inserted: rows.length })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:telemetry:user-event', e)
   }
 }

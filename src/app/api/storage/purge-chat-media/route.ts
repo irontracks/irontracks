@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
 
 const BodySchema = z
@@ -93,6 +93,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, scope: channelId || 'ALL', deleted: allPaths.length, messagesRemoved })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:storage:purge-chat-media', e)
   }
 }

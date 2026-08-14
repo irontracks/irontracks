@@ -1,7 +1,7 @@
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser, isSafeStoragePath, canUploadToChatMediaPath } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -53,6 +53,6 @@ export async function GET(req: Request) {
     headers.set('Cache-Control', 'private, max-age=300')
     return new Response(null, { status: 307, headers })
   } catch (e: unknown) {
-    return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
+    return respondInternalError('api:chat:media', e)
   }
 }

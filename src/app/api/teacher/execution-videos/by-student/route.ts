@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 
 export const runtime = 'nodejs'
@@ -50,6 +50,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, items: Array.isArray(data) ? data : [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
-    return jsonError(500, getErrorMessage(e))
+    return respondInternalError('api:teacher:execution-videos:by-student', e)
   }
 }

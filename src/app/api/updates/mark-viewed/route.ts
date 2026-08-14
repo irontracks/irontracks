@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +38,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:updates:mark-viewed', e)
   }
 }

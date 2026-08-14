@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -64,6 +64,6 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, archived: idsToArchive.length })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:vip:periodization:cleanup', e)
   }
 }

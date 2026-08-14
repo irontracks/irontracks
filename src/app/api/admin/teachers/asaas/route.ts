@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { requireRoleOrBearer } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { safeEmailLike } from '@/utils/safePgFilter'
 
@@ -267,6 +267,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, teacher: updated })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return respondInternalError('api:admin:teachers:asaas', e)
   }
 }

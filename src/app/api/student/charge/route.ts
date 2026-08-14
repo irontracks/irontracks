@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -121,7 +122,8 @@ export async function POST(req: Request) {
       payment = await mercadopagoRequest<Record<string, unknown>>({ method: 'POST', path: '/v1/payments', body: paymentBody })
     } catch (mpErr: unknown) {
       logError('student_charge', 'MercadoPago falhou', { userId: user.id, subscriptionId: subscription_id, error: getErrorMessage(mpErr) })
-      return NextResponse.json({ ok: false, error: getErrorMessage(mpErr) || 'pagamento_falhou' }, { status: 502 })
+      // SEC-05: o detalhe do provedor fica no logError acima; o cliente recebe o enumerado.
+      return NextResponse.json({ ok: false, error: 'pagamento_falhou' }, { status: 502 })
     }
 
     const poi = (payment?.point_of_interaction ?? {}) as Record<string, unknown>
@@ -150,6 +152,6 @@ export async function POST(req: Request) {
     if (chargeErr) return respondDbError('student:charge:insert', chargeErr)
     return NextResponse.json({ ok: true, charge })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:student:charge', e)
   }
 }

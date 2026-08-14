@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
@@ -7,7 +8,6 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 import { cacheDelete } from '@/utils/cache'
@@ -120,6 +120,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:app:subscriptions:cancel-active', e)
   }
 }

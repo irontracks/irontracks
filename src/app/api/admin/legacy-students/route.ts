@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +53,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, students })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:legacy-students', e)
   }
 }

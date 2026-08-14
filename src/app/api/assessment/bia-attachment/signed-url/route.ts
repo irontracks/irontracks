@@ -8,12 +8,12 @@
  * Acesso: dono do path, professor vinculado ou admin (canAccessBiaPath).
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { BIA_BUCKET, canAccessBiaPath } from '@/utils/storage/biaAttachmentAccess'
 
 export const dynamic = 'force-dynamic'
@@ -45,11 +45,11 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const { data, error } = await admin.storage.from(BIA_BUCKET).createSignedUrl(safe.path, SIGNED_URL_TTL_SECONDS)
     if (error || !data?.signedUrl) {
-      return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed_to_sign' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'failed_to_sign' }, { status: 400 })
     }
 
     return NextResponse.json({ ok: true, url: data.signedUrl, expiresIn: SIGNED_URL_TTL_SECONDS })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:assessment:bia-attachment:signed-url', e)
   }
 }

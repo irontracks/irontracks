@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 
 import { parseJsonBody } from '@/utils/zod'
@@ -6,7 +7,6 @@ import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { env } from '@/utils/env'
 import { resolveCanonicalItems } from '@/utils/ai/exerciseCanonicalizeShared'
@@ -239,6 +239,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, processed, created, updated, failed })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:exercises:canonicalize:backfill', e)
   }
 }

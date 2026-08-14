@@ -9,10 +9,10 @@
  * Idempotent: calling it on an already-cancelled subscription is a no-op.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { logWarn } from '@/lib/logger'
 
@@ -68,6 +68,6 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, cancelled })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:teachers:cancel-recurring', e)
   }
 }

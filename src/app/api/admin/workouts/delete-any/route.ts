@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { deleteTemplateFromSubscribers } from '@/lib/workoutSync'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
@@ -85,6 +85,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:workouts:delete-any', e)
   }
 }

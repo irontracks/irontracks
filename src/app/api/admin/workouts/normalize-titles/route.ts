@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export async function POST(req: Request) {
@@ -39,6 +39,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, updated: updates.length })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:workouts:normalize-titles', e)
   }
 }

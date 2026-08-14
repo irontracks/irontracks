@@ -8,9 +8,9 @@
  * No external PDF libraries needed — the browser engine handles everything.
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -308,6 +308,6 @@ export async function GET(req: Request) {
       },
     })
   } catch (e) {
-    return new NextResponse(getErrorMessage(e) || 'Server error', { status: 500 })
+    return respondInternalError('api:nutrition:export-pdf', e)
   }
 }

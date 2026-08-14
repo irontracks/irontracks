@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createClient } from '@/utils/supabase/server'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -35,6 +35,6 @@ export async function GET() {
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:workouts:list', e)
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isCronAuthorized } from '@/utils/cron/auth'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -81,6 +81,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, purged, retentionDays: RETENTION_DAYS, cutoff: cutoffIso })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:cron:telemetry-retention', e)
   }
 }

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
@@ -42,7 +42,7 @@ export async function GET() {
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:vip:profile', e)
   }
 }
 
@@ -84,6 +84,6 @@ export async function PUT(req: Request) {
     await cacheSet(`vip:profile:${user.id}`, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:vip:profile', e)
   }
 }

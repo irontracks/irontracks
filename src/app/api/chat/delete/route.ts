@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { extractStoragePathFromPublicUrl } from '@/utils/storage/publicUrlPath'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -97,6 +97,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:chat:delete', e)
   }
 }

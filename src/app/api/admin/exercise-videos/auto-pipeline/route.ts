@@ -26,6 +26,7 @@
  *   }
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -293,6 +294,6 @@ export async function POST(req: Request) {
     })
   } catch (e) {
     logError('exercise-videos:auto-pipeline', e)
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:exercise-videos:auto-pipeline', e)
   }
 }

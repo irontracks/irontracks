@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isCronAuthorized } from '@/utils/cron/auth'
-import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +47,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, cutoffIso, deletedRows })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:cron:clean-live-activity-tokens', e)
   }
 }

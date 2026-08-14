@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -89,6 +89,6 @@ export async function GET() {
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return respondInternalError('api:vip:periodization:active', e)
   }
 }

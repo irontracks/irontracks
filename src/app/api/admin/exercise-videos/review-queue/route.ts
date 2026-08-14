@@ -17,11 +17,11 @@
  *   - Os irmãos continuam pending (não cascateia)
  */
 import { NextResponse } from 'next/server'
+import { respondInternalError } from '@/utils/api/internalError'
 import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
       groups: Array.from(grouped.values()),
     })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:exercise-videos:review-queue', e)
   }
 }
 
@@ -162,6 +162,6 @@ export async function POST(req: Request) {
       .eq('id', video_id)
     return NextResponse.json({ ok: true, action: 'rejected' })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return respondInternalError('api:admin:exercise-videos:review-queue', e)
   }
 }
