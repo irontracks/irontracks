@@ -3,6 +3,7 @@
 import React from 'react'
 import Image from 'next/image'
 import { Dumbbell, Trophy, Flame, Target, Heart, Wifi } from 'lucide-react'
+import { feedMessageSemNome } from '@/lib/social/feedMessage'
 
 export interface FeedItem {
   id: string
@@ -172,7 +173,7 @@ function FeedCard({
           <span className="text-[10px] text-neutral-600 flex-shrink-0">{timeAgo(item.createdAt)}</span>
         </div>
         <p className="text-[13px] text-neutral-400 leading-snug line-clamp-2">
-          {item.message}
+          {feedMessageSemNome(item.message, name)}
         </p>
 
         {/* PR detail chips */}
