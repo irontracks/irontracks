@@ -97,10 +97,15 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             root.style.setProperty('--it-rest-bar-h', `${Math.round(el.getBoundingClientRect().height)}px`);
         };
         publish();
-        const ro = new ResizeObserver(publish);
-        ro.observe(el);
+        // jsdom (e WebViews antigas) não têm ResizeObserver: a medição inicial
+        // já resolve o caso comum, e o observer é só para a barra mudar de
+        // altura em voo (safe-area/AUTO). Sem guarda, o componente inteiro
+        // quebrava nos testes — e no aparelho seria a tela do descanso caindo.
+        const RO = typeof ResizeObserver !== 'undefined' ? ResizeObserver : null;
+        const ro = RO ? new RO(publish) : null;
+        ro?.observe(el);
         return () => {
-            ro.disconnect();
+            ro?.disconnect();
             // Descanso acabou/desmontou: devolve o rodapé ao chão. Sem isto o
             // WorkoutFooter ficaria flutuando com um vão para sempre.
             root.style.removeProperty('--it-rest-bar-h');
