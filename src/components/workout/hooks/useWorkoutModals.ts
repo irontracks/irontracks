@@ -66,7 +66,14 @@ export function useWorkoutModals(collapsedKey: string | null) {
         transitionTime: '',
     }));
     const [editExerciseOriginal, setEditExerciseOriginal] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null>(null);
-    const [persistToPlan, setPersistToPlan] = useState<boolean>(false);
+    const [persistToPlan, setPersistToPlanRaw] = useState<boolean>(false);
+    // true depois que o USUÁRIO mexeu no toggle "Atualizar plano" nesta abertura
+    // do modal — o auto-ligado abaixo nunca passa por cima de escolha explícita.
+    const persistTouchedRef = useRef(false);
+    const setPersistToPlan = useCallback((v: boolean) => {
+        persistTouchedRef.current = true;
+        setPersistToPlanRaw(v);
+    }, []);
 
     const editExerciseHasChanges = useMemo(() => {
         if (!editExerciseOriginal || !editExerciseDraft) return false;
@@ -80,6 +87,37 @@ export function useWorkoutModals(collapsedKey: string | null) {
             (editExerciseDraft.transitionTime ?? '') !== (editExerciseOriginal.transitionTime ?? '')
         );
     }, [editExerciseDraft, editExerciseOriginal]);
+
+    // Unilateral é propriedade do EXERCÍCIO, não ajuste do dia: o Cross que é
+    // unilateral hoje continua unilateral amanhã. Quando o que mudou foi o
+    // bloco unilateral (toggle/descanso entre lados/troca), o padrão vira
+    // PERSISTIR no plano — o usuário ainda pode desligar. Sem isso, o relato
+    // real de 14/08/2026: o aluno marca unilateral, toca em "Salvar" achando
+    // que é definitivo (o toggle "Atualizar plano" nasce desligado), a sessão
+    // recebe e o TEMPLATE não — no próximo treino o exercício volta bilateral,
+    // "toda vez que eu vou lá e salvo, ele não salva".
+    const unilateralBlockChanged = useMemo(() => {
+        if (!editExerciseOriginal || !editExerciseDraft) return false;
+        return (
+            !!editExerciseDraft.isUnilateral !== !!editExerciseOriginal.isUnilateral ||
+            (editExerciseDraft.sideRestTime ?? '') !== (editExerciseOriginal.sideRestTime ?? '') ||
+            (editExerciseDraft.transitionTime ?? '') !== (editExerciseOriginal.transitionTime ?? '')
+        );
+    }, [editExerciseDraft, editExerciseOriginal]);
+
+    useEffect(() => {
+        // A cada abertura o toggle volta ao estado "não tocado" — o reset feito
+        // pelo openEditExercise usa o setter embrulhado e marcaria touched.
+        if (editExerciseOpen) persistTouchedRef.current = false;
+    }, [editExerciseOpen]);
+
+    useEffect(() => {
+        if (!editExerciseOpen) return;
+        if (persistTouchedRef.current) return;
+        // Segue o bloco unilateral enquanto o usuário não tocar no toggle:
+        // mudou → liga; desfez a mudança → desliga de volta.
+        setPersistToPlanRaw(unilateralBlockChanged);
+    }, [editExerciseOpen, unilateralBlockChanged]);
 
     // ---- Delete exercise confirmation ----
     const [deleteConfirmIdx, setDeleteConfirmIdx] = useState<number | null>(null);

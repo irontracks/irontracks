@@ -18,6 +18,7 @@
  * Acesso: só o DONO do treino (RLS + checagem explícita). Rate limit: 30/min.
  */
 import { NextResponse } from 'next/server'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -107,6 +108,8 @@ export async function POST(req: Request) {
                     video_url: body.videoUrl ?? null,
                     rest_time: DEFAULT_REST_SECONDS,
                     order: Number.isFinite(lastOrder) ? lastOrder + 1 : 0,
+                    // Exercício novo do picker: nasce bilateral explícito, pela fonte única.
+                    ...unilateralPersistFields(body as unknown as Record<string, unknown>),
                 })
                 .select('id')
                 .single()

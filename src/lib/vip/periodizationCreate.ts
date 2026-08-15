@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseJsonWithSchema } from '@/utils/zod';
@@ -218,6 +219,7 @@ export async function createPeriodizationProgram(
             cadence: ex.cadence ?? null,
             method: ex.method ?? null,
             order: ex.order,
+            ...unilateralPersistFields(ex as unknown as Record<string, unknown>),
             sets: ex.sets.map((s) => ({
                 weight: s.weight ?? null, reps: s.reps ?? null, rpe: s.rpe ?? null,
                 set_number: s.set_number, completed: false, is_warmup: !!s.is_warmup,

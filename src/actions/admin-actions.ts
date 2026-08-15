@@ -9,6 +9,7 @@ import { waitUntil } from '@vercel/functions'
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 
 import { getErrorMessage } from '@/utils/errorMessage'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { safePg, safeEmailLike } from '@/utils/safePgFilter'
 
 async function checkAdmin() {
@@ -355,7 +356,9 @@ export async function assignWorkoutToStudent(
                 rest_time: ex?.rest_time ?? 60,
                 cadence: ex?.cadence ?? '2020',
                 method: ex?.method ?? 'Normal',
-                order: ex?.order ?? idx
+                order: ex?.order ?? idx,
+                // Clonar template sem isto regravava o exercício como bilateral.
+                ...unilateralPersistFields(ex as Record<string, unknown>)
             }));
             const { data: insertedExs, error: exError } = await adminDb
                 .from('exercises')

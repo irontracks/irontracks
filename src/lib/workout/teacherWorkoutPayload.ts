@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 /**
@@ -65,6 +66,9 @@ export interface TeacherExercisePayload {
     method: unknown
     order: number
     is_unilateral: boolean
+    side_rest_time: number | null
+    transition_time: number | null
+    is_alternating: boolean
     sets: TeacherSetPayload[]
 }
 
@@ -117,7 +121,7 @@ export function buildTeacherExercisesPayload(exercises: unknown): TeacherExercis
                 cadence: ex.cadence ?? null,
                 method: ex.method ?? null,
                 order: idx,
-                is_unilateral: !!(ex.isUnilateral ?? ex.is_unilateral),
+                ...unilateralPersistFields(ex as Record<string, unknown>),
                 sets,
             }
         })

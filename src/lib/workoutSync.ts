@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logError } from '@/lib/logger'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 
 type SyncResult = { created: number; updated: number; failed: number }
 
@@ -258,6 +259,8 @@ const replaceExercisesAndSets = async ({
         method: ex?.method ?? null,
         cadence: ex?.cadence ?? null,
         order: ex?.order ?? 0,
+        // Sem isto, o sync professor→aluno regravava o exercício como bilateral.
+        ...unilateralPersistFields(e as Record<string, unknown>),
       })
       .select('id')
       .single()
