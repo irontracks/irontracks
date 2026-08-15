@@ -49,3 +49,21 @@ jobs:
       env:
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+
+    # E2E de navegador — só a fatia que NÃO depende de login nem de dado real:
+    # as páginas públicas carregam, as protegidas redirecionam (em vez de dar
+    # 500) e a árvore de acessibilidade das telas públicas continua íntegra.
+    # Medido antes de ligar: 29 testes, 2 rodadas seguidas, 100% verdes e ~5 s.
+    # Os specs `authenticated-*` ficam DE FORA — exigem E2E_USER_EMAIL/PASSWORD
+    # como secrets do repositório (decisão do dono) — e `visual-regression`
+    # também, porque comparação de screenshot entre máquinas diferentes é flake
+    # por construção. Reaproveita o build do passo acima via `npm run start`.
+    - name: Install Playwright browser (chromium)
+      run: npx playwright install --with-deps chromium
+
+    - name: E2E — public pages (Playwright)
+      run: npx playwright test --project=chromium e2e/pages-smoke.spec.ts e2e/pages-smoke-protected.spec.ts e2e/accessibility.spec.ts --reporter=github
+      env:
+        PLAYWRIGHT_CI_SERVER: "1"
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
