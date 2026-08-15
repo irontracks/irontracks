@@ -963,6 +963,52 @@ no meio do treino sem perder log nem tempo.
 digitado vira "12". Contorno: long-press → selecionar → digitar. A correção
 seria selecionar o conteúdo ao focar.
 
+## Cobertura de teste: o que roda no CI hoje (15/08/2026)
+
+O teste manual de 10 passos passou por cima de **5.476 testes verdes** e ainda
+achou três defeitos — porque nenhum deles ANDAVA pelo app. Estado atual, para
+ninguém remedir:
+
+| camada | roda no CI? | o que cobre |
+|---|---|---|
+| Vitest unit/integração (5.4k) | **sim** | lógica, contratos, guards de classe |
+| Vitest de jornada (jsdom) | **sim** | contrato entre componentes (ex.: `jornadaDescansoRodape` — o descanso publica `--it-rest-bar-h`, o rodapé consome, some ao desmontar) |
+| Playwright público (29 testes) | **sim, desde 15/08** | páginas públicas carregam, protegidas redirecionam sem 500, árvore de acessibilidade íntegra |
+| Playwright `authenticated-*` | **não** | exige `E2E_USER_EMAIL`/`PASSWORD` como secrets do repositório — decisão do dono |
+| `visual-regression` | **não, de propósito** | screenshot entre máquinas diferentes é flake por construção |
+
+**O que ainda NÃO tem teste automatizado é a jornada logada de UI** (iniciar
+treino → concluir série → editar no meio → finalizar). Os specs
+`authenticated-workout*.spec.ts` que existem são de **API**, não de tela — não
+teriam pego nenhum dos três bugs. Ligar isso exige, além dos secrets: sanear os
+specs que hoje dependem de ambiente (medido em 15/08: `admin-protection` e
+`critical-api` falham localmente por env, não por regressão).
+
+**jsdom não tem `ResizeObserver`** — usar direto derrubou 3 testes de cardio e,
+no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
+componente sempre com `typeof X !== 'undefined'`.
+
+## Campo numérico SELECIONA ao focar (15/08/2026)
+
+Tocar num campo com valor e digitar INSERIA no cursor: com `2`, digitar `1`
+virava `12` — carga errada gravada no histórico, que é a base que o motor de
+carga automática lê depois. Hoje tocar seleciona o valor e digitar substitui.
+
+Fonte única em `utils/ui/selectOnFocus.ts`. Três detalhes que a versão ingênua
+erra no iOS: `requestAnimationFrame` (dentro do `onFocus` o WebKit ainda está
+posicionando o cursor pelo toque, e o `select()` não pega), `setSelectionRange`
+em vez de `select()` (mais confiável em `type="text"` com `inputMode` numérico —
+e `type=number` está fora de questão, rejeita vírgula no pt-BR) e abortar se o
+foco já saiu no frame seguinte.
+
+**A cobertura é por DELEGAÇÃO de evento** (`installNumericSelectOnFocus`,
+montada no shell do dashboard): são ~80 inputs numéricos escritos à mão nos
+modais de método, e reescrever 80 JSX por regex é a operação que já colapsou 73
+arquivos aqui. O alvo é o `inputMode` (decimal/numeric) — texto livre fica de
+fora por construção. `NumericInput` e os campos de série (`useInputField`,
+`selectOnFocus` **true por padrão**) também selecionam explicitamente; **notas**
+é a exceção declarada. Opt-out por `data-no-select-on-focus`.
+
 ## Teste no simulador iOS (o agente verifica sozinho, não o dono)
 **Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
 

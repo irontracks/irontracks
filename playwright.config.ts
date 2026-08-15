@@ -57,9 +57,19 @@ export default defineConfig({
             : []),
     ],
 
-    // Automatically start dev server when running E2E locally
+    // Sobe o servidor sozinho. Local: dev (rápido de iterar). No CI: só quando
+    // PLAYWRIGHT_CI_SERVER=1 (o job de E2E do ci.yml), servindo o build que o
+    // passo "Verify Build" já produziu — sem isso o CI tentaria falar com um
+    // localhost que ninguém iniciou.
     webServer: process.env.CI
-        ? undefined
+        ? (process.env.PLAYWRIGHT_CI_SERVER === '1'
+            ? {
+                command: 'npm run start',
+                url: 'http://localhost:3000',
+                reuseExistingServer: false,
+                timeout: 120_000,
+            }
+            : undefined)
         : {
             command: 'npm run dev',
             url: 'http://localhost:3000',
