@@ -22,6 +22,7 @@ import { PlateHintLine } from './PlateHintLine';
 import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { FailureToggle } from './FailureToggle';
 import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
+import { selectFieldContent } from '@/utils/ui/selectOnFocus'
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -35,7 +36,22 @@ import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
  *  `externalValue` vazio (a gravação ainda não voltou pelo estado do React). */
 const TYPED_VALUE_GRACE_MS = 2000;
 
-function useInputField(externalValue: string, onChange: (v: string) => void, label?: string) {
+/**
+ * `selectOnFocus` é o PADRÃO (true) de propósito: quase todo campo aqui é valor
+ * curto (peso/reps/RPE, e as variantes L_/R_), onde tocar e digitar deve
+ * SUBSTITUIR — com "2" no campo, digitar "1" produzia "12", ou seja carga errada
+ * gravada e depois lida pelo motor de carga automática (achado do teste E2E de
+ * 15/08/2026). Campo de TEXTO (notas) passa `false` explicitamente: lá o usuário
+ * complementa o que já escreveu. Padrão invertido faria todo renderer novo
+ * nascer com o defeito.
+ */
+function useInputField(
+  externalValue: string,
+  onChange: (v: string) => void,
+  label?: string,
+  opts?: { selectOnFocus?: boolean },
+) {
+  const selectOnFocus = opts?.selectOnFocus !== false;
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
   const blurredAtRef = useRef(0);
@@ -120,9 +136,14 @@ function useInputField(externalValue: string, onChange: (v: string) => void, lab
     [onChange],
   );
 
-  const handleFocus = useCallback(() => {
+  const handleFocus = useCallback((e?: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     isFocused.current = true;
-  }, []);
+    // O evento é opcional porque o campo de notas chama sem argumento; a
+    // seleção só faz sentido em <input> (textarea de notas fica de fora pelo
+    // opts.selectOnFocus=false).
+    const el = e?.currentTarget;
+    if (selectOnFocus && el instanceof HTMLInputElement) selectFieldContent(el);
+  }, [selectOnFocus]);
 
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -334,9 +355,11 @@ const NormalSetInner = ({
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   'rpe');
+  // Notas é o ÚNICO campo de texto livre aqui: selecionar tudo ao focar
+  // apagaria o que o usuário já escreveu na primeira tecla. Exceção explícita.
   const notesField = useInputField(extNotes, (v) =>
     updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
+  undefined, { selectOnFocus: false });
 
   // ── Input fields — unilateral ─────────────────────────────────────────
   // Marca a fonte como 'user' ao editar um lado — sem isto a re-sincronização do

@@ -103,6 +103,7 @@ import {
 import type { AdminUser } from '@/types/admin'
 import { logError } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
+import { installNumericSelectOnFocus } from '@/utils/ui/selectOnFocus'
 const HealthWidget = dynamic(() => import('@/components/dashboard/HealthWidget'), { ssr: false })
 const GymDetectToastWrapper = dynamic(() => import('@/components/dashboard/GymDetectToastWrapper'), { ssr: false })
 
@@ -161,6 +162,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // bridge do Capacitor (que pode não estar injetado no 1º render — mesma
     // corrida documentada em useWorkoutLiveActivity), senão o Watch ficaria
     // sem academias por uma checagem prematura.
+    // Campo numérico: tocar SELECIONA o valor, então digitar substitui em vez
+    // de inserir no cursor ("2" + "1" virava "12" — carga errada gravada e
+    // depois lida pelo motor de carga automática; achado do teste E2E de
+    // 15/08/2026). Um listener delegado cobre os ~80 inputs numéricos escritos
+    // à mão nos modais de método e todo campo futuro — reescrever cada JSX por
+    // regex é a operação que já colapsou arquivos neste repo.
+    useEffect(() => installNumericSelectOnFocus(), [])
+
     const [watchGyms, setWatchGyms] = useState<WatchGym[]>([])
     const [gymsBridgeReady, setGymsBridgeReady] = useState<boolean>(() => isIosNative())
     useEffect(() => {
