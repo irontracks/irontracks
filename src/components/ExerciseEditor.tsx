@@ -80,6 +80,29 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             onChange?.({ ...workout, exercises: validExercises });
         }
     }, [workout, onChange]);
+    // Todo exercício SEM id ganha uma chave efêmera (_itx_exKey) na entrada.
+    // A key do card NUNCA pode derivar do nome: com key = nome+index, cada
+    // tecla na renomeação criava uma key nova → o React desmontava o card →
+    // o input perdia o foco → o teclado do iOS fechava a cada letra (bug real
+    // relatado em 14/08/2026: "toda vez que digito uma letra some a caixa de
+    // letras embaixo"). A chave é interna e nunca persiste: os payloads de
+    // save mapeiam campos explícitos e os fluxos de sessão passam por
+    // stripWorkoutInternalKeys.
+    React.useEffect(() => {
+        if (!Array.isArray(workout?.exercises)) return;
+        let changed = false;
+        const withKeys = workout.exercises.map((ex) => {
+            if (!ex || typeof ex !== 'object') return ex;
+            const rec = ex as { id?: string; _itx_exKey?: string };
+            if (rec.id || rec._itx_exKey) return ex;
+            changed = true;
+            const fresh = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : `exk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+            return { ...ex, _itx_exKey: fresh };
+        });
+        if (changed) onChange?.({ ...workout, exercises: withKeys });
+    }, [workout, onChange]);
     React.useEffect(() => {
         if (!Array.isArray(workout?.exercises)) return;
         let changed = false;
@@ -231,13 +254,16 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                         const setsCount = Math.max(setsFromField, setsFromDetails);
                         const setDetails = ensureSetDetails(exercise, setsCount);
 
-                        // Key estável: prioriza id do exercício; fallback combina nome + index pra
-                        // não perder identidade ao reordenar. `index` puro causava foco "pular" entre
-                        // inputs ao arrastar exercícios.
+                        // Key estável: id do exercício ou a chave efêmera atribuída no efeito
+                        // acima. JAMAIS derivar do nome: key = nome+index desmontava o card a
+                        // cada tecla da renomeação e o teclado fechava letra a letra. O
+                        // fallback `ex-${index}` só existe para o frame anterior ao efeito
+                        // (`index` puro fazia o foco "pular" ao reordenar — por isso a chave
+                        // efêmera, não o index, é quem dá identidade).
                         const stableKey = String(
                             (exercise as { id?: string; _itx_exKey?: string })?.id
                             ?? (exercise as { _itx_exKey?: string })?._itx_exKey
-                            ?? `${exercise?.name || 'ex'}-${index}`
+                            ?? `ex-${index}`
                         );
 
                         // Canônico (só força) e detecção de séries customizadas — dirige o
