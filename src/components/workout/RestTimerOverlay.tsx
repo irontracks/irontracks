@@ -83,6 +83,29 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Fonte única: useKeyboardInset (mesma medição, agora compartilhada com o
     // WorkoutFooter, que sofria do mesmo problema).
     const kbInset = useKeyboardInset();
+    // Altura REAL da barra do descanso publicada como --it-rest-bar-h no
+    // documento: é ela que faz o WorkoutFooter subir em vez de ficar coberto
+    // (o "Finalizar" era inalcançável durante o descanso — 15/08/2026). A
+    // medida vem do DOM (ResizeObserver) porque a barra muda de altura com a
+    // safe-area e com o estado (com/sem AUTO), e chutar px erra no notch.
+    const barRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const el = barRef.current;
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        if (!el || !root) return;
+        const publish = () => {
+            root.style.setProperty('--it-rest-bar-h', `${Math.round(el.getBoundingClientRect().height)}px`);
+        };
+        publish();
+        const ro = new ResizeObserver(publish);
+        ro.observe(el);
+        return () => {
+            ro.disconnect();
+            // Descanso acabou/desmontou: devolve o rodapé ao chão. Sem isto o
+            // WorkoutFooter ficaria flutuando com um vão para sempre.
+            root.style.removeProperty('--it-rest-bar-h');
+        };
+    });
     // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
     // keeping the bottom bar (timer + START + AUTO) visible. Lets the user
     // peek at the upcoming sets in the workout list below WITHOUT pressing
@@ -723,7 +746,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
             {/* perf: fundo sólido em vez de backdrop-blur-xl — o blur roda o descanso
                 inteiro (efeito iOS mais caro da tela) e engasga o scroll da lista por baixo. */}
-            <div style={{ bottom: kbInset || undefined }} className="fixed bottom-0 left-0 right-0 bg-neutral-950 border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden transition-[bottom] duration-150">
+            <div ref={barRef} style={{ bottom: kbInset || undefined }} className="fixed bottom-0 left-0 right-0 bg-neutral-950 border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden transition-[bottom] duration-150">
                 <div className="flex items-center gap-3 max-w-md mx-auto min-w-0">
                     {/* Circular SVG ring — compact size matching bar height */}
                     <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>
