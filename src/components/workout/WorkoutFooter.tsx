@@ -70,8 +70,22 @@ export default function WorkoutFooter() {
   // acima do teclado por conta própria.
   const keyboardOpen = useKeyboardOpen()
 
+  // Com o DESCANSO rolando, a barra do RestTimerOverlay (fixed bottom-0,
+  // z-[2100], renderizada na raiz) ficava POR CIMA deste rodapé — e o
+  // "Finalizar" virava inalcançável: para terminar o treino o usuário tinha
+  // que esperar (ou pular) o descanso. Mesma classe do bug dos modais
+  // (14/08/2026): position+z-index do <ActiveWorkout> cria contexto de
+  // empilhamento, então subir o z-50 daqui não resolve nada.
+  //
+  // A saída aqui NÃO é sobrepor (as duas barras ocupam o mesmo espaço do
+  // rodapé e brigariam): este rodapé SOBE a altura da barra do descanso e as
+  // duas ficam visíveis e clicáveis, empilhadas. `--it-rest-bar-h` é
+  // publicada pelo RestTimerOverlay enquanto o descanso existe.
   return (
-    <div className={`fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe ${keyboardOpen ? 'hidden' : ''}`}>
+    <div
+      style={{ bottom: 'var(--it-rest-bar-h, 0px)' }}
+      className={`fixed left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
+    >
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
         <button aria-label="Descartar treino"
