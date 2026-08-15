@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
+import { selectFieldContent } from '@/utils/ui/selectOnFocus'
 
 type BaseInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -78,6 +79,10 @@ export function NumericInput({
       onChange={handleChange}
       onFocus={(e) => {
         focusedRef.current = true
+        // Campo curto de valor: tocar seleciona o que está lá, então digitar
+        // SUBSTITUI em vez de inserir no cursor ("2" + tecla "1" virava "12" —
+        // carga errada gravada, achado do teste E2E de 15/08/2026).
+        selectFieldContent(e.currentTarget)
         onFocus?.(e)
       }}
       onBlur={(e) => {
