@@ -898,6 +898,71 @@ três vezes (rótulo por palpite em botão com texto dinâmico, `aria-expanded` 
 botão que abre modal, guard com regex furado). Corrija só o inequívoco e
 **reporte o resto em vez de silenciar**.
 
+## ⚠️ NUNCA mandar print/screenshot ao dono (regra dele, 15/08/2026)
+
+Pedido explícito, repetido duas vezes na mesma sessão: **não tirar screenshot
+para mostrar, não anexar imagem na resposta.** Screenshot segue valendo como
+FERRAMENTA de verificação do agente (ver a tela para decidir o próximo toque),
+mas o resultado se relata em TEXTO — número do banco, estado do elemento, o que
+funcionou. Imagem é o input mais caro que existe e o dono não quer recebê-la.
+
+## Percorrer o app inteiro acha o que 5.476 testes verdes não acham (15/08/2026)
+
+Teste de 10 passos pedido pelo dono (abrir → treinar → editar no meio → sair →
+voltar → deletar → adicionar → métodos avançados → respeitar TODOS os descansos
+→ finalizar), rodado no simulador de ponta a ponta. A suíte estava 100% verde e
+mesmo assim o passo 10 **travou**: com o descanso rolando, a barra do
+`RestTimerOverlay` cobria o `WorkoutFooter` e o botão **Finalizar era
+inalcançável** — para terminar o treino era preciso esperar ou pular o descanso.
+
+**A lição que dói: eu tinha "corrigido" essa MESMA classe no dia anterior.** O
+PR #833 portou os 19 overlays de modal para cima da barra, e escrevi um guard —
+que varria só os três arquivos de modais. O rodapé principal, que sofre do
+mesmo defeito pelo mesmo motivo, ficou de fora, e o guard passou verde com o bug
+vivo. **Guard que varre a lista dos arquivos que eu já conhecia não é guard de
+classe: é guard da instância com cara de classe.** A pergunta certa ao escrever
+guard continua sendo "onde ele NÃO olha?".
+
+**Sobreposição no rodapé não se resolve com z-index.** Modal versus barra: dá
+para empilhar em z (o modal cobre a tela toda, a barra fica atrás). Duas BARRAS
+de rodapé disputam o mesmo espaço físico — quem estiver por cima esconde a
+outra, qualquer que seja o z. A saída é geométrica: o `RestTimerOverlay` publica
+a altura real da sua barra em `--it-rest-bar-h` (medida por `ResizeObserver`,
+porque ela muda com safe-area e com o botão AUTO) e o `WorkoutFooter` posiciona
+`bottom` por essa variável, com fallback `0px`. Guard em
+`__tests__/rodapeAcimaDoDescanso.test.ts`; **barra fixa NOVA no rodapé do treino
+ativo reprova em `barrasDoRodapeTreino.test.ts` até declarar como convive com o
+descanso.**
+
+**jsdom não tem `ResizeObserver`** — usar direto derrubou 3 testes de cardio e,
+no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
+componente sempre com `typeof X !== 'undefined'`; a medição inicial já cobre o
+caso comum e o observer é só para mudança em voo.
+
+**`git checkout <arquivo>` durante prova por mutação apaga trabalho não
+commitado.** Perdi duas vezes uma reescrita inteira desfazendo a mutação num
+arquivo que ainda não estava no índice. **Commitar ANTES de mutar** — a mutação
+se desfaz com `git checkout` justamente porque o commit existe.
+
+**Automação do simulador — o que custou toque errado:** as coordenadas são
+PONTOS (440×956 no 17 Pro Max), não pixels do screenshot; um toque convertido de
+px caiu no botão "Duplicar" e criou exercício fantasma no rascunho. O backspace
+(`\b`) NÃO chega ao campo: para limpar, long-press no texto → o iOS seleciona →
+digitar substitui. E a autocorreção do iOS renomeia o que você digita ("Drop
+teste" virou "Frio teste", "Bi A" virou "Vi A") — nomes de teste devem ser
+palavras que o corretor não toca, senão a conferência por nome falha.
+
+**O que o app fez CERTO no teste** (não reinvestigar como se fosse bug):
+recusou concluir Drop-set com uma etapa só ("defina pelo menos 2") e Cluster com
+bloco vazio; preservou sessão, edição e cronômetro ao sair e voltar; perguntou
+"só hoje / pra sempre" ao deletar exercício; e sobreviveu a uma pausa de horas
+no meio do treino sem perder log nem tempo.
+
+**Achado de UX que ficou aberto (não é bug):** nos campos numéricos do editor
+(Sets/Reps/RPE), digitar INSERE no cursor em vez de substituir — "2" com "1"
+digitado vira "12". Contorno: long-press → selecionar → digitar. A correção
+seria selecionar o conteúdo ao focar.
+
 ## Teste no simulador iOS (o agente verifica sozinho, não o dono)
 **Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
 
