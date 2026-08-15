@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -393,6 +394,8 @@ export async function POST(req: Request) {
                   method: String(eObj.method ?? 'Normal'),
                   cadence: String(eObj.cadence ?? '2020'),
                   order: eObj.order ?? 0,
+                  // Sem isto, o sync de templates regravava o exercício como bilateral.
+                  ...unilateralPersistFields(eObj),
                 })
                 .select()
                 .single()
@@ -443,6 +446,8 @@ export async function POST(req: Request) {
                   method: String(eObj.method ?? 'Normal'),
                   cadence: String(eObj.cadence ?? '2020'),
                   order: eObj.order ?? 0,
+                  // Sem isto, o sync de templates regravava o exercício como bilateral.
+                  ...unilateralPersistFields(eObj),
                 })
                 .select()
                 .single()

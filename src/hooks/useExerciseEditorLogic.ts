@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { SetDetail, Exercise, Workout } from '@/components/ExerciseEditor/types'
 import { defaultAdvancedConfigForMethod } from '@/components/workout/helpers/editorMethod'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 
 interface UseExerciseEditorLogicParams {
     workout: Workout
@@ -228,7 +229,7 @@ export function useExerciseEditorLogic({
                         const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
                         sets.push({ weight: s?.weight ?? null, reps: s?.reps ?? ex?.reps ?? null, rpe: s?.rpe ?? ex?.rpe ?? null, set_number: s?.set_number ?? (i + 1), completed: false, is_warmup: !!(s?.is_warmup ?? s?.isWarmup), advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null })
                     }
-                    return { name: ex?.name || '', notes: ex?.notes || '', video_url: ex?.videoUrl || null, rest_time: ex?.restTime ?? null, cadence: ex?.cadence ?? null, method: ex?.method ?? null, order: idx, sets }
+                    return { name: ex?.name || '', notes: ex?.notes || '', video_url: ex?.videoUrl || null, rest_time: ex?.restTime ?? null, cadence: ex?.cadence ?? null, method: ex?.method ?? null, order: idx, ...unilateralPersistFields(ex as unknown as Record<string, unknown>), sets }
                 })
                 const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', { p_workout_id: workout.id || null, p_user_id: user.id, p_created_by: user.id, p_is_template: true, p_name: normalizeWorkoutTitle(workout.title), p_notes: workout.notes, p_exercises: exercisesPayload })
                 if (error) throw error

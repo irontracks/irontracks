@@ -4,6 +4,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { cacheDeletePattern } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
 
@@ -49,6 +50,9 @@ const buildExercisesPayload = (workout: unknown) => {
         cadence: ex?.cadence ?? null,
         method: ex?.method ?? null,
         order: idx,
+        // Sem isto, "Atualizar plano de treino" regravava o exercício como
+        // bilateral (a RPC apaga e reinsere) — o bug do "unilateral não salva".
+        ...unilateralPersistFields(ex),
         sets,
       }
     })
