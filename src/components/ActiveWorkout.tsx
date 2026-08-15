@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Gamepad2, Brain } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
@@ -257,7 +258,16 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         </div>
 
         <WorkoutFooter />
-        <Modals />
+        {/* PORTAL para o document.body, de propósito (bug real de 14/08/2026):
+            o <ActiveWorkout> é fixed inset-0 z-[50] — position+z criam um
+            CONTEXTO DE EMPILHAMENTO, então todo overlay daqui de dentro era
+            refém do 50 do pai e PERDIA para a barra do descanso
+            (RestTimerOverlay, z-[2100], renderizada na raiz): a barra cobria o
+            "Salvar" dos modais e o usuário tinha que encerrar o descanso para
+            conseguir salvar. O portal tira a família inteira de modais do
+            contexto; os z de cada um (2250–2350) vencem a barra NA RAIZ. Os
+            alerts do GlobalDialog (z-10000, raiz) continuam acima de tudo. */}
+        {typeof document !== 'undefined' && createPortal(<Modals />, document.body)}
       </motion.div>
      </WorkoutTimerProvider>
      </WorkoutLogsProvider>
