@@ -906,7 +906,7 @@ FERRAMENTA de verificação do agente (ver a tela para decidir o próximo toque)
 mas o resultado se relata em TEXTO — número do banco, estado do elemento, o que
 funcionou. Imagem é o input mais caro que existe e o dono não quer recebê-la.
 
-## Percorrer o app inteiro acha o que 5.476 testes verdes não acham (15/08/2026)
+## Percorrer o app inteiro acha o que a suíte verde não acha (15/08/2026)
 
 Teste de 10 passos pedido pelo dono (abrir → treinar → editar no meio → sair →
 voltar → deletar → adicionar → métodos avançados → respeitar TODOS os descansos
@@ -1040,6 +1040,44 @@ certo.
 detector ficaria cego logo após o primeiro erro. A média sofre do mesmo mal, e o
 teste mede: 200 ÷ média 80,5 = 2,48, abaixo do limiar, o erro passaria.
 
+### ⚠️ O cronômetro do simulador CONGELA quando a janela perde o foco
+
+Custou 25 minutos de espera inútil e quase virou um "o teto não funciona".
+
+Ao tentar provar o teto de 15 min do descanso no aparelho, o contador andou
+**25 segundos em 8 minutos reais** — o ticker do WebView é estrangulado quando a
+janela do Simulator não está em foco no macOS. Nesse ritmo, esperar os 15 min do
+produto levaria mais de meia hora de relógio de parede.
+
+**Consequência prática:** qualquer invariante que dependa de TEMPO PASSAR
+(timeout, teto, expiração, auto-avanço) é impraticável de verificar por espera no
+simulador. Prove por teste + mutação e diga que a prova foi de código, não de
+tela — e não conclua "não funcionou" a partir de um contador que parece parado.
+
+O que É verificável no simulador continua sendo o de sempre: o que reage a TOQUE
+e a DIGITAÇÃO. A autocorreção, por exemplo, se prova em 30 segundos — digitar
+"Bi A Drop teste" num campo de nome e ler o que ficou lá.
+
+### O que ficou provado ONDE (não misturar as duas coisas)
+
+| correção | prova |
+|---|---|
+| autocorreção do teclado | **no aparelho** (texto digitado ficou intacto; no dia anterior virava "Vi A"/"Frio teste") + render + guard de classe |
+| sessão esquecida | teste + mutação (3 mutações, todas vermelhas) |
+| teto do descanso | teste + mutação — **prova de tela não fechada**, ver o congelamento acima |
+| conferência de carga | teste + mutação |
+
+### Mutação INVÁLIDA não prova guard fraco
+
+Ao provar o teste de render dos atributos de teclado, a primeira mutação
+(`autoCorrect` → `autocorrect`) **não derrubou o teste — e estava certo**: o
+React 19 normaliza os dois spellings para o mesmo atributo HTML, então não havia
+bug a introduzir. A mutação válida é REMOVER o atributo (derruba 3 de 4 casos).
+
+Antes de afrouxar um guard que "não pegou a mutação", confira se a mutação
+representa um defeito real. Guard que não falha com bug presente é guard falso;
+guard que não falha com uma mudança inócua está apenas correto.
+
 ### Três erros meus que o ferramental pegou
 
 Registrados porque vão se repetir:
@@ -1057,15 +1095,46 @@ Registrados porque vão se repetir:
    em massa, confira CADA ponto pelo que ele é, não pela primeira coincidência —
    e feche com `next build`, que é o que de fato prova JSX íntegro.
 
+## Que modelo roda o teste exploratório no simulador (16/08/2026)
+
+**Opus** — e não pela execução. Tocar, digitar e capturar tela qualquer modelo
+faz; o valor do teste de 10 passos esteve inteiro no JULGAMENTO.
+
+Nenhum dos três defeitos achados estava no roteiro. O passo 10 dizia "finalize o
+treino"; o botão não respondeu, e a decisão seguinte era **dar como feito ou
+desconfiar**. Os outros dois momentos que exigiram o mesmo: reconhecer que o
+guard escrito no dia ANTERIOR era falso (varria só os arquivos já conhecidos), e
+distinguir bug de acerto — o app recusou concluir Drop-set com uma etapa só, o
+que parece falha e é comportamento correto; reportar isso custaria uma
+investigação atrás de fantasma.
+
+- **Sonnet** dá conta de regressão com roteiro fechado e critério objetivo
+  ("toque aqui, confirme que aparece X"). O que ele tende a não fazer é o passo
+  lateral, parar num "isto está estranho" que ninguém mandou procurar.
+- **Haiku não**, para este caso: coordenada espacial lida de imagem, sessão longa
+  com estado acumulado e decisão visual a cada passo.
+- **Ressalva honesta:** isto é julgamento sobre a natureza da tarefa, não
+  medição — o mesmo roteiro não foi rodado em Sonnet para comparar.
+
+**Não repita o roteiro antigo com modelo nenhum.** Os três bugs daquele teste já
+são Playwright no CI (26 s, a cada PR). O que ainda paga Opus é EXPLORAR caminho
+novo: tela nunca percorrida, fluxo que mudou, método de série que ninguém rodou
+de ponta a ponta. Exploração acha o que 5.582 testes verdes não acham — foi
+literalmente o que aconteceu.
+
+**O que encarece não é o modelo, é a foto.** Screenshot é o input mais caro que
+existe; capturar só nos pontos de decisão corta a maior parte da conta.
+
 ## Cobertura de teste: o que roda no CI hoje (15/08/2026)
 
-O teste manual de 10 passos passou por cima de **5.476 testes verdes** e ainda
+O teste manual de 10 passos passou por cima de **5.476 testes verdes** (hoje
+5.582) e ainda
 achou três defeitos — porque nenhum deles ANDAVA pelo app. Estado atual, para
 ninguém remedir:
 
 | camada | roda no CI? | o que cobre |
 |---|---|---|
-| Vitest unit/integração (5.4k) | **sim** | lógica, contratos, guards de classe |
+| Vitest unit/integração (5,6k) | **sim** | lógica, contratos, guards de classe |
 | Vitest de jornada (jsdom) | **sim** | contrato entre componentes (ex.: `jornadaDescansoRodape` — o descanso publica `--it-rest-bar-h`, o rodapé consome, some ao desmontar) |
 | Playwright público (29 testes) | **sim, desde 15/08** | páginas públicas carregam, protegidas redirecionam sem 500, árvore de acessibilidade íntegra |
 | Playwright autenticado (jornada, 4 testes) | **sim, desde 16/08** | percorre treino real em viewport mobile contra o preview da Vercel, sem expor chaves privadas de servidor |
@@ -1104,6 +1173,49 @@ reposto antes de o teste ser corrigido:
 5. **Estado que o teste mesmo criou.** Clicar num campo que já está focado não
    dispara `focusin`; o caso do select-on-focus media um cenário inexistente
    até o teste tirar o foco antes.
+
+### ⚠️ A sessão de treino ativa é SINCRONIZADA PELO SERVIDOR — e o E2E divide a conta
+
+Custou um CI vermelho num PR que só mexia em `.md`, e o diagnóstico começou
+errado duas vezes.
+
+`active_workout_sessions` (tabela, com `state` jsonb) guarda a sessão em
+andamento **no servidor**, para o treino continuar de outro aparelho. Ou seja:
+ela **sobrevive entre execuções do CI** e é compartilhada por TODOS os clientes
+logados na conta de teste — inclusive um simulador esquecido aberto.
+
+Foi o que houve em 16/08/2026: deixei o app aberto no simulador com
+`djmkbrasil`, ele seguiu reescrevendo essa linha por horas, e cada escrita
+voltava por **realtime** para o navegador do CI. O `fill('42')` do Playwright
+era desfeito pelo estado remoto (o teste esperava `42` e encontrava `40`, o
+peso da minha tela) e o re-render constante impedia o botão "Voltar" de ficar
+`stable` — o caso morria em `locator.click: Test timeout`.
+
+**Nada disso era bug do app**: é o sync multi-dispositivo funcionando como
+projetado. Era contaminação de ambiente.
+
+Duas hipóteses minhas que a verificação derrubou, nesta ordem — as duas
+plausíveis, as duas erradas:
+1. "É a documentação" — não, o step que falhou foi o E2E logado.
+2. "A sessão do simulador vive só no armazenamento local, não alcança o CI" —
+   **falso**, e é justamente o ponto: ela vai para o banco.
+
+Só a consulta ao `active_workout_sessions` (com `state->'logs'`) fechou o caso:
+o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
+
+**O que fica:**
+- Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
+  app aberto continua escrevendo. E confira a tabela:
+  ```sql
+  select started_at, updated_at, (state->'logs'->'0-0'->>'weight') as peso_s1
+  from active_workout_sessions
+  where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
+  ```
+- O spec da jornada agora **DESCARTA** a sessão preexistente em vez de
+  reaproveitá-la. Reaproveitar herda logs que o teste não escreveu — o caso
+  deixa de medir o que diz medir.
+- Regra geral: **teste E2E que divide conta com gente de verdade precisa partir
+  de estado que ele mesmo criou.** Estado herdado é flake com cara de bug.
 
 ### Armadilhas de ambiente (custaram mais que o spec)
 
