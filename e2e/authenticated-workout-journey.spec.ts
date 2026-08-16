@@ -1,0 +1,224 @@
+import { test, expect, type Page } from '@playwright/test'
+
+/**
+ * JORNADA LOGADA DO TREINO — o teste que faltava.
+ *
+ * Em 15/08/2026 um teste MANUAL de 10 passos no simulador iOS achou três bugs
+ * que passaram por 5.476 testes verdes: o teclado fechava a cada letra ao
+ * renomear exercício, o "unilateral" não persistia no plano, e a barra do
+ * descanso cobria o FINALIZAR (o treino não terminava sem pular o descanso).
+ * Nenhum foi pego porque nenhum teste ANDAVA pelo app — os specs
+ * `authenticated-workout*` existentes batem em API, não em tela.
+ *
+ * Este spec percorre a jornada pela INTERFACE, na ordem em que o usuário faz.
+ *
+ * Decisões que valem explicação (cada uma evita um jeito conhecido de escrever
+ * teste frágil ou sujo):
+ *
+ *  - **Usa um treino que já existe na conta e NÃO cria dados.** Não há rota
+ *    REST de criar/apagar treino (a criação é server action + RPC), então
+ *    criar pela API não é possível e criar pela UI a cada caso tornaria o spec
+ *    um teste do editor. O caso pega o primeiro card da lista, seja qual for.
+ *  - **Cada caso DESCARTA a sessão no fim.** Sem isso o segundo caso encontra
+ *    "CONTINUAR TREINO" em vez de "INICIAR", e a conta de teste acumula
+ *    sessões abertas.
+ *  - **Não finaliza treino.** Finalizar grava sessão de verdade na conta (que
+ *    aparece no feed da comunidade) e não existe rota para limpar depois — a
+ *    cada PR o CI deixaria lixo. O que importava do passo 10 é o FINALIZAR
+ *    estar ALCANÇÁVEL com o descanso na tela, e isso é verificado sem gravar.
+ *  - **Zero `waitForTimeout` como sincronização** — só `expect` com condição.
+ *  - **Seletores por papel/rótulo acessível**: as classes CSS deste repo mudam
+ *    toda semana (auditoria de design constante); os rótulos, não.
+ */
+
+/** Entra no primeiro treino da lista. Devolve o nome, para o log de falha. */
+async function iniciarPrimeiroTreino(page: Page): Promise<void> {
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+
+    // Já existe sessão aberta? O app abre DIRETO no treino ativo e não há card
+    // nenhum no dashboard. Acontece quando um caso anterior caiu por timeout
+    // antes do afterEach. Reaproveita a sessão em vez de falhar procurando um
+    // botão que, corretamente, não está na tela.
+    const rodape = page.getByRole('button', { name: /Descartar treino/i })
+    if (await rodape.isVisible({ timeout: 5_000 }).catch(() => false)) return
+
+    // `exact: true` é obrigatório aqui: o CARD inteiro também é um <button>, e
+    // o nome acessível dele contém "INICIAR TREINO" no meio do texto todo
+    // ("SEG · Upper B … 30 séries INICIAR TREINO Ações do treino"). Sem exact,
+    // o clique cai no card externo e a sessão nunca abre.
+    const iniciar = page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first()
+    const continuar = page.getByRole('button', { name: 'CONTINUAR TREINO', exact: true }).first()
+    const alvo = (await continuar.isVisible().catch(() => false)) ? continuar : iniciar
+    await expect(alvo, 'a lista de treinos precisa ter ao menos um card').toBeVisible({ timeout: 30_000 })
+    await alvo.click()
+
+    // Check-in PRÉ-treino: aparece entre o toque e a sessão quando a conta tem
+    // o prompt ligado (é o default). Um spec que não trate isso conclui que
+    // "o treino não abriu" com o modal parado na frente — foi assim que a
+    // primeira versão deste arquivo falhou.
+    const pularCheckin = page.getByRole('button', { name: /^Pular$/i })
+    if (await pularCheckin.isVisible({ timeout: 8_000 }).catch(() => false)) {
+        await pularCheckin.click()
+    }
+
+    // A sessão abriu quando o rodapé do treino ativo existe.
+    await expect(page.getByRole('button', { name: /Descartar treino/i })).toBeVisible({ timeout: 30_000 })
+}
+
+/** Descarta a sessão para o próximo caso começar do zero. */
+async function descartarSessao(page: Page): Promise<void> {
+    const x = page.getByRole('button', { name: /Descartar treino/i })
+    if (!(await x.isVisible().catch(() => false))) return
+    await x.click()
+    const confirmar = page.getByRole('button', { name: /^Descartar$/i })
+    if (await confirmar.isVisible({ timeout: 5_000 }).catch(() => false)) await confirmar.click()
+    await expect(page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first())
+        .toBeVisible({ timeout: 20_000 })
+}
+
+test.describe('Jornada do treino (UI autenticada)', () => {
+    // Jornada tem mais passos que um teste de unidade: iniciar sessão (que
+    // carrega o bootstrap), abrir editor, adicionar exercício, digitar tecla a
+    // tecla. Os 30 s padrão do projeto estouram no caso mais longo.
+    test.describe.configure({ timeout: 90_000 })
+
+    // VIEWPORT MOBILE — não é detalhe: o app é usado no celular, e um dos bugs
+    // (a barra do descanso cobrindo o FINALIZAR) SÓ existe aqui. No desktop a
+    // barra é centralizada (`max-w-md`) e o botão fica à direita, fora dela:
+    // o mesmo caso passa verde com o bug presente numa viewport larga
+    // (medido em 15/08/2026).
+    test.use({ viewport: { width: 390, height: 844 } })
+
+    test.afterEach(async ({ page }) => {
+        await descartarSessao(page).catch(() => { })
+    })
+
+    test('concluir série registra e mantém o FINALIZAR alcançável durante o descanso', async ({ page }) => {
+        await iniciarPrimeiroTreino(page)
+
+        const peso = page.getByLabel(/Peso em kg – série 1/i).first()
+        await expect(peso).toBeVisible({ timeout: 20_000 })
+        await peso.fill('40')
+
+        await page.getByRole('button', { name: /^Concluir$/ }).first().click()
+        // A série virou "Feito": o app registrou de verdade.
+        await expect(page.getByRole('button', { name: /^Feito$/ }).first()).toBeVisible({ timeout: 20_000 })
+
+        // BUG DE 15/08: com o descanso na tela, a barra ficava POR CIMA do
+        // rodapé e o FINALIZAR era inalcançável — dava para ver, não para
+        // clicar. `toBeVisible` não pega isso (o elemento existe e está
+        // pintado); o que pega é a "actionability" do Playwright, que exige o
+        // elemento ser o alvo real no ponto — se algo estiver por cima, falha
+        // por interceptação de ponteiro.
+        const finalizar = page.getByRole('button', { name: /Finalizar/i }).last()
+        await expect(finalizar).toBeVisible()
+        await expect(finalizar).toBeEnabled()
+        // `click({ trial: true })` roda TODAS as checagens de actionability
+        // (visível, estável, habilitado e — o que importa aqui — recebendo
+        // eventos de ponteiro) e NÃO clica. `hover` não serve: ele move o mouse
+        // sem exigir que o alvo receba o evento, e passava verde com a barra do
+        // descanso por cima (medido).
+        await finalizar.click({ trial: true, timeout: 10_000 })
+    })
+
+    test('renomear exercício no EDITOR COMPLETO: o campo não perde o foco a cada tecla', async ({ page }) => {
+        await iniciarPrimeiroTreino(page)
+
+        // O caminho do relato: "cê vai adicionar treino, daí vai editar o nome".
+        // É o EDITOR COMPLETO (botão "Editar treino" do topo), não o modal
+        // rápido de exercício — a primeira versão deste caso mirou o modal, que
+        // nunca teve o defeito, e por isso passava verde com o bug reposto.
+        await page.getByTitle(/Editar treino \(exercícios/i).click()
+
+        // ADICIONA um exercício antes de digitar. É essencial: exercício vindo
+        // do treino salvo tem `id` do banco, e a key do card usa o id — a
+        // instabilidade não aparece nele. O defeito era no exercício RECÉM
+        // ADICIONADO (sem id), que é exatamente o caminho do relato
+        // ("cê vai adicionar treino, daí vai editar o nome").
+        await page.getByRole('button', { name: /Adicionar Exercício/i }).click()
+
+        const nome = page.getByLabel(/Nome do exercício/i).last()
+        await expect(nome).toBeVisible({ timeout: 20_000 })
+
+        // BUG DE 15/08: a key do card derivava do NOME; cada tecla trocava a
+        // key, o React DESMONTAVA o card e o input era destruído e recriado —
+        // e o teclado do iOS fecha junto com o campo que ele servia.
+        //
+        // A verificação é a IDENTIDADE DO NÓ, não o valor: o Playwright
+        // re-resolve o locator a cada tecla e o estado do React repõe o texto,
+        // então digitar e conferir o valor passa verde COM o bug presente
+        // (medido). O que não sobrevive ao remount é o nó original continuar
+        // conectado ao documento.
+        await nome.click()
+        await nome.fill('')
+        const noOriginal = await nome.elementHandle()
+
+        await nome.pressSequentially('Supino renomeado E2E', { delay: 15 })
+
+        const aindaNoDocumento = await noOriginal!.evaluate((el) => el.isConnected)
+        expect(aindaNoDocumento, 'o input foi destruído durante a digitação — é isso que fecha o teclado no iOS').toBe(true)
+        await expect(nome).toBeFocused()
+        await expect(nome).toHaveValue('Supino renomeado E2E')
+
+        // Sai sem salvar — o caso não altera o plano da conta.
+        await page.getByRole('button', { name: /Fechar editor/i }).click()
+        const confirmar = page.getByRole('button', { name: /^(Sim|Confirmar|Descartar)$/i }).first()
+        if (await confirmar.isVisible({ timeout: 4_000 }).catch(() => false)) await confirmar.click()
+    })
+
+    test('campo numérico: digitar SUBSTITUI o valor em vez de concatenar', async ({ page }) => {
+        await iniciarPrimeiroTreino(page)
+
+        const peso = page.getByLabel(/Peso em kg – série 1/i).first()
+        await expect(peso).toBeVisible({ timeout: 20_000 })
+        await peso.fill('20')
+        await expect(peso).toHaveValue('20')
+
+        // Tira o foco ANTES de voltar ao campo — é o que o usuário faz (registra
+        // a série, mexe em outra coisa, depois volta para corrigir a carga). Sem
+        // este passo o campo continua focado do `fill` acima e um segundo clique
+        // não gera novo `focusin`: o teste mediria um cenário que não existe.
+        await page.getByRole('button', { name: /Descartar treino/i }).focus()
+        await expect(peso).not.toBeFocused()
+
+        // BUG DE 15/08: ao voltar, tocar posicionava o cursor e a tecla INSERIA
+        // — "20" com "5" digitado virava "205". Carga errada gravada no
+        // histórico, que é a base lida pelo motor de carga automática.
+        await peso.click()
+
+        // Espera a SELEÇÃO acontecer antes de digitar. Isso não é maquiagem de
+        // teste: a seleção é adiada um frame de propósito (no iOS o WebKit
+        // ainda está posicionando o cursor durante o onFocus, e selecionar ali
+        // não pega). Um dedo humano leva ~100 ms entre tocar e digitar; o
+        // `keyboard.type` do Playwright dispara em ~1 ms e passaria na frente
+        // do frame. O invariante que importa é "ao focar, o conteúdo fica
+        // selecionado" — é isso que faz a próxima tecla substituir.
+        await expect.poll(
+            async () => peso.evaluate((el: HTMLInputElement) => el.selectionEnd! - el.selectionStart!),
+            { message: 'o conteúdo do campo deveria estar selecionado após o foco', timeout: 5_000 },
+        ).toBe(2)
+
+        await page.keyboard.type('5')
+        await expect(peso).toHaveValue('5')
+    })
+
+    test('sair do treino e voltar preserva a sessão e as séries feitas', async ({ page }) => {
+        await iniciarPrimeiroTreino(page)
+
+        const peso = page.getByLabel(/Peso em kg – série 1/i).first()
+        await expect(peso).toBeVisible({ timeout: 20_000 })
+        await peso.fill('42')
+        await page.getByRole('button', { name: /^Concluir$/ }).first().click()
+        await expect(page.getByRole('button', { name: /^Feito$/ }).first()).toBeVisible({ timeout: 20_000 })
+
+        // Sai SEM descartar (o "Voltar" do topo).
+        await page.getByRole('button', { name: /^Voltar$/i }).first().click()
+        await expect(page.getByRole('button', { name: 'CONTINUAR TREINO', exact: true }).first())
+            .toBeVisible({ timeout: 30_000 })
+
+        // Volta: a série feita continua feita, o peso continua lá.
+        await page.getByRole('button', { name: 'CONTINUAR TREINO', exact: true }).first().click()
+        await expect(page.getByRole('button', { name: /^Feito$/ }).first()).toBeVisible({ timeout: 30_000 })
+        await expect(page.getByLabel(/Peso em kg – série 1/i).first()).toHaveValue('42')
+    })
+})

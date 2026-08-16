@@ -9,6 +9,13 @@ on:
 jobs:
   quality-check:
     runs-on: ubuntu-latest
+    env:
+      # O contexto `secrets` não está disponível em `if:` de step — usar ali faz
+      # o workflow inteiro falhar antes de rodar ("workflow file issue"), como
+      # aconteceu no run 31918472665. A leitura vai para env no nível do JOB,
+      # onde `secrets` é válido, e os steps decidem por env.
+      TEM_E2E_LOGIN: ${{ secrets.E2E_USER_EMAIL != '' && secrets.E2E_USER_PASSWORD != '' }}
+      TEM_SUPABASE_PUBLICO: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}
 
     steps:
     - name: Checkout code
@@ -47,8 +54,12 @@ jobs:
     - name: Verify Build
       run: npm run build
       env:
-        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+        # Usa as chaves REAIS quando o repositório as tiver (são NEXT_PUBLIC_,
+        # portanto públicas por definição — vão no bundle que qualquer usuário
+        # baixa). Sem elas, cai no placeholder: o build valida, mas o app não
+        # conecta e o E2E logado abaixo é pulado.
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
 
     # E2E de navegador — só a fatia que NÃO depende de login nem de dado real:
     # as páginas públicas carregam, as protegidas redirecionam (em vez de dar
@@ -60,6 +71,28 @@ jobs:
     # por construção. Reaproveita o build do passo acima via `npm run start`.
     - name: Install Playwright browser (chromium)
       run: npx playwright install --with-deps chromium
+
+    # E2E LOGADO — a jornada do treino pela interface (iniciar → concluir série
+    # → editar no editor completo → sair/voltar). É a camada que faltava: os 3
+    # bugs de 15/08/2026 passaram por 5.4k testes verdes porque nenhum ANDAVA
+    # pelo app, e os specs `authenticated-api-*` batem em API, não em tela.
+    # Roda em viewport MOBILE de propósito — um dos bugs (barra do descanso
+    # cobrindo o FINALIZAR) não existe em tela larga.
+    # `if:` com o secret: em PR de fork o segredo não existe e o passo é
+    # PULADO, não quebrado.
+    - name: E2E — jornada logada (Playwright)
+      # Exige TAMBÉM as chaves públicas do Supabase: os passos acima buildam
+      # com placeholders, e com placeholder o app não conecta em lugar nenhum —
+      # o login falharia e o job ficaria vermelho por configuração, não por
+      # regressão. Sem as quatro variáveis, o passo é PULADO.
+      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_SUPABASE_PUBLICO == 'true'
+      run: npx playwright test --project=authenticated e2e/authenticated-workout-journey.spec.ts --reporter=github
+      env:
+        PLAYWRIGHT_CI_SERVER: "1"
+        E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+        E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
     - name: E2E — public pages (Playwright)
       run: npx playwright test --project=chromium e2e/pages-smoke.spec.ts e2e/pages-smoke-protected.spec.ts e2e/accessibility.spec.ts --reporter=github
