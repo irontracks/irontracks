@@ -207,7 +207,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
                         <label className={['pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-yellow-500/50 bg-black/55 px-5 py-4 text-center cursor-pointer backdrop-blur-[2px] active:scale-[0.98] transition', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
                           <Upload size={20} className="text-yellow-500" />
-                          <span className="text-[11px] font-black uppercase tracking-wider text-white">Toque para pôr sua foto</span>
+                          <span className="t-action text-[11px] uppercase tracking-wider text-white">Toque para pôr sua foto</span>
                           <span className="text-[10px] text-neutral-300">ou vídeo — dá para seguir sem</span>
                           <input
                             type="file" aria-label="Adicionar mídia ao story" accept="image/*,video/*" className="sr-only"
@@ -298,7 +298,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       'flex-1 rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] uppercase tracking-wider',
                       backgroundImage || isVideo
                         ? 'h-12 bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] hover:bg-neutral-800 hover:border-neutral-700'
-                        : 'h-14 bg-yellow-500 text-black font-black text-xs hover:bg-yellow-400',
+                        : 'h-14 bg-yellow-500 text-black t-action text-xs hover:bg-yellow-400',
                       busy ? 'opacity-50 pointer-events-none' : '',
                     ].join(' ')}>
                       <Upload size={16} className={backgroundImage || isVideo ? 'text-yellow-500' : 'text-black'} />
