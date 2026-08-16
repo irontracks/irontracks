@@ -60,6 +60,7 @@ const NAO_E_JANELA: Record<string, string> = {
   'components/StoryComposer.tsx': 'editor em tela cheia',
   'components/NutritionStoryComposer.tsx': 'editor em tela cheia',
   'components/CardioStoryComposer.tsx': 'editor em tela cheia',
+  'components/MetricsStoryComposer.tsx': 'editor em tela cheia',
   'components/StoryComposerIosSavePanel.tsx': 'painel de salvar em tela cheia',
   'components/dashboard/nutrition/BarcodeScanner.tsx': 'câmera em tela cheia',
   'components/workout/RestTimerOverlay.tsx': 'barra do descanso — cobre a tela sem bloquear a interação por baixo',
