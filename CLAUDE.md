@@ -977,12 +977,53 @@ ninguém remedir:
 | Playwright `authenticated-*` | **não** | exige `E2E_USER_EMAIL`/`PASSWORD` como secrets do repositório — decisão do dono |
 | `visual-regression` | **não, de propósito** | screenshot entre máquinas diferentes é flake por construção |
 
-**O que ainda NÃO tem teste automatizado é a jornada logada de UI** (iniciar
-treino → concluir série → editar no meio → finalizar). Os specs
-`authenticated-workout*.spec.ts` que existem são de **API**, não de tela — não
-teriam pego nenhum dos três bugs. Ligar isso exige, além dos secrets: sanear os
-specs que hoje dependem de ambiente (medido em 15/08: `admin-protection` e
-`critical-api` falham localmente por env, não por regressão).
+**A jornada logada de UI já tem spec** (`e2e/authenticated-workout-journey.spec.ts`,
+15/08/2026): concluir série com o FINALIZAR alcançável durante o descanso,
+renomear no editor completo sem perder o foco, campo numérico substituindo, e
+sair/voltar preservando a sessão. O job existe no CI e é **pulado** enquanto
+faltar `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` nos secrets
+(o build do CI usa placeholder, e com placeholder o app não conecta — o login
+seria impossível e o job ficaria vermelho por configuração). São chaves
+públicas, vão no bundle: adicioná-las não expõe nada novo. Continua fora:
+sanear `admin-protection` e `critical-api`, que falham por ambiente.
+
+### Escrever E2E de UI: cinco jeitos de passar VERDE com o bug presente
+
+Todos medidos ao escrever aquele spec — cada um passou verde com o defeito
+reposto antes de o teste ser corrigido:
+
+1. **Viewport errada.** A barra do descanso é centralizada (`max-w-md`); em
+   tela larga ela não cobre o FINALIZAR e o caso passa. O app é mobile —
+   `test.use({ viewport: { width: 390, height: 844 } })`.
+2. **Superfície errada.** O bug do teclado era no EDITOR COMPLETO e só em
+   exercício ADICIONADO na hora: exercício salvo tem `id` e a key já é estável;
+   no modal rápido de exercício o defeito nunca existiu.
+3. **Asserção que o framework conserta.** Conferir o VALOR digitado não pega
+   remount: o Playwright re-resolve o locator a cada tecla e o estado do React
+   repõe o texto. O que não sobrevive é a IDENTIDADE do nó
+   (`elementHandle` + `isConnected`).
+4. **`hover` no lugar de `click({ trial: true })`.** Hover move o mouse sem
+   exigir que o alvo receba o ponteiro — passa com outro elemento por cima.
+   O trial click roda todas as checagens de actionability sem clicar.
+5. **Estado que o teste mesmo criou.** Clicar num campo que já está focado não
+   dispara `focusin`; o caso do select-on-focus media um cenário inexistente
+   até o teste tirar o foco antes.
+
+### Armadilhas de ambiente (custaram mais que o spec)
+
+- **A porta 3000 pode ter OUTRO projeto.** Com `reuseExistingServer`, o
+  Playwright testa o app errado em silêncio — a suíte rodou inteira contra a
+  tela de login de outro produto. Use `PLAYWRIGHT_PORT`.
+- **`globalSetup` roda junto com a subida do servidor**: sem esperar o app
+  responder, o login falha, o storage state não é criado e TODOS os testes
+  autenticados morrem com `Error reading storage state`, que não diz a causa.
+- **`secrets` NÃO existe em `if:` de step.** Usar ali derruba o workflow
+  INTEIRO antes de rodar qualquer passo ("workflow file issue", run
+  31918472665) — inclusive typecheck e testes. Leia para `env` no nível do job.
+  Guard varre isso em `ciE2ePublicoLigado.test.ts`.
+- **`npm run dev` não aguenta a suíte**: o app chega a mostrar "Não foi
+  possível carregar o app" depois de algumas execuções. Rode contra o build
+  (`CI=1 PLAYWRIGHT_CI_SERVER=1`), que é o que o CI faz.
 
 **jsdom não tem `ResizeObserver`** — usar direto derrubou 3 testes de cardio e,
 no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
