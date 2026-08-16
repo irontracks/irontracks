@@ -32,6 +32,20 @@ export default defineConfig({
 
     use: {
         baseURL: BASE_URL,
+        // Bypass da proteção da Vercel: os previews deste projeto têm Vercel
+        // Authentication ligada (`ssoProtection: all_except_custom_domains`), e
+        // sem este header o Playwright bate numa tela de login da Vercel em vez
+        // do app. O token é o "Protection Bypass for Automation" — específico
+        // para automação, escopo só de deployments; não é chave de banco.
+        // Ausente = header vazio, e o E2E contra preview simplesmente não roda.
+        ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+            ? {
+                extraHTTPHeaders: {
+                    'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+                    'x-vercel-set-bypass-cookie': 'true',
+                },
+            }
+            : {}),
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },

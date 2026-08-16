@@ -28,6 +28,12 @@ jobs:
       # teste com chave própria. Enquanto isso, o passo fica pulado — e pulado
       # é honesto; vermelho por configuração ensina a ignorar o vermelho.
       TEM_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
+      # Token "Protection Bypass for Automation" da Vercel (Settings →
+      # Deployment Protection). Permite que a automação alcance o PREVIEW deste
+      # PR, que tem Vercel Authentication ligada. É escopo de deployment — não
+      # dá acesso a banco nem a dados; por isso pode viver aqui, ao contrário
+      # da service role.
+      TEM_BYPASS_VERCEL: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET != '' }}
 
     steps:
     - name: Checkout code
@@ -84,28 +90,51 @@ jobs:
     - name: Install Playwright browser (chromium)
       run: npx playwright install --with-deps chromium
 
-    # E2E LOGADO — a jornada do treino pela interface (iniciar → concluir série
-    # → editar no editor completo → sair/voltar). É a camada que faltava: os 3
-    # bugs de 15/08/2026 passaram por 5.4k testes verdes porque nenhum ANDAVA
-    # pelo app, e os specs `authenticated-api-*` batem em API, não em tela.
-    # Roda em viewport MOBILE de propósito — um dos bugs (barra do descanso
-    # cobrindo o FINALIZAR) não existe em tela larga.
-    # `if:` com o secret: em PR de fork o segredo não existe e o passo é
-    # PULADO, não quebrado.
+    # ── E2E LOGADO — roda contra o PREVIEW da Vercel deste PR ──────────────
+    #
+    # Por que não subir o app aqui, como faz o E2E público: o dashboard precisa
+    # de SUPABASE_SERVICE_ROLE_KEY (bootstrap e telemetria usam admin client), e
+    # essa chave ignora RLS e alcança os dados de TODOS os usuários — não entra
+    # nos secrets de um repositório PÚBLICO. Medido em 16/08: com só as chaves
+    # públicas, o login passa e a lista de treinos nunca carrega.
+    #
+    # O preview da Vercel já roda com as variáveis certas, no ambiente certo, e
+    # é exatamente o build que vai para produção. O acesso usa o token de bypass
+    # de automação (escopo de deployment, não de dados).
+    - name: Aguarda o preview da Vercel deste commit
+      id: preview
+      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_BYPASS_VERCEL == 'true' && github.event_name == 'pull_request'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        # A Vercel publica o deployment no próprio GitHub; lemos o
+        # environment_url de lá em vez de precisar de um token da Vercel.
+        for i in $(seq 1 60); do
+          url=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?sha=${SHA}&per_page=20" \
+            --jq '.[].id' 2>/dev/null | while read -r id; do
+              gh api "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses?per_page=10" \
+                --jq '.[] | select(.state=="success") | .environment_url' 2>/dev/null
+            done | grep -m1 -E '^https://.+' || true)
+          if [ -n "$url" ]; then
+            echo "url=$url" >> "$GITHUB_OUTPUT"
+            echo "Preview pronto: $url"
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "Preview não ficou pronto em 10 min — o passo seguinte será pulado."
+
     - name: E2E — jornada logada (Playwright)
-      # Exige TAMBÉM as chaves públicas do Supabase: os passos acima buildam
-      # com placeholders, e com placeholder o app não conecta em lugar nenhum —
-      # o login falharia e o job ficaria vermelho por configuração, não por
-      # regressão. Sem as quatro variáveis, o passo é PULADO.
-      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_SUPABASE_PUBLICO == 'true' && env.TEM_SERVICE_ROLE == 'true'
+      if: steps.preview.outputs.url != ''
       run: npx playwright test --project=authenticated e2e/authenticated-workout-journey.spec.ts --reporter=github
       env:
-        PLAYWRIGHT_CI_SERVER: "1"
+        # Sem PLAYWRIGHT_CI_SERVER: o app já está no ar no preview; subir um
+        # servidor local aqui seria testar outro binário e sem as variáveis.
+        PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
+        VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
         E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     - name: E2E — public pages (Playwright)
       run: npx playwright test --project=chromium e2e/pages-smoke.spec.ts e2e/pages-smoke-protected.spec.ts e2e/accessibility.spec.ts --reporter=github

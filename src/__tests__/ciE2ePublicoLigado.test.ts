@@ -55,50 +55,49 @@ describe('CI — E2E de navegador nas páginas públicas', () => {
  * roda o spec de jornada e é PULADO (não quebrado) quando faltar configuração —
  * um job vermelho por falta de secret ensina a equipe a ignorar o vermelho.
  */
-describe('CI — E2E da jornada logada', () => {
-  const step = ci.slice(ci.indexOf('E2E — jornada logada'))
+describe('CI — E2E da jornada logada (contra o preview da Vercel)', () => {
+  /**
+   * Recorta APENAS o step do E2E logado (até o próximo `- name:`) e remove os
+   * comentários. Sem as duas coisas o guard erra dos dois jeitos clássicos:
+   * pega o step seguinte (que legitimamente usa PLAYWRIGHT_CI_SERVER) e casa
+   * com o próprio comentário que explica por que aquilo não deve existir aqui.
+   */
+  const step = (() => {
+    const inicio = ci.indexOf('    - name: E2E — jornada logada')
+    const resto = ci.slice(inicio + 10)
+    const fim = resto.indexOf('\n    - name:')
+    const bruto = fim === -1 ? resto : resto.slice(0, fim)
+    return bruto.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n')
+  })()
 
   it('nenhum `if:` de step usa o contexto secrets (derruba o workflow inteiro)', () => {
+    // Aconteceu no run 31918472665: `secrets` não existe em `if:` de step e o
+    // GitHub reprova o workflow ANTES de rodar qualquer passo.
     const ifsDeStep = ci.split('\n').filter((l) => l.trim().startsWith('if:'))
     for (const linha of ifsDeStep) expect(linha).not.toMatch(/secrets\./)
   })
 
-  it('roda o spec de jornada', () => {
-    expect(ci).toContain('E2E — jornada logada')
+  it('roda o spec de jornada contra a URL do preview, sem subir servidor', () => {
     expect(step).toMatch(/e2e\/authenticated-workout-journey\.spec\.ts/)
-    expect(step).toMatch(/--project=authenticated/)
+    expect(step).toMatch(/PLAYWRIGHT_BASE_URL:\s*\$\{\{\s*steps\.preview\.outputs\.url/)
+    // Subir servidor aqui testaria outro binário, sem as variáveis do ambiente.
+    expect(step).not.toMatch(/PLAYWRIGHT_CI_SERVER/)
   })
 
-  it('é PULADO sem as credenciais e sem as chaves públicas do Supabase', () => {
-    // Sem as chaves, o build sai com placeholder e o app não conecta: o job
-    // ficaria vermelho por configuração, não por regressão.
-    // O gate lê env do JOB (o contexto `secrets` não existe em `if:` de step —
-    // usá-lo ali derruba o workflow inteiro antes de rodar; aconteceu no run
-    // 31918472665).
-    expect(step).toMatch(/if:\s*env\.TEM_E2E_LOGIN\s*==\s*'true'/)
-    expect(step).toMatch(/env\.TEM_SUPABASE_PUBLICO\s*==\s*'true'/)
-    expect(ci).toMatch(/TEM_SUPABASE_PUBLICO:\s*\$\{\{\s*secrets\.NEXT_PUBLIC_SUPABASE_URL/)
+  it('a service role NÃO aparece no job do E2E logado (repo é público)', () => {
+    // A chave ignora RLS e alcança os dados de todos os usuários. O preview da
+    // Vercel já a tem no ambiente correto — ela não precisa existir aqui.
+    expect(step).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/)
   })
 
-  it('exige a service role — sem ela o app não serve o dashboard e o job falharia por configuração', () => {
-    // Medido no run de 16/08: com as chaves públicas o LOGIN funciona, mas o
-    // bootstrap (admin client) não, e o teste morre em "a lista de treinos
-    // precisa ter ao menos um card".
-    expect(step).toMatch(/env\.TEM_SERVICE_ROLE\s*==\s*'true'/)
+  it('o passo é PULADO sem o token de bypass ou sem o preview pronto', () => {
+    expect(ci).toMatch(/TEM_BYPASS_VERCEL:\s*\$\{\{\s*secrets\.VERCEL_AUTOMATION_BYPASS_SECRET/)
+    expect(step).toMatch(/if:\s*steps\.preview\.outputs\.url\s*!=\s*''/)
   })
 
-  it('a service role NÃO é lida de lugar nenhum além do secret (repo é público)', () => {
-    // A chave ignora RLS e alcança os dados de todos os usuários: ela não pode
-    // ser embutida no workflow, só referenciada de secrets — e o gate acima
-    // mantém o passo pulado enquanto o segredo não existir.
-    const linhas = ci.split('\n').filter((l) => l.includes('SUPABASE_SERVICE_ROLE_KEY'))
-    for (const l of linhas) {
-      const ok = l.includes('secrets.SUPABASE_SERVICE_ROLE_KEY') || l.trim().startsWith('#')
-      expect(ok, `linha com service role fora de secrets: ${l.trim()}`).toBe(true)
-    }
-  })
-
-  it('o build usa as chaves reais quando existirem (senão o E2E logado é inútil)', () => {
-    expect(ci).toMatch(/NEXT_PUBLIC_SUPABASE_URL:\s*\$\{\{\s*secrets\.NEXT_PUBLIC_SUPABASE_URL\s*\|\|/)
+  it('o bypass da Vercel chega ao Playwright e ao login (senão bate na tela da Vercel)', () => {
+    expect(pw).toMatch(/x-vercel-protection-bypass/)
+    const gs = readFileSync('e2e/global-setup.ts', 'utf8')
+    expect(gs).toMatch(/x-vercel-protection-bypass/)
   })
 })
