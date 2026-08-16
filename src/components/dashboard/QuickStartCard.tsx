@@ -1,12 +1,13 @@
 'use client'
 
 import React, { memo, useCallback, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronRight, Dumbbell, Loader2, Play, X } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Dumbbell, Loader2, Moon, Play, X } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
-import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
+import { isWorkoutToday, pickQuickStartWorkoutIndex } from '@/utils/workout/workoutDay'
 import { estimateWorkoutMinutes } from '@/utils/workout/estimateDuration'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
 import { brtDateKey } from '@/utils/cron/dateBrt'
+import { useDayChangeTick } from '@/hooks/useDayChangeTick'
 
 type QuickStartCardProps = {
     workouts: DashboardWorkout[]
@@ -17,6 +18,8 @@ type QuickStartCardProps = {
     onQuickView?: (w: DashboardWorkout) => void
     /** Já concluiu uma sessão hoje? O atalho some — a tela fica limpa depois do treino. */
     trainedToday?: boolean
+    /** Respondeu "vou descansar" hoje. O convite para treinar some — ele já decidiu. */
+    restingToday?: boolean
 }
 
 /**
@@ -28,9 +31,10 @@ type QuickStartCardProps = {
  * (sprint 2); este card fecha a conta: a ação primária do app passa a ser a
  * primeira coisa visível, com o treino certo já escolhido.
  *
- * A escolha do treino reusa `pickEmphasizedWorkoutIndex` — o de HOJE pelo dia
- * no título; se nenhum bate, o primeiro da ordem do usuário. Mesma regra do
- * selo HOJE no card, para os dois nunca discordarem na tela.
+ * A escolha do treino é de `pickQuickStartWorkoutIndex`: o de HOJE pelo dia no
+ * título e, para quem NÃO agenda por dia, o primeiro da ordem. Quem agenda
+ * ("SEG · Upper B") não vê nada no dia sem treino — o card voltava a acender no
+ * sábado oferecendo o treino de segunda.
  *
  * O card tem DUAS ações e elas são botões IRMÃOS, nunca aninhados: o corpo abre
  * a visualização rápida (ver o que vem pela frente antes de começar) e a barra
@@ -67,7 +71,10 @@ function Corpo({ onClick, ariaLabel, children }: { onClick?: () => void; ariaLab
  */
 const CHAVE_DISPENSA = 'it.trainedCard.dismissed'
 
-function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQuickView, trainedToday }: QuickStartCardProps) {
+function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQuickView, trainedToday, restingToday }: QuickStartCardProps) {
+    // Vira a meia-noite ⇒ o treino de hoje muda. Sem isto, o app aberto desde
+    // ontem seguiria mostrando (ou escondendo) o card pela resposta de ontem.
+    const viradaDoDia = useDayChangeTick()
     const [iniciando, setIniciando] = useState(false)
     const [concluidoDispensado, setConcluidoDispensado] = useState(() => {
         // No servidor não há storage — e este ramo só é alcançado depois que
@@ -95,9 +102,12 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
     const alvo = useMemo(() => {
         const lista = (Array.isArray(workouts) ? workouts : []).filter((w) => !w?.archived_at)
         if (!lista.length) return null
-        const idx = pickEmphasizedWorkoutIndex(lista.map((w) => w?.title))
+        const idx = pickQuickStartWorkoutIndex(lista.map((w) => w?.title))
         return idx >= 0 ? lista[idx] : null
-    }, [workouts])
+        // `viradaDoDia` não é lido aqui de propósito: ele existe só para
+        // reavaliar a escolha quando o dia muda com o app aberto.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workouts, viradaDoDia])
 
     const iniciar = useCallback(async () => {
         if (!alvo || iniciando) return
@@ -159,6 +169,28 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
         )
     }
 
+    // ── Ele já disse que hoje não ──────────────────────────────────────────────
+    // "Vou descansar" é uma decisão, não um silêncio: manter TREINAR AGORA aceso
+    // logo acima da pergunta que acabou de sumir é o app discordando do usuário.
+    // Fica uma linha discreta — sem dourado, que é a cor de quem convida à ação —
+    // só para o espaço nobre não ficar órfão e a resposta ter recibo. Volta
+    // sozinha amanhã: a intenção é gravada por dia.
+    if (restingToday) {
+        return (
+            <div className="mb-3 flex items-center gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] px-4 py-3">
+                <Moon className="h-5 w-5 shrink-0 text-sky-400" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-sky-300">Dia de descanso</p>
+                    <p className="text-[11px] leading-snug text-neutral-400">
+                        Sua meta de calorias de hoje já está ajustada.
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    // Sem treino para hoje o topo cala e a lista sobe. Quem agenda por dia tem
+    // dia de folga, e folga não é lugar de CTA.
     if (!alvo) return null
 
     const titulo = String(alvo?.title || 'Treino').trim()

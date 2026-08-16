@@ -27,6 +27,7 @@ import { WorkoutCard } from './WorkoutCard'
 import { QuickStartCard } from './QuickStartCard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { useTrainedToday } from '@/hooks/useTrainedToday'
+import { useRestDayIntent } from '@/hooks/useRestDayIntent'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
@@ -352,6 +353,10 @@ export default function StudentDashboard(props: Props) {
   // treinar logo depois de o usuário finalizar.
   const trainedToday = useTrainedToday(props.currentUserId, props.hasActiveSession)
 
+  // "Vou descansar" no card de intenção apaga o convite para treinar. Os dois
+  // são irmãos aqui — a resposta chega por evento, não por estado compartilhado.
+  const restDayIntent = useRestDayIntent(props.currentUserId)
+
   const showVipTab = props.vipEnabled !== false
   const vipLocked = !!props.vipLocked
   const vipLabel = String(props.vipLabel || 'VIP')
@@ -376,6 +381,7 @@ export default function StudentDashboard(props: Props) {
           hasActiveSession={props.hasActiveSession}
           onQuickView={props.onQuickView}
           trainedToday={trainedToday === true}
+          restingToday={restDayIntent?.willTrain === false}
         />
       )}
 

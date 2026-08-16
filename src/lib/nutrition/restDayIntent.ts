@@ -19,6 +19,28 @@ export function brtDateKey(): string {
 
 export type RestDayIntent = { willTrain: boolean } | null
 
+/**
+ * Evento disparado quando a resposta de HOJE é gravada. Existe porque quem
+ * PERGUNTA (RestDayPromptCard) e quem REAGE (o atalho "Treinar agora" no topo)
+ * são componentes irmãos, sem estado em comum: sem o aviso, responder
+ * "vou descansar" escondia a pergunta e deixava o convite para treinar aceso
+ * logo acima dela.
+ */
+export const REST_DAY_INTENT_EVENT = 'irontracks:rest-day-intent'
+
+export type RestDayIntentEventDetail = { userId: string; willTrain: boolean; dateKey: string }
+
+function broadcastRestDayIntent(userId: string, willTrain: boolean): void {
+  try {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent<RestDayIntentEventDetail>(REST_DAY_INTENT_EVENT, {
+        detail: { userId, willTrain, dateKey: brtDateKey() },
+      }),
+    )
+  } catch { /* ambiente sem CustomEvent — o card resolve no próximo boot */ }
+}
+
 /** Resposta do usuário para HOJE, ou null se ainda não respondeu. */
 export async function getTodayRestDayIntent(userId: string): Promise<RestDayIntent> {
   if (!userId) return null
@@ -48,6 +70,7 @@ export async function setRestDayIntent(userId: string, willTrain: boolean): Prom
         { user_id: userId, date_key: brtDateKey(), will_train: willTrain, updated_at: new Date().toISOString() },
         { onConflict: 'user_id,date_key' },
       )
+    if (!error) broadcastRestDayIntent(userId, willTrain)
     return !error
   } catch {
     return false

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { QuickStartCard } from '@/components/dashboard/QuickStartCard'
 import type { DashboardWorkout } from '@/types/dashboard'
 
@@ -33,16 +33,47 @@ describe('escolha do treino', () => {
         vi.useRealTimers()
     })
 
-    it('sem treino do dia, cai no primeiro e muda o rótulo', () => {
+    /**
+     * Relato do dono, 16/08/2026: no fim de semana o topo mostrava
+     * "PRÓXIMO TREINO · SEG · Upper B" com TREINAR AGORA. O treino de segunda
+     * só existe na segunda — quem escreve o dia no título tem agenda, e agenda
+     * tem folga.
+     */
+    it('no dia sem treino agendado, o card não aparece', () => {
         vi.setSystemTime(new Date(2026, 7, 9, 9, 0, 0)) // domingo
-        render(
+        const { container } = render(
             <QuickStartCard
                 workouts={[treino('A - empurrar a (segunda)'), treino('B - puxar a (terça)')]}
                 onStartSession={() => { }}
             />,
         )
-        expect(screen.getByText('A - empurrar a (segunda)')).toBeInTheDocument()
+        expect(container.textContent, 'domingo não é dia de treinar segunda').toBe('')
+        vi.useRealTimers()
+    })
+
+    it('quem NÃO nomeia por dia continua vendo o atalho', () => {
+        vi.setSystemTime(new Date(2026, 7, 9, 9, 0, 0)) // domingo
+        render(<QuickStartCard workouts={[treino('Treino A'), treino('Treino B')]} onStartSession={() => { }} />)
+        expect(screen.getByText('Treino A')).toBeInTheDocument()
         expect(screen.getByText(/Próximo treino/i)).toBeInTheDocument()
+        vi.useRealTimers()
+    })
+
+    /**
+     * O card reaparece sozinho na virada — o app fica dias aberto no iPhone e
+     * ninguém recarrega a página à meia-noite.
+     */
+    it('à meia-noite de segunda, o treino de segunda volta ao topo', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(2026, 7, 16, 23, 59, 30)) // domingo, 23:59:30
+        const { container } = render(
+            <QuickStartCard workouts={[treino('SEG · Upper B')]} onStartSession={() => { }} />,
+        )
+        expect(container.textContent).toBe('')
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(45_000) }) // → segunda 00:00:15
+
+        expect(container.textContent).toContain('SEG · Upper B')
         vi.useRealTimers()
     })
 
@@ -186,6 +217,42 @@ describe('ação', () => {
     })
 })
 
+/**
+ * "Vou descansar" é uma DECISÃO. Manter TREINAR AGORA aceso logo acima da
+ * pergunta que acabou de sumir é o app discordando do usuário.
+ */
+describe('dia de descanso', () => {
+    it('respondeu que vai descansar → o convite para treinar some', () => {
+        render(
+            <QuickStartCard workouts={[treino('Treino A')]} onStartSession={() => { }} restingToday />,
+        )
+        expect(screen.queryByRole('button', { name: /treinar agora/i })).not.toBeInTheDocument()
+        expect(screen.queryByText('Treino A')).not.toBeInTheDocument()
+    })
+
+    it('o topo não fica órfão: sobra o recibo da escolha', () => {
+        render(
+            <QuickStartCard workouts={[treino('Treino A')]} onStartSession={() => { }} restingToday />,
+        )
+        expect(screen.getByText(/dia de descanso/i)).toBeInTheDocument()
+    })
+
+    it('sem dourado — a cor da ação primária não pertence a quem não vai agir', () => {
+        const { container } = render(
+            <QuickStartCard workouts={[treino('Treino A')]} onStartSession={() => { }} restingToday />,
+        )
+        expect(container.innerHTML).not.toMatch(/yellow|amber/)
+    })
+
+    it('quem treinou vence quem disse que ia descansar', () => {
+        render(
+            <QuickStartCard workouts={[treino('Treino A')]} onStartSession={() => { }} restingToday trainedToday />,
+        )
+        expect(screen.getByText(/treino concluído hoje/i)).toBeInTheDocument()
+        expect(screen.queryByText(/dia de descanso/i)).not.toBeInTheDocument()
+    })
+})
+
 describe('posição no dashboard', () => {
     it('é renderizado ANTES do aviso de perfil', () => {
         const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
@@ -220,6 +287,18 @@ describe('posição no dashboard', () => {
         const bloco = dash.slice(dash.indexOf('<QuickStartCard'), dash.indexOf('<QuickStartCard') + 400)
         expect(bloco, 'sem esta prop o card nunca some depois do treino').toMatch(/trainedToday=\{/)
         expect(dash).toMatch(/useTrainedToday\(props\.currentUserId, props\.hasActiveSession\)/)
+    })
+
+    /**
+     * Fiação: quem pergunta ("vai treinar hoje?") e quem reage (este card) são
+     * irmãos sem estado em comum. Sem a prop, a resposta não chega ao topo.
+     */
+    it('o dashboard alimenta o card com "vou descansar"', () => {
+        const dash = readFileSync(join(__dirname, '..', 'StudentDashboard.tsx'), 'utf8')
+        const bloco = dash.slice(dash.indexOf('<QuickStartCard'), dash.indexOf('<QuickStartCard') + 400)
+        expect(bloco, 'sem esta prop o convite fica aceso depois de "vou descansar"')
+            .toMatch(/restingToday=\{/)
+        expect(dash).toMatch(/useRestDayIntent\(props\.currentUserId\)/)
     })
 
     it('os painéis de dados ficam DEPOIS da lista de treinos', () => {
