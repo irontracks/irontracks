@@ -158,7 +158,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
           <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-gradient-to-b from-black/60 to-transparent border-b border-yellow-500/10">
             <div className="min-w-0 flex-1 mr-4">
               <h3 className="font-black text-lg truncate leading-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">Story de métricas</h3>
-              <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE OS NÚMEROS</p>
+              <p className="text-[10px] t-meta-inherit text-yellow-500/70 mt-1">COMPARTILHE OS NÚMEROS</p>
             </div>
             <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800/80 border border-neutral-700/50 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none" aria-label="Voltar" title="Voltar"><ArrowLeft size={16} /></button>
           </div>
@@ -170,7 +170,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
             <div className="hidden sm:flex px-6 py-5 border-b border-yellow-500/10 items-center justify-between flex-none">
               <div>
                 <h2 className="font-black text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">Story de métricas</h2>
-                <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE OS NÚMEROS</p>
+                <p className="text-[10px] t-meta-inherit text-yellow-500/70 mt-1">COMPARTILHE OS NÚMEROS</p>
               </div>
               <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Voltar" title="Voltar"><ArrowLeft size={18} /></button>
             </div>
@@ -214,7 +214,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                       onTouchCancel={onWorkoutTouchEnd}
                       onWheel={(e) => onWorkoutWheel(e.deltaY)}
                     >
-                      <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[9px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[10px] t-meta-inherit text-white/80 whitespace-nowrap">
                         Pinça: zoom · Arraste: mover
                       </div>
                     </div>
@@ -243,7 +243,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
 
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
                     <button type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy} aria-label="Diminuir zoom" className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95">−</button>
-                    <div className="flex-1 h-11 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-center text-xs font-black tabular-nums text-yellow-500">
+                    <div className="flex-1 h-11 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-center text-xs font-bold tabular-nums text-yellow-500">
                       {Math.round(workoutTransform.scale * 100)}%
                     </div>
                     <button type="button" onClick={() => nudgeWorkoutScale(0.05)} disabled={busy} aria-label="Aumentar zoom" className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95">+</button>
@@ -270,7 +270,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                 <div className="w-full max-w-[340px] lg:max-w-none space-y-4">
                   <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 space-y-4">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">Período</p>
+                      <p className="text-[10px] t-meta-inherit text-neutral-400 mb-2">Período</p>
                       <div className="flex gap-2">
                         {PERIODS.map((d) => (
                           <button
@@ -278,7 +278,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                             type="button"
                             onClick={() => setPeriodDays(d)}
                             aria-pressed={periodDays === d}
-                            className={['flex-1 h-11 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-colors active:scale-95', periodDays === d ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:bg-neutral-800'].join(' ')}
+                            className={['flex-1 h-11 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-colors active:scale-95', periodDays === d ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:bg-neutral-800'].join(' ')}
                           >{d} dias</button>
                         ))}
                         <button
@@ -292,13 +292,13 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                     </div>
 
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">Destaque</p>
+                      <p className="text-[10px] t-meta-inherit text-neutral-400 mb-2">Destaque</p>
                       {loading && metrics.length === 0 ? (
-                        <p className="text-xs text-neutral-500">Carregando métricas…</p>
+                        <p className="text-xs text-neutral-400">Carregando métricas…</p>
                       ) : loadError ? (
                         <p className="text-xs text-red-400">{loadError}</p>
                       ) : metrics.length === 0 ? (
-                        <p className="text-xs text-neutral-500">Nenhuma métrica no período.</p>
+                        <p className="text-xs text-neutral-400">Nenhuma métrica no período.</p>
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {metrics.map((m) => (
@@ -307,7 +307,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                               type="button"
                               onClick={() => setHeroKey(m.key)}
                               aria-pressed={heroKey === m.key}
-                              className={['px-3 h-9 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-colors active:scale-95', heroKey === m.key ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800'].join(' ')}
+                              className={['tap-44 px-3 h-9 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-95', heroKey === m.key ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800'].join(' ')}
                             >{m.label} · {m.value}</button>
                           ))}
                         </div>
@@ -315,7 +315,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                     </div>
 
                     <div>
-                      <label htmlFor="metrics-story-title" className="block text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">Título</label>
+                      <label htmlFor="metrics-story-title" className="block text-[10px] t-meta-inherit text-neutral-400 mb-2">Título</label>
                       <input
                         id="metrics-story-title"
                         {...properNameFieldProps}

@@ -22,7 +22,7 @@ export function FunnelStoryButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-yellow-500 text-black text-[11px] font-black uppercase tracking-wider hover:bg-yellow-400 transition-colors active:scale-95"
+        className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-yellow-500 text-black text-[11px] font-bold uppercase tracking-wider hover:bg-yellow-400 transition-colors active:scale-95"
       >
         <Share2 size={15} />
         Gerar story
