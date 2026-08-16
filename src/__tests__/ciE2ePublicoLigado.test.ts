@@ -100,4 +100,11 @@ describe('CI — E2E da jornada logada (contra o preview da Vercel)', () => {
     const gs = readFileSync('e2e/global-setup.ts', 'utf8')
     expect(gs).toMatch(/x-vercel-protection-bypass/)
   })
+
+  it('o login não espera networkidle e falha claramente sem storage state', () => {
+    const gs = readFileSync('e2e/global-setup.ts', 'utf8')
+    expect(gs).toMatch(/waitUntil:\s*'domcontentloaded'/)
+    expect(gs).not.toMatch(/waitUntil:\s*'networkidle'/)
+    expect(gs).toMatch(/catch \(err\)[\s\S]*throw err/)
+  })
 })

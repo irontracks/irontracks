@@ -8,7 +8,7 @@ import { WorkoutHeader } from './ExerciseEditor/EditorHeader';
 import { CardioFields, CARDIO_OPTIONS } from './ExerciseEditor/CardioFields';
 import { SetDetailsSection } from './ExerciseEditor/SetDetailsSection';
 import type { AdvancedConfig, SetDetail, Exercise, Workout } from './ExerciseEditor/types';
-import { useExerciseEditorLogic } from '@/hooks/useExerciseEditorLogic';
+import { createExerciseEditorKey, useExerciseEditorLogic } from '@/hooks/useExerciseEditorLogic';
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
@@ -96,10 +96,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             const rec = ex as { id?: string; _itx_exKey?: string };
             if (rec.id || rec._itx_exKey) return ex;
             changed = true;
-            const fresh = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-                ? crypto.randomUUID()
-                : `exk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-            return { ...ex, _itx_exKey: fresh };
+            return { ...ex, _itx_exKey: createExerciseEditorKey() };
         });
         if (changed) onChange?.({ ...workout, exercises: withKeys });
     }, [workout, onChange]);

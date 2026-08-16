@@ -65,7 +65,10 @@ export default async function globalSetup(_config: FullConfig) {
 
     try {
         // Navigate to login page (app login is at root /)
-        await page.goto(`${baseURL}/`, { waitUntil: 'networkidle', timeout: 15_000 })
+        // O app mantém conexões vivas (Supabase Realtime/analytics), portanto
+        // `networkidle` nunca é uma condição estável. O formulário abaixo é a
+        // evidência explícita de que a página terminou de carregar para o login.
+        await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded', timeout: 15_000 })
 
         // Wait for login form to appear
         await page.waitForSelector('input[type="email"]', { timeout: 10_000 })
@@ -91,7 +94,9 @@ export default async function globalSetup(_config: FullConfig) {
         console.log('[E2E] Authenticated storage state saved to e2e/.auth/user.json')
     } catch (err) {
         console.error('[E2E] Auth setup failed:', err)
-        // Don't throw — let unauthenticated tests still run
+        // Com credenciais presentes, continuar sem o storage state só produz
+        // uma cascata enganosa de ENOENT em todos os specs autenticados.
+        throw err
     } finally {
         await browser.close()
     }

@@ -974,18 +974,20 @@ ninguém remedir:
 | Vitest unit/integração (5.4k) | **sim** | lógica, contratos, guards de classe |
 | Vitest de jornada (jsdom) | **sim** | contrato entre componentes (ex.: `jornadaDescansoRodape` — o descanso publica `--it-rest-bar-h`, o rodapé consome, some ao desmontar) |
 | Playwright público (29 testes) | **sim, desde 15/08** | páginas públicas carregam, protegidas redirecionam sem 500, árvore de acessibilidade íntegra |
-| Playwright `authenticated-*` | **não** | exige `E2E_USER_EMAIL`/`PASSWORD` como secrets do repositório — decisão do dono |
+| Playwright autenticado (jornada, 4 testes) | **sim, desde 16/08** | percorre treino real em viewport mobile contra o preview da Vercel, sem expor chaves privadas de servidor |
 | `visual-regression` | **não, de propósito** | screenshot entre máquinas diferentes é flake por construção |
 
 **A jornada logada de UI já tem spec** (`e2e/authenticated-workout-journey.spec.ts`,
 15/08/2026): concluir série com o FINALIZAR alcançável durante o descanso,
 renomear no editor completo sem perder o foco, campo numérico substituindo, e
-sair/voltar preservando a sessão. O job existe no CI e é **pulado** enquanto
-faltar `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` nos secrets
-(o build do CI usa placeholder, e com placeholder o app não conecta — o login
-seria impossível e o job ficaria vermelho por configuração). São chaves
-públicas, vão no bundle: adicioná-las não expõe nada novo. Continua fora:
-sanear `admin-protection` e `critical-api`, que falham por ambiente.
+sair/voltar preservando a sessão. O job do CI aponta para o **preview da Vercel
+do PR**, porque ali o dashboard já tem as variáveis privadas de servidor sem
+expor `SUPABASE_SERVICE_ROLE_KEY` ao repositório público. O gate exige as
+credenciais da conta de teste e `VERCEL_AUTOMATION_BYPASS_SECRET`. Os cinco
+secrets necessários estão configurados no GitHub. A primeira execução limpa foi
+o run `31926932133`: preview encontrado, **4/4 testes em 26,1 s**, sem retry nem
+flake. Continua fora: sanear `admin-protection` e `critical-api`, que falham por
+ambiente.
 
 ### Escrever E2E de UI: cinco jeitos de passar VERDE com o bug presente
 

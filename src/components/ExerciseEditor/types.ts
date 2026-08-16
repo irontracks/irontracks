@@ -41,6 +41,8 @@ export interface SetDetail {
 }
 
 export interface Exercise {
+    /** Identidade efêmera do card no editor; removida antes de persistir. */
+    _itx_exKey?: string
     name: string
     sets: number | string
     reps: string | number | null

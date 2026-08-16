@@ -23,6 +23,12 @@ interface UseExerciseEditorLogicParams {
     ensureSetDetails: (exercise: Exercise, desiredCount: number) => SetDetail[]
 }
 
+export function createExerciseEditorKey(): string {
+    return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `exk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function useExerciseEditorLogic({
     workout,
     onSave, onCancel, onChange, onSaved,
@@ -111,7 +117,7 @@ export function useExerciseEditorLogic({
     const addExercise = useCallback(() => {
         onChange?.({
             ...workout,
-            exercises: [...(workout.exercises || []), { name: '', sets: 4, reps: '10', rpe: '8', cadence: '2020', restTime: 60, method: 'Normal', videoUrl: '', notes: '' }]
+            exercises: [...(workout.exercises || []), { _itx_exKey: createExerciseEditorKey(), name: '', sets: 4, reps: '10', rpe: '8', cadence: '2020', restTime: 60, method: 'Normal', videoUrl: '', notes: '' }]
         })
     }, [workout, onChange])
 

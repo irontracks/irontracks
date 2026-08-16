@@ -48,9 +48,23 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
     // o clique cai no card externo e a sessão nunca abre.
     const iniciar = page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first()
     const continuar = page.getByRole('button', { name: 'CONTINUAR TREINO', exact: true }).first()
-    const alvo = (await continuar.isVisible().catch(() => false)) ? continuar : iniciar
-    await expect(alvo, 'a lista de treinos precisa ter ao menos um card').toBeVisible({ timeout: 30_000 })
-    await alvo.click()
+    // Não escolha o alvo antes da hidratação: nesse instante ambos os locators
+    // ainda podem estar invisíveis e o fallback para INICIAR abre indevidamente
+    // o diálogo de troca quando já existe uma sessão ativa.
+    await expect(
+        iniciar.or(continuar).first(),
+        'a lista de treinos precisa ter ao menos um card',
+    ).toBeVisible({ timeout: 30_000 })
+    // O bootstrap pode trocar CONTINUAR por INICIAR (ou o inverso) enquanto o
+    // botão anima. O locator combinado se resolve de novo se o nó for trocado.
+    await iniciar.or(continuar).first().click()
+
+    // Se a sessão ativa pertence a outro card, INICIAR pede confirmação. Esse
+    // é um estado válido da conta de teste e precisa ser resolvido pela UI.
+    const trocarTreino = page.getByRole('heading', { name: /Trocar de treino\?/i })
+    if (await trocarTreino.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await page.getByRole('button', { name: /^Confirmar$/i }).click()
+    }
 
     // Check-in PRÉ-treino: aparece entre o toque e a sessão quando a conta tem
     // o prompt ligado (é o default). Um spec que não trate isso conclui que
@@ -87,7 +101,7 @@ test.describe('Jornada do treino (UI autenticada)', () => {
     // barra é centralizada (`max-w-md`) e o botão fica à direita, fora dela:
     // o mesmo caso passa verde com o bug presente numa viewport larga
     // (medido em 15/08/2026).
-    test.use({ viewport: { width: 390, height: 844 } })
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
     test.afterEach(async ({ page }) => {
         await descartarSessao(page).catch(() => { })
@@ -153,12 +167,19 @@ test.describe('Jornada do treino (UI autenticada)', () => {
         await nome.fill('')
         const noOriginal = await nome.elementHandle()
 
-        await nome.pressSequentially('Supino renomeado E2E', { delay: 15 })
-
-        const aindaNoDocumento = await noOriginal!.evaluate((el) => el.isConnected)
-        expect(aindaNoDocumento, 'o input foi destruído durante a digitação — é isso que fecha o teclado no iOS').toBe(true)
-        await expect(nome).toBeFocused()
-        await expect(nome).toHaveValue('Supino renomeado E2E')
+        const textoFinal = 'Supino renomeado E2E'
+        let textoAcumulado = ''
+        for (const caractere of textoFinal) {
+            await nome.pressSequentially(caractere)
+            textoAcumulado += caractere
+            await expect(nome).toHaveValue(textoAcumulado)
+            await expect(nome).toBeFocused()
+            const aindaNoDocumento = await noOriginal!.evaluate((el) => el.isConnected)
+            expect(
+                aindaNoDocumento,
+                'o input foi destruído durante a digitação — é isso que fecha o teclado no iOS',
+            ).toBe(true)
+        }
 
         // Sai sem salvar — o caso não altera o plano da conta.
         await page.getByRole('button', { name: /Fechar editor/i }).click()
@@ -184,7 +205,7 @@ test.describe('Jornada do treino (UI autenticada)', () => {
         // BUG DE 15/08: ao voltar, tocar posicionava o cursor e a tecla INSERIA
         // — "20" com "5" digitado virava "205". Carga errada gravada no
         // histórico, que é a base lida pelo motor de carga automática.
-        await peso.click()
+        await peso.tap()
 
         // Espera a SELEÇÃO acontecer antes de digitar. Isso não é maquiagem de
         // teste: a seleção é adiada um frame de propósito (no iOS o WebKit
