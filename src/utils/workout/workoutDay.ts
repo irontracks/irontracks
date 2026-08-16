@@ -80,3 +80,38 @@ export function pickEmphasizedWorkoutIndex(titles: unknown[], now: Date = new Da
   const todayIdx = titles.findIndex((t) => isWorkoutToday(t, now))
   return todayIdx >= 0 ? todayIdx : 0
 }
+
+/**
+ * True quando ALGUM título da lista declara dia da semana. É o que separa quem
+ * usa a agenda ("SEG · Upper B") de quem só nomeia os treinos ("Treino A").
+ */
+export function hasScheduledDay(titles: unknown[]): boolean {
+  return Array.isArray(titles) && titles.some((t) => parseWorkoutDay(t) !== null)
+}
+
+/**
+ * Índice do treino que o ATALHO DO TOPO deve oferecer hoje, ou -1 quando o dia
+ * não tem treino programado.
+ *
+ * Diferente de `pickEmphasizedWorkoutIndex`, que nunca devolve -1: lá o
+ * fallback existe para dar âncora visual a uma lista que já está na tela; aqui
+ * a pergunta é outra — "há treino para HOJE?" —, e o fallback respondia sempre
+ * que sim. No sábado, com a semana nomeada SEG…SEX, o topo anunciava
+ * "PRÓXIMO TREINO · SEG" com um botão TREINAR AGORA: convite para adiantar o
+ * treino de segunda no fim de semana, que ninguém pediu (relato do dono,
+ * 16/08/2026). Quem agenda por dia quer ver o card só no dia.
+ *
+ * A regra, em ordem:
+ *   1. treino cujo dia bate com hoje;
+ *   2. se a lista TEM agenda mas hoje não é dia de nada, o primeiro treino SEM
+ *      dia declarado (o avulso — pode ser feito qualquer dia), ou -1;
+ *   3. lista sem agenda nenhuma: o primeiro, como antes — senão o atalho
+ *      sumiria para sempre de quem nomeia os treinos por letra.
+ */
+export function pickQuickStartWorkoutIndex(titles: unknown[], now: Date = new Date()): number {
+  if (!Array.isArray(titles) || titles.length === 0) return -1
+  const todayIdx = titles.findIndex((t) => isWorkoutToday(t, now))
+  if (todayIdx >= 0) return todayIdx
+  if (!hasScheduledDay(titles)) return 0
+  return titles.findIndex((t) => parseWorkoutDay(t) === null)
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseWorkoutDay, isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
+import { parseWorkoutDay, isWorkoutToday, pickEmphasizedWorkoutIndex, pickQuickStartWorkoutIndex } from '@/utils/workout/workoutDay'
 
 describe('parseWorkoutDay', () => {
   it('lê abreviações no formato do app ("SEG · LOWER B")', () => {
@@ -93,5 +93,40 @@ describe('pickEmphasizedWorkoutIndex', () => {
 
   it('lista vazia → -1', () => {
     expect(pickEmphasizedWorkoutIndex([], segunda)).toBe(-1)
+  })
+})
+
+/**
+ * `pickQuickStartWorkoutIndex` — o atalho do topo, que pode dizer NÃO.
+ *
+ * O relato (16/08/2026): no fim de semana o card anunciava "PRÓXIMO TREINO ·
+ * SEG · Upper B" com o botão TREINAR AGORA. Quem escreve o dia no título tem
+ * agenda, e agenda tem folga — o topo não pode convidar a adiantar segunda no
+ * sábado.
+ */
+describe('pickQuickStartWorkoutIndex', () => {
+  const sabado = new Date(2026, 7, 15, 10, 0, 0)  // sábado
+  const segunda = new Date(2026, 7, 17, 0, 0, 1)  // segunda, logo após a meia-noite
+
+  const semana = ['SEG · Upper B', 'TER · Lower A', 'QUA · Push', 'QUI · Pull', 'SEX · Legs']
+
+  it('no dia do treino, escolhe o treino do dia', () => {
+    expect(pickQuickStartWorkoutIndex(semana, segunda)).toBe(0)
+  })
+
+  it('fim de semana com a semana agendada → nenhum treino (-1)', () => {
+    expect(pickQuickStartWorkoutIndex(semana, sabado)).toBe(-1)
+  })
+
+  it('quem NÃO agenda por dia continua vendo o primeiro', () => {
+    expect(pickQuickStartWorkoutIndex(['Treino A', 'Treino B'], sabado)).toBe(0)
+  })
+
+  it('lista mista: no dia sem agenda, oferece o treino avulso', () => {
+    expect(pickQuickStartWorkoutIndex([...semana, 'Cardio livre'], sabado)).toBe(5)
+  })
+
+  it('lista vazia → -1', () => {
+    expect(pickQuickStartWorkoutIndex([], sabado)).toBe(-1)
   })
 })
