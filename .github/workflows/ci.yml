@@ -101,11 +101,6 @@ jobs:
     # O preview da Vercel já roda com as variáveis certas, no ambiente certo, e
     # é exatamente o build que vai para produção. O acesso usa o token de bypass
     # de automação (escopo de deployment, não de dados).
-    - name: Diagnóstico temporário do gate E2E logado
-      run: |
-        [ "$TEM_E2E_LOGIN" = "true" ] && echo "login=true" || echo "login=false"
-        [ "$TEM_BYPASS_VERCEL" = "true" ] && echo "bypass=true" || echo "bypass=false"
-
     - name: Aguarda o preview da Vercel deste commit
       id: preview
       if: env.TEM_E2E_LOGIN == 'true' && env.TEM_BYPASS_VERCEL == 'true' && github.event_name == 'pull_request'
