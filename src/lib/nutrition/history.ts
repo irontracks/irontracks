@@ -1,0 +1,113 @@
+/**
+ * Histórico de nutrição — os dias com lançamento, agregados.
+ *
+ * ⚠️ A fonte é `nutrition_meal_entries`, NUNCA `daily_nutrition_logs`.
+ * O agregado diário existe e parece o caminho óbvio (kcal e macros já somados,
+ * uma linha por dia), mas ele DIVERGE do que a tela do dia mostra — medido na
+ * conta do dono em 16/08/2026, 3 dias em 61:
+ *
+ *   • 11/07 — 1050 kcal no agregado e ZERO refeições (as refeições foram
+ *     apagadas e o agregado ficou para trás);
+ *   • 06/07 — agregado 1701 × soma real 2126 (o agregado parou às 15:12, a
+ *     última refeição entrou às 22:08);
+ *   • 14/06 — agregado 1166 × soma real 729.
+ *
+ * Ou seja: ele é escrito em alguns caminhos e não em todos. A tela do dia soma
+ * os ENTRIES — é o número que o usuário viu. Um histórico que discordasse dela
+ * seria a mesma classe de defeito das 744 × 698 kcal entre relatório e
+ * nutrição: duas superfícies, dois números, nenhuma forma de o usuário saber
+ * qual vale.
+ *
+ * ⚠️ E nunca selecione `items`: é o jsonb com a refeição inteira quebrada em
+ * alimentos. Trazê-lo para uma LISTA serve centenas de KB para desenhar um
+ * total — o mesmo engorda-payload que o `slimHistoryRow` desfez no histórico
+ * de treino.
+ */
+
+/** Um dia com pelo menos um lançamento. Dia sem lançamento não entra na lista. */
+export type NutritionHistoryDay = {
+  /** YYYY-MM-DD, o mesmo `date` da tabela (dia BRT gravado pelo app). */
+  date: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  /** Quantas refeições foram lançadas naquele dia. */
+  meals: number
+}
+
+export type NutritionHistoryEntryRow = {
+  date?: string | null
+  calories?: number | string | null
+  protein?: number | string | null
+  carbs?: number | string | null
+  fat?: number | string | null
+}
+
+const num = (v: unknown): number => {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * Agrega as linhas cruas por dia, do mais recente para o mais antigo.
+ * Função pura: é ela que os testes exercitam.
+ */
+export function aggregateEntriesByDay(rows: NutritionHistoryEntryRow[] | null | undefined): NutritionHistoryDay[] {
+  const porDia = new Map<string, NutritionHistoryDay>()
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const date = String(r?.date || '').slice(0, 10)
+    if (!date) continue
+    const acc = porDia.get(date) ?? { date, calories: 0, protein: 0, carbs: 0, fat: 0, meals: 0 }
+    acc.calories += num(r?.calories)
+    acc.protein += num(r?.protein)
+    acc.carbs += num(r?.carbs)
+    acc.fat += num(r?.fat)
+    acc.meals += 1
+    porDia.set(date, acc)
+  }
+  return Array.from(porDia.values()).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+}
+
+export type NutritionHistorySummary = {
+  /** Dias COM lançamento na janela. */
+  loggedDays: number
+  /** Tamanho da janela em dias — o denominador honesto da cobertura. */
+  windowDays: number
+  /** Médias sobre os dias REGISTRADOS (ver abaixo). 0 quando não há nenhum. */
+  avgCalories: number
+  avgProtein: number
+}
+
+/**
+ * Resumo da janela.
+ *
+ * A média divide pelos dias REGISTRADOS, não pelo tamanho da janela — e a
+ * cobertura (`loggedDays` de `windowDays`) viaja junto para quem exibe.
+ *
+ * A diferença não é detalhe: no treino, dia sem sessão significa descanso; na
+ * nutrição, dia sem lançamento significa que a pessoa esqueceu de lançar.
+ * Dividir 12 dias de comida por 30 devolveria ~950 kcal/dia para quem come
+ * 2400 — um número inventado com cara de medição, que é exatamente o defeito
+ * do `workout_calories: 300` que já saiu do heatmap.
+ */
+export function summarizeHistory(days: NutritionHistoryDay[] | null | undefined, windowDays: number): NutritionHistorySummary {
+  const lista = Array.isArray(days) ? days : []
+  const loggedDays = lista.length
+  if (!loggedDays) return { loggedDays: 0, windowDays, avgCalories: 0, avgProtein: 0 }
+  const kcal = lista.reduce((a, d) => a + num(d.calories), 0)
+  const prot = lista.reduce((a, d) => a + num(d.protein), 0)
+  return {
+    loggedDays,
+    windowDays,
+    avgCalories: Math.round(kcal / loggedDays),
+    avgProtein: Math.round(prot / loggedDays),
+  }
+}
+
+/** Primeiro dia da janela (YYYY-MM-DD), contando `days` dias até `endDate` inclusive. */
+export function windowStartDate(endDate: string, days: number): string {
+  const d = new Date(`${endDate}T12:00:00`)
+  d.setDate(d.getDate() - (Math.max(1, Math.floor(days)) - 1))
+  return d.toISOString().slice(0, 10)
+}

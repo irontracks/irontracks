@@ -1,0 +1,112 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, it, expect } from 'vitest'
+import {
+  aggregateEntriesByDay,
+  summarizeHistory,
+  windowStartDate,
+} from '@/lib/nutrition/history'
+
+describe('aggregateEntriesByDay', () => {
+  const linhas = [
+    { date: '2026-08-14', calories: 500, protein: 40, carbs: 50, fat: 10 },
+    { date: '2026-08-14', calories: 700, protein: 55, carbs: 60, fat: 20 },
+    { date: '2026-08-16', calories: 300, protein: 30, carbs: 10, fat: 5 },
+  ]
+
+  it('soma por dia e conta as refeições', () => {
+    const dias = aggregateEntriesByDay(linhas)
+    const d14 = dias.find((d) => d.date === '2026-08-14')
+    expect(d14).toMatchObject({ calories: 1200, protein: 95, carbs: 110, fat: 30, meals: 2 })
+  })
+
+  it('devolve do mais recente para o mais antigo', () => {
+    expect(aggregateEntriesByDay(linhas).map((d) => d.date)).toEqual(['2026-08-16', '2026-08-14'])
+  })
+
+  it('aceita número em texto com vírgula e ignora linha sem data', () => {
+    const dias = aggregateEntriesByDay([
+      { date: '2026-08-16', calories: '10,5' as unknown as number },
+      { date: '', calories: 999 },
+      { date: null, calories: 999 },
+    ])
+    expect(dias).toHaveLength(1)
+    expect(dias[0].calories).toBeCloseTo(10.5)
+  })
+
+  it('lista vazia não quebra', () => {
+    expect(aggregateEntriesByDay(null)).toEqual([])
+  })
+})
+
+/**
+ * A regra que separa nutrição de treino: dia sem sessão é DESCANSO, dia sem
+ * lançamento é ESQUECIMENTO. Dividir a comida de 12 dias por 30 devolveria uma
+ * média que ninguém comeu.
+ */
+describe('summarizeHistory', () => {
+  const dias = [
+    { date: '2026-08-16', calories: 2400, protein: 180, carbs: 250, fat: 70, meals: 4 },
+    { date: '2026-08-15', calories: 2000, protein: 160, carbs: 200, fat: 60, meals: 3 },
+  ]
+
+  it('a média divide pelos dias REGISTRADOS, não pela janela', () => {
+    const r = summarizeHistory(dias, 30)
+    expect(r.avgCalories, '(2400+2000)/2 — não /30').toBe(2200)
+    expect(r.avgProtein).toBe(170)
+  })
+
+  it('a cobertura viaja junto com a média', () => {
+    const r = summarizeHistory(dias, 30)
+    expect(r.loggedDays).toBe(2)
+    expect(r.windowDays).toBe(30)
+  })
+
+  it('janela sem nenhum lançamento não inventa média', () => {
+    expect(summarizeHistory([], 7)).toEqual({ loggedDays: 0, windowDays: 7, avgCalories: 0, avgProtein: 0 })
+  })
+})
+
+describe('windowStartDate', () => {
+  it('inclui o próprio dia final na contagem', () => {
+    expect(windowStartDate('2026-08-16', 7)).toBe('2026-08-10')
+    expect(windowStartDate('2026-08-16', 1)).toBe('2026-08-16')
+  })
+
+  it('atravessa a virada do mês', () => {
+    expect(windowStartDate('2026-03-02', 30)).toBe('2026-02-01')
+  })
+})
+
+/**
+ * Source-guards. Os dois travam decisões que a auditoria de 16/08/2026 mediu no
+ * banco, e que voltariam a ser tomadas "pelo caminho óbvio" por quem chegar
+ * depois sem os números.
+ */
+describe('a fonte do histórico', () => {
+  const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+
+  it('a lista NÃO lê daily_nutrition_logs — ele diverge da tela do dia', () => {
+        const modal = read('src/components/dashboard/nutrition/NutritionHistoryModal.tsx')
+        const codigo = modal.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+        expect(codigo, 'medido: 3 dias em 61 divergem, até 1050 kcal (dia com agregado e ZERO refeições)')
+            .not.toMatch(/daily_nutrition_logs/)
+        expect(codigo).toMatch(/nutrition_meal_entries/)
+    })
+
+  it('a lista NÃO baixa `items` — é a refeição inteira em jsonb', () => {
+    const modal = read('src/components/dashboard/nutrition/NutritionHistoryModal.tsx')
+    const select = modal.match(/\.select\(\s*'([^']+)'\s*\)/)
+    expect(select, 'o select precisa existir para ser auditado').toBeTruthy()
+    const colunas = String(select?.[1] || '').split(',').map((c) => c.trim())
+    expect(colunas).not.toContain('items')
+    expect(colunas).not.toContain('*')
+    expect(colunas).toContain('date')
+  })
+
+  it('o erro de leitura não é confundido com "nunca comeu"', () => {
+    const modal = read('src/components/dashboard/nutrition/NutritionHistoryModal.tsx')
+    expect(modal, 'supabase-js entrega a falha no retorno, não como exceção')
+      .toMatch(/if\s*\(\s*error\s*\)/)
+  })
+})

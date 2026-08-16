@@ -41,6 +41,7 @@ const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
 const PrescribedDietPlan = dynamic(() => import('./PrescribedDietPlan'), { ssr: false })
 const MyDietPlan = dynamic(() => import('./MyDietPlan'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
+const NutritionHistoryModal = dynamic(() => import('./NutritionHistoryModal'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
 const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorrelation'), { ssr: false })
@@ -785,6 +786,7 @@ export default function NutritionMixer({
 
   const handleFavoriteSelect = useCallback((mealText: string) => { setInput(mealText); try { inputRef.current?.focus() } catch {} }, [])
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const handleBarcodeResult = useCallback(async (ean: string) => {
     setShowBarcodeScanner(false)
@@ -827,7 +829,16 @@ export default function NutritionMixer({
     <div className="space-y-4 pb-24">
 
       {/* ── Date Navigator ──────────────────────────────────────────────── */}
-      <DateNavigator currentDate={currentDateKey} todayDate={todayDate} onDateChange={handleDateChange} />
+      <DateNavigator currentDate={currentDateKey} todayDate={todayDate} onDateChange={handleDateChange} onOpenHistory={() => setHistoryOpen(true)} />
+
+      {/* ── Histórico (lista de dias) ───────────────────────────────────── */}
+      <NutritionHistoryModal
+        open={historyOpen}
+        userId={userId}
+        todayDate={todayDate}
+        onPickDate={handleDateChange}
+        onClose={() => setHistoryOpen(false)}
+      />
 
       {/* ══ HERO — Calorie Ring + Summary ════════════════════════════════ */}
       <Card glow="bg-[radial-gradient(ellipse_at_top,_rgba(250,204,21,0.08),transparent_60%)]" className="p-5">
