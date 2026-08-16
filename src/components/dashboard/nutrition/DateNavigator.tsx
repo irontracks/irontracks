@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function formatDateLabel(dateStr: string, todayStr: string): string {
   if (dateStr === todayStr) return 'Hoje'
@@ -26,17 +26,20 @@ export default function DateNavigator({
   currentDate,
   todayDate,
   onDateChange,
+  onOpenHistory,
 }: {
   currentDate: string
   todayDate: string
   onDateChange: (date: string) => void
+  /** Abre a lista de dias. Sem ela, chegar a três semanas atrás custa 21 toques. */
+  onOpenHistory?: () => void
 }) {
   const isToday = currentDate === todayDate
   const isFuture = currentDate > todayDate
   const label = formatDateLabel(currentDate, todayDate)
 
   return (
-    <div className="flex items-center justify-center gap-3 mb-4">
+    <div className="flex items-center justify-center gap-2 mb-4">
       <button
         type="button"
         onClick={() => onDateChange(shiftDate(currentDate, -1))}
@@ -71,6 +74,17 @@ export default function DateNavigator({
       >
         <ChevronRight size={16} className="text-neutral-300" />
       </button>
+
+      {onOpenHistory && (
+        <button
+          type="button"
+          onClick={onOpenHistory}
+          className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition"
+          aria-label="Histórico de nutrição"
+        >
+          <CalendarDays size={16} className="text-neutral-300" />
+        </button>
+      )}
     </div>
   )
 }
