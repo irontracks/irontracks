@@ -980,12 +980,14 @@ ninguém remedir:
 **A jornada logada de UI já tem spec** (`e2e/authenticated-workout-journey.spec.ts`,
 15/08/2026): concluir série com o FINALIZAR alcançável durante o descanso,
 renomear no editor completo sem perder o foco, campo numérico substituindo, e
-sair/voltar preservando a sessão. O job existe no CI e é **pulado** enquanto
-faltar `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` nos secrets
-(o build do CI usa placeholder, e com placeholder o app não conecta — o login
-seria impossível e o job ficaria vermelho por configuração). São chaves
-públicas, vão no bundle: adicioná-las não expõe nada novo. Continua fora:
-sanear `admin-protection` e `critical-api`, que falham por ambiente.
+sair/voltar preservando a sessão. O job do CI aponta para o **preview da Vercel
+do PR**, porque ali o dashboard já tem as variáveis privadas de servidor sem
+expor `SUPABASE_SERVICE_ROLE_KEY` ao repositório público. O gate exige as
+credenciais da conta de teste e `VERCEL_AUTOMATION_BYPASS_SECRET`; em 16/08/2026
+os cinco secrets necessários foram configurados no GitHub e esta branch valida
+a primeira execução real. Até o run confirmar, não tratar a cobertura como
+ativa. Continua fora: sanear `admin-protection` e `critical-api`, que falham por
+ambiente.
 
 ### Escrever E2E de UI: cinco jeitos de passar VERDE com o bug presente
 
