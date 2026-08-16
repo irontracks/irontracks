@@ -8,6 +8,7 @@ import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useLoginScreen } from '@/hooks/useLoginScreen'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { codeFieldProps, plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ── Floating Gold Particles Background ──────────────────────────────────────
 
@@ -250,7 +251,7 @@ const LoginScreen = () => {
                             <div className="space-y-4">
                                 <div className="relative">
                                     <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                                    <input
+                                    <input {...properNameFieldProps}
                                         required
                                         type="text"
                                         placeholder="Nome Completo"
@@ -281,7 +282,7 @@ const LoginScreen = () => {
                                     </div>
                                     <div className="relative">
                                         <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                                        <input
+                                        <input {...plainFieldProps}
                                             required
                                             type="tel"
                                             placeholder="(DDD) 99999-9999"
@@ -327,7 +328,7 @@ const LoginScreen = () => {
                                     {emailData.isTeacher && (
                                         <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
                                             <label htmlFor="cref-input" className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
-                                            <input
+                                            <input {...plainFieldProps}
                                                 id="cref-input"
                                                 required
                                                 name="cref"
@@ -468,7 +469,7 @@ const LoginScreen = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <input
+                                    <input {...codeFieldProps}
                                         required
                                         type="text"
                                         placeholder="Código de recuperação (ex: ABCD-EF12-...)"
@@ -634,7 +635,7 @@ const LoginScreen = () => {
                                 <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
                                     Enviamos um código de 6 dígitos para <span className="text-white font-semibold break-all">{emailData.email}</span>. Digite abaixo.
                                 </p>
-                                <input
+                                <input {...codeFieldProps}
                                     type="text"
                                     inputMode="numeric"
                                     autoComplete="one-time-code"
@@ -743,7 +744,7 @@ const LoginScreen = () => {
 
                                     <div className="space-y-1">
                                         <label htmlFor="req-full-name" className="text-xs font-bold text-neutral-400 uppercase">Nome Completo</label>
-                                        <input
+                                        <input {...properNameFieldProps}
                                             id="req-full-name"
                                             aria-label="Nome Completo"
                                             required
@@ -773,7 +774,7 @@ const LoginScreen = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label htmlFor="req-phone" className="text-xs font-bold text-neutral-400 uppercase">WhatsApp</label>
-                                            <input
+                                            <input {...plainFieldProps}
                                                 id="req-phone"
                                                 aria-label="Telefone WhatsApp"
                                                 required
@@ -821,7 +822,7 @@ const LoginScreen = () => {
                                         {formData.is_teacher && (
                                             <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
                                                 <label htmlFor="req-cref-input" className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
-                                                <input
+                                                <input {...plainFieldProps}
                                                     id="req-cref-input"
                                                     aria-label="Número do CREF"
                                                     required

@@ -5,6 +5,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react'
 import { Copy, Check, Share2, Users, Gift, Loader2 } from 'lucide-react'
+import { codeFieldProps } from '@/utils/ui/textFieldProps'
 
 export default function ReferralSection() {
   const [code, setCode] = useState('')
@@ -157,7 +158,7 @@ export default function ReferralSection() {
       <div className="space-y-2 pt-2">
         <p className="text-xs font-black text-white/55 uppercase tracking-widest">Entrou por convite? Digite o código</p>
         <div className="flex gap-2">
-          <input
+          <input {...codeFieldProps}
             type="text"
             value={inputCode}
             onChange={e => setInputCode(e.target.value.toUpperCase().slice(0, 8))}

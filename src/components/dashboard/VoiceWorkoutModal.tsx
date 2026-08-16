@@ -21,6 +21,7 @@ import { isIosNative, isNativePlatform } from '@/utils/platform'
 import { NumericInput } from '@/components/ui/NumericInput'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ── Web Speech API types (not fully typed in all TS DOM libs) ─────────────────
 
@@ -140,8 +141,7 @@ function MicWave({ active }: { active: boolean }) {
 
 // Inline edit field
 function EditField({
-  label, value, onChange, type = 'text', placeholder, inputMode, numeric,
-}: {
+  label, value, onChange, type = 'text', placeholder, inputMode, numeric, identifier,}: {
   label: string
   value: string
   onChange: (v: string) => void
@@ -150,7 +150,7 @@ function EditField({
   inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url' | 'none'
   /** Campo numérico: usa NumericInput (aceita vírgula, sem type="number"). */
   numeric?: 'decimal' | 'integer'
-}) {
+ identifier?: boolean}) {
   const isNumber = numeric != null || type === 'number'
   const cls = `w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-yellow-500/60 ${isNumber ? 'text-[16px]' : 'text-sm'}`
   return (
@@ -168,7 +168,7 @@ function EditField({
           className={cls}
         />
       ) : (
-        <input
+        <input {...(identifier ? properNameFieldProps : {})}
           aria-label={label}
           type={type}
           inputMode={inputMode}
@@ -265,6 +265,7 @@ function EditCard({
       <div className="p-3 space-y-2.5">
         <EditField
           label="Exercício"
+          identifier
           value={draft.name}
           onChange={v => onChange({ ...draft, name: v })}
           placeholder="Nome do exercício"

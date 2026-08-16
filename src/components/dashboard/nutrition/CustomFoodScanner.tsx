@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic'
 import type { CustomFoodDraft } from './useCustomFoods'
 import { NumericInput } from '@/components/ui/NumericInput'
 import { lookupBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
@@ -270,7 +271,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
           {/* Name */}
           <div className="flex flex-col gap-1">
             <label htmlFor="custom-food-name" className="text-[10px] uppercase tracking-widest text-neutral-400">Nome do produto *</label>
-            <input
+            <input {...properNameFieldProps}
               id="custom-food-name"
               aria-label="Nome do produto"
               value={name}
@@ -284,7 +285,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
           <div className="flex flex-col gap-1">
             <label htmlFor="custom-food-barcode" className="text-[10px] uppercase tracking-widest text-neutral-400">Código de barras (opcional)</label>
             <div className="flex gap-2">
-              <input
+              <input {...plainFieldProps}
                 id="custom-food-barcode"
                 aria-label="Código de barras"
                 inputMode="numeric"

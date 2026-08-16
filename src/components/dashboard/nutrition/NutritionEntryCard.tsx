@@ -4,6 +4,7 @@ import { memo, useState } from 'react'
 import { X } from 'lucide-react'
 import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
 import { MACRO_COLORS, MACRO_SEGMENT_GAP_PX, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -153,7 +154,7 @@ function NutritionEntryCard({
           {editingId === item.id ? (
             /* ── Editor de ALIMENTOS (adicionar/remover; macros = soma) ── */
             <div className="mt-3 space-y-3" role="none" onClick={(e) => e.stopPropagation()}>
-              <input
+              <input {...properNameFieldProps}
                 type="text"
                 aria-label="Nome da refeição"
                 value={editDraft.food_name}
@@ -194,7 +195,7 @@ function NutritionEntryCard({
 
               {/* Adicionar alimento */}
               <div className="flex items-center gap-1.5">
-                <input
+                <input {...plainFieldProps}
                   type="text"
                   aria-label="Adicionar alimento"
                   value={addText}

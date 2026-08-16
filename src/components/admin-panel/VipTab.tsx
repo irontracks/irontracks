@@ -8,6 +8,7 @@ import {
     Zap, Star, Trophy, AlertCircle
 } from 'lucide-react'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 // ─── Types ────────────────────────────────────────────────────────
 type VipItem = {
@@ -325,7 +326,7 @@ export const VipTab: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <div className="relative flex-1 w-full">
                     <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                    <input
+                    <input {...plainFieldProps}
                         type="text"
                         aria-label="Buscar VIP por nome ou e-mail"
                         placeholder="Buscar VIP por nome ou e-mail…"

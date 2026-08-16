@@ -11,6 +11,7 @@ import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { backdropProps } from '@/utils/a11y/backdrop'
+import { codeFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 /** Peso em pt-BR (vírgula decimal): 96.85 → "96,85". */
 const formatKgPtBr = (kg: number): string =>
@@ -227,7 +228,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             <button type="button" onClick={() => setShowCompleteProfile(false)} className="tap-44 w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Nome de Exibição</label>
-                        <input value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500" />
+                        <input {...properNameFieldProps} value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500" />
                         <div className="flex gap-2 mt-5">
                             <button type="button" onClick={() => setShowCompleteProfile(false)} disabled={savingProfile} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50">Cancelar</button>
                             <button type="button" onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50">{savingProfile ? 'Salvando...' : 'Salvar'}</button>
@@ -241,7 +242,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
                         <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                        <input value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase" />
+                        <input {...codeFieldProps} value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase" />
                         <div className="flex gap-2">
                             <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
                             <button onClick={handleImportWorkout} className="flex-1 p-3 bg-amber-500 hover:bg-amber-400 rounded-xl font-bold text-black">Importar</button>

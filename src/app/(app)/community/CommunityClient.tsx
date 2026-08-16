@@ -14,6 +14,7 @@ import UserProfileModal from './UserProfileModal'
 import LeaderboardPanel from './LeaderboardPanel'
 import ChallengesPanel from './ChallengesPanel'
 import { publicDisplayName } from '@/lib/user/publicDisplayName'
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 type CommunityTab = 'feed' | 'follow' | 'ranking' | 'challenges'
 
@@ -353,7 +354,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 <Search size={15} className="text-neutral-400 flex-shrink-0" />
-                <input
+                <input {...plainFieldProps}
                   aria-label="Buscar usuários"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

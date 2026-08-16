@@ -11,6 +11,7 @@ import { apiStudentBilling } from '@/lib/api/student-billing'
 import type { StudentCharge } from '@/lib/api/student-billing'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
 
               <div>
                 <label htmlFor="pix-name" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide">Nome completo</label>
-                <input
+                <input {...properNameFieldProps}
                   id="pix-name"
                   aria-label="Nome completo do pagador"
                   type="text"
@@ -136,7 +137,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
 
               <div>
                 <label htmlFor="pix-cpf" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide">CPF *</label>
-                <input
+                <input {...plainFieldProps}
                   id="pix-cpf"
                   aria-label="CPF do pagador"
                   type="text"
@@ -151,7 +152,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
 
               <div>
                 <label htmlFor="pix-phone" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide">Celular com DDD *</label>
-                <input
+                <input {...plainFieldProps}
                   id="pix-phone"
                   aria-label="Celular com DDD do pagador"
                   type="tel"

@@ -12,6 +12,7 @@ import { isIosNative as getIsIosNative } from '@/utils/platform'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { apiBilling, ApiError } from '@/lib/api'
 import { logError } from '@/lib/logger'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // 402 no_active_entitlement: o backend consultou o RevenueCat e não achou entitlement
 // ativo. Logo após a compra isso costuma ser LAG de propagação (retry resolve); no
@@ -737,19 +738,19 @@ export default function MarketplaceClient() {
               ) : (
                 <>
                   <div className="grid grid-cols-1 gap-3">
-                    <input
+                    <input {...properNameFieldProps}
                       className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
                       placeholder="Nome completo"
                       value={payerName}
                       onChange={(e) => setPayerName(e.target.value)}
                     />
-                    <input
+                    <input {...plainFieldProps}
                       className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
                       placeholder="Celular (DDD + número)"
                       value={mobilePhone}
                       onChange={(e) => setMobilePhone(e.target.value)}
                     />
-                    <input
+                    <input {...plainFieldProps}
                       className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
                       placeholder="CPF ou CNPJ"
                       value={cpfCnpj}

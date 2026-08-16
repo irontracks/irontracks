@@ -10,6 +10,7 @@ import { memo, useState, useCallback } from 'react'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
 import type { CustomFood, CustomFoodDraft } from './useCustomFoods'
 import { NumericInput } from '@/components/ui/NumericInput'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 interface Props {
   foods: CustomFood[]
@@ -179,7 +180,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
                   {/* Name */}
                   <div className="flex flex-col gap-0.5">
                     <label htmlFor={`cfl-name-${food.id}`} className="text-[9px] uppercase tracking-widest text-neutral-400">Nome</label>
-                    <input
+                    <input {...properNameFieldProps}
                       id={`cfl-name-${food.id}`}
                       aria-label="Nome do alimento"
                       type="text"
