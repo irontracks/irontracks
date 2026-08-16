@@ -3,6 +3,7 @@ import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { setVolume, setTopWeightReps, isWorkingSet } from '@/utils/report/setVolume'
+import { detectWeightOutlier, outlierLabel } from '@/lib/workout/weightOutlier'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -376,6 +377,13 @@ export const shouldOpenFinishPrompt = (params: {
 export const buildWorkoutSummary = (
   exercises: unknown,
   logs: unknown,
+  /**
+   * Peso de referência por exercício (`normalizeExerciseKey(nome)` → kg), usado
+   * só para marcar carga MUITO fora do padrão na conferência. Opcional de
+   * propósito: sem histórico o resumo sai idêntico ao de antes, e exercício
+   * novo nunca gera alarme falso.
+   */
+  referenciaPorExercicio?: Record<string, number> | null,
 ): { text: string; exercises: number; sets: number; volume: number } => {
   const exArr = Array.isArray(exercises) ? exercises : [];
   const logMap = isObject(logs) ? logs : {};
@@ -390,6 +398,7 @@ export const buildWorkoutSummary = (
     let done = 0;
     let vol = 0;
     let missing = false;
+    let topDaSessao = 0;
 
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
@@ -401,6 +410,7 @@ export const buildWorkoutSummary = (
       done += 1;
       const v = setVolume(log); // trata cluster + unilateral (L+R) + normal
       const { weight: w, reps: r } = setTopWeightReps(log);
+      if (w > topDaSessao) topDaSessao = w;
       if (v > 0 && w > 0 && r > 0) {
         vol += v;
       } else {
@@ -422,6 +432,12 @@ export const buildWorkoutSummary = (
     }
     let line = `• ${name} — ${detail}`;
     if (missing) line += ' ⚠️ sem carga';
+    // Carga fora do padrão: conferência, nunca bloqueio. A comparação é com o
+    // histórico DAQUELE exercício — comparar entre exercícios acusaria toda
+    // troca de leg press por rosca direta.
+    const ref = referenciaPorExercicio?.[normalizeExerciseKey(name)];
+    const outlier = ref != null ? detectWeightOutlier(topDaSessao, ref) : null;
+    if (outlier) line += ` ${outlierLabel(outlier)}`;
     lines.push(line);
   });
 

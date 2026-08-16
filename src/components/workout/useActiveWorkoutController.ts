@@ -18,6 +18,7 @@ import {
   WorkoutExercise,
 } from './types';
 import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
+import { buildWeightReference } from '@/lib/workout/weightOutlier';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
@@ -581,14 +582,17 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!open) return;
     finishPromptedRef.current = true;
     void (async () => {
-      const summary = buildWorkoutSummary(exercises, logs);
+      // A conferência compara a carga desta sessão com o histórico DAQUELE
+      // exercício: 12 kg e 120 kg estão a um toque de distância, e o histórico
+      // é a base que o motor de carga automática lê na sessão seguinte.
+      const summary = buildWorkoutSummary(exercises, logs, buildWeightReference(reportHistory));
       const message = summary.text
         ? `Você concluiu todos os exercícios! Confira antes de finalizar:\n\n${summary.text}`
         : 'Você concluiu todos os exercícios! Deseja finalizar o treino agora?';
       const ok = await confirm(message, 'Treino concluído 💪', { confirmText: 'Finalizar' });
       if (ok) await finishWorkout();
     })();
-  }, [allExercisesComplete, finishing, confirm, finishWorkout, exercises, logs]);
+  }, [allExercisesComplete, finishing, confirm, finishWorkout, exercises, logs, reportHistory]);
 
   // Memoiza o contexto inteiro pra não recriar o `value` do WorkoutProvider a
   // cada render do controller. Sem isso, qualquer mudança no controller (ticker
