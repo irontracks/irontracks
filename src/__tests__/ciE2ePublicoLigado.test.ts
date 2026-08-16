@@ -80,6 +80,24 @@ describe('CI — E2E da jornada logada', () => {
     expect(ci).toMatch(/TEM_SUPABASE_PUBLICO:\s*\$\{\{\s*secrets\.NEXT_PUBLIC_SUPABASE_URL/)
   })
 
+  it('exige a service role — sem ela o app não serve o dashboard e o job falharia por configuração', () => {
+    // Medido no run de 16/08: com as chaves públicas o LOGIN funciona, mas o
+    // bootstrap (admin client) não, e o teste morre em "a lista de treinos
+    // precisa ter ao menos um card".
+    expect(step).toMatch(/env\.TEM_SERVICE_ROLE\s*==\s*'true'/)
+  })
+
+  it('a service role NÃO é lida de lugar nenhum além do secret (repo é público)', () => {
+    // A chave ignora RLS e alcança os dados de todos os usuários: ela não pode
+    // ser embutida no workflow, só referenciada de secrets — e o gate acima
+    // mantém o passo pulado enquanto o segredo não existir.
+    const linhas = ci.split('\n').filter((l) => l.includes('SUPABASE_SERVICE_ROLE_KEY'))
+    for (const l of linhas) {
+      const ok = l.includes('secrets.SUPABASE_SERVICE_ROLE_KEY') || l.trim().startsWith('#')
+      expect(ok, `linha com service role fora de secrets: ${l.trim()}`).toBe(true)
+    }
+  })
+
   it('o build usa as chaves reais quando existirem (senão o E2E logado é inútil)', () => {
     expect(ci).toMatch(/NEXT_PUBLIC_SUPABASE_URL:\s*\$\{\{\s*secrets\.NEXT_PUBLIC_SUPABASE_URL\s*\|\|/)
   })

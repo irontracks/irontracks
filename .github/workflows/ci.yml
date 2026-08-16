@@ -16,6 +16,18 @@ jobs:
       # onde `secrets` é válido, e os steps decidem por env.
       TEM_E2E_LOGIN: ${{ secrets.E2E_USER_EMAIL != '' && secrets.E2E_USER_PASSWORD != '' }}
       TEM_SUPABASE_PUBLICO: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}
+      # O app precisa TAMBÉM da service role para servir o dashboard (bootstrap
+      # e telemetria usam admin client). Medido no run de 16/08: com as chaves
+      # públicas o LOGIN funciona, mas a lista de treinos não carrega e o job
+      # falha em "a lista de treinos precisa ter ao menos um card".
+      #
+      # ⚠️ Esta chave NÃO deve ser adicionada aqui enquanto o repositório for
+      # PÚBLICO: ela ignora RLS e alcança os dados de todos os usuários. O
+      # caminho certo é apontar o E2E para o deploy de PREVIEW da Vercel (que já
+      # tem as variáveis no ambiente correto) ou usar um projeto Supabase de
+      # teste com chave própria. Enquanto isso, o passo fica pulado — e pulado
+      # é honesto; vermelho por configuração ensina a ignorar o vermelho.
+      TEM_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}
 
     steps:
     - name: Checkout code
@@ -85,7 +97,7 @@ jobs:
       # com placeholders, e com placeholder o app não conecta em lugar nenhum —
       # o login falharia e o job ficaria vermelho por configuração, não por
       # regressão. Sem as quatro variáveis, o passo é PULADO.
-      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_SUPABASE_PUBLICO == 'true'
+      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_SUPABASE_PUBLICO == 'true' && env.TEM_SERVICE_ROLE == 'true'
       run: npx playwright test --project=authenticated e2e/authenticated-workout-journey.spec.ts --reporter=github
       env:
         PLAYWRIGHT_CI_SERVER: "1"
@@ -93,6 +105,7 @@ jobs:
         E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     - name: E2E — public pages (Playwright)
       run: npx playwright test --project=chromium e2e/pages-smoke.spec.ts e2e/pages-smoke-protected.spec.ts e2e/accessibility.spec.ts --reporter=github
@@ -100,3 +113,4 @@ jobs:
         PLAYWRIGHT_CI_SERVER: "1"
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+
