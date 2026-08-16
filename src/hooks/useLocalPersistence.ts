@@ -12,6 +12,7 @@
 'use client'
 import { logWarn } from '@/lib/logger'
 import { persistActiveSession, clearPersistedSession } from '@/lib/offline/activeSessionPersistence'
+import { readRestorableSession } from '@/lib/workout/restoreSessionGate'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 import { useEffect, useRef } from 'react'
@@ -72,11 +73,15 @@ export function useLocalPersistence({
         if (!isDashboardRoot && !isActiveRoute) return
       }
 
-      const scopedSessionKey = `irontracks.activeSession.v2.${userId}`
-      const savedSession = localStorage.getItem(scopedSessionKey)
       // Único caso onde forçamos navegação: restore-after-crash de treino ativo
       // (user matou app no meio de sessão e voltou — vai pra /dashboard/active).
-      if (savedSession) {
+      //
+      // A existência da chave NÃO basta para decidir isso: sessão velha demais
+      // é descartada pelo portão (`readRestorableSession`), e sem essa checagem
+      // aqui o app abriria dentro de um treino que o `useSessionSync` acabou de
+      // recusar hidratar — tela de treino sem treino.
+      const { verdict } = readRestorableSession(userId, Date.now())
+      if (verdict !== 'expired') {
         setView('active')
       }
       // Outros casos: respeitar URL atual. View string legada vai sair em PR futuro.

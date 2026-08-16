@@ -8,6 +8,8 @@ import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider, WorkoutLogsProvider } from './workout/WorkoutContext';
 import type { WorkoutContextType } from './workout/WorkoutContext';
+import { useDialog } from '@/contexts/DialogContext';
+import { staleSessionAgeLabel } from '@/lib/workout/staleSession';
 import { WorkoutTimerProvider } from './workout/WorkoutTimerContext';
 import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
 import WorkoutHeader from './workout/WorkoutHeader';
@@ -75,6 +77,49 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     ?? (session as Record<string, unknown> | null | undefined)?._savedAt
     ?? 0,
   ) || 0;
+
+  // Preenchido logo abaixo, quando o `enhancedController` é montado. Um ref
+  // porque o efeito do aviso roda ANTES dele existir no corpo do componente.
+  const cancelWorkoutRef = React.useRef<(() => void) | undefined>(undefined);
+
+  // ── Sessão retomada VELHA: avisa antes de deixar o usuário seguir ──
+  //
+  // O `localStorage` não expirava nada (o IndexedDB expirava em 24 h — as duas
+  // metades da mesma sessão discordavam), então um treino aberto na segunda e
+  // esquecido reabria o app dentro dele na quarta, em silêncio. Quem finalizasse
+  // dali gravaria a sessão de segunda com a data de hoje, e a DURAÇÃO alimenta a
+  // estimativa de calorias — o número falso não pararia no card do treino.
+  //
+  // A marca vem do portão de restauração (`restoreSessionGate`), não daqui:
+  // quem lê o armazenamento não abre diálogo, e quem abre diálogo não conhece o
+  // armazenamento.
+  //
+  // A POLARIDADE da pergunta é deliberada: descartar é o botão destrutivo, e
+  // continuar é o que acontece ao fechar por fora (o `confirm` resolve `false`
+  // no backdrop). Invertido, um toque fora do modal apagaria as séries de um
+  // treino em andamento — dano irreversível como padrão de fechamento. É a
+  // mesma lição do rodapé, onde o dourado estava na opção que apaga a sessão.
+  const staleRestoreAgeMs = Number(
+    (session as Record<string, unknown> | null | undefined)?._staleRestoreAgeMs ?? 0,
+  ) || 0;
+  const { confirm: confirmDialog } = useDialog();
+  const stalePromptShownRef = React.useRef(false);
+  React.useEffect(() => {
+    if (staleRestoreAgeMs <= 0) return;
+    if (stalePromptShownRef.current) return;
+    stalePromptShownRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      const descartar = await confirmDialog(
+        `Você abriu este treino ${staleSessionAgeLabel(staleRestoreAgeMs)} e nada foi registrado desde então. O tempo parado não entra na conta. Quer continuar de onde parou?`,
+        'Treino ficou aberto',
+        { confirmText: 'Descartar treino', cancelText: 'Continuar de onde parei', destructive: true },
+      );
+      if (cancelled || !descartar) return;
+      cancelWorkoutRef.current?.();
+    })();
+    return () => { cancelled = true };
+  }, [staleRestoreAgeMs, confirmDialog]);
 
   // ── Painel de cardio com GPS: só ocupa o topo quando é relevante ──
   //
@@ -148,6 +193,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
       ...(props.onBack ? { _exitOnBack: () => triggerExit(props.onBack!) } : {}),
     };
   }, [controller, props.onBack, triggerExit, openCardioGps, showCardioPanel]);
+
+  cancelWorkoutRef.current = enhancedController.cancelWorkout;
 
 
   if (!session || !workout) {
