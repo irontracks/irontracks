@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { FunnelStoryButton } from './FunnelStoryButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,7 +73,10 @@ export default async function AcquisitionPage() {
             <h1 className="text-2xl font-black">Aquisição</h1>
             <p className="text-sm text-neutral-400">Cohort por canal/campanha — só usuários com UTM atribuído.</p>
           </div>
-          <Link href="/dashboard" className="text-sm text-yellow-500 hover:underline">← Dashboard</Link>
+          <div className="flex items-center gap-4">
+            <FunnelStoryButton />
+            <Link href="/dashboard" className="text-sm text-yellow-500 hover:underline">← Dashboard</Link>
+          </div>
         </header>
 
         {/* Funnel */}

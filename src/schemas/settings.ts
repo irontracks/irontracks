@@ -167,6 +167,8 @@ export const UserSettingsSchema = z
     nutritionStoryTemplate: z.string().default('fresh'),
     /** Último template escolhido no composer de Story de cardio de rua. */
     cardioStoryTemplate: z.string().default('fresh'),
+    /** Último template escolhido no composer de Story de métricas (admin). */
+    metricsStoryTemplate: z.string().default('fresh'),
   })
   .passthrough()
 
