@@ -9,6 +9,13 @@ on:
 jobs:
   quality-check:
     runs-on: ubuntu-latest
+    env:
+      # O contexto `secrets` não está disponível em `if:` de step — usar ali faz
+      # o workflow inteiro falhar antes de rodar ("workflow file issue"), como
+      # aconteceu no run 31918472665. A leitura vai para env no nível do JOB,
+      # onde `secrets` é válido, e os steps decidem por env.
+      TEM_E2E_LOGIN: ${{ secrets.E2E_USER_EMAIL != '' && secrets.E2E_USER_PASSWORD != '' }}
+      TEM_SUPABASE_PUBLICO: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}
 
     steps:
     - name: Checkout code
@@ -78,7 +85,7 @@ jobs:
       # com placeholders, e com placeholder o app não conecta em lugar nenhum —
       # o login falharia e o job ficaria vermelho por configuração, não por
       # regressão. Sem as quatro variáveis, o passo é PULADO.
-      if: ${{ secrets.E2E_USER_EMAIL != '' && secrets.E2E_USER_PASSWORD != '' && secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}
+      if: env.TEM_E2E_LOGIN == 'true' && env.TEM_SUPABASE_PUBLICO == 'true'
       run: npx playwright test --project=authenticated e2e/authenticated-workout-journey.spec.ts --reporter=github
       env:
         PLAYWRIGHT_CI_SERVER: "1"
