@@ -108,6 +108,32 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     drawNutritionStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset })
   }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset])
 
+  /**
+   * Story de nutrição NASCE pedindo a foto (pedido do dono, 16/08/2026).
+   *
+   * A mídia sempre foi aceita nos três modos, mas era um botão no meio do
+   * painel: quem abria via o card sobre o gradiente do template e seguia
+   * assim. Agora o seletor abre junto com a tela, como no Instagram Stories.
+   *
+   * Três guardas: (1) só uma vez por abertura (`pediuMidiaRef`), senão cancelar
+   * o picker o reabriria em loop; (2) só quando ainda NÃO há mídia — reabrir o
+   * composer de um story que já tem foto não pode pedir outra; (3) falha em
+   * silêncio se o WebView recusar o clique programático (sem gesto recente o
+   * iOS ignora) — nesse caso sobra a tela normal, com o botão de sempre.
+   */
+  const pediuMidiaRef = useRef(false)
+  useEffect(() => {
+    if (!open) { pediuMidiaRef.current = false; return }
+    if (pediuMidiaRef.current || backgroundImage || isVideo) return
+    pediuMidiaRef.current = true
+    // rAF: o input precisa estar montado no DOM antes do clique.
+    const id = requestAnimationFrame(() => {
+      try { inputRef.current?.click() } catch { /* WebView recusou — segue a tela normal */ }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open, backgroundImage, isVideo, inputRef])
+
+
   if (!open) return null
 
   return (

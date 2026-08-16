@@ -241,6 +241,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         pendingNutritionRef.current = false
         setNutritionOpen(true)
     }, [view, setNutritionOpen])
+    // "Histórico de refeições" no menu: abre a nutrição JÁ no histórico. A flag
+    // é consumida na abertura e zerada ao fechar — sem isso, reabrir a aba pela
+    // barra cairia no histórico de novo, sem ninguém ter pedido.
+    const [nutritionHistoryOnOpen, setNutritionHistoryOnOpen] = useState(false)
+    const openNutritionHistory = useCallback(() => {
+        setNutritionHistoryOnOpen(true)
+        openNutrition()
+    }, [openNutrition])
+
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
@@ -1143,6 +1152,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenTeacherArea={() => setView('teacher')}
                             onOpenChatList={handleOpenChatList}
                             onOpenHistory={handleOpenHistory}
+                            onOpenNutritionHistory={openNutritionHistory}
                             onOpenNotifications={handleOpenNotifications}
                             onOpenSchedule={() => router.push('/dashboard/schedule')}
                             onOpenWallet={() => { openAdminPanel('billing'); setView('admin'); }}
@@ -1328,8 +1338,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             {nutritionOpen && view === 'dashboard' ? (
                                 <NutritionOverlay
-                                    onClose={() => setNutritionOpen(false)}
+                                    onClose={() => { setNutritionOpen(false); setNutritionHistoryOnOpen(false) }}
                                     canViewMacros={!!(vipStatus?.limits as Record<string, unknown> | undefined)?.nutrition_macros}
+                                    openHistoryOnMount={nutritionHistoryOnOpen}
                                 />
                             ) : null}
 
