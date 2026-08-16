@@ -204,8 +204,21 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                         `pointer-events-none` para o arrasto da marca e da
                         legenda continuar funcionando sem mídia. */}
                     {!backgroundImage && !isVideo && (
-                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                        <label className={['pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-yellow-500/50 bg-black/55 px-5 py-4 text-center cursor-pointer backdrop-blur-[2px] active:scale-[0.98] transition', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
+                      <div className="absolute inset-0 z-20 flex items-start justify-center pt-[26%] pointer-events-none">
+                        {/* `stopPropagation` no toque: a prévia inteira escuta
+                            touchstart/move para a pinça e o arrasto, e esses
+                            handlers dão `preventDefault` — que CANCELA o clique
+                            sintético do label e o seletor nunca abre (medido no
+                            iPhone: o mesmo padrão de label funciona no botão do
+                            rodapé, que está fora da prévia).
+
+                            E `pt-[26%]` em vez de centralizado: no centro o
+                            convite cobria o rótulo "MÉDIA POR DIA" logo abaixo. */}
+                        <label
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          className={['pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-yellow-500/50 bg-black/55 px-5 py-4 text-center cursor-pointer backdrop-blur-[2px] active:scale-[0.98] transition', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
                           <Upload size={20} className="text-yellow-500" />
                           <span className="t-action text-[11px] uppercase tracking-wider text-white">Toque para pôr sua foto</span>
                           <span className="text-[10px] text-neutral-300">ou vídeo — dá para seguir sem</span>

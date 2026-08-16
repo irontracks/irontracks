@@ -51,9 +51,28 @@ describe('convite de foto na prévia', () => {
 
   it('não trava o arrasto da marca e da legenda quando não há mídia', () => {
     const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
-    const trecho = bloco.slice(0, 900)
-    expect(trecho, 'a camada inteira não pode capturar toque').toMatch(/inset-0[^"]*pointer-events-none/)
+    const trecho = bloco.slice(0, 2200)
+    expect(trecho, 'a camada inteira não pode capturar toque').toMatch(/absolute inset-0[\s\S]{0,120}pointer-events-none/)
     expect(trecho, 'só o convite recebe o toque').toMatch(/pointer-events-auto/)
+  })
+
+  /**
+   * MEDIDO no iPhone: sem isto o convite não abre nada. A prévia escuta
+   * touchstart/move para a pinça e o arrasto, e esses handlers dão
+   * `preventDefault` — o que cancela o clique sintético do <label>. O botão do
+   * rodapé sempre funcionou porque vive FORA da prévia.
+   */
+  it('o toque no convite não é engolido pelos gestos da prévia', () => {
+    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
+    const trecho = bloco.slice(0, 1600)
+    expect(trecho).toMatch(/onTouchStart=\{\(e\)\s*=>\s*e\.stopPropagation\(\)\}/)
+    expect(trecho).toMatch(/onTouchEnd=\{\(e\)\s*=>\s*e\.stopPropagation\(\)\}/)
+  })
+
+  it('o convite não cobre o número do story na prévia', () => {
+    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
+    expect(bloco.slice(0, 400), 'centralizado, ele tapava o rótulo MÉDIA POR DIA')
+      .toMatch(/items-start[^"]*pt-\[/)
   })
 
   it('diz que dá para seguir sem foto — nada é bloqueado', () => {
