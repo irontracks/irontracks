@@ -55,8 +55,9 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
         iniciar.or(continuar).first(),
         'a lista de treinos precisa ter ao menos um card',
     ).toBeVisible({ timeout: 30_000 })
-    const alvo = (await continuar.isVisible()) ? continuar : iniciar
-    await alvo.click()
+    // O bootstrap pode trocar CONTINUAR por INICIAR (ou o inverso) enquanto o
+    // botão anima. O locator combinado se resolve de novo se o nó for trocado.
+    await iniciar.or(continuar).first().click()
 
     // Se a sessão ativa pertence a outro card, INICIAR pede confirmação. Esse
     // é um estado válido da conta de teste e precisa ser resolvido pela UI.

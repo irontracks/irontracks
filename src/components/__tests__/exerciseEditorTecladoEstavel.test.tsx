@@ -88,6 +88,27 @@ describe('ExerciseEditor — teclado estável ao renomear exercício', () => {
         expect((after as HTMLInputElement).value).toBe('Supino')
     })
 
+    it('exercício ADICIONADO recebe a chave antes do primeiro caractere', () => {
+        let last: Workout | null = null
+        render(
+            <Harness
+                initial={{ title: 'Treino vazio', exercises: [] } as unknown as Workout}
+                onWorkout={(w) => { last = w }}
+            />,
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /Adicionar Exercício/i }))
+        const before = screen.getByLabelText('Nome do exercício')
+        before.focus()
+        fireEvent.change(before, { target: { value: 'S' } })
+
+        const after = screen.getByLabelText('Nome do exercício')
+        expect(after).toBe(before)
+        expect(document.activeElement).toBe(after)
+        expect(((last as Workout | null)?.exercises?.[0] as Record<string, unknown>)?._itx_exKey)
+            .toBeTruthy()
+    })
+
     it('exercício sem id ganha _itx_exKey na entrada (a identidade não vem do nome nem do index)', () => {
         let last: Workout | null = null
         render(<Harness initial={baseWorkout()} onWorkout={(w) => { last = w }} />)
