@@ -13,6 +13,7 @@
  * defined".
  */
 export const DOM_TEST_FILES = [
+  'src/lib/workout/__tests__/restoreSessionGate.test.ts',
   'src/app/(app)/community/__tests__/communityAlertsToast.test.ts',
   'src/components/update/__tests__/swAutoUpdate.test.ts',
   'src/components/workout/__tests__/deloadGuards.test.ts',

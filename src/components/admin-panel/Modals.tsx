@@ -4,6 +4,7 @@ import { UserPlus, Edit3, ArrowLeft } from 'lucide-react';
 import HistoryList from '../HistoryList'; // Import relative or alias
 import AdminWorkoutEditor from '../AdminWorkoutEditor'; // Import relative or alias
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 // import { AdminWorkout } from '@/types/admin';
 
 export const Modals: React.FC = () => {
@@ -63,7 +64,7 @@ export const Modals: React.FC = () => {
                         <div className="space-y-3">
                             <div>
                                 <label htmlFor="new-student-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
-                                <input
+                                <input {...properNameFieldProps}
                                     id="new-student-name"
                                     type="text"
                                     aria-label="Nome Completo"
@@ -111,7 +112,7 @@ export const Modals: React.FC = () => {
                         <div className="space-y-3">
                             <div>
                                 <label htmlFor="new-teacher-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
-                                <input
+                                <input {...properNameFieldProps}
                                     id="new-teacher-name"
                                     type="text"
                                     aria-label="Nome Completo"
@@ -135,7 +136,7 @@ export const Modals: React.FC = () => {
                             </div>
                             <div>
                                 <label htmlFor="new-teacher-phone" className="text-xs text-neutral-400 uppercase font-bold">Telefone</label>
-                                <input
+                                <input {...plainFieldProps}
                                     id="new-teacher-phone"
                                     type="tel"
                                     aria-label="Telefone"
@@ -171,7 +172,7 @@ export const Modals: React.FC = () => {
                         <div className="space-y-3">
                             <div>
                                 <label htmlFor="edit-teacher-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
-                                <input
+                                <input {...properNameFieldProps}
                                     id="edit-teacher-name"
                                     type="text"
                                     aria-label="Nome Completo"
@@ -195,7 +196,7 @@ export const Modals: React.FC = () => {
                             </div>
                             <div>
                                 <label htmlFor="edit-teacher-phone" className="text-xs text-neutral-400 uppercase font-bold">Telefone</label>
-                                <input
+                                <input {...plainFieldProps}
                                     id="edit-teacher-phone"
                                     type="tel"
                                     aria-label="Telefone"

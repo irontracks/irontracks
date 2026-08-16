@@ -6,6 +6,7 @@ import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMa
 import { useTeacherStudentSessions } from '@/hooks/useTeacherStudentSessions';
 import { OPEN_TEACHER_CONTROL_EVENT } from '@/components/teacher/TeacherControlHost';
 import { logError } from '@/lib/logger';
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 // Abre o controle de treino pelo host GLOBAL (montado no shell do dashboard) — o
 // modal e a auto-abertura no aceite não vivem mais aqui, pra funcionar em qualquer
@@ -315,7 +316,7 @@ export const StudentsTab: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 backdrop-blur-sm">
                 <div className="relative w-full md:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                    <input
+                    <input {...plainFieldProps}
                         type="text"
                         aria-label="Buscar alunos"
                         placeholder="Buscar alunos..."

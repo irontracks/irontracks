@@ -5,6 +5,7 @@ import { Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 /* Primeiro acesso do aluno convidado — depois de entrar por OTP (só email), ele define uma
  * senha (pra logar normal depois) e confirma o nome. A conta já está criada e aprovada; esta
@@ -92,7 +93,7 @@ export default function OnboardingPage() {
             <label htmlFor="ob-name" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Nome completo</label>
             <div className="relative">
               <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
+              <input {...properNameFieldProps}
                 id="ob-name"
                 type="text"
                 autoComplete="name"

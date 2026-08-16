@@ -49,6 +49,7 @@ const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStory
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useCustomFoods, customFoodsToExtraFoods, type CustomFood } from './useCustomFoods'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -1146,7 +1147,7 @@ export default function NutritionMixer({
               instrução que ENSINA o parser ("150g frango + arroz + salada") e
               estava a dois campos de distância de onde se digita, enquanto o
               placeholder do textarea ("O que você comeu?") não ensinava nada. */}
-          <input
+          <input {...properNameFieldProps}
             type="text"
             aria-label="Nome da refeição (opcional)"
             value={mealName}

@@ -8,6 +8,7 @@ import {
 import { useAdminPanel } from './AdminPanelContext';
 import type { AdminUser, AdminTeacher } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 // ─── Avatar helper ────────────────────────────────────────────────
 const TeacherAvatar = ({ teacher, size = 'md' }: { teacher: AdminTeacher; size?: 'sm' | 'md' | 'lg' }) => {
@@ -512,7 +513,7 @@ export const TeachersTab: React.FC = () => {
             {/* Search */}
             <div className="relative">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
+                <input {...plainFieldProps}
                     type="text"
                     aria-label="Buscar professor por nome ou e-mail"
                     placeholder="Buscar professor por nome ou e-mail…"

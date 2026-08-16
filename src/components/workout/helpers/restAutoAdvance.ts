@@ -41,3 +41,39 @@ export function shouldAutoAdvanceRest(input: AutoAdvanceInput): boolean {
  * entre o usuário ser avisado e não ser.
  */
 export const REST_ALARM_FULL_CYCLE_MS = 1500
+
+/**
+ * Depois de quanto tempo ALÉM do planejado o descanso desiste sozinho.
+ *
+ * O contador de "além do planejado" não tinha teto: no teste de 10 passos
+ * (15/08/2026) a barra exibia **"+286:32 além do planejado"** — quase cinco
+ * horas — em VERDE, a cor de coisa boa, ocupando o rodapé. Nos primeiros
+ * minutos o extra informa ("você demorou 40 s a mais"); passando disso não há
+ * nada a informar, e a barra ainda empurra o rodapé do treino para cima
+ * (`--it-rest-bar-h`), comendo tela.
+ *
+ * 15 minutos porque ninguém descansa 15 minutos ENTRE SÉRIES. Passou disso, o
+ * descanso acabou de fato — o usuário está treinando outra coisa, guardou o
+ * celular ou saiu.
+ */
+export const REST_ABANDON_EXTRA_SECONDS = 15 * 60
+
+export interface AbandonRestInput {
+  /** Segundos ALÉM do planejado (0 enquanto o descanso não estourou). */
+  extraSeconds: number
+  /**
+   * Timer de EXERCÍCIO (prancha, cardio) em vez de descanso.
+   *
+   * A distinção não é detalhe: uma corrida de 40 min é um uso legítimo e
+   * esperado do cronômetro. Encerrá-la por "tempo demais" apagaria a medição
+   * de um exercício em andamento — dano real, não incômodo.
+   */
+  isExerciseTimer: boolean
+}
+
+export function shouldAbandonRest(input: AbandonRestInput): boolean {
+  if (input.isExerciseTimer === true) return false
+  const extra = Number(input.extraSeconds)
+  if (!Number.isFinite(extra)) return false
+  return extra >= REST_ABANDON_EXTRA_SECONDS
+}

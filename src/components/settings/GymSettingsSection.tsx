@@ -5,6 +5,7 @@ import { useGeoLocation } from '@/hooks/useGeoLocation'
 import { haversineDistance } from '@/utils/geoUtils'
 import { logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 const GymQRCode = lazy(() => import('@/components/GymQRCode'))
 
@@ -395,7 +396,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
               style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}
             >
               <div className="relative">
-                <input
+                <input {...plainFieldProps}
                   type="text"
                   value={newGymName}
                   aria-label="Nome da academia"

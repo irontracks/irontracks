@@ -3,11 +3,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
-import { shouldAutoAdvanceRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
+import { shouldAutoAdvanceRest, shouldAbandonRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
+import { logError, logWarnRemote } from '@/lib/logger';
 
 interface RestTimerContext {
     kind?: string;
@@ -648,6 +649,36 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [])
 
     // ── Early return: hide immediately on dismiss OR when no timer ──
+    // ── Descanso abandonado: desiste sozinho em vez de contar para sempre ──
+    //
+    // O contador de "além do planejado" não tinha teto. No teste de 10 passos
+    // (15/08/2026) a barra chegou a "+286:32 além do planejado" — quase cinco
+    // horas — em VERDE, e ocupando o rodapé: além de não informar mais nada,
+    // ela empurra o WorkoutFooter para cima (--it-rest-bar-h) e come tela.
+    //
+    // Encerra pelo `onFinish` (handleTimerFinish), que limpa o cronômetro SEM
+    // avançar para a próxima série — quem sumiu por 15 min não quer que o app
+    // decida por ele qual série começou. Timer de exercício (prancha, cardio)
+    // fica de fora: uma corrida de 40 min é uso legítimo, e encerrá-la apagaria
+    // uma medição em andamento.
+    const abandonedRef = useRef(false);
+    useEffect(() => {
+        const extra = Math.max(0, -timeLeft);
+        if (!shouldAbandonRest({ extraSeconds: extra, isExerciseTimer })) return;
+        if (abandonedRef.current) return;
+        abandonedRef.current = true;
+        setDismissed(true);
+        try {
+            if (notifyIdRef.current) endRestLiveActivity(notifyIdRef.current);
+            updateWorkoutRestCountdown(0);
+            stopAlarm(true);
+            logWarnRemote('workout.rest.abandoned', 'descanso encerrado por teto de tempo extra', { extraSeconds: extra });
+            if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
+        } catch (e) {
+            logError('RestTimerOverlay.abandonRest', e);
+        }
+    }, [timeLeft, isExerciseTimer]);
+
     if (!targetTime || dismissed) return null;
 
     const handleStart = () => {
@@ -685,6 +716,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     const baseSeconds = Math.max(0, timeLeft);
     const extraSeconds = Math.max(0, -timeLeft);
+
 
     // ── SVG Ring ────────────────────────────────────────────────────────────
     const r = 33;             // ring radius inside 96×96 viewBox (center 48,48)

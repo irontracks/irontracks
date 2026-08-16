@@ -963,6 +963,100 @@ no meio do treino sem perder log nem tempo.
 digitado vira "12". Contorno: long-press → selecionar → digitar. A correção
 seria selecionar o conteúdo ao focar.
 
+## As 4 correções de UX do teste de 10 passos (16/08/2026)
+
+O teste manual gerou quatro frentes. **Três delas mudaram de diagnóstico ao ler
+o código** — vale mais como método do que como changelog.
+
+### Sessão esquecida: o defeito NÃO era o tempo inflar
+
+Meu diagnóstico inicial ("o treino contou 616:03 e ninguém perguntou nada")
+estava errado na causa. O tempo já tinha DUAS defesas —
+`computeRecoveryPauseMs` no mount e o listener de `visibilitychange`, ambos
+descontando gap acima de `LONG_GAP_MS` (20 min), escritos por causa de um "bug
+do treino de 4h" anterior. **Não reimplementar isso.**
+
+A lacuna real era outra e mais séria: **o `localStorage` não expirava NADA**,
+enquanto o IndexedDB — a outra metade do mesmo snapshot — expira em 24 h
+(`MAX_SESSION_AGE_MS`). E é o `localStorage` quem manda o app abrir no treino:
+`useLocalPersistence` decide a view, `useSessionSync` hidrata. Resultado: treino
+aberto na segunda reabre o app dentro dele na quarta, em silêncio; finalizar
+dali grava a sessão de segunda com a data de hoje, e a **duração alimenta a
+estimativa de calorias** (`getEpocFactor`), então o número falso chega ao
+relatório, ao PDF e à Nutrição.
+
+Hoje toda restauração passa por `lib/workout/restoreSessionGate.ts`, usado pelos
+DOIS hooks — com a regra escrita só num deles, o outro discordaria e a view
+abriria num treino que o estado recusou hidratar. Faixas: `fresh` (< 4 h),
+`stale` (4–24 h, avisa), `expired` (> 24 h, descarta). A idade é da **última
+atividade**, não da duração: quem treina 3 h com atividade recente segue fresh.
+Na dúvida (sem carimbo, relógio para trás, `savedAt` corrompido) o veredito é
+`fresh` — perder série registrada é irreversível, retomar sessão velha é só
+incômodo. Um guard cobra que os dois armazenamentos expirem no MESMO prazo,
+que é exatamente a divergência que causou o bug.
+
+**Polaridade de diálogo destrutivo:** o `confirm` resolve `false` ao fechar por
+fora, então DESCARTAR é o `confirmText` (destrutivo) e continuar é o caminho do
+`false`. Invertido, um toque fora do modal apagaria as séries de um treino em
+andamento. Mesma lição já aprendida no rodapé do treino.
+
+### Autocorreção: o app tinha ZERO proteção, e a lista manual estava incompleta
+
+O teclado do iOS renomeia o que você digita — "Drop teste" virou "Frio teste",
+"Bi A" virou "Vi A" — porque nome de exercício não é palavra de dicionário. O
+app inteiro tinha **zero `autoCorrect`** e dois `spellCheck` soltos.
+
+Fonte única em `utils/ui/textFieldProps.ts` (nome próprio · código ·
+identificador sem forma de palavra), hoje em 49 campos. **A fronteira é
+IDENTIFICADOR × TEXTO LIVRE**: em notas, chat e descrição a autocorreção AJUDA,
+e o guard cobra os dois sentidos — identificador sem proteção reprova, e texto
+livre COM proteção também.
+
+Duas lições de método aqui:
+1. **Um subagente varreu e devolveu 38 campos; o guard achou 16 que ele
+   perdeu** — e um dos 38 estava errado (casou com uma mensagem de erro, não
+   com um input). Resultado de subagente é insumo, não verdade.
+2. **Componente genérico não recebe a decisão.** O `EditField` do
+   `VoiceWorkoutModal` serve o nome do exercício E o campo Notas; aplicar nele
+   desligaria o corretor justamente onde ele ajuda. A marca foi para a CHAMADA.
+
+### Descanso sem teto e conferência de carga
+
+O contador de "além do planejado" chegava a **"+286:32"** em verde, ocupando o
+rodapé (e empurrando o `WorkoutFooter` por `--it-rest-bar-h`). Agora desiste aos
+15 min de extra, pelo `onFinish` — que encerra SEM avançar série. **Cardio e
+prancha ficam de fora**: são timers de EXERCÍCIO, e encerrar uma corrida de
+40 min apagaria uma medição em andamento.
+
+A conferência de carga (`lib/workout/weightOutlier.ts`) entra no resumo que a
+finalização já mostra, **de propósito**: cobre os 14 métodos de série sem tocar
+em nenhum renderer. Fator 4×, folgado — progressão real anda em 2,5–10% e o
+autoload trava em +10%, enquanto erro de digitação dá fator 5 a 10. Limiar
+apertado vira ruído, e aviso que aparece à toa é ignorado inclusive quando está
+certo.
+
+**A referência é MEDIANA, e isso é o ponto do módulo.** Com o ÚLTIMO valor, um
+200 digitado errado na sessão passada faria o 200 de hoje parecer normal — o
+detector ficaria cego logo após o primeiro erro. A média sofre do mesmo mal, e o
+teste mede: 200 ÷ média 80,5 = 2,48, abaixo do limiar, o erro passaria.
+
+### Três erros meus que o ferramental pegou
+
+Registrados porque vão se repetir:
+
+1. **Hook depois de early return.** O efeito do teto entrou abaixo de
+   `if (!targetTime || dismissed) return null` — o ESLint travou, e um teste de
+   cardio já estava vermelho por isso. Componente grande esconde onde termina a
+   região dos hooks.
+2. **Guard fatiado a partir do IMPORT.** `indexOf('shouldAbandonRest')` casa
+   primeiro com a linha de import e arrasta o arquivo inteiro para dentro do
+   bloco medido — o guard passou a medir o `handleStart`, que legitimamente usa
+   `onStartRef`. Fatie pela CHAMADA (`/nome\s*\(\s*\{/`), nunca pelo nome solto.
+3. **Busca por `find` da primeira ocorrência.** Aplicar props procurando o
+   placeholder pegou uma string de mensagem de erro em vez do input. Ao editar
+   em massa, confira CADA ponto pelo que ele é, não pela primeira coincidência —
+   e feche com `next build`, que é o que de fato prova JSX íntegro.
+
 ## Cobertura de teste: o que roda no CI hoje (15/08/2026)
 
 O teste manual de 10 passos passou por cima de **5.476 testes verdes** e ainda

@@ -15,6 +15,7 @@ import { PremiumInput } from '@/components/ui/PremiumUI'
 import { NumericInput } from '@/components/ui/NumericInput'
 import { createClient } from '@/utils/supabase/client'
 import { updateProfileDisplayName, type UpdateProfileState } from '@/actions/server/profile-actions'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 const GymSettingsWrapper = dynamic(() => import('@/components/settings/GymSettingsWrapper'), { ssr: false })
 const ReferralSection = dynamic(() => import('@/components/settings/ReferralSection'), { ssr: false })
 const ChangePasswordModal = dynamic(() => import('@/components/settings/ChangePasswordModal'), { ssr: false })
@@ -339,7 +340,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 Como você aparece pra outros usuários. Pode ter espaços e acentos.
               </p>
               <form action={nameAction} className="flex items-center gap-2">
-                <input
+                <input {...properNameFieldProps}
                   type="text"
                   name="displayName"
                   aria-label="Nome de exibição"
@@ -370,7 +371,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-neutral-400 text-sm">@</span>
-                <input
+                <input {...plainFieldProps}
                   type="text"
                   aria-label="Nome de usuário (handle)"
                   value={handleDraft}
@@ -459,7 +460,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <FieldLabel label="Telefone" hint="Opcional — não será exibido publicamente" />
               <div className="relative">
                 <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
+                <input {...plainFieldProps}
                   type="tel"
                   aria-label="Telefone"
                   value={draft.phone ?? ''}

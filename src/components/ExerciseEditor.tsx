@@ -10,6 +10,7 @@ import { SetDetailsSection } from './ExerciseEditor/SetDetailsSection';
 import type { AdvancedConfig, SetDetail, Exercise, Workout } from './ExerciseEditor/types';
 import { createExerciseEditorKey, useExerciseEditorLogic } from '@/hooks/useExerciseEditorLogic';
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 
@@ -218,7 +219,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                     <label htmlFor="workout-title" className="block text-[11px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-2">
                         Nome do Treino
                     </label>
-                    <input
+                    <input {...properNameFieldProps}
                         id="workout-title"
                         aria-label="Nome do Treino"
                         value={workout.title || ''}
@@ -308,7 +309,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     </select>
                                                 </>
                                             ) : (
-                                                <input
+                                                <input {...properNameFieldProps}
                                                     aria-label="Nome do exercício"
                                                     value={exercise.name || ''}
                                                     onChange={e => updateExercise(index, 'name', e.target.value)}

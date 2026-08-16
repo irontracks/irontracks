@@ -23,6 +23,7 @@ import { logError, logWarn } from '@/lib/logger'
 import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
 import { diffSessionForSync } from '@/lib/sessionSyncDiff'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
+import { readRestorableSession, activeSessionStorageKey } from '@/lib/workout/restoreSessionGate'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -206,13 +207,18 @@ export function useSessionSync({
         restoredForUserRef.current = uid
         let cancelled = false
 
-        const scopedKey = `irontracks.activeSession.v2.${uid}`
+        const scopedKey = activeSessionStorageKey(uid)
         let localSavedAt = 0
 
         try {
-            const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession')
-            if (raw) {
-                const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()))
+            // O portão decide se este snapshot ainda vale. Sessão parada há mais
+            // de 24 h é descartada por ele (e a chave, apagada) — antes daqui o
+            // `localStorage` não expirava NADA, então o treino de segunda-feira
+            // reabria o app dentro dele na quarta, em silêncio, e a duração
+            // falsa ia para o histórico e para a estimativa de calorias.
+            const gate = readRestorableSession(uid, Date.now())
+            if (gate.session) {
+                const parsed: unknown = gate.session
                 if (isRecord(parsed) && parsed?.startedAt && parsed?.workout) {
                     localSavedAt = Number(parsed?._savedAt ?? 0) || 0
                     // Seed echo guard from restored state — critical on iOS where
@@ -220,6 +226,13 @@ export function useSessionSync({
                     // stale events that would otherwise pass the guard (ref = 0).
                     lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, localSavedAt)
                     const clean = sanitizeRestoredSession(parsed as Record<string, unknown>)
+                    // `stale` = parada há horas, mas ainda dentro das 24 h. A
+                    // sessão é restaurada normalmente e a marca viaja junto para
+                    // a UI decidir o que perguntar — quem restaura não abre
+                    // diálogo, e quem abre diálogo não conhece o armazenamento.
+                    if (gate.verdict === 'stale') {
+                        ;(clean as Record<string, unknown>)._staleRestoreAgeMs = gate.ageMs
+                    }
                     setActiveSession(clean as unknown as ActiveWorkoutSession)
                     setView('active')
 

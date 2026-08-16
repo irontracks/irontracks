@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { Camera, Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User, AtSign } from 'lucide-react'
 import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } from './settingsShared'
 import { createClient } from '@/utils/supabase/client'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ── Perfil ───────────────────────────────────────────────────────────────────
 interface SettingsProfileSectionProps extends SettingsSectionProps {
@@ -80,7 +81,7 @@ function HandleEditor({ userId }: { userId?: string }) {
             </div>
             <div className="flex items-center gap-2">
                 <span className="text-neutral-400 text-sm">@</span>
-                <input
+                <input {...plainFieldProps}
                     type="text"
                     aria-label="Nome de usuário (handle)"
                     value={draft}
@@ -1181,7 +1182,7 @@ export function SettingsGymGeofenceSection({
             {/* Nome (editável antes de capturar) */}
             <div className="mb-3">
                 <label htmlFor="favorite-gym-name" className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1 block">Nome da academia</label>
-                <input
+                <input {...properNameFieldProps}
                     id="favorite-gym-name"
                     type="text"
                     value={nameDraft}

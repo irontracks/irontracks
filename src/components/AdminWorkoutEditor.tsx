@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Trash2, Plus, Megaphone } from 'lucide-react';
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 export interface AdminExercise {
     name: string;
@@ -96,7 +97,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                 <button onClick={onCancel} className="text-neutral-400">Cancelar</button>
                 <h3 className="font-bold text-white">{workout?.id ? 'Editar' : 'Novo'}</h3>
             </div>
-            <input
+            <input {...properNameFieldProps}
                 aria-label="Nome do Treino"
                 value={workout.title}
                 onChange={e => setWorkout((prev) => ({ ...prev, title: e.target.value }))}
@@ -123,7 +124,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                             <Trash2 size={16} />
                         </button>
                         <div className="space-y-3 pr-8">
-                            <input
+                            <input {...properNameFieldProps}
                                 aria-label="Nome do Exercício"
                                 value={ex.name}
                                 onChange={e => updateExercise(idx, 'name', e.target.value)}

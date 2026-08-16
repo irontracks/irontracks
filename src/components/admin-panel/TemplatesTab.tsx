@@ -6,6 +6,7 @@ import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { ApplyWorkoutToStudentsModal } from './ApplyWorkoutToStudentsModal';
 import { eligibleStudentsForApply } from '@/lib/admin/eligibleStudents';
 import type { UnknownRecord } from '@/types/app';
+import { plainFieldProps } from '@/utils/ui/textFieldProps'
 
 export const TemplatesTab: React.FC = () => {
     const {
@@ -50,7 +51,7 @@ export const TemplatesTab: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="relative w-full md:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                    <input
+                    <input {...plainFieldProps}
                         type="text"
                         aria-label="Buscar templates"
                         placeholder="Buscar templates..."

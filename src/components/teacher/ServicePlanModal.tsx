@@ -11,6 +11,7 @@ import { NumericInput } from '@/components/ui/NumericInput'
 import { backdropProps } from '@/utils/a11y/backdrop'
 import { dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
           {/* Nome */}
           <div>
             <label htmlFor="sp-name" className="block text-xs font-semibold text-neutral-400 mb-1.5 uppercase tracking-wide">Nome do Plano *</label>
-            <input
+            <input {...properNameFieldProps}
               id="sp-name"
               aria-label="Nome do plano"
               type="text"

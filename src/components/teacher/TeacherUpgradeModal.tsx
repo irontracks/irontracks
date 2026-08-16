@@ -18,6 +18,7 @@ import type { TeacherPlanState } from '@/hooks/useTeacherPlan'
 import { backdropProps } from '@/utils/a11y/backdrop'
 import { dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -427,7 +428,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
               <div className="space-y-3">
                 <div>
                   <label htmlFor="tup-name" className="text-xs text-neutral-400 mb-1 block">Seu nome</label>
-                  <input
+                  <input {...properNameFieldProps}
                     id="tup-name"
                     aria-label="Seu nome"
                     type="text"
@@ -439,7 +440,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                 </div>
                 <div>
                   <label htmlFor="tup-cpf" className="text-xs text-neutral-400 mb-1 block">CPF ou CNPJ</label>
-                  <input
+                  <input {...plainFieldProps}
                     id="tup-cpf"
                     aria-label="CPF ou CNPJ"
                     type="text"
@@ -453,7 +454,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                 </div>
                 <div>
                   <label htmlFor="tup-phone" className="text-xs text-neutral-400 mb-1 block">Celular (WhatsApp)</label>
-                  <input
+                  <input {...plainFieldProps}
                     id="tup-phone"
                     aria-label="Celular"
                     type="text"
