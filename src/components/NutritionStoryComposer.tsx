@@ -195,41 +195,6 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
 
                     <canvas ref={previewCanvasRef} aria-label="Canvas de prévia da story" width={CANVAS_W} height={CANVAS_H} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
 
-                    {/* Convite na PRÓPRIA prévia — é ele que garante a foto no
-                        iPhone: o clique aqui é gesto de verdade, e o WKWebView
-                        só abre o seletor de arquivo com ativação do usuário
-                        (o disparo automático no mount não passa; medido).
-
-                        Faixa no meio, não a prévia inteira: o container é
-                        `pointer-events-none` para o arrasto da marca e da
-                        legenda continuar funcionando sem mídia. */}
-                    {!backgroundImage && !isVideo && (
-                      <div className="absolute inset-0 z-20 flex items-start justify-center pt-[26%] pointer-events-none">
-                        {/* `stopPropagation` no toque: a prévia inteira escuta
-                            touchstart/move para a pinça e o arrasto, e esses
-                            handlers dão `preventDefault` — que CANCELA o clique
-                            sintético do label e o seletor nunca abre (medido no
-                            iPhone: o mesmo padrão de label funciona no botão do
-                            rodapé, que está fora da prévia).
-
-                            E `pt-[26%]` em vez de centralizado: no centro o
-                            convite cobria o rótulo "MÉDIA POR DIA" logo abaixo. */}
-                        <label
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onTouchMove={(e) => e.stopPropagation()}
-                          onTouchEnd={(e) => e.stopPropagation()}
-                          className={['pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-yellow-500/50 bg-black/55 px-5 py-4 text-center cursor-pointer backdrop-blur-[2px] active:scale-[0.98] transition', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
-                          <Upload size={20} className="text-yellow-500" />
-                          <span className="t-action text-[11px] uppercase tracking-wider text-white">Toque para pôr sua foto</span>
-                          <span className="text-[10px] text-neutral-300">ou vídeo — dá para seguir sem</span>
-                          <input
-                            type="file" aria-label="Adicionar mídia ao story" accept="image/*,video/*" className="sr-only"
-                            onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ''; loadMedia(f) }}
-                          />
-                        </label>
-                      </div>
-                    )}
-
                     {showSafeGuide && (
                       <div className="absolute inset-0 pointer-events-none z-10">
                         <div className="absolute left-0 right-0 h-px bg-yellow-400/40" style={{ top: `${(SAFE_TOP / CANVAS_H) * 100}%` }} />
@@ -306,7 +271,16 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                     {/* Sem mídia, isto é a AÇÃO da tela — o story de nutrição é
                         para sair com foto (pedido do dono, 16/08/2026). Com mídia
                         já escolhida vira o botão discreto de trocar: dourado ali
-                        competiria com salvar/publicar. */}
+                        competiria com salvar/publicar.
+
+                        ⚠️ Já houve um convite DENTRO da prévia, e ele foi
+                        removido depois de duas rodadas no aparelho: (1) os
+                        handlers de pinça/arrasto da prévia dão `preventDefault`
+                        e cancelavam o clique do label, então ele não abria
+                        nada; (2) resolvido isso, ele cobria o desenho —
+                        centralizado tapava o "MÉDIA POR DIA", e mais acima
+                        tapava a marca. A prévia é o RESULTADO; controle se
+                        põe fora dela. Não recriar. */}
                     <label className={[
                       'flex-1 rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] uppercase tracking-wider',
                       backgroundImage || isVideo
@@ -315,7 +289,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       busy ? 'opacity-50 pointer-events-none' : '',
                     ].join(' ')}>
                       <Upload size={16} className={backgroundImage || isVideo ? 'text-yellow-500' : 'text-black'} />
-                      {backgroundImage || isVideo ? 'TROCAR MÍDIA' : 'ADICIONAR FOTO/VÍDEO'}
+                      {backgroundImage || isVideo ? 'TROCAR MÍDIA' : 'PONHA SUA FOTO OU VÍDEO'}
                       <input
                         ref={inputRef} type="file" aria-label="Adicionar mídia" accept="image/*,video/*" className="sr-only"
                         onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
