@@ -100,7 +100,7 @@ test.describe('Jornada do treino (UI autenticada)', () => {
     // barra é centralizada (`max-w-md`) e o botão fica à direita, fora dela:
     // o mesmo caso passa verde com o bug presente numa viewport larga
     // (medido em 15/08/2026).
-    test.use({ viewport: { width: 390, height: 844 } })
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
     test.afterEach(async ({ page }) => {
         await descartarSessao(page).catch(() => { })
@@ -166,12 +166,19 @@ test.describe('Jornada do treino (UI autenticada)', () => {
         await nome.fill('')
         const noOriginal = await nome.elementHandle()
 
-        await nome.pressSequentially('Supino renomeado E2E', { delay: 15 })
-
-        const aindaNoDocumento = await noOriginal!.evaluate((el) => el.isConnected)
-        expect(aindaNoDocumento, 'o input foi destruído durante a digitação — é isso que fecha o teclado no iOS').toBe(true)
-        await expect(nome).toBeFocused()
-        await expect(nome).toHaveValue('Supino renomeado E2E')
+        const textoFinal = 'Supino renomeado E2E'
+        let textoAcumulado = ''
+        for (const caractere of textoFinal) {
+            await nome.pressSequentially(caractere)
+            textoAcumulado += caractere
+            await expect(nome).toHaveValue(textoAcumulado)
+            await expect(nome).toBeFocused()
+            const aindaNoDocumento = await noOriginal!.evaluate((el) => el.isConnected)
+            expect(
+                aindaNoDocumento,
+                'o input foi destruído durante a digitação — é isso que fecha o teclado no iOS',
+            ).toBe(true)
+        }
 
         // Sai sem salvar — o caso não altera o plano da conta.
         await page.getByRole('button', { name: /Fechar editor/i }).click()
@@ -197,7 +204,7 @@ test.describe('Jornada do treino (UI autenticada)', () => {
         // BUG DE 15/08: ao voltar, tocar posicionava o cursor e a tecla INSERIA
         // — "20" com "5" digitado virava "205". Carga errada gravada no
         // histórico, que é a base lida pelo motor de carga automática.
-        await peso.click()
+        await peso.tap()
 
         // Espera a SELEÇÃO acontecer antes de digitar. Isso não é maquiagem de
         // teste: a seleção é adiada um frame de propósito (no iOS o WebKit
