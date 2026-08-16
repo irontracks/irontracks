@@ -19,7 +19,7 @@ import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface NutritionStoryComposerProps {
   open: boolean
-  mode: 'meal' | 'day'
+  mode: 'meal' | 'day' | 'period'
   content: NutritionStoryContent
   onClose: () => void
 }
@@ -42,7 +42,10 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
   }, [open])
   const { settings, updateSetting, save } = useUserSettings(userId)
 
-  const title = content.kind === 'meal' ? content.mealName : 'Resumo do dia'
+  const title =
+    content.kind === 'meal' ? content.mealName
+      : content.kind === 'period' ? content.periodLabel
+        : 'Resumo do dia'
 
   // Renderer injetado + meta/caption do POST (deriva do content).
   const draw = useCallback(
@@ -50,12 +53,21 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
       drawNutritionStory({ ...args, content }),
     [content],
   )
-  const metaOverride = useMemo<Record<string, unknown>>(() => (
-    content.kind === 'meal'
-      ? { source: 'nutrition', kind: 'meal', mealName: content.mealName, calories: content.calories, protein: content.protein, carbs: content.carbs, fat: content.fat }
-      : { source: 'nutrition', kind: 'day', dateText: content.dateText, calories: content.calories, goalCalories: content.goalCalories, protein: content.protein, carbs: content.carbs, fat: content.fat }
-  ), [content])
-  const captionOverride = content.kind === 'meal' ? content.mealName : `Resumo do dia ${content.dateText}`
+  const metaOverride = useMemo<Record<string, unknown>>(() => {
+    if (content.kind === 'meal') {
+      return { source: 'nutrition', kind: 'meal', mealName: content.mealName, calories: content.calories, protein: content.protein, carbs: content.carbs, fat: content.fat }
+    }
+    if (content.kind === 'period') {
+      // `loggedDays`/`windowDays` viajam no meta pelo mesmo motivo que estão
+      // desenhados: a média sem a cobertura vira outra afirmação.
+      return { source: 'nutrition', kind: 'period', periodLabel: content.periodLabel, rangeText: content.rangeText, calories: content.calories, goalCalories: content.goalCalories, protein: content.protein, carbs: content.carbs, fat: content.fat, loggedDays: content.loggedDays, windowDays: content.windowDays }
+    }
+    return { source: 'nutrition', kind: 'day', dateText: content.dateText, calories: content.calories, goalCalories: content.goalCalories, protein: content.protein, carbs: content.carbs, fat: content.fat }
+  }, [content])
+  const captionOverride =
+    content.kind === 'meal' ? content.mealName
+      : content.kind === 'period' ? `${content.periodLabel} · ${content.rangeText}`
+        : `Resumo do dia ${content.dateText}`
 
   const {
     inputRef, videoRef,
@@ -110,7 +122,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
           <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-gradient-to-b from-black/60 to-transparent border-b border-yellow-500/10">
             <div className="min-w-0 flex-1 mr-4">
               <h3 className="font-black text-lg truncate leading-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{title}</h3>
-              <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">{mode === 'meal' ? 'COMPARTILHE SUA REFEIÇÃO' : 'COMPARTILHE SEU DIA'}</p>
+              <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">{mode === 'meal' ? 'COMPARTILHE SUA REFEIÇÃO' : mode === 'period' ? 'COMPARTILHE SEU PERÍODO' : 'COMPARTILHE SEU DIA'}</p>
             </div>
             <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800/80 border border-neutral-700/50 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none" aria-label="Voltar" title="Voltar"><ArrowLeft size={16} /></button>
           </div>
@@ -123,7 +135,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
             <div className="hidden sm:flex px-6 py-5 border-b border-yellow-500/10 items-center justify-between flex-none bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-900">
               <div>
                 <h2 className="font-black text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{title}</h2>
-                <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">{mode === 'meal' ? 'COMPARTILHE SUA REFEIÇÃO' : 'COMPARTILHE SEU DIA'}</p>
+                <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">{mode === 'meal' ? 'COMPARTILHE SUA REFEIÇÃO' : mode === 'period' ? 'COMPARTILHE SEU PERÍODO' : 'COMPARTILHE SEU DIA'}</p>
               </div>
               <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Voltar" title="Voltar"><ArrowLeft size={18} /></button>
             </div>

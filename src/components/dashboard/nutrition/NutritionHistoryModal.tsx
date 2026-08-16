@@ -11,7 +11,8 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, UtensilsCrossed } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -19,10 +20,15 @@ import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { MACRO_COLORS } from '@/lib/nutrition/macroColors'
 import {
   aggregateEntriesByDay,
+  periodLabel,
+  periodRangeText,
   summarizeHistory,
   windowStartDate,
   type NutritionHistoryDay,
 } from '@/lib/nutrition/history'
+import { periodToContent } from '@/components/stories/nutritionStory'
+
+const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStoryComposer'), { ssr: false, loading: () => null })
 
 const JANELAS = [
   { days: 7, label: '7 dias' },
@@ -52,11 +58,13 @@ type Props = {
   userId?: string
   /** Dia de hoje (YYYY-MM-DD, BRT) — o mesmo que a aba usa. */
   todayDate: string
+  /** Meta ATUAL, para o story do período. O banco não guarda meta datada. */
+  goals?: { calories?: number } | null
   onPickDate: (date: string) => void
   onClose: () => void
 }
 
-export default function NutritionHistoryModal({ open, userId, todayDate, onPickDate, onClose }: Props) {
+export default function NutritionHistoryModal({ open, userId, todayDate, goals, onPickDate, onClose }: Props) {
   const [janela, setJanela] = useState<number>(30)
   // Um estado só, CARIMBADO com a consulta que o produziu: trocar de janela
   // invalida o resultado no próprio render, sem um `setDias(null)` dentro do
@@ -100,6 +108,9 @@ export default function NutritionHistoryModal({ open, userId, todayDate, onPickD
   }, [open, userId, todayDate, janela, chave])
 
   const resumo = useMemo(() => summarizeHistory(dias, janela), [dias, janela])
+
+  const [storyAberto, setStoryAberto] = useState(false)
+  const rotulo = periodLabel(janela)
 
   const abrirDia = useCallback((date: string) => {
     onPickDate(date)
@@ -216,12 +227,37 @@ export default function NutritionHistoryModal({ open, userId, todayDate, onPickD
           )}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-neutral-800 px-4 py-3 text-xs text-neutral-400">
-          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
-          </span>
+        <div className="flex items-center gap-3 border-t border-neutral-800 px-4 py-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-neutral-400">
+            <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
+            </span>
+          </div>
+          {/* Sem dia registrado não há o que postar — e um story de "0 kcal em
+              média" seria uma afirmação falsa sobre a semana da pessoa. */}
+          <button
+            type="button"
+            onClick={() => setStoryAberto(true)}
+            disabled={resumo.loggedDays === 0}
+            className="tap-44 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-yellow-500/25 bg-yellow-500/10 px-3 text-xs t-action uppercase tracking-wider text-yellow-400 disabled:opacity-40"
+          >
+            <Clapperboard className="h-4 w-4" aria-hidden="true" />
+            Compartilhar {rotulo.toLowerCase()}
+          </button>
         </div>
+
+        {storyAberto && (
+          <NutritionStoryComposer
+            open={storyAberto}
+            mode="period"
+            content={periodToContent(resumo, goals, {
+              periodLabel: rotulo,
+              rangeText: periodRangeText(todayDate, janela),
+            })}
+            onClose={() => setStoryAberto(false)}
+          />
+        )}
       </div>
     </div>
   )

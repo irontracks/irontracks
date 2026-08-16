@@ -42,6 +42,28 @@ export type NutritionStoryContent =
       goalCarbs: number
       goalFat: number
     }
+  | {
+      /**
+       * Semana / mês — MÉDIA por dia registrado.
+       *
+       * `loggedDays`/`windowDays` não são enfeite: sem a cobertura, "2.180
+       * kcal/dia" de quem lançou 8 dias em 30 lê como se fosse o mês inteiro.
+       * O story sai da mão do dono e ninguém do outro lado tem como perguntar.
+       */
+      kind: 'period'
+      /** "Semana" | "Mês" | "45 dias". */
+      periodLabel: string
+      /** "10 – 16 de ago." */
+      rangeText: string
+      calories: number
+      /** Meta ATUAL (0 quando não há) — o banco não guarda meta datada. */
+      goalCalories: number
+      protein: number
+      carbs: number
+      fat: number
+      loggedDays: number
+      windowDays: number
+    }
 
 const nf = (n: unknown): string => Math.round(Number(n) || 0).toLocaleString('pt-BR')
 
@@ -199,7 +221,10 @@ export const drawNutritionStory = ({
   ctx.restore()
 
   // ── Título ────────────────────────────────────────────────────────────────
-  const rawTitle = content.kind === 'meal' ? content.mealName : 'Resumo do dia'
+  const rawTitle =
+    content.kind === 'meal' ? content.mealName
+      : content.kind === 'period' ? content.periodLabel
+        : 'Resumo do dia'
   const titleText = template.titleUppercase ? String(rawTitle || '').toUpperCase() : String(rawTitle || '')
   const titleSize = 40
   const titleLineH = titleSize + 8
@@ -228,15 +253,20 @@ export const drawNutritionStory = ({
 
   // ── Subtítulo pill (data no modo dia) ──────────────────────────────────────
   const subY = titleY + lines.length * titleLineH + 14
-  const subText = content.kind === 'day' ? content.dateText : 'REFEIÇÃO'
-  if (subText) {
+  const subText =
+    content.kind === 'day' ? content.dateText
+      : content.kind === 'period' ? content.rangeText
+        : 'REFEIÇÃO'
+
+  /** Pill do template — devolve onde ele terminou, para o próximo encostar. */
+  const drawPill = (x: number, y: number, text: string): number => {
     ctx.font = f(F.subtitleWeight, 22)
-    const tw = ctx.measureText(subText).width
+    const tw = ctx.measureText(text).width
     const padX = 16
     const padY = 9
     const pillW = tw + padX * 2
     const pillH = 22 + padY * 2
-    drawRoundedRect(ctx, left, subY, pillW, pillH, pillH / 2)
+    drawRoundedRect(ctx, x, y, pillW, pillH, pillH / 2)
     ctx.fillStyle = C.pillFill
     ctx.fill()
     ctx.lineWidth = 1
@@ -244,7 +274,21 @@ export const drawNutritionStory = ({
     ctx.stroke()
     ctx.fillStyle = C.pillText
     ctx.textBaseline = 'top'
-    ctx.fillText(subText, left + padX, subY + padY)
+    ctx.fillText(text, x + padX, y + padY)
+    return x + pillW
+  }
+
+  if (subText) {
+    const fim = drawPill(left, subY, subText)
+    // A cobertura anda GRUDADA no período: é ela que impede a média de ser
+    // lida como "todo dia do mês". Some quando não cabe — melhor sem o segundo
+    // pill do que com ele estourando a margem segura.
+    if (content.kind === 'period') {
+      const cobertura = `${nf(content.loggedDays)} de ${nf(content.windowDays)} dias`
+      ctx.font = f(F.subtitleWeight, 22)
+      const larguraNecessaria = ctx.measureText(cobertura).width + 32
+      if (fim + 10 + larguraNecessaria <= right) drawPill(fim + 10, subY, cobertura)
+    }
   }
 
   // ── CALORIAS hero ──────────────────────────────────────────────────────────
@@ -296,7 +340,7 @@ export const drawNutritionStory = ({
   ctx.font = f(F.labelWeight, 22)
   ctx.fillStyle = C.cardLabel
   ctx.letterSpacing = F.labelLetterSpacing
-  ctx.fillText('CALORIAS', left, heroLabelY)
+  ctx.fillText(content.kind === 'period' ? 'MÉDIA POR DIA' : 'CALORIAS', left, heroLabelY)
   ctx.letterSpacing = '0px'
 
   const over = content.kind === 'day' && content.calories > content.goalCalories && content.goalCalories > 0
@@ -310,7 +354,11 @@ export const drawNutritionStory = ({
   // unidade / meta ao lado do número grande
   ctx.font = f(F.subtitleWeight, 34)
   ctx.fillStyle = C.subtitle
-  const tail = content.kind === 'day' ? ` / ${nf(content.goalCalories)} kcal` : ' kcal'
+  const tail =
+    content.kind === 'day' ? ` / ${nf(content.goalCalories)} kcal`
+      : content.kind === 'period'
+        ? (content.goalCalories > 0 ? ` / ${nf(content.goalCalories)} kcal` : ' kcal')
+        : ' kcal'
   ctx.fillText(tail, left + calW + 12, heroNumY + heroSize - 44)
   ctx.restore()
 
@@ -319,7 +367,7 @@ export const drawNutritionStory = ({
   const mg = (v: number) => `${nf(v)}g`
   const dg = (v: number, goal: number) => `${nf(v)}/${nf(goal)}g`
   const cards: Array<{ label: string; value: string }> =
-    content.kind === 'meal'
+    content.kind === 'meal' || content.kind === 'period'
       ? [
           { label: 'PROTEÍNA', value: mg(content.protein) },
           { label: 'CARBO', value: mg(content.carbs) },
@@ -416,3 +464,28 @@ export const dayToContent = (
     goalFat: Number(goals?.fat) || 0,
   }
 }
+
+/**
+ * Resumo de período (semana/mês) → conteúdo do story.
+ *
+ * Os números são MÉDIA POR DIA REGISTRADO — vêm prontos de `summarizeHistory`,
+ * que é quem sabe dividir pelo denominador certo. Este adapter não recalcula
+ * nada: duas contas para a mesma média é como nasce divergência entre a tela e
+ * o que foi postado.
+ */
+export const periodToContent = (
+  summary: { loggedDays: number; windowDays: number; avgCalories: number; avgProtein: number; avgCarbs: number; avgFat: number },
+  goals: { calories?: number } | null | undefined,
+  labels: { periodLabel: string; rangeText: string },
+): NutritionStoryContent => ({
+  kind: 'period',
+  periodLabel: String(labels?.periodLabel || 'Período'),
+  rangeText: String(labels?.rangeText || ''),
+  calories: Number(summary?.avgCalories) || 0,
+  goalCalories: Number(goals?.calories) || 0,
+  protein: Number(summary?.avgProtein) || 0,
+  carbs: Number(summary?.avgCarbs) || 0,
+  fat: Number(summary?.avgFat) || 0,
+  loggedDays: Number(summary?.loggedDays) || 0,
+  windowDays: Number(summary?.windowDays) || 0,
+})

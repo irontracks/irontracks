@@ -836,6 +836,7 @@ export default function NutritionMixer({
         open={historyOpen}
         userId={userId}
         todayDate={todayDate}
+        goals={safeGoals}
         onPickDate={handleDateChange}
         onClose={() => setHistoryOpen(false)}
       />
