@@ -29,6 +29,38 @@ const efeito = (() => {
   return codigo.slice(ini, fim)
 })()
 
+/**
+ * ⚠️ O disparo automático NÃO funciona no iPhone — medido no aparelho em
+ * 16/08/2026. O WKWebView só abre o seletor de arquivo com ativação transitória
+ * do usuário, e ela já expirou quando o efeito roda (o composer é `dynamic()`:
+ * entre o toque e o mount há o carregamento do chunk). Quem garante a foto lá é
+ * o CONVITE na prévia, cujo clique é gesto de verdade.
+ *
+ * Os dois convivem de propósito: o automático vale na web e não custa nada.
+ */
+describe('convite de foto na prévia', () => {
+  it('a prévia sem mídia traz o convite', () => {
+    expect(codigo).toMatch(/!backgroundImage\s*&&\s*!isVideo/)
+    expect(src).toMatch(/Toque para pôr sua foto/)
+  })
+
+  it('o convite tem input próprio — o clique precisa ser gesto do usuário', () => {
+    const bloco = src.slice(src.indexOf('Toque para pôr sua foto'))
+    expect(bloco.slice(0, 600)).toMatch(/type="file"[^>]*accept="image\/\*,video\/\*"/)
+  })
+
+  it('não trava o arrasto da marca e da legenda quando não há mídia', () => {
+    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
+    const trecho = bloco.slice(0, 900)
+    expect(trecho, 'a camada inteira não pode capturar toque').toMatch(/inset-0[^"]*pointer-events-none/)
+    expect(trecho, 'só o convite recebe o toque').toMatch(/pointer-events-auto/)
+  })
+
+  it('diz que dá para seguir sem foto — nada é bloqueado', () => {
+    expect(src).toMatch(/dá para seguir sem/)
+  })
+})
+
 describe('o story de nutrição nasce pedindo a foto', () => {
   it('clica no seletor de mídia ao abrir', () => {
     expect(codigo).toMatch(/inputRef\.current\?\.click\(\)/)

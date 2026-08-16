@@ -115,11 +115,17 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
    * painel: quem abria via o card sobre o gradiente do template e seguia
    * assim. Agora o seletor abre junto com a tela, como no Instagram Stories.
    *
+   * ⚠️ MEDIDO NO IPHONE (16/08/2026): no WKWebView isto NÃO abre o seletor. O
+   * WebKit só abre o picker de arquivo com ativação transitória do usuário, e
+   * até este efeito rodar ela já se foi — o composer é `dynamic()`, então entre
+   * o toque em "Compartilhar" e o mount há o carregamento do chunk. A tentativa
+   * fica porque funciona na web e não custa nada; quem garante a foto no
+   * aparelho é o CONVITE em cima da prévia, que abre o picker com um toque real.
+   *
    * Três guardas: (1) só uma vez por abertura (`pediuMidiaRef`), senão cancelar
    * o picker o reabriria em loop; (2) só quando ainda NÃO há mídia — reabrir o
    * composer de um story que já tem foto não pode pedir outra; (3) falha em
-   * silêncio se o WebView recusar o clique programático (sem gesto recente o
-   * iOS ignora) — nesse caso sobra a tela normal, com o botão de sempre.
+   * silêncio se o WebView recusar — nesse caso sobra a tela normal.
    */
   const pediuMidiaRef = useRef(false)
   useEffect(() => {
@@ -188,6 +194,28 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                     )}
 
                     <canvas ref={previewCanvasRef} aria-label="Canvas de prévia da story" width={CANVAS_W} height={CANVAS_H} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+
+                    {/* Convite na PRÓPRIA prévia — é ele que garante a foto no
+                        iPhone: o clique aqui é gesto de verdade, e o WKWebView
+                        só abre o seletor de arquivo com ativação do usuário
+                        (o disparo automático no mount não passa; medido).
+
+                        Faixa no meio, não a prévia inteira: o container é
+                        `pointer-events-none` para o arrasto da marca e da
+                        legenda continuar funcionando sem mídia. */}
+                    {!backgroundImage && !isVideo && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                        <label className={['pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-yellow-500/50 bg-black/55 px-5 py-4 text-center cursor-pointer backdrop-blur-[2px] active:scale-[0.98] transition', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
+                          <Upload size={20} className="text-yellow-500" />
+                          <span className="text-[11px] font-black uppercase tracking-wider text-white">Toque para pôr sua foto</span>
+                          <span className="text-[10px] text-neutral-300">ou vídeo — dá para seguir sem</span>
+                          <input
+                            type="file" aria-label="Adicionar mídia ao story" accept="image/*,video/*" className="sr-only"
+                            onChange={(e) => { const f = e.target.files?.[0] || null; e.target.value = ''; loadMedia(f) }}
+                          />
+                        </label>
+                      </div>
+                    )}
 
                     {showSafeGuide && (
                       <div className="absolute inset-0 pointer-events-none z-10">
@@ -262,8 +290,18 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                       oferecia os estilos de cor, sem anexar mídia. O renderer já compõe os
                       macros por cima da imagem/vídeo (transparentBg quando é vídeo). */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
-                    <label className={['flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
-                      <Upload size={16} className="text-yellow-500" />
+                    {/* Sem mídia, isto é a AÇÃO da tela — o story de nutrição é
+                        para sair com foto (pedido do dono, 16/08/2026). Com mídia
+                        já escolhida vira o botão discreto de trocar: dourado ali
+                        competiria com salvar/publicar. */}
+                    <label className={[
+                      'flex-1 rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] uppercase tracking-wider',
+                      backgroundImage || isVideo
+                        ? 'h-12 bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] hover:bg-neutral-800 hover:border-neutral-700'
+                        : 'h-14 bg-yellow-500 text-black font-black text-xs hover:bg-yellow-400',
+                      busy ? 'opacity-50 pointer-events-none' : '',
+                    ].join(' ')}>
+                      <Upload size={16} className={backgroundImage || isVideo ? 'text-yellow-500' : 'text-black'} />
                       {backgroundImage || isVideo ? 'TROCAR MÍDIA' : 'ADICIONAR FOTO/VÍDEO'}
                       <input
                         ref={inputRef} type="file" aria-label="Adicionar mídia" accept="image/*,video/*" className="sr-only"
