@@ -37,10 +37,24 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
 
     // Já existe sessão aberta? O app abre DIRETO no treino ativo e não há card
     // nenhum no dashboard. Acontece quando um caso anterior caiu por timeout
-    // antes do afterEach. Reaproveita a sessão em vez de falhar procurando um
-    // botão que, corretamente, não está na tela.
+    // antes do afterEach — e também quando a sessão veio de OUTRO APARELHO.
+    //
+    // DESCARTA em vez de reaproveitar, e isso não é preferência de estilo. A
+    // sessão ativa é sincronizada pelo SERVIDOR (`active_workout_sessions`),
+    // então ela sobrevive entre execuções do CI e é compartilhada por todos os
+    // clientes logados na conta de teste. Em 16/08/2026 um simulador ficou
+    // horas com o app aberto reescrevendo essa linha; cada escrita voltava por
+    // realtime para o navegador do CI, desfazia o valor que o teste tinha
+    // acabado de digitar (esperava 42, encontrava 40) e re-renderizava a tela,
+    // de modo que o "Voltar" nunca ficava `stable` e o caso morria por timeout.
+    // Não era bug do app: era o sync multi-dispositivo funcionando.
+    //
+    // Reaproveitar herda logs que o teste não escreveu. Partir do zero é a
+    // única forma de o caso medir o que ele diz medir.
     const rodape = page.getByRole('button', { name: /Descartar treino/i })
-    if (await rodape.isVisible({ timeout: 5_000 }).catch(() => false)) return
+    if (await rodape.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await descartarSessao(page)
+    }
 
     // `exact: true` é obrigatório aqui: o CARD inteiro também é um <button>, e
     // o nome acessível dele contém "INICIAR TREINO" no meio do texto todo

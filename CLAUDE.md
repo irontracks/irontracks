@@ -1174,6 +1174,49 @@ reposto antes de o teste ser corrigido:
    dispara `focusin`; o caso do select-on-focus media um cenário inexistente
    até o teste tirar o foco antes.
 
+### ⚠️ A sessão de treino ativa é SINCRONIZADA PELO SERVIDOR — e o E2E divide a conta
+
+Custou um CI vermelho num PR que só mexia em `.md`, e o diagnóstico começou
+errado duas vezes.
+
+`active_workout_sessions` (tabela, com `state` jsonb) guarda a sessão em
+andamento **no servidor**, para o treino continuar de outro aparelho. Ou seja:
+ela **sobrevive entre execuções do CI** e é compartilhada por TODOS os clientes
+logados na conta de teste — inclusive um simulador esquecido aberto.
+
+Foi o que houve em 16/08/2026: deixei o app aberto no simulador com
+`djmkbrasil`, ele seguiu reescrevendo essa linha por horas, e cada escrita
+voltava por **realtime** para o navegador do CI. O `fill('42')` do Playwright
+era desfeito pelo estado remoto (o teste esperava `42` e encontrava `40`, o
+peso da minha tela) e o re-render constante impedia o botão "Voltar" de ficar
+`stable` — o caso morria em `locator.click: Test timeout`.
+
+**Nada disso era bug do app**: é o sync multi-dispositivo funcionando como
+projetado. Era contaminação de ambiente.
+
+Duas hipóteses minhas que a verificação derrubou, nesta ordem — as duas
+plausíveis, as duas erradas:
+1. "É a documentação" — não, o step que falhou foi o E2E logado.
+2. "A sessão do simulador vive só no armazenamento local, não alcança o CI" —
+   **falso**, e é justamente o ponto: ela vai para o banco.
+
+Só a consulta ao `active_workout_sessions` (com `state->'logs'`) fechou o caso:
+o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
+
+**O que fica:**
+- Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
+  app aberto continua escrevendo. E confira a tabela:
+  ```sql
+  select started_at, updated_at, (state->'logs'->'0-0'->>'weight') as peso_s1
+  from active_workout_sessions
+  where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
+  ```
+- O spec da jornada agora **DESCARTA** a sessão preexistente em vez de
+  reaproveitá-la. Reaproveitar herda logs que o teste não escreveu — o caso
+  deixa de medir o que diz medir.
+- Regra geral: **teste E2E que divide conta com gente de verdade precisa partir
+  de estado que ele mesmo criou.** Estado herdado é flake com cara de bug.
+
 ### Armadilhas de ambiente (custaram mais que o spec)
 
 - **A porta 3000 pode ter OUTRO projeto.** Com `reuseExistingServer`, o
