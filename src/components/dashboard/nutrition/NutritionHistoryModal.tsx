@@ -30,13 +30,18 @@ const JANELAS = [
   { days: 90, label: '90 dias' },
 ] as const
 
+/** "sex., 14 de ago." — só a PRIMEIRA letra sobe. */
+function primeiraMaiuscula(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+
 function rotuloData(date: string, hoje: string): string {
   if (date === hoje) return 'Hoje'
   const d = new Date(`${date}T12:00:00`)
   const h = new Date(`${hoje}T12:00:00`)
   if (Math.round((h.getTime() - d.getTime()) / 86_400_000) === 1) return 'Ontem'
   try {
-    return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })
+    return primeiraMaiuscula(d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }))
   } catch {
     return date
   }
@@ -190,7 +195,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, onPickD
                     className="flex w-full items-center gap-3 rounded-xl border border-neutral-800/60 bg-neutral-950 px-3 py-3 text-left transition active:scale-[0.99] hover:bg-neutral-800/50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold capitalize text-neutral-100">
+                      <div className="truncate text-sm font-bold text-neutral-100">
                         {rotuloData(d.date, todayDate)}
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-neutral-400">
