@@ -202,6 +202,7 @@ export default function NutritionMixer({
   profileStats,
   currentPhase,
   phaseIsExplicit,
+  openHistoryOnMount,
 }: {
   dateKey: string
   initialTotals: Totals
@@ -211,6 +212,8 @@ export default function NutritionMixer({
   workoutCaloriesToday?: number
   goalsSource?: 'saved' | 'profile' | 'default'
   restDayReduction?: number
+  /** Abre a aba já com o histórico de refeições na tela (entrada pelo menu). */
+  openHistoryOnMount?: boolean
   /** Perfil (peso/altura/idade/sexo/frequência) p/ o seletor recalcular a meta. Null = incompleto. */
   profileStats?: UserStats | null
   /** Fase em vigor: a escolhida, ou a derivada do objetivo de treino. */
@@ -786,7 +789,9 @@ export default function NutritionMixer({
 
   const handleFavoriteSelect = useCallback((mealText: string) => { setInput(mealText); try { inputRef.current?.focus() } catch {} }, [])
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
-  const [historyOpen, setHistoryOpen] = useState(false)
+  // `openHistoryOnMount`: o menu do avatar abre a aba JÁ no histórico — é de lá
+  // que o dono foi procurar (é onde mora o histórico de treinos).
+  const [historyOpen, setHistoryOpen] = useState(Boolean(openHistoryOnMount))
 
   const handleBarcodeResult = useCallback(async (ean: string) => {
     setShowBarcodeScanner(false)

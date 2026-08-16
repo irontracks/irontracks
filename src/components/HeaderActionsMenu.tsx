@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import {
+  Apple,
   Bell,
   Calendar,
   Cog,
@@ -33,6 +34,8 @@ interface HeaderActionsMenuProps {
   onOpenTeacherArea?: () => void
   onOpenChatList?: () => void
   onOpenHistory?: () => void
+  /** Histórico de REFEIÇÕES — irmão do de treinos, e onde o dono foi procurar. */
+  onOpenNutritionHistory?: () => void
   onOpenNotifications?: () => void
   onLogout?: () => void
   onOpenSchedule?: () => void
@@ -164,6 +167,7 @@ export default function HeaderActionsMenu({
   onOpenTeacherArea,
   onOpenChatList,
   onOpenHistory,
+  onOpenNutritionHistory,
   onOpenNotifications,
   onLogout,
   onOpenSchedule,
@@ -457,11 +461,22 @@ export default function HeaderActionsMenu({
               <Divider />
 
               {/* Utility */}
+              {/* Dois históricos, nomeados: "Histórico" sozinho virou ambíguo no dia
+                  em que a nutrição ganhou o seu — e o dono procurou o de refeições
+                  aqui, não dentro da aba. */}
               <MenuItem
                 icon={<History size={14} className="text-neutral-400" />}
-                label="Histórico"
+                label="Histórico de treinos"
                 onClick={() => { onOpenHistory?.(); close() }}
               />
+
+              {onOpenNutritionHistory && (
+                <MenuItem
+                  icon={<Apple size={14} className="text-neutral-400" />}
+                  label="Histórico de refeições"
+                  onClick={() => { onOpenNutritionHistory?.(); close() }}
+                />
+              )}
 
               <MenuItem
                 icon={<Sparkles size={14} className="text-neutral-400" />}

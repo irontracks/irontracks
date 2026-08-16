@@ -30,9 +30,11 @@ function safeNumber(value: unknown): number {
 interface NutritionOverlayProps {
   onClose: () => void
   canViewMacros?: boolean
+  /** Entrou pelo item "Histórico de refeições" do menu: já abre nele. */
+  openHistoryOnMount?: boolean
 }
 
-export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: NutritionOverlayProps) {
+export default function NutritionOverlay({ onClose: _onClose, canViewMacros, openHistoryOnMount }: NutritionOverlayProps) {
   const supabase = useMemo(() => createClient(), [])
   const [data, setData] = useState<{
     dateKey: string
@@ -231,6 +233,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
             profileStats={data.profileStats}
             currentPhase={data.currentPhase}
             phaseIsExplicit={data.phaseIsExplicit}
+            openHistoryOnMount={openHistoryOnMount}
           />
         ) : (
           <div className="space-y-4">

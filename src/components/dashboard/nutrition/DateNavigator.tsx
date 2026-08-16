@@ -53,7 +53,7 @@ export default function DateNavigator({
         type="button"
         onClick={() => !isToday && onDateChange(todayDate)}
         className={`
-          min-w-[140px] tap-44 h-9 rounded-xl px-4 text-sm font-semibold tracking-tight transition
+          min-w-[104px] tap-44 h-9 rounded-xl px-4 text-sm font-semibold tracking-tight transition
           ${isToday
             ? 'bg-yellow-500/10 border border-yellow-500/25 text-yellow-400'
             : 'bg-neutral-900/60 border border-neutral-800/60 text-neutral-200 hover:bg-neutral-800/80'}
@@ -75,14 +75,19 @@ export default function DateNavigator({
         <ChevronRight size={16} className="text-neutral-300" />
       </button>
 
+      {/* Com RÓTULO, não só o ícone: o dono não achou o histórico quando ele era
+          um calendário mudo ao lado das setas — e num navegador de datas o
+          ícone de calendário lê como "escolher data", não como "ver o passado".
+          Ícone sozinho é atalho para quem já sabe que a função existe. */}
       {onOpenHistory && (
         <button
           type="button"
           onClick={onOpenHistory}
-          className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition"
+          className="tap-44 h-9 inline-flex items-center gap-1.5 rounded-xl border border-neutral-800/60 bg-neutral-900/60 px-2.5 text-[11px] font-semibold text-neutral-300 transition hover:bg-neutral-800/80 active:scale-95"
           aria-label="Histórico de nutrição"
         >
-          <CalendarDays size={16} className="text-neutral-300" />
+          <CalendarDays size={14} className="text-neutral-400" />
+          Histórico
         </button>
       )}
     </div>
