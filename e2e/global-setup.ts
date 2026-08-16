@@ -33,7 +33,15 @@ export default async function globalSetup(_config: FullConfig) {
     const deadline = Date.now() + 120_000
     for (;;) {
         try {
-            const r = await fetch(baseURL, { redirect: 'manual' })
+            const r = await fetch(baseURL, {
+                redirect: 'manual',
+                // Mesmo bypass do `use.extraHTTPHeaders`: sem ele, um preview
+                // protegido responde a tela da Vercel e a espera "conclui" num
+                // app que não é o nosso.
+                headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+                    ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+                    : {},
+            })
             if (r.status > 0) break
         } catch {
             if (Date.now() > deadline) {
@@ -45,7 +53,14 @@ export default async function globalSetup(_config: FullConfig) {
     }
 
     const browser = await chromium.launch()
-    const context = await browser.newContext()
+    const context = await browser.newContext({
+        extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+            ? {
+                'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+                'x-vercel-set-bypass-cookie': 'true',
+            }
+            : {},
+    })
     const page = await context.newPage()
 
     try {
