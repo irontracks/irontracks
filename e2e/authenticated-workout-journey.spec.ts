@@ -48,9 +48,22 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
     // o clique cai no card externo e a sessão nunca abre.
     const iniciar = page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first()
     const continuar = page.getByRole('button', { name: 'CONTINUAR TREINO', exact: true }).first()
-    const alvo = (await continuar.isVisible().catch(() => false)) ? continuar : iniciar
-    await expect(alvo, 'a lista de treinos precisa ter ao menos um card').toBeVisible({ timeout: 30_000 })
+    // Não escolha o alvo antes da hidratação: nesse instante ambos os locators
+    // ainda podem estar invisíveis e o fallback para INICIAR abre indevidamente
+    // o diálogo de troca quando já existe uma sessão ativa.
+    await expect(
+        iniciar.or(continuar).first(),
+        'a lista de treinos precisa ter ao menos um card',
+    ).toBeVisible({ timeout: 30_000 })
+    const alvo = (await continuar.isVisible()) ? continuar : iniciar
     await alvo.click()
+
+    // Se a sessão ativa pertence a outro card, INICIAR pede confirmação. Esse
+    // é um estado válido da conta de teste e precisa ser resolvido pela UI.
+    const trocarTreino = page.getByRole('heading', { name: /Trocar de treino\?/i })
+    if (await trocarTreino.isVisible({ timeout: 5_000 }).catch(() => false)) {
+        await page.getByRole('button', { name: /^Confirmar$/i }).click()
+    }
 
     // Check-in PRÉ-treino: aparece entre o toque e a sessão quando a conta tem
     // o prompt ligado (é o default). Um spec que não trate isso conclui que
