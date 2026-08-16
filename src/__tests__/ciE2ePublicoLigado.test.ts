@@ -41,10 +41,37 @@ describe('CI — E2E de navegador nas páginas públicas', () => {
   it('o servidor sobe no CI a partir do build (senão o job fala com localhost vazio)', () => {
     expect(ci).toMatch(/PLAYWRIGHT_CI_SERVER:\s*"1"/)
     expect(pw).toMatch(/PLAYWRIGHT_CI_SERVER === '1'/)
-    expect(pw).toMatch(/command:\s*'npm run start'/)
+    expect(pw).toMatch(/command:\s*`npm run start[^`]*`/)
   })
 
   it('o E2E vem DEPOIS do build (reaproveita o .next em vez de buildar de novo)', () => {
     expect(ci.indexOf('Verify Build')).toBeLessThan(ci.indexOf('E2E — public pages'))
+  })
+})
+
+/**
+ * O E2E LOGADO é a camada que os 3 bugs de 15/08/2026 atravessaram: 5.4k
+ * testes verdes e nenhum ANDANDO pelo app. Estes casos travam que o job existe,
+ * roda o spec de jornada e é PULADO (não quebrado) quando faltar configuração —
+ * um job vermelho por falta de secret ensina a equipe a ignorar o vermelho.
+ */
+describe('CI — E2E da jornada logada', () => {
+  const step = ci.slice(ci.indexOf('E2E — jornada logada'))
+
+  it('roda o spec de jornada', () => {
+    expect(ci).toContain('E2E — jornada logada')
+    expect(step).toMatch(/e2e\/authenticated-workout-journey\.spec\.ts/)
+    expect(step).toMatch(/--project=authenticated/)
+  })
+
+  it('é PULADO sem as credenciais e sem as chaves públicas do Supabase', () => {
+    // Sem as chaves, o build sai com placeholder e o app não conecta: o job
+    // ficaria vermelho por configuração, não por regressão.
+    expect(step).toMatch(/if:\s*\$\{\{[^}]*E2E_USER_EMAIL[^}]*\}\}/)
+    expect(step).toMatch(/NEXT_PUBLIC_SUPABASE_URL\s*!=\s*''/)
+  })
+
+  it('o build usa as chaves reais quando existirem (senão o E2E logado é inútil)', () => {
+    expect(ci).toMatch(/NEXT_PUBLIC_SUPABASE_URL:\s*\$\{\{\s*secrets\.NEXT_PUBLIC_SUPABASE_URL\s*\|\|/)
   })
 })

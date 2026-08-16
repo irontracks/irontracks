@@ -21,7 +21,28 @@ export default async function globalSetup(_config: FullConfig) {
         return
     }
 
-    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'
+    const baseURL =
+        process.env.PLAYWRIGHT_BASE_URL ??
+        `http://localhost:${process.env.PLAYWRIGHT_PORT ?? '3000'}`
+
+    // Espera o app responder antes de tentar o login. O globalSetup corre em
+    // paralelo com a subida do webServer: sem esta espera, o login falha por
+    // "connection refused", o storage state não é criado e TODOS os testes
+    // autenticados morrem com "Error reading storage state" — um erro que não
+    // diz nada sobre a causa real (medido em 15/08/2026).
+    const deadline = Date.now() + 120_000
+    for (;;) {
+        try {
+            const r = await fetch(baseURL, { redirect: 'manual' })
+            if (r.status > 0) break
+        } catch {
+            if (Date.now() > deadline) {
+                console.warn(`[E2E] app não respondeu em ${baseURL} — seguindo assim mesmo`)
+                break
+            }
+            await new Promise((r) => setTimeout(r, 2_000))
+        }
+    }
 
     const browser = await chromium.launch()
     const context = await browser.newContext()

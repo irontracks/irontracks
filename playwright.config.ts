@@ -2,6 +2,15 @@ import { defineConfig, devices } from '@playwright/test'
 import * as fs from 'node:fs'
 
 const hasAuthCredentials = !!(process.env.E2E_USER_EMAIL && process.env.E2E_USER_PASSWORD)
+/**
+ * Porta do app sob teste. Configurável porque a 3000 pode estar ocupada por
+ * OUTRO projeto na máquina de quem roda — e aí o Playwright, com
+ * `reuseExistingServer`, testa o app errado em silêncio (aconteceu em
+ * 15/08/2026: a suíte falhou contra a tela de login de outro produto).
+ * Com PLAYWRIGHT_PORT definido, o servidor é sempre iniciado do zero.
+ */
+const PORT = process.env.PLAYWRIGHT_PORT ?? '3000'
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`
 const authStatePath = 'e2e/.auth/user.json'
 const hasAuthState = fs.existsSync(authStatePath) && fs.statSync(authStatePath).size > 50
 
@@ -22,7 +31,7 @@ export default defineConfig({
     ...(hasAuthCredentials ? { globalSetup: './e2e/global-setup.ts' } : {}),
 
     use: {
-        baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
+        baseURL: BASE_URL,
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },
@@ -64,17 +73,19 @@ export default defineConfig({
     webServer: process.env.CI
         ? (process.env.PLAYWRIGHT_CI_SERVER === '1'
             ? {
-                command: 'npm run start',
-                url: 'http://localhost:3000',
+                command: `npm run start -- --port ${PORT}`,
+                url: BASE_URL,
                 reuseExistingServer: false,
                 timeout: 120_000,
             }
             : undefined)
         : {
-            command: 'npm run dev',
-            url: 'http://localhost:3000',
-            reuseExistingServer: true,
-            timeout: 60_000,
+            command: `npm run dev -- --port ${PORT}`,
+            url: BASE_URL,
+            // Só reaproveita servidor existente na porta PADRÃO. Com uma porta
+            // explícita, sobe a própria — é o ponto de ter escolhido a porta.
+            reuseExistingServer: !process.env.PLAYWRIGHT_PORT,
+            timeout: 120_000,
         },
 
     // Screenshot comparison config for visual regression
