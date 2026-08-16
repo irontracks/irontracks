@@ -91,6 +91,18 @@ describe('lista de dias', () => {
         expect(screen.queryByText(/nenhum dia registrado/i)).not.toBeInTheDocument()
     })
 
+    /**
+     * Visto no aparelho: a linha lia "Sex., 14 De Ago." — o `capitalize` do
+     * Tailwind sobe TODA palavra, e o navegador de data logo acima escreve
+     * "sex., 14 de ago.". Duas grafias da mesma data na mesma tela.
+     */
+    it('a data sobe só a primeira letra — "De Ago." não existe', async () => {
+        abrir()
+        const linha = await screen.findByText(/14 de ago/i)
+        expect(linha.textContent).not.toMatch(/\sDe\s/)
+        expect(linha.className, 'capitalize do Tailwind sobe toda palavra').not.toMatch(/capitalize/)
+    })
+
     it('fechada, não renderiza nada', () => {
         const { container } = abrir({ open: false })
         expect(container.textContent).toBe('')
