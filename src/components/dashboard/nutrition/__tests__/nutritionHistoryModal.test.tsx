@@ -109,6 +109,39 @@ describe('lista de dias', () => {
     })
 })
 
+/**
+ * Compartilhar o PERÍODO — o passo 2 do histórico. O composer é o mesmo dos
+ * modos refeição e dia (5 templates), só muda o conteúdo desenhado.
+ */
+describe('story do período', () => {
+    it('o botão nomeia o período da janela', async () => {
+        abrir()
+        expect(await screen.findByRole('button', { name: /compartilhar mês/i })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: /^7 dias$/i }))
+        expect(await screen.findByRole('button', { name: /compartilhar semana/i })).toBeInTheDocument()
+    })
+
+    it('janela sem lançamento não deixa postar — média de nada é afirmação falsa', async () => {
+        resposta.data = []
+        abrir()
+        const botao = await screen.findByRole('button', { name: /compartilhar/i })
+        expect(botao).toBeDisabled()
+    })
+
+    it('com dias registrados, o botão libera', async () => {
+        abrir()
+        const botao = await screen.findByRole('button', { name: /compartilhar/i })
+        expect(botao).not.toBeDisabled()
+    })
+
+    it('o composer recebe o resumo JÁ calculado, sem refazer a média', () => {
+        const modal = readFileSync(join(__dirname, '..', 'NutritionHistoryModal.tsx'), 'utf8')
+        expect(modal, 'duas contas para a mesma média é como nasce divergência')
+            .toMatch(/periodToContent\(resumo,/)
+        expect(modal).toMatch(/mode="period"/)
+    })
+})
+
 describe('fiação na aba de nutrição', () => {
     const read = (f: string) => readFileSync(join(__dirname, '..', f), 'utf8')
 
@@ -124,6 +157,13 @@ describe('fiação na aba de nutrição', () => {
         const bloco = mixer.slice(mixer.indexOf('<NutritionHistoryModal'), mixer.indexOf('<NutritionHistoryModal') + 300)
         expect(bloco, 'a lista existe para navegar — sem isto ela é só leitura')
             .toMatch(/onPickDate=\{handleDateChange\}/)
+    })
+
+    it('a meta chega ao story do período', () => {
+        const mixer = readFileSync(join(__dirname, '..', 'NutritionMixer.tsx'), 'utf8')
+        const bloco = mixer.slice(mixer.indexOf('<NutritionHistoryModal'), mixer.indexOf('<NutritionHistoryModal') + 400)
+        expect(bloco, 'sem a meta o story do período perde a referência do hero')
+            .toMatch(/goals=\{safeGoals\}/)
     })
 
     it('o botão de histórico tem nome acessível', () => {

@@ -77,6 +77,8 @@ export type NutritionHistorySummary = {
   /** Médias sobre os dias REGISTRADOS (ver abaixo). 0 quando não há nenhum. */
   avgCalories: number
   avgProtein: number
+  avgCarbs: number
+  avgFat: number
 }
 
 /**
@@ -94,14 +96,43 @@ export type NutritionHistorySummary = {
 export function summarizeHistory(days: NutritionHistoryDay[] | null | undefined, windowDays: number): NutritionHistorySummary {
   const lista = Array.isArray(days) ? days : []
   const loggedDays = lista.length
-  if (!loggedDays) return { loggedDays: 0, windowDays, avgCalories: 0, avgProtein: 0 }
-  const kcal = lista.reduce((a, d) => a + num(d.calories), 0)
-  const prot = lista.reduce((a, d) => a + num(d.protein), 0)
+  if (!loggedDays) return { loggedDays: 0, windowDays, avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 }
+  const media = (pega: (d: NutritionHistoryDay) => number) =>
+    Math.round(lista.reduce((a, d) => a + num(pega(d)), 0) / loggedDays)
   return {
     loggedDays,
     windowDays,
-    avgCalories: Math.round(kcal / loggedDays),
-    avgProtein: Math.round(prot / loggedDays),
+    avgCalories: media((d) => d.calories),
+    avgProtein: media((d) => d.protein),
+    avgCarbs: media((d) => d.carbs),
+    avgFat: media((d) => d.fat),
+  }
+}
+
+/**
+ * Nome do período pela janela. "Semana" e "Mês" são o que o usuário chama de
+ * 7 e 30 dias; fora disso, a contagem crua — inventar nome para 45 dias seria
+ * pior que dizer "45 dias".
+ */
+export function periodLabel(windowDays: number): string {
+  if (windowDays === 7) return 'Semana'
+  if (windowDays === 30) return 'Mês'
+  return `${Math.max(1, Math.floor(windowDays))} dias`
+}
+
+/** "10 – 16 de ago." — o intervalo que o período cobre, para o story. */
+export function periodRangeText(endDate: string, windowDays: number): string {
+  const fim = new Date(`${endDate}T12:00:00`)
+  const ini = new Date(`${windowStartDate(endDate, windowDays)}T12:00:00`)
+  try {
+    const mesIni = ini.toLocaleDateString('pt-BR', { month: 'short' })
+    const mesFim = fim.toLocaleDateString('pt-BR', { month: 'short' })
+    // Mesmo mês: o nome aparece uma vez só ("10 – 16 de ago.").
+    return mesIni === mesFim
+      ? `${ini.getDate()} – ${fim.getDate()} de ${mesFim}`
+      : `${ini.getDate()} de ${mesIni} – ${fim.getDate()} de ${mesFim}`
+  } catch {
+    return `${windowStartDate(endDate, windowDays)} – ${endDate}`
   }
 }
 

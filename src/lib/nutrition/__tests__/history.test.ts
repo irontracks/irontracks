@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   aggregateEntriesByDay,
+  periodLabel,
+  periodRangeText,
   summarizeHistory,
   windowStartDate,
 } from '@/lib/nutrition/history'
@@ -63,7 +65,23 @@ describe('summarizeHistory', () => {
   })
 
   it('janela sem nenhum lançamento não inventa média', () => {
-    expect(summarizeHistory([], 7)).toEqual({ loggedDays: 0, windowDays: 7, avgCalories: 0, avgProtein: 0 })
+    expect(summarizeHistory([], 7)).toEqual({ loggedDays: 0, windowDays: 7, avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 })
+  })
+})
+
+describe('rótulo e intervalo do período', () => {
+  it('7 e 30 dias têm nome; o resto é a contagem crua', () => {
+    expect(periodLabel(7)).toBe('Semana')
+    expect(periodLabel(30)).toBe('Mês')
+    expect(periodLabel(45), 'inventar nome para 45 dias é pior que dizer 45 dias').toBe('45 dias')
+  })
+
+  it('mesmo mês escreve o mês uma vez só', () => {
+    expect(periodRangeText('2026-08-16', 7)).toBe('10 – 16 de ago.')
+  })
+
+  it('virada de mês nomeia os dois', () => {
+    expect(periodRangeText('2026-03-02', 7)).toMatch(/fev.*mar/)
   })
 })
 
