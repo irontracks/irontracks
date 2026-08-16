@@ -34,49 +34,31 @@ const efeito = (() => {
  * 16/08/2026. O WKWebView só abre o seletor de arquivo com ativação transitória
  * do usuário, e ela já expirou quando o efeito roda (o composer é `dynamic()`:
  * entre o toque e o mount há o carregamento do chunk). Quem garante a foto lá é
- * o CONVITE na prévia, cujo clique é gesto de verdade.
+ * o CTA dourado, cujo clique é gesto de verdade — provado no aparelho: o
+ * seletor "Photo Library / Choose File" abre.
  *
- * Os dois convivem de propósito: o automático vale na web e não custa nada.
+ * ⚠️ NÃO recriar um convite DENTRO da prévia. Foi tentado e removido em duas
+ * rodadas: os handlers de pinça/arrasto dão `preventDefault` e cancelam o
+ * clique do label (não abria nada), e depois de corrigido isso ele cobria o
+ * desenho — no centro tapava o "MÉDIA POR DIA", mais acima tapava a marca.
+ * A prévia é o RESULTADO; controle fica fora dela.
  */
-describe('convite de foto na prévia', () => {
-  it('a prévia sem mídia traz o convite', () => {
-    expect(codigo).toMatch(/!backgroundImage\s*&&\s*!isVideo/)
-    expect(src).toMatch(/Toque para pôr sua foto/)
+describe('o CTA de mídia é a ação da tela quando não há foto', () => {
+  it('sem mídia, o botão é dourado e maior', () => {
+    expect(src).toMatch(/h-14 bg-yellow-500 text-black/)
   })
 
-  it('o convite tem input próprio — o clique precisa ser gesto do usuário', () => {
-    const bloco = src.slice(src.indexOf('Toque para pôr sua foto'))
-    expect(bloco.slice(0, 600)).toMatch(/type="file"[^>]*accept="image\/\*,video\/\*"/)
+  it('com mídia, ele volta a ser discreto — dourado competiria com publicar', () => {
+    expect(src).toMatch(/backgroundImage \|\| isVideo\s*\n?\s*\?\s*'h-12 bg-neutral-900/)
   })
 
-  it('não trava o arrasto da marca e da legenda quando não há mídia', () => {
-    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
-    const trecho = bloco.slice(0, 2200)
-    expect(trecho, 'a camada inteira não pode capturar toque').toMatch(/absolute inset-0[\s\S]{0,120}pointer-events-none/)
-    expect(trecho, 'só o convite recebe o toque').toMatch(/pointer-events-auto/)
+  it('o texto pede a foto', () => {
+    expect(src).toMatch(/PONHA SUA FOTO OU VÍDEO/)
   })
 
-  /**
-   * MEDIDO no iPhone: sem isto o convite não abre nada. A prévia escuta
-   * touchstart/move para a pinça e o arrasto, e esses handlers dão
-   * `preventDefault` — o que cancela o clique sintético do <label>. O botão do
-   * rodapé sempre funcionou porque vive FORA da prévia.
-   */
-  it('o toque no convite não é engolido pelos gestos da prévia', () => {
-    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
-    const trecho = bloco.slice(0, 1600)
-    expect(trecho).toMatch(/onTouchStart=\{\(e\)\s*=>\s*e\.stopPropagation\(\)\}/)
-    expect(trecho).toMatch(/onTouchEnd=\{\(e\)\s*=>\s*e\.stopPropagation\(\)\}/)
-  })
-
-  it('o convite não cobre o número do story na prévia', () => {
-    const bloco = src.slice(src.indexOf('{!backgroundImage && !isVideo && ('))
-    expect(bloco.slice(0, 400), 'centralizado, ele tapava o rótulo MÉDIA POR DIA')
-      .toMatch(/items-start[^"]*pt-\[/)
-  })
-
-  it('diz que dá para seguir sem foto — nada é bloqueado', () => {
-    expect(src).toMatch(/dá para seguir sem/)
+  it('nada de convite sobreposto à prévia', () => {
+    expect(src, 'a prévia é o resultado; controle fica fora dela')
+      .not.toMatch(/Toque para pôr sua foto/)
   })
 })
 
