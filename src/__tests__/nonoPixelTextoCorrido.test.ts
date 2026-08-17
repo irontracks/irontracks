@@ -42,7 +42,6 @@ const TETO_POR_ARQUIVO: Record<string, number> = {
   'src/components/workout/AIExerciseSwap.tsx': 1,
   'src/components/workout/ExerciseList.tsx': 1,
   'src/components/workout/SessionDeloadBanner.tsx': 1,
-  'src/components/workout/WorkoutFooter.tsx': 1,
   'src/components/workout/set-renderers/normalSet.tsx': 4,
 }
 
