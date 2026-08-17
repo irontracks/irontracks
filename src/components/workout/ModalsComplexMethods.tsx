@@ -11,6 +11,7 @@ import { normalizeMiniSets } from './helpers/restPauseRules';
 import { UnknownRecord, WorkoutExercise } from './types';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { REST_BAR_INSET } from './helpers/restBarInset'
 
 /**
  * ModalsComplexMethods
@@ -65,7 +66,7 @@ export function ModalsComplexMethods() {
             {/* ── Rest-Pause / SST Modal ── */}
             {restPauseModal && (
                 <div
-                    className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                    style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
                     {...backdropProps(() => setRestPauseModal(null))}
                 >
                     <div
@@ -314,7 +315,7 @@ export function ModalsComplexMethods() {
                 };
                 return (
                     <div
-                        className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                        style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
                         {...backdropProps(() => setDropSetModal(null))}
                     >
                         <div
@@ -447,7 +448,7 @@ export function ModalsComplexMethods() {
                     ? (strippingModal.stages as Array<{ weight: string | null; reps: number | null }>)
                     : [];
                 return (
-                    <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Stripping" onClick={() => setStrippingModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setStrippingModal(null) }}>
+                    <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Stripping" onClick={() => setStrippingModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setStrippingModal(null) }}>
                         <div ref={strippingRef} {...dialogProps('Etapas do Stripping')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -489,7 +490,7 @@ export function ModalsComplexMethods() {
                     : Array.from({ length: 7 }).map(() => ({ weight: null, reps: null }));
                 const intraSec = parseTrainingNumber(fst7Modal.intra_sec) ?? 30;
                 return (
-                    <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal FST-7" onClick={() => setFst7Modal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setFst7Modal(null) }}>
+                    <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal FST-7" onClick={() => setFst7Modal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setFst7Modal(null) }}>
                         <div ref={fst7Ref} {...dialogProps('Séries do FST-7')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -537,7 +538,7 @@ export function ModalsComplexMethods() {
                     ? (waveModal.waves as Array<{ heavy: number | null; medium: number | null; ultra: number | null }>)
                     : [{ heavy: 3, medium: 5, ultra: 2 }, { heavy: 3, medium: 5, ultra: 2 }];
                 return (
-                    <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Wave" onClick={() => setWaveModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setWaveModal(null) }}>
+                    <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Wave" onClick={() => setWaveModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setWaveModal(null) }}>
                         <div ref={waveRef} {...dialogProps('Ondas da série')} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -601,7 +602,7 @@ export function ModalsComplexMethods() {
             {/* ── Cluster Modal ── */}
             {clusterModal && (
                 <div
-                    className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                    style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
                     {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
                 >
                     <div

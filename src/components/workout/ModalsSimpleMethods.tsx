@@ -6,6 +6,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
 import { UnknownRecord } from './types';
 import { getSuggestion, watermarkPlaceholder } from './utils';
+import { REST_BAR_INSET } from './helpers/restBarInset'
 
 /**
  * ModalsSimpleMethods
@@ -41,7 +42,7 @@ export function ModalsSimpleMethods() {
         <>
             {/* ── Heavy Duty Modal ── */}
             {heavyDutyModal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setHeavyDutyModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setHeavyDutyModal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setHeavyDutyModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setHeavyDutyModal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -95,7 +96,7 @@ export function ModalsSimpleMethods() {
 
             {/* ── Ponto Zero Modal ── */}
             {pontoZeroModal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setPontoZeroModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setPontoZeroModal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setPontoZeroModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setPontoZeroModal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -143,7 +144,7 @@ export function ModalsSimpleMethods() {
 
             {/* ── Forced Reps Modal ── */}
             {forcedRepsModal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setForcedRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setForcedRepsModal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setForcedRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setForcedRepsModal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -184,7 +185,7 @@ export function ModalsSimpleMethods() {
 
             {/* ── Negative Reps Modal ── */}
             {negativeRepsModal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setNegativeRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setNegativeRepsModal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setNegativeRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setNegativeRepsModal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -225,7 +226,7 @@ export function ModalsSimpleMethods() {
 
             {/* ── Partial Reps Modal ── */}
             {partialRepsModal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setPartialRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setPartialRepsModal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setPartialRepsModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setPartialRepsModal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -266,7 +267,7 @@ export function ModalsSimpleMethods() {
 
             {/* ── Sistema 21 Modal ── */}
             {sistema21Modal && (
-                <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setSistema21Modal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setSistema21Modal(null); }}>
+                <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setSistema21Modal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setSistema21Modal(null); }}>
                     <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -315,7 +316,7 @@ export function ModalsSimpleMethods() {
                 };
                 const desc = methodDescriptions[methodName] ?? { subtitle: info, tip: '' };
                 return (
-                    <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setGroupMethodModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setGroupMethodModal(null); }}>
+                    <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal" onClick={(e) => { if (e.target === e.currentTarget) setGroupMethodModal(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setGroupMethodModal(null); }}>
                         <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" role="dialog" aria-modal="true">
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">

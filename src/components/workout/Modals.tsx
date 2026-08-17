@@ -27,6 +27,7 @@ import { ModalsSimpleMethods } from './ModalsSimpleMethods';
 import { ModalsComplexMethods } from './ModalsComplexMethods';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { REST_BAR_INSET } from './helpers/restBarInset'
 
 const ExerciseSortRow = ({
   item,
@@ -162,7 +163,7 @@ export default function Modals() {
           Ao salvar, os logs das séries feitas são remapeados e o usuário escolhe
           "só hoje" ou "pra sempre". */}
       {fullEditorOpen && fullEditorWorkout && (
-        <div className="fixed inset-0 z-[2250] bg-neutral-950 overflow-y-auto overscroll-none pt-safe pb-safe">
+        <div style={REST_BAR_INSET} className="fixed inset-0 z-[2250] bg-neutral-950 overflow-y-auto overscroll-none pt-safe pb-safe">
           <ExerciseEditor
             workout={fullEditorWorkout as unknown as EditorWorkout}
             onChange={(w: EditorWorkout) => setFullEditorWorkout?.(w as unknown as UnknownRecord)}
@@ -184,7 +185,7 @@ export default function Modals() {
           motivo do z-[2200] do editor em IronTracksAppClientImpl). */}
       {postCheckinOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe"
+          style={REST_BAR_INSET} className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe"
           onClick={() => {
             setPostCheckinOpen(false);
             const r = postCheckinResolveRef.current;
@@ -289,7 +290,7 @@ export default function Modals() {
 
       {deloadModal && (
         <div
-          className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
           {...backdropProps(() => setDeloadModal(null), 'Fechar deload')}
         >
           {(() => {
@@ -431,7 +432,7 @@ export default function Modals() {
       )}
 
       {addExerciseOpen && (
-        <div className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar busca de exercícios" onClick={() => setAddExerciseOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setAddExerciseOpen(false) }}>
+        <div style={REST_BAR_INSET} className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar busca de exercícios" onClick={() => setAddExerciseOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setAddExerciseOpen(false) }}>
           <div ref={addExerciseRef} {...dialogProps('Adicionar exercício extra')} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -503,7 +504,7 @@ export default function Modals() {
       )}
 
       {editExerciseOpen && editExerciseIdx != null && (
-        <div className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar edição de exercício" onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { setEditExerciseOpen(false); setEditExerciseIdx(null); } }}>
+        <div style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar edição de exercício" onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { setEditExerciseOpen(false); setEditExerciseIdx(null); } }}>
           <div ref={editExerciseRef} {...dialogProps('Editar exercício')} className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -662,7 +663,7 @@ export default function Modals() {
       )}
 
       {organizeOpen && (
-        <div className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar organização" onClick={requestCloseOrganize} onKeyDown={(e) => { if (e.key === 'Escape') requestCloseOrganize() }}>
+        <div style={REST_BAR_INSET} className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe" role="button" tabIndex={-1} aria-label="Fechar organização" onClick={requestCloseOrganize} onKeyDown={(e) => { if (e.key === 'Escape') requestCloseOrganize() }}>
           <div ref={organizeRef} {...dialogProps('Organizar exercícios')} className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -727,7 +728,7 @@ export default function Modals() {
 
       {clusterModal && (
         <div
-          className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          style={REST_BAR_INSET} className="fixed inset-0 z-[2350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
           {...backdropProps(() => setClusterModal(null), 'Fechar cluster')}
         >
           <div
