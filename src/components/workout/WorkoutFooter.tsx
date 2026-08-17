@@ -10,7 +10,6 @@ import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
 export default function WorkoutFooter() {
   const {
     session,
-    currentExercise,
     finishing,
     finishWorkout,
     confirm,
@@ -34,34 +33,30 @@ export default function WorkoutFooter() {
   const allDone = allSets > 0 && completedSets >= allSets;
 
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-  const toNum = (v: unknown) => {
-    const n = Number(String(v ?? '').replace(',', '.'))
-    return Number.isFinite(n) ? n : 0
-  }
   const ui = isRecord(session?.ui) ? (session?.ui as Record<string, unknown>) : null
   const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null
   const startedAtMs = activeExec ? Number(activeExec.startedAtMs) : 0
   const isExecuting = Number.isFinite(startedAtMs) && startedAtMs > 0
-  const timerTargetTime = toNum((session as Record<string, unknown>)?.timerTargetTime)
-  const hasRecovery = Number.isFinite(timerTargetTime) && timerTargetTime > 0
-  const recoveryRemaining = hasRecovery ? Math.ceil((timerTargetTime - ticker) / 1000) : 0
-  const recoverySeconds = hasRecovery ? Math.max(0, recoveryRemaining) : 0
-  const recoveryExtraSeconds = hasRecovery ? Math.max(0, -recoveryRemaining) : 0
-  const displaySeconds = hasRecovery ? recoverySeconds : isExecuting ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : elapsedSeconds
-  const displayLabel = hasRecovery ? 'Recuperação' : isExecuting ? 'Exercício' : 'Treino'
-  const plannedRestSec = toNum(
-    currentExercise?.restTime ?? (currentExercise as Record<string, unknown>)?.rest_time ?? (currentExercise as Record<string, unknown>)?.rest ?? currentExercise?.rest_time
-  )
-  const displayTime = `${formatElapsed(displaySeconds)}${recoveryExtraSeconds > 0 ? ` (+${formatElapsed(recoveryExtraSeconds)})` : ''}`
 
-  // Recovery ring: shows progress from plannedRestSec → 0
-  const { recoveryRingPct, recoveryRingColor } = React.useMemo(() => {
-    const pct = hasRecovery && plannedRestSec > 0
-      ? Math.max(0, Math.min(100, (recoverySeconds / plannedRestSec) * 100))
-      : 0
-    const color = pct > 60 ? '#22c55e' : pct > 30 ? '#f59e0b' : '#ef4444'
-    return { recoveryRingPct: pct, recoveryRingColor: color }
-  }, [hasRecovery, plannedRestSec, recoverySeconds])
+  /**
+   * ⚠️ O DESCANSO NÃO É DESENHADO AQUI — e isso é decisão, não esquecimento.
+   *
+   * Esta barra já mostrou "RECUPERAÇÃO 0:14" com anel colorido enquanto a
+   * barra do RestTimerOverlay, logo abaixo, mostrava "0:13 DESC" com outro
+   * anel: o MESMO descanso, dois relógios, e discordando em 1 segundo porque
+   * cada um arredondava por conta própria (`Math.ceil` aqui, outro lá).
+   *
+   * A duplicação sempre existiu, escondida — as duas barras se cobriam. Quando
+   * elas passaram a conviver (17/08/2026), ficou à vista e o dono apontou.
+   *
+   * O corte segue a regra da casa (docs/DESIGN_HIERARCHY.md): um fato aparece
+   * UMA vez, e no lugar mais próximo da ação. O tempo restante mora na barra
+   * de baixo, colado no START, que é quem encerra o descanso. Aqui fica o
+   * tempo de TREINO — que, de quebra, sumia justamente durante o descanso.
+   */
+  const displaySeconds = isExecuting ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : elapsedSeconds
+  const displayLabel = isExecuting ? 'Exercício' : 'Treino'
+  const displayTime = formatElapsed(displaySeconds)
 
   // Com o teclado aberto, esta barra (fixed bottom-0) fica ATRÁS dele e a barra de
   // acessórios do iOS a corta ao meio — "vazando" meia barra na tela. Enquanto o
@@ -127,41 +122,6 @@ export default function WorkoutFooter() {
 
         {/* ── Timer display — center ── */}
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Recovery ring — visible during active recovery */}
-          <div
-            className={`shrink-0 transition-all duration-200 ${hasRecovery && plannedRestSec > 0 ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0 overflow-hidden'}`}
-          >
-            {(() => {
-              const size = 36;
-              const stroke = 3;
-              const radius = (size - stroke) / 2;
-              const circumference = 2 * Math.PI * radius;
-              const offset = circumference - (recoveryRingPct / 100) * circumference;
-              return (
-                <div className="relative" style={{ width: size, height: size }}>
-                  <svg width={size} height={size} className="rotate-[-90deg]">
-                    <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} />
-                    <circle
-                      cx={size / 2} cy={size / 2} r={radius} fill="none"
-                      stroke={recoveryRingColor}
-                      strokeWidth={stroke}
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={offset}
-                      style={{
-                        transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s',
-                        filter: `drop-shadow(0 0 3px ${recoveryRingColor}90)`,
-                      }}
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tabular-nums" style={{ color: recoveryRingColor }}>
-                    {recoverySeconds}
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
-
           {/* Time + label */}
           <div className="flex flex-col items-center min-w-0">
             <span className="text-[9px] uppercase tracking-widest text-yellow-500 font-black leading-tight">
