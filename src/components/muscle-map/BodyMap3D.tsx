@@ -70,6 +70,13 @@ const DIMMED = 0.3
 
 type MuscleState = { color?: string; sets?: number; ratio?: number; label?: string }
 
+type FalloffUniforms = {
+  uTint: { value: THREE.Color }
+  uTintAmount: { value: number }
+  uGlow: { value: THREE.Color }
+  uGlowAmount: { value: number }
+}
+
 type Props = {
   view: 'front' | 'back'
   muscles: Record<string, MuscleState>
@@ -91,6 +98,57 @@ type Stage = {
   materials: Map<string, THREE.MeshStandardMaterial>
   raycaster: THREE.Raycaster
   targetAngle: number
+}
+
+/**
+ * Faz o peso de borda (gravado como cor de vértice pelo pipeline) modular a
+ * tinta e a emissão, em vez de multiplicar o albedo como o three faria por
+ * padrão com `vertexColors`.
+ *
+ * A multiplicação padrão escureceria o corpo até o preto na fronteira, que é o
+ * oposto do desejado: ali o músculo tem que virar PELE, não sombra. Por isso o
+ * `color_fragment` é substituído, não complementado.
+ */
+function applyFalloffShader(mat: THREE.MeshStandardMaterial) {
+  const uniforms = {
+    uTint: { value: new THREE.Color(0x000000) },
+    uTintAmount: { value: 0 },
+    uGlow: { value: new THREE.Color(0x000000) },
+    uGlowAmount: { value: 0 },
+  }
+  // Guardado no material para o repinte atualizar sem recompilar o shader.
+  ;(mat as THREE.MeshStandardMaterial & { userData: { uniforms?: typeof uniforms } })
+    .userData.uniforms = uniforms
+
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms)
+
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vFalloff;')
+      .replace('#include <color_vertex>', '#include <color_vertex>\nvFalloff = color.r;')
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         varying float vFalloff;
+         uniform vec3 uTint;
+         uniform float uTintAmount;
+         uniform vec3 uGlow;
+         uniform float uGlowAmount;`,
+      )
+      // Substitui a multiplicação padrão do vertexColor: aqui a cor do vértice
+      // é PESO, não pigmento.
+      .replace(
+        '#include <color_fragment>',
+        'diffuseColor.rgb = mix(diffuseColor.rgb, uTint, uTintAmount * vFalloff);',
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uGlow * (uGlowAmount * vFalloff);',
+      )
+  }
+  mat.needsUpdate = true
 }
 
 function buildLights(scene: THREE.Scene) {
@@ -133,6 +191,7 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
     stage.materials.forEach((mat, name) => {
       // Base idêntica para tudo, sempre: manequim e músculo são a mesma pele.
       mat.color.setHex(BODY_COLOR)
+      mat.emissiveIntensity = 0
 
       if (name === 'body' || !MUSCLE_IDS.has(name)) {
         mat.emissive.setHex(0x000000)
@@ -156,10 +215,27 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
       // achatava tudo que não fosse volume alto.
       const t = Math.sqrt(Math.min(1, Math.max(0, ratio)))
       const dim = selectedId && name !== selectedId ? DIMMED : 1
+      const tint = (MIN_TINT + (MAX_TINT - MIN_TINT) * t) * dim
+      const glow = (MIN_GLOW + (MAX_GLOW - MIN_GLOW) * t) * dim
 
-      mat.color.lerp(c, (MIN_TINT + (MAX_TINT - MIN_TINT) * t) * dim)
-      mat.emissive.copy(c)
-      mat.emissiveIntensity = (MIN_GLOW + (MAX_GLOW - MIN_GLOW) * t) * dim
+      const u = (mat as THREE.MeshStandardMaterial & {
+        userData: { uniforms?: FalloffUniforms }
+      }).userData.uniforms
+
+      if (u) {
+        // Com falloff, quem aplica a cor é o shader — por vértice, desvanecendo
+        // na fronteira. O material fica neutro de propósito.
+        u.uTint.value.copy(c)
+        u.uTintAmount.value = tint
+        u.uGlow.value.copy(c)
+        u.uGlowAmount.value = glow
+      } else {
+        // Modelo antigo, sem peso de borda gravado: mantém o caminho direto,
+        // com borda dura, em vez de simplesmente não pintar nada.
+        mat.color.lerp(c, tint)
+        mat.emissive.copy(c)
+        mat.emissiveIntensity = glow
+      }
     })
     needsRenderRef.current = true
   }, [])
@@ -236,7 +312,12 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
             metalness: 0,
             emissive: 0x000000,
             emissiveIntensity: 0,
+            // O modelo traz, por vértice, o quanto ele está no NÚCLEO do músculo
+            // (1) ou na fronteira da região (0). Sem isso a região tem borda
+            // dura de recorte — cada grupo é um conjunto fechado de faces.
+            vertexColors: child.name !== 'body' && MUSCLE_IDS.has(child.name),
           })
+          if (mat.vertexColors) applyFalloffShader(mat)
           child.material = mat
           stage.materials.set(child.name, mat)
           stage.meshes.set(child.name, child)

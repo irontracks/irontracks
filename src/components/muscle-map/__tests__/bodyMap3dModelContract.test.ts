@@ -61,3 +61,21 @@ describe('contrato do modelo 3D do mapa muscular', () => {
     }
   })
 })
+
+describe('peso de borda (falloff) gravado no modelo', () => {
+  it('cada grupo carrega COLOR_0 — é o peso que desvanece a borda', () => {
+    const gltf = readGlbJson(GLB)
+    const semPeso = (gltf.meshes || [])
+      .filter((m: { name: string }) => m.name !== 'body')
+      .filter((m: { primitives: { attributes: Record<string, number> }[] }) =>
+        m.primitives[0].attributes.COLOR_0 === undefined)
+      .map((m: { name: string }) => m.name)
+    expect(semPeso).toEqual([])
+  })
+
+  it('o manequim NÃO carrega peso — ele não é pintado por grupo nenhum', () => {
+    const gltf = readGlbJson(GLB)
+    const body = (gltf.meshes || []).find((m: { name: string }) => m.name === 'body')
+    expect(body?.primitives?.[0]?.attributes?.COLOR_0).toBeUndefined()
+  })
+})

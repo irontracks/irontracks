@@ -190,6 +190,55 @@ def assign_skin_regions(skin, muscle_objs, max_dist, weights):
     return face_group
 
 
+def bake_falloff(piece, muscle_obj, max_dist):
+    """Grava, por VÉRTICE, o quanto ele está no núcleo do músculo (1) ou na
+    fronteira da região (0), como cor de vértice.
+
+    A atribuição de região é binária — cada face pertence a um grupo — e isso
+    desenha uma borda dura, que é o que sobra de amador no mapa. Com este peso
+    o shader desvanece a cor na fronteira em vez de cortá-la, sem custar um
+    polígono a mais.
+
+    `smoothstep` em vez de linear: a queda linear deixa um anel cinza largo em
+    volta de cada grupo e o músculo parece murcho; a curva em S mantém o núcleo
+    cheio e concentra a transição na beirada.
+    """
+    from mathutils import kdtree
+
+    mw = muscle_obj.matrix_world
+    verts = muscle_obj.data.vertices
+    kd = kdtree.KDTree(len(verts))
+    for i, v in enumerate(verts):
+        kd.insert(mw @ v.co, i)
+    kd.balance()
+
+    me = piece.data
+    # As malhas do Z-Anatomy JÁ TRAZEM um vertex color próprio ('Color'), e o
+    # exportador leva o ATIVO. Sem limpar, o peso calculado aqui nunca chega ao
+    # GLB: o arquivo sai com o atributo herdado, branco, e o shader recebe 1 em
+    # todo vértice — o falloff "funciona" e não muda um pixel. Medido.
+    while len(me.color_attributes):
+        me.color_attributes.remove(me.color_attributes[0])
+    attr = me.color_attributes.new(name="falloff", type="FLOAT_COLOR", domain="POINT")
+
+    # A transição mora só na BEIRADA: dentro de 65% do raio o peso é cheio, e a
+    # queda acontece nos 35% finais. Normalizar pelo raio inteiro (a primeira
+    # tentativa) dava mediana 0,46 no peitoral e 0,12 no quadríceps — o grupo
+    # apagava por completo em vez de só perder a borda dura.
+    CORE = 0.65
+    band = max_dist * (1.0 - CORE)
+
+    pmw = piece.matrix_world
+    for i, v in enumerate(me.vertices):
+        _, _, dist = kd.find(pmw @ v.co)
+        t = 1.0 if band <= 0 else min(1.0, max(0.0, (max_dist - dist) / band))
+        w = t * t * (3.0 - 2.0 * t)   # smoothstep
+        attr.data[i].color = (w, w, w, 1.0)
+
+    me.color_attributes.active_color_index = 0
+    me.color_attributes.render_color_index = 0
+
+
 def split_skin_by_region(skin, face_group, muscle_ids):
     """Uma malha por grupo, recortada da pele. Sobra vira o manequim ('body')."""
     pieces = {}
@@ -373,6 +422,12 @@ print(f"[regiões] {covered}/{len(face_group)} faces do manequim atribuídas a u
 
 pieces = split_skin_by_region(body, face_group, list(built.keys()))
 
+# Peso de borda por vértice — o que transforma o corte duro em desvanecimento.
+for muscle_id, piece in pieces.items():
+    if muscle_id == "body":
+        continue
+    bake_falloff(piece, built[muscle_id], MAX_REGION_DIST)
+
 # Mãos, pés e cabeça entram como manequim puro, sem passar pela classificação.
 if neutral_objs:
     neutral = duplicate(neutral_objs, "src_neutral")
@@ -395,6 +450,12 @@ if neutral_objs:
 for obj in built.values():
     bpy.data.objects.remove(obj, do_unlink=True)
 bpy.data.objects.remove(body, do_unlink=True)
+
+# Depois do join com mãos/pés/cabeça: o neutral traz o vertex color herdado do
+# Z-Anatomy de volta, e o manequim não é pintado por grupo nenhum.
+if "body" in pieces:
+    while len(pieces["body"].data.color_attributes):
+        pieces["body"].data.color_attributes.remove(pieces["body"].data.color_attributes[0])
 
 missing_groups = [m for m in built.keys() if m not in pieces]
 if missing_groups:
@@ -461,6 +522,8 @@ export_kwargs = dict(
     export_yup=True,
     export_normals=True,
     export_texcoords=False,
+    export_vertex_color="ACTIVE",   # leva o peso de borda gravado em `falloff`
+
     export_skins=False,
     export_animations=False,
 )
