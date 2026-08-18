@@ -522,7 +522,11 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <motion.div
-                key={`map-${dataUpdatedAt}`}
+                // No 2D a key muda a cada refetch para reanimar o fade. No 3D ela
+                // precisa ser ESTÁVEL: key nova remonta o canvas, o modelo recarrega
+                // e a rotação que o usuário acabou de fazer com o dedo volta à
+                // estaca zero sozinha. Visto no iPhone.
+                key={is3d ? 'map-3d' : `map-${dataUpdatedAt}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.25 }}
