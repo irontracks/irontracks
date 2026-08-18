@@ -26,13 +26,22 @@ def arg(flag, default=None):
 MAP_PATH    = arg("--map", "scripts/muscle-map-3d/muscle-groups.json")
 OUT_PATH    = arg("--out", "public/models/body-map.glb")
 TARGET_TRIS = int(arg("--target-tris", "90000"))
-# Raio máximo entre a face do manequim e o músculo que a reivindica. 0,05 m
-# cobre a espessura de tecido do tronco sem deixar o trapézio anexar a cabeça.
-MAX_REGION_DIST = float(arg("--max-region-dist", "0.05"))
+# Raio máximo entre a face do manequim e o músculo que a reivindica.
+#
+# 18 mm é decisão de DESIGN, medida com --calibrate-dist: cor só significa
+# contra silêncio, e a 50 mm cada grupo reivindicava a pele toda em volta —
+# 90% do corpo aceso, um macacão colorido em que nada se destaca. A 18 mm
+# sobra metade do manequim neutro e o músculo ainda tem forma reconhecível;
+# abaixo disso os grupos viram manchas soltas e a leitura anatômica se perde.
+MAX_REGION_DIST = float(arg("--max-region-dist", "0.018"))
 # Modo calibração: mede a distribuição de área para vários pesos de um grupo
 # numa execução só. Montar os músculos leva minutos; classificar é rápido — sem
 # isso cada tentativa de peso custava um build inteiro.
 CALIBRATE = arg("--calibrate")
+# Varre RAIOS e mede quanto do corpo fica colorido. O mapa precisa de respiro:
+# com raio grande cada grupo reivindica a pele toda em volta e o manequim vira
+# um macacão colorido — o 2D só pinta o ventre do músculo.
+CALIBRATE_DIST = "--calibrate-dist" in argv
 USE_DRACO   = "--no-draco" not in argv
 
 # A pele leva uma fatia do orçamento; o resto se divide entre os músculos
@@ -325,6 +334,20 @@ print(f"[grupo] {'body':16} {len(skin_objs):3} objetos  {tri_count(body):>8} tri
 
 # --- 3. a pele é o que se vê; os músculos só classificam as faces dela
 decimate(body, TARGET_TRIS)
+if CALIBRATE_DIST:
+    print("[raio] cobertura da superfície por raio de atribuição")
+    for d in (0.050, 0.040, 0.032, 0.026, 0.022, 0.018, 0.014):
+        fg = assign_skin_regions(body, built, d, weights)
+        areas = {}
+        for i, poly in enumerate(body.data.polygons):
+            areas[fg[i] or "body"] = areas.get(fg[i] or "body", 0.0) + poly.area
+        total_a = sum(areas.values()) or 1
+        colorido = 100 * (1 - areas.get("body", 0.0) / total_a)
+        vazios = [m for m in built if m not in areas]
+        print(f"[raio] {d*1000:5.0f} mm -> {colorido:5.1f}% colorido"
+              + (f"   SEM ÁREA: {','.join(vazios)}" if vazios else ""))
+    sys.exit(0)
+
 if CALIBRATE:
     target_id = CALIBRATE
     print(f"[calibrar] varrendo pesos de {target_id}")
