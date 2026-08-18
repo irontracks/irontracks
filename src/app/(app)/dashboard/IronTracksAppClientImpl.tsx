@@ -11,6 +11,8 @@ import CommunityLoading from '@/app/(app)/community/loading';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
 const TeacherControlHost = dynamic(() => import('@/components/teacher/TeacherControlHost'), { ssr: false });
+const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
+const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
 import { DashboardHeader } from './DashboardHeader';
 import { pathnameToView, viewToPath } from './viewPath';
 
@@ -241,6 +243,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         pendingNutritionRef.current = false
         setNutritionOpen(true)
     }, [view, setNutritionOpen])
+    // ⚠️ MEMOIZADO, e isso não é micro-otimização: passar `{ id, email }` como
+    // objeto literal cria uma referência NOVA a cada render, e os efeitos do
+    // TeamWorkoutProvider (que dependem de `user`) re-disparam em cadeia —
+    // setState → render → novo objeto → setState. O E2E pegou como
+    // "element is not stable ... detached from the DOM": o card de treino
+    // remontava sem parar e nenhum clique conseguia acertá-lo.
+    const teamUser = useMemo(
+        () => (user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null),
+        [user?.id, user?.email],
+    )
+
     // "Histórico de refeições" no menu: abre a nutrição JÁ no histórico. A flag
     // é consumida na abertura e zerada ao fechar — sem isso, reabrir a aba pela
     // barra cairia no histórico de novo, sem ninguém ter pedido.
@@ -1086,6 +1099,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 watchDashboard={watchDashboard}
                 watchGyms={watchGyms}
                 onWatchRefresh={() => { fetchWorkouts().catch(() => {}) }}
+                teamUser={teamUser}
+                onStartSession={handleStartSession as unknown as (w: Record<string, unknown>) => void | Promise<void>}
             >
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
                 <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
@@ -1110,6 +1125,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         design system, não valor avulso. Reverter: volte para
                         `bg-neutral-900`. */}
                     <div className="w-full bg-depth-2 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                        <IncomingInviteModal
+                            onStartSession={handleStartSession}
+                            savedWorkouts={workouts}
+                            onWorkoutSaved={() => { fetchWorkouts().catch(() => {}) }}
+                        />
+                        <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour

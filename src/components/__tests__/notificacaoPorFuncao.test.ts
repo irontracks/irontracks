@@ -26,10 +26,10 @@ const codigo = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ''
 const FUNCOES = ['acao', 'conquista', 'aviso', 'lembrete', 'social']
 
 /** Cada entrada do TYPE_CONFIG, com a função declarada. */
-const tipos = (): { chave: string; funcao: string }[] => {
+const tipos = (): { chave: string; rotulo: string; funcao: string }[] => {
   const bloco = codigo.slice(codigo.indexOf('const TYPE_CONFIG'), codigo.indexOf('\n};', codigo.indexOf('const TYPE_CONFIG')))
-  return [...bloco.matchAll(/(\w+):\s*tipo\([^,]+,\s*'[^']*',\s*'(\w+)'\)/g)]
-    .map((m) => ({ chave: m[1], funcao: m[2] }))
+  return [...bloco.matchAll(/(\w+):\s*tipo\([^,]+,\s*'([^']*)',\s*'(\w+)'\)/g)]
+    .map((m) => ({ chave: m[1], rotulo: m[2], funcao: m[3] }))
 }
 
 describe('notificações — cor por função, não por evento', () => {
@@ -59,8 +59,16 @@ describe('notificações — cor por função, não por evento', () => {
     for (const f of FUNCOES) expect(mapa).toContain(`${f}:`)
   })
 
+  /**
+   * O teto é de RÓTULOS distintos, não de entradas do mapa: `invite` e
+   * `team_invite` são dois nomes do mesmo evento (compatibilidade com dados
+   * antigos) e chegam ao usuário como um "Convite" só. Contar entradas puniria
+   * o alias sem que nada mudasse na tela — e o que o teto protege é a
+   * percepção: se tudo vira ação, nada é ação.
+   */
   it('pedir resposta é raro — se tudo vira ação, nada é ação', () => {
-    const acoes = tipos().filter((t) => t.funcao === 'acao')
-    expect(acoes.length).toBeLessThanOrEqual(4)
+    const rotulos = new Set(tipos().filter((t) => t.funcao === 'acao').map((t) => t.rotulo))
+    expect([...rotulos].sort()).toEqual(['Convite', 'Desafio', 'Mensagem', 'Seguir'])
+    expect(rotulos.size).toBeLessThanOrEqual(4)
   })
 })

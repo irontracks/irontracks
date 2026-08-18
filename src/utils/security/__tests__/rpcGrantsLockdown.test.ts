@@ -45,6 +45,11 @@ describe('classe: função nova em migration precisa fechar EXECUTE', () => {
         '20260802120000_patch_active_session_logs_rpc.sql',
         '20260802180000_telemetry_monthly_rollup.sql',
         '20260814095031_harden_increment_counter_v2.sql',
+        // Restauração do TeamworkV2 (18/08): recria accept_team_invite e
+        // leave_team_session. O fechamento veio na migration IRMÃ
+        // 20260818093000, escrita minutos depois porque o advisor 0028 mostrou
+        // que `revoke ... from anon` não basta — o EXECUTE vem de PUBLIC.
+        '20260818090000_restore_teamwork_v2.sql',
     ]
 
     it('as migrations que criam função têm lockdown correspondente', () => {
@@ -57,9 +62,20 @@ describe('classe: função nova em migration precisa fechar EXECUTE', () => {
                 // ou na PRÓPRIA migration (autocontida, padrão desde 14/08) —
                 // o que não pode é não existir em lugar nenhum.
                 const autocontida = sql.includes(`revoke all on function public.${fn}`)
+                // Terceiro lugar aceito: uma migration IRMÃ que revoga de
+                // PUBLIC. É o caso da restauração do teamwork — o advisor
+                // apontou depois de aplicada, e o fechamento veio num arquivo
+                // próprio. O invariante continua sendo "existe revoke
+                // versionado", não "está neste arquivo".
+                const emIrma = readdirSync(MIGRATIONS_DIR)
+                    .filter((f) => f.endsWith('.sql') && f !== arquivo)
+                    .some((f) => {
+                        const outra = readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8').toLowerCase()
+                        return new RegExp(`revoke (all|execute) on function public\\.${fn}\\([^)]*\\) from public`).test(outra)
+                    })
                 expect(
-                    LOCKDOWN_SQL.includes(fn) || autocontida,
-                    `${fn} criada em ${arquivo} sem revoke de anon (nem no lockdown compartilhado, nem na própria migration)`
+                    LOCKDOWN_SQL.includes(fn) || autocontida || emIrma,
+                    `${fn} criada em ${arquivo} sem revoke de anon (nem no lockdown compartilhado, nem na própria migration, nem numa irmã)`
                 ).toBe(true)
             }
         }

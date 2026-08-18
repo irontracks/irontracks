@@ -32,9 +32,21 @@ export default async function globalSetup(_config: FullConfig) {
     // diz nada sobre a causa real (medido em 15/08/2026).
     const deadline = Date.now() + 120_000
     for (;;) {
+        // ⚠️ O deadline precisa ser checado ANTES da tentativa, não só no
+        // catch: `fetch` sem timeout NUNCA rejeita se o servidor aceita a
+        // conexão e não responde — e aí o loop fica preso para sempre. Foi o
+        // que aconteceu em 18/08/2026: o job ficou 46 minutos sem imprimir uma
+        // linha sequer do Playwright (nem "Running N tests"), até ser
+        // cancelado à mão. Sem output, parece o app travando; era a espera.
+        if (Date.now() > deadline) {
+            console.warn(`[E2E] app não respondeu em ${baseURL} — seguindo assim mesmo`)
+            break
+        }
         try {
             const r = await fetch(baseURL, {
                 redirect: 'manual',
+                // Cada tentativa tem teto próprio; o loop cuida da paciência total.
+                signal: AbortSignal.timeout(10_000),
                 // Mesmo bypass do `use.extraHTTPHeaders`: sem ele, um preview
                 // protegido responde a tela da Vercel e a espera "conclui" num
                 // app que não é o nosso.
@@ -44,10 +56,6 @@ export default async function globalSetup(_config: FullConfig) {
             })
             if (r.status > 0) break
         } catch {
-            if (Date.now() > deadline) {
-                console.warn(`[E2E] app não respondeu em ${baseURL} — seguindo assim mesmo`)
-                break
-            }
             await new Promise((r) => setTimeout(r, 2_000))
         }
     }

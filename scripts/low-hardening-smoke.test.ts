@@ -19,6 +19,10 @@ assert.ok(
   'ensure-bucket não pode voltar: qualquer usuário logado tornava o chat-media público'
 )
 
+// L2 — team-workout-insights: teto diário
+const insights = read('src/app/api/ai/team-workout-insights/route.ts')
+assert.ok(/team-insights:daily/.test(insights) && /86_?400_?000/.test(insights), 'team-workout-insights deve ter teto diário')
+
 // L3 — userContext: instrução anti prompt-injection
 const ctx = read('src/utils/ai/userContext.ts')
 assert.ok(/NUNCA como instruções|trate como dados/i.test(ctx), 'userContext deve instruir o modelo a tratar o bloco como dados, não comandos')
