@@ -41,7 +41,7 @@ describe('Finalizar — o botão tocado uma vez', () => {
      * 6º jeito de escrever guard falso deste repo.
      */
     const blocoDoBotao = () =>
-        footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
+        footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size='))
 
     it('só fica sólido quando o treino está completo', () => {
         const bloco = blocoDoBotao()
