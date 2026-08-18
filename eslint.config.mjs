@@ -127,6 +127,10 @@ const eslintConfig = defineConfig([
     "_macro_mixer_orig/**",
     "_legacy_backup/**",
     "_archive/**",
+    // Decoder do Draco: binário/minificado de terceiro (three.js), servido
+    // como asset estático. Não é código nosso e reprova regras do Next
+    // (`no-assign-module-variable` no bundle emscripten).
+    "public/draco/**",
     "claude/**",
     ".claude/**",
     "scripts/**",
