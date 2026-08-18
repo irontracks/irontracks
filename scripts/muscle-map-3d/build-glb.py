@@ -26,22 +26,6 @@ def arg(flag, default=None):
 MAP_PATH    = arg("--map", "scripts/muscle-map-3d/muscle-groups.json")
 OUT_PATH    = arg("--out", "public/models/body-map.glb")
 TARGET_TRIS = int(arg("--target-tris", "90000"))
-# Raio máximo entre a face do manequim e o músculo que a reivindica.
-#
-# 18 mm é decisão de DESIGN, medida com --calibrate-dist: cor só significa
-# contra silêncio, e a 50 mm cada grupo reivindicava a pele toda em volta —
-# 90% do corpo aceso, um macacão colorido em que nada se destaca. A 18 mm
-# sobra metade do manequim neutro e o músculo ainda tem forma reconhecível;
-# abaixo disso os grupos viram manchas soltas e a leitura anatômica se perde.
-MAX_REGION_DIST = float(arg("--max-region-dist", "0.018"))
-# Modo calibração: mede a distribuição de área para vários pesos de um grupo
-# numa execução só. Montar os músculos leva minutos; classificar é rápido — sem
-# isso cada tentativa de peso custava um build inteiro.
-CALIBRATE = arg("--calibrate")
-# Varre RAIOS e mede quanto do corpo fica colorido. O mapa precisa de respiro:
-# com raio grande cada grupo reivindica a pele toda em volta e o manequim vira
-# um macacão colorido — o 2D só pinta o ventre do músculo.
-CALIBRATE_DIST = "--calibrate-dist" in argv
 
 # Quanto a pele do TRONCO E MEMBROS afunda para virar o corpo escuro POR BAIXO
 # dos músculos. Mãos, pés e cabeça não afundam: são a pele visível de verdade,
@@ -57,7 +41,7 @@ USE_DRACO   = "--no-draco" not in argv
 # proporcionalmente ao tamanho original de cada grupo.
 BODY_TRIS_SHARE = 0.22
 
-print(f"[build] alvo={TARGET_TRIS} tris | raio={MAX_REGION_DIST} m | draco={USE_DRACO}")
+print(f"[build] alvo={TARGET_TRIS} tris | pele -{SKIN_SINK} m | draco={USE_DRACO}")
 
 # ---------------------------------------------------------------- utilidades
 def obj_variants(name):
@@ -185,83 +169,6 @@ def inflate(obj, amount):
     bm.free()
 
 
-def assign_skin_regions(skin, muscle_objs, max_dist, weights):
-    """Fatia a PELE em regiões, uma por grupo muscular.
-
-    É assim que o mapa 2D funciona: o usuário vê a área do corpo que o músculo
-    ocupa, pintada na superfície. Duas tentativas anteriores falharam e ficam
-    registradas para ninguém repetir:
-
-      1. Exportar as malhas musculares e inflá-las para fora da pele. Elas ficam
-         a distâncias muito diferentes da superfície (dedos x abdome), então
-         qualquer valor único deixa metade escondida.
-      2. Encolher a pele alguns milímetros para o músculo aflorar. Medido a 6 mm:
-         aparecem MANCHAS irregulares — um pedaço de antebraço, um risco nas
-         costas — porque a espessura do tecido varia pelo corpo. Aumentar o
-         encolhimento deforma dedos e rosto antes de fechar as áreas.
-
-    Aqui cada face do manequim pergunta "qual músculo está mais perto de mim?".
-    Passando de `max_dist` a face não pertence a ninguém e continua manequim —
-    sem esse teto, a cabeça inteira viraria trapézio por falta de concorrência.
-    """
-    from mathutils import kdtree, Vector
-
-    # Uma árvore POR GRUPO, e não uma só com todos os pontos. Com árvore única
-    # os N vizinhos mais próximos de uma face lombar são TODOS do dorsal — ele é
-    # denso e está por cima —, então o eretor espinhal nunca entra na disputa e
-    # o peso não tem em quem agir. Medido: mudar o peso de 0,55 para 0,30 não
-    # alterou UM triângulo. Perguntando a cada grupo a sua distância, todos
-    # competem em pé de igualdade.
-    trees = {}
-    for muscle_id, obj in muscle_objs.items():
-        mw = obj.matrix_world
-        verts = obj.data.vertices
-        kd = kdtree.KDTree(len(verts))
-        for i, v in enumerate(verts):
-            kd.insert(mw @ v.co, i)
-        kd.balance()
-        trees[muscle_id] = kd
-
-    mw = skin.matrix_world
-    face_group = []
-    for poly in skin.data.polygons:
-        center = mw @ Vector(poly.center)
-        best_id, best_score = None, float("inf")
-        for muscle_id, kd in trees.items():
-            _, _, dist = kd.find(center)
-            score = dist * weights.get(muscle_id, 1.0)
-            if score < best_score:
-                best_score, best_id = score, muscle_id
-        face_group.append(best_id if best_score <= max_dist else None)
-    return face_group
-
-
-def split_skin_by_region(skin, face_group, muscle_ids):
-    """Uma malha por grupo, recortada da pele. Sobra vira o manequim ('body')."""
-    pieces = {}
-    for target in list(muscle_ids) + [None]:
-        name = target or "body"
-        piece = skin.copy()
-        piece.data = skin.data.copy()
-        piece.name = name
-        piece.data.name = name
-        bpy.context.scene.collection.objects.link(piece)
-
-        bm = bmesh.new()
-        bm.from_mesh(piece.data)
-        bm.faces.ensure_lookup_table()
-        doomed = [f for i, f in enumerate(bm.faces) if face_group[i] != target]
-        bmesh.ops.delete(bm, geom=doomed, context="FACES")
-        bm.to_mesh(piece.data)
-        bm.free()
-
-        if len(piece.data.polygons) == 0:
-            bpy.data.objects.remove(piece, do_unlink=True)
-            continue
-        pieces[name] = piece
-    return pieces
-
-
 def set_material(obj, name, rgba):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -279,11 +186,7 @@ def set_material(obj, name, rgba):
 
 
 # ---------------------------------------------------------------- construção
-_map = json.load(open(MAP_PATH))
-groups = _map["groups"]
-# Peso < 1 aproxima o grupo: é como um músculo PROFUNDO ganha a superfície que
-# de fato é dele. Calibração visual, conferida no render — não é anatomia.
-weights = _map.get("weights", {})
+groups = json.load(open(MAP_PATH))["groups"]
 
 bpy.ops.object.mode_set(mode="OBJECT") if bpy.context.object and bpy.context.object.mode != "OBJECT" else None
 

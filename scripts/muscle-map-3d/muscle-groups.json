@@ -77,11 +77,5 @@
       "Lateral head of gastrocnemius",
       "Soleus muscle"
     ]
-  },
-  "weights": {
-    "spinal_erectors": 0.55,
-    "delts_side": 0.85,
-    "delts_rear": 0.9
-  },
-  "_weights_doc": "Peso multiplica a distância na disputa por cada face do manequim: <1 aproxima o grupo. Existe para músculo PROFUNDO não perder toda a superfície que é dele — com peso 1,0 o eretor espinhal fica com 0,17%% do corpo, porque o dorsal está literalmente por cima dele na lombar. A curva é abrupta e foi medida com --calibrate: 0,7 -> 1,5%%; 0,55 -> ~4%%; 0,35 -> 12,5%%; 0,12 -> 40%%. Régua usada: dorsal 5,4%%, trapézio 6,0%%, glúteo 6,8%%. Calibração visual, conferida no render — não é anatomia."
+  }
 }
