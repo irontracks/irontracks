@@ -114,9 +114,16 @@ describe('rodapé do treino — uma ação', () => {
         expect(header).toMatch(/cancelWorkout/)
     })
 
+    /**
+     * Mirar o NOME (`togglePause`) não bastava: ele continua na desestruturação
+     * do hook mesmo se ninguém chamar. A primeira versão deste caso passou
+     * verde com a chamada amputada — procure a CHAMADA, não o identificador.
+     */
     it('a pausa acompanhou o cronômetro para o cabeçalho', () => {
         const header = stripComments(readFileSync('src/components/workout/WorkoutHeader.tsx', 'utf8'))
-        expect(header).toMatch(/togglePause/)
+        expect(header, 'o botão precisa CHAMAR togglePause, não só importá-lo')
+            .toMatch(/togglePause\(\)/)
+        expect(header).toMatch(/aria-label=\{isPaused \? 'Retomar treino' : 'Pausar treino'\}/)
         expect(footer, 'pausa sem cronômetro ao lado é botão órfão').not.toMatch(/togglePause/)
     })
 })
