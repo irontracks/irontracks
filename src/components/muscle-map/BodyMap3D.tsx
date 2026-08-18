@@ -19,6 +19,12 @@ import { MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
  * A cor vem pronta do servidor (`muscles[id].color`), a mesma do 2D: a escala
  * NENHUM/BAIXO/NA META/ALTO/ACIMA não é reimplementada aqui.
  *
+ * A superfície visível é a MALHA ANATÔMICA de cada músculo — peitoral com
+ * forma de peitoral. Antes eram regiões recortadas da pele por proximidade, o
+ * que produz manchas sem forma: "um manequim pintado por uma criança", nas
+ * palavras do dono, e ele estava certo. Cor, borda e proporção não consertam
+ * falta de forma.
+ *
  * three.js PURO, sem @react-three/fiber nem drei, de propósito: os dois
  * estendem `JSX.IntrinsicElements` e, com o React 19 deste projeto, isso derruba
  * 14 arquivos que nada têm a ver com 3D (admin-panel, ProfilePage...) com
@@ -34,48 +40,37 @@ const DRACO_PATH = '/draco/'
 const MUSCLE_IDS = new Set<string>(MUSCLE_GROUPS.map((m) => m.id))
 
 /**
- * O corpo é UM corpo. O material nunca muda de cor — o volume da semana entra
- * como LUZ PRÓPRIA (emissive) sobre esta base. Pintar o albedo de laranja é o
- * que fazia o manequim parecer plástico: em 2D a cor é um véu translúcido sobre
- * uma textura que já tem sombra; a tradução física disso em 3D é emissão.
+ * O corpo POR BAIXO dos músculos: pescoço, flancos, articulações, mãos, pés e
+ * cabeça. Escuro de propósito — é ele que abre o vão entre um grupo e outro e
+ * faz cada músculo ter contorno próprio.
  *
  * Warm black, da mesma família dos fundos do app (#0f0f0e / #151514 / #1a1a18).
- * O cinza azulado anterior (#3a3a3c) destoava de toda a paleta.
  */
-const BODY_COLOR = 0x4a4a42
-/**
- * Fundo do palco. Precisa ser MAIS FUNDO que o corpo, senão o manequim neutro
- * some: metade da superfície não pertence a grupo nenhum, e se ela não é
- * visível as ilhas coloridas ficam boiando no vazio. Medido em tela.
- */
+const BODY_COLOR = 0x474740
+/** Fundo do palco: mais fundo que o corpo, para a silhueta ter onde pousar. */
 const STAGE_COLOR = 0x0f0f0e
 
 /**
  * A cor entra por DOIS canais, e cada um faz uma coisa que o outro não faz:
  *
- *  - `tint` mistura a cor no ALBEDO. É o que preserva o sombreamento: superfície
- *    tingida ainda recebe luz, então o relevo do corpo continua legível.
- *  - `glow` é a EMISSÃO. É o que faz o grupo "acender" e dá vida ao dado.
+ *  - `tint` mistura a cor no ALBEDO. A superfície tingida ainda recebe luz, e
+ *    aqui isso importa mais do que nunca: o relevo do músculo é geometria real,
+ *    então tingir forte não achata coisa alguma.
+ *  - `glow` é a EMISSÃO, que faz o grupo acender e dá vida ao dado. Fica
+ *    moderada — com forma anatômica, quem informa é o desenho, não o brilho.
  *
- * Emissão sozinha não recebe shading e achata o corpo numa silhueta chapada
- * (medido); tinta sozinha é plástico pintado, que foi a primeira versão.
+ * Quando as regiões eram manchas recortadas da pele, o tint precisava ser tímido
+ * para não virar plástico pintado. Com o músculo de verdade, o limite subiu.
  */
-const MAX_TINT = 0.46
-const MIN_TINT = 0.12
-const MAX_GLOW = 0.34
-const MIN_GLOW = 0.06
+const MAX_TINT = 0.78
+const MIN_TINT = 0.26
+const MAX_GLOW = 0.26
+const MIN_GLOW = 0.05
 /** Quanto os outros grupos recuam quando um está selecionado. Hierarquia se
  *  faz tirando: o escolhido não precisa gritar se os demais sussurram. */
 const DIMMED = 0.3
 
 type MuscleState = { color?: string; sets?: number; ratio?: number; label?: string }
-
-type FalloffUniforms = {
-  uTint: { value: THREE.Color }
-  uTintAmount: { value: number }
-  uGlow: { value: THREE.Color }
-  uGlowAmount: { value: number }
-}
 
 type Props = {
   view: 'front' | 'back'
@@ -100,62 +95,11 @@ type Stage = {
   targetAngle: number
 }
 
-/**
- * Faz o peso de borda (gravado como cor de vértice pelo pipeline) modular a
- * tinta e a emissão, em vez de multiplicar o albedo como o three faria por
- * padrão com `vertexColors`.
- *
- * A multiplicação padrão escureceria o corpo até o preto na fronteira, que é o
- * oposto do desejado: ali o músculo tem que virar PELE, não sombra. Por isso o
- * `color_fragment` é substituído, não complementado.
- */
-function applyFalloffShader(mat: THREE.MeshStandardMaterial) {
-  const uniforms = {
-    uTint: { value: new THREE.Color(0x000000) },
-    uTintAmount: { value: 0 },
-    uGlow: { value: new THREE.Color(0x000000) },
-    uGlowAmount: { value: 0 },
-  }
-  // Guardado no material para o repinte atualizar sem recompilar o shader.
-  ;(mat as THREE.MeshStandardMaterial & { userData: { uniforms?: typeof uniforms } })
-    .userData.uniforms = uniforms
-
-  mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms)
-
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vFalloff;')
-      .replace('#include <color_vertex>', '#include <color_vertex>\nvFalloff = color.r;')
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-         varying float vFalloff;
-         uniform vec3 uTint;
-         uniform float uTintAmount;
-         uniform vec3 uGlow;
-         uniform float uGlowAmount;`,
-      )
-      // Substitui a multiplicação padrão do vertexColor: aqui a cor do vértice
-      // é PESO, não pigmento.
-      .replace(
-        '#include <color_fragment>',
-        'diffuseColor.rgb = mix(diffuseColor.rgb, uTint, uTintAmount * vFalloff);',
-      )
-      .replace(
-        '#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uGlow * (uGlowAmount * vFalloff);',
-      )
-  }
-  mat.needsUpdate = true
-}
-
 function buildLights(scene: THREE.Scene) {
   // Luz baixa de propósito: quem informa é a EMISSÃO do músculo, não o quanto
   // a lâmpada bate na pele. Com key forte, a luz difusa lava a cor e o volume
   // da semana some — foi o que aconteceu na primeira versão.
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+  scene.add(new THREE.AmbientLight(0xffffff, 0.62))
 
   const key = new THREE.DirectionalLight(0xfff4e0, 0.95)
   key.position.set(2, 3, 4)
@@ -218,24 +162,9 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
       const tint = (MIN_TINT + (MAX_TINT - MIN_TINT) * t) * dim
       const glow = (MIN_GLOW + (MAX_GLOW - MIN_GLOW) * t) * dim
 
-      const u = (mat as THREE.MeshStandardMaterial & {
-        userData: { uniforms?: FalloffUniforms }
-      }).userData.uniforms
-
-      if (u) {
-        // Com falloff, quem aplica a cor é o shader — por vértice, desvanecendo
-        // na fronteira. O material fica neutro de propósito.
-        u.uTint.value.copy(c)
-        u.uTintAmount.value = tint
-        u.uGlow.value.copy(c)
-        u.uGlowAmount.value = glow
-      } else {
-        // Modelo antigo, sem peso de borda gravado: mantém o caminho direto,
-        // com borda dura, em vez de simplesmente não pintar nada.
-        mat.color.lerp(c, tint)
-        mat.emissive.copy(c)
-        mat.emissiveIntensity = glow
-      }
+      mat.color.lerp(c, tint)
+      mat.emissive.copy(c)
+      mat.emissiveIntensity = glow
     })
     needsRenderRef.current = true
   }, [])
@@ -312,12 +241,7 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
             metalness: 0,
             emissive: 0x000000,
             emissiveIntensity: 0,
-            // O modelo traz, por vértice, o quanto ele está no NÚCLEO do músculo
-            // (1) ou na fronteira da região (0). Sem isso a região tem borda
-            // dura de recorte — cada grupo é um conjunto fechado de faces.
-            vertexColors: child.name !== 'body' && MUSCLE_IDS.has(child.name),
           })
-          if (mat.vertexColors) applyFalloffShader(mat)
           child.material = mat
           stage.materials.set(child.name, mat)
           stage.meshes.set(child.name, child)

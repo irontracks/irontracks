@@ -42,6 +42,15 @@ CALIBRATE = arg("--calibrate")
 # com raio grande cada grupo reivindica a pele toda em volta e o manequim vira
 # um macacão colorido — o 2D só pinta o ventre do músculo.
 CALIBRATE_DIST = "--calibrate-dist" in argv
+
+# Quanto a pele do TRONCO E MEMBROS afunda para virar o corpo escuro POR BAIXO
+# dos músculos. Mãos, pés e cabeça não afundam: são a pele visível de verdade,
+# e ali isso colapsaria os dedos.
+#
+# 22 mm medido em tela: a 14 mm a coxa e o glúteo ainda ficavam cobertos e só
+# aparecia uma faixa fina do feixe — o tecido sobre eles é mais espesso que
+# sobre o peitoral.
+SKIN_SINK = float(arg("--skin-sink", "0.022"))
 USE_DRACO   = "--no-draco" not in argv
 
 # A pele leva uma fatia do orçamento; o resto se divide entre os músculos
@@ -139,6 +148,43 @@ def fill_holes(obj, sides=400):
     bm.free()
 
 
+def recalc_normals(obj):
+    """Deixa todas as faces apontando para fora.
+
+    A pele é montada de ~250 objetos independentes do Z-Anatomy e parte deles
+    vem com as faces invertidas. Como `inflate` empurra o vértice pela normal,
+    a metade invertida INFLA quando se pede para afundar — e cobre os músculos.
+    Sintoma medido: um lado do corpo com musculatura visível e o outro liso,
+    mesmo com as malhas perfeitamente simétricas.
+    """
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+
+
+def inflate(obj, amount):
+    """Desloca cada vértice pela própria normal. Negativo AFUNDA.
+
+    É assim que a pele do tronco e dos membros vira o corpo escuro por baixo:
+    ela some alguns milímetros para dentro e os músculos, que já estão ali,
+    passam a ser a superfície visível. Mãos, pés e cabeça não passam por aqui —
+    são pele de verdade, e afundar 14 mm colapsaria os dedos.
+    """
+    if amount == 0:
+        return
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * amount
+    bm.to_mesh(me)
+    bm.free()
+
+
 def assign_skin_regions(skin, muscle_objs, max_dist, weights):
     """Fatia a PELE em regiões, uma por grupo muscular.
 
@@ -188,55 +234,6 @@ def assign_skin_regions(skin, muscle_objs, max_dist, weights):
                 best_score, best_id = score, muscle_id
         face_group.append(best_id if best_score <= max_dist else None)
     return face_group
-
-
-def bake_falloff(piece, muscle_obj, max_dist):
-    """Grava, por VÉRTICE, o quanto ele está no núcleo do músculo (1) ou na
-    fronteira da região (0), como cor de vértice.
-
-    A atribuição de região é binária — cada face pertence a um grupo — e isso
-    desenha uma borda dura, que é o que sobra de amador no mapa. Com este peso
-    o shader desvanece a cor na fronteira em vez de cortá-la, sem custar um
-    polígono a mais.
-
-    `smoothstep` em vez de linear: a queda linear deixa um anel cinza largo em
-    volta de cada grupo e o músculo parece murcho; a curva em S mantém o núcleo
-    cheio e concentra a transição na beirada.
-    """
-    from mathutils import kdtree
-
-    mw = muscle_obj.matrix_world
-    verts = muscle_obj.data.vertices
-    kd = kdtree.KDTree(len(verts))
-    for i, v in enumerate(verts):
-        kd.insert(mw @ v.co, i)
-    kd.balance()
-
-    me = piece.data
-    # As malhas do Z-Anatomy JÁ TRAZEM um vertex color próprio ('Color'), e o
-    # exportador leva o ATIVO. Sem limpar, o peso calculado aqui nunca chega ao
-    # GLB: o arquivo sai com o atributo herdado, branco, e o shader recebe 1 em
-    # todo vértice — o falloff "funciona" e não muda um pixel. Medido.
-    while len(me.color_attributes):
-        me.color_attributes.remove(me.color_attributes[0])
-    attr = me.color_attributes.new(name="falloff", type="FLOAT_COLOR", domain="POINT")
-
-    # A transição mora só na BEIRADA: dentro de 65% do raio o peso é cheio, e a
-    # queda acontece nos 35% finais. Normalizar pelo raio inteiro (a primeira
-    # tentativa) dava mediana 0,46 no peitoral e 0,12 no quadríceps — o grupo
-    # apagava por completo em vez de só perder a borda dura.
-    CORE = 0.65
-    band = max_dist * (1.0 - CORE)
-
-    pmw = piece.matrix_world
-    for i, v in enumerate(me.vertices):
-        _, _, dist = kd.find(pmw @ v.co)
-        t = 1.0 if band <= 0 else min(1.0, max(0.0, (max_dist - dist) / band))
-        w = t * t * (3.0 - 2.0 * t)   # smoothstep
-        attr.data[i].color = (w, w, w, 1.0)
-
-    me.color_attributes.active_color_index = 0
-    me.color_attributes.render_color_index = 0
 
 
 def split_skin_by_region(skin, face_group, muscle_ids):
@@ -381,95 +378,64 @@ weld(body, dist=0.002)
 fill_holes(body)
 print(f"[grupo] {'body':16} {len(skin_objs):3} objetos  {tri_count(body):>8} tris")
 
-# --- 3. a pele é o que se vê; os músculos só classificam as faces dela
-decimate(body, TARGET_TRIS)
-if CALIBRATE_DIST:
-    print("[raio] cobertura da superfície por raio de atribuição")
-    for d in (0.050, 0.040, 0.032, 0.026, 0.022, 0.018, 0.014):
-        fg = assign_skin_regions(body, built, d, weights)
-        areas = {}
-        for i, poly in enumerate(body.data.polygons):
-            areas[fg[i] or "body"] = areas.get(fg[i] or "body", 0.0) + poly.area
-        total_a = sum(areas.values()) or 1
-        colorido = 100 * (1 - areas.get("body", 0.0) / total_a)
-        vazios = [m for m in built if m not in areas]
-        print(f"[raio] {d*1000:5.0f} mm -> {colorido:5.1f}% colorido"
-              + (f"   SEM ÁREA: {','.join(vazios)}" if vazios else ""))
-    sys.exit(0)
+# --- 3. o que se vê é o MÚSCULO, não um adesivo na pele
+#
+# Três rodadas foram gastas pintando regiões da pele antes de aceitar o óbvio:
+# uma região definida por "qual músculo está mais perto desta face" não tem
+# forma de músculo — é uma mancha. O dono resumiu em uma frase: "parece um
+# manequim pintado por uma criança". Nenhum ajuste de cor, borda ou proporção
+# conserta falta de forma.
+#
+# O Z-Anatomy traz o peitoral COM forma de peitoral. Ele é a superfície agora.
+# A pele do tronco e dos membros afunda alguns milímetros e vira o corpo escuro
+# que preenche os vãos entre os grupos; mãos, pés e cabeça continuam pele.
 
-if CALIBRATE:
-    target_id = CALIBRATE
-    print(f"[calibrar] varrendo pesos de {target_id}")
-    for w in (1.0, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12):
-        probe = dict(weights)
-        probe[target_id] = w
-        fg = assign_skin_regions(body, built, MAX_REGION_DIST, probe)
-        areas = {}
-        for i, poly in enumerate(body.data.polygons):
-            key = fg[i] or "body"
-            areas[key] = areas.get(key, 0.0) + poly.area
-        total_a = sum(areas.values()) or 1
-        share = 100 * areas.get(target_id, 0.0) / total_a
-        rivals = sorted(areas.items(), key=lambda kv: -kv[1])[:4]
-        rivals_txt = " ".join(f"{k}:{100*v/total_a:.0f}%" for k, v in rivals)
-        print(f"[calibrar] peso {w:>4} -> {target_id} {share:5.2f}%   maiores: {rivals_txt}")
-    sys.exit(0)
+MUSCLE_BUDGET = int(TARGET_TRIS * 0.72)
+raw_total = sum(raw_sizes.values()) or 1
 
-face_group = assign_skin_regions(body, built, MAX_REGION_DIST, weights)
+pieces = {}
+for muscle_id, obj in built.items():
+    share = raw_sizes[muscle_id] / raw_total
+    decimate(obj, max(1200, int(MUSCLE_BUDGET * share)))
+    # Sai do prefixo de trabalho: o componente casa malha com grupo POR NOME,
+    # e `src_chest` no GLB significa peitoral que nunca acende.
+    obj.name = muscle_id
+    obj.data.name = muscle_id
+    set_material(obj, muscle_id, (0.72, 0.30, 0.26, 1.0))
+    pieces[muscle_id] = obj
+    print(f"[músculo] {muscle_id:16} {tri_count(obj):>7} tris")
 
-covered = sum(1 for g in face_group if g)
-print(f"[regiões] {covered}/{len(face_group)} faces do manequim atribuídas a um grupo")
+# A pele vira o corpo por baixo: afunda o suficiente para os músculos ficarem
+# por fora, sem sumir — ela ainda preenche pescoço, flancos, articulações.
+decimate(body, int(TARGET_TRIS * 0.20))
+recalc_normals(body)
+inflate(body, -SKIN_SINK)
+set_material(body, "body", (0.20, 0.20, 0.19, 1.0))
 
-pieces = split_skin_by_region(body, face_group, list(built.keys()))
-
-# Peso de borda por vértice — o que transforma o corte duro em desvanecimento.
-for muscle_id, piece in pieces.items():
-    if muscle_id == "body":
-        continue
-    bake_falloff(piece, built[muscle_id], MAX_REGION_DIST)
-
-# Mãos, pés e cabeça entram como manequim puro, sem passar pela classificação.
 if neutral_objs:
     neutral = duplicate(neutral_objs, "src_neutral")
     apply_transform(neutral)
     weld(neutral, dist=0.002)
-    decimate(neutral, max(2000, TARGET_TRIS // 6))
-    if "body" in pieces:
-        bpy.ops.object.select_all(action="DESELECT")
-        pieces["body"].select_set(True)
-        neutral.select_set(True)
-        bpy.context.view_layer.objects.active = pieces["body"]
-        bpy.ops.object.join()
-    else:
-        neutral.name = "body"
-        neutral.data.name = "body"
-        pieces["body"] = neutral
+    decimate(neutral, int(TARGET_TRIS * 0.08))
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True)
+    neutral.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
 
-# As malhas musculares cumpriram o papel e não vão para o GLB: fora do arquivo,
-# fora do orçamento de download.
-for obj in built.values():
-    bpy.data.objects.remove(obj, do_unlink=True)
-bpy.data.objects.remove(body, do_unlink=True)
+body.name = "body"
+body.data.name = "body"
+set_material(body, "body", (0.20, 0.20, 0.19, 1.0))
+pieces["body"] = body
+print(f"[malha] {'body':16} {tri_count(body):>7} tris")
 
-# Depois do join com mãos/pés/cabeça: o neutral traz o vertex color herdado do
-# Z-Anatomy de volta, e o manequim não é pintado por grupo nenhum.
-if "body" in pieces:
-    while len(pieces["body"].data.color_attributes):
-        pieces["body"].data.color_attributes.remove(pieces["body"].data.color_attributes[0])
-
-missing_groups = [m for m in built.keys() if m not in pieces]
-if missing_groups:
-    print("[ERRO] grupos sem nenhuma face na superfície:", ", ".join(missing_groups))
-    sys.exit(1)
-
-# Área, não contagem de triângulos: mão e rosto têm malha densa e área
-# minúscula, então tris engana sobre o que o usuário enxerga na tela.
-total_area = sum(sum(p.area for p in o.data.polygons) for o in pieces.values()) or 1
-for name, obj in pieces.items():
-    color = (0.32, 0.32, 0.33, 1.0) if name == "body" else (0.72, 0.30, 0.26, 1.0)
-    set_material(obj, name, color)
-    area = sum(p.area for p in obj.data.polygons)
-    print(f"[malha] {name:16} {tri_count(obj):>7} tris  {100 * area / total_area:5.1f}% da superfície")
+# As malhas do Z-Anatomy trazem vertex color próprio. No écorché a forma vem da
+# GEOMETRIA, e uma cor de vértice herdada tingiria o músculo por baixo do que o
+# app pinta — além de engordar o arquivo à toa. O guard do contrato reprova se
+# algum COLOR_0 escapar.
+for _piece in pieces.values():
+    while len(_piece.data.color_attributes):
+        _piece.data.color_attributes.remove(_piece.data.color_attributes[0])
 
 # --- 4. limpar a cena: só o que vai pro GLB
 keep = set(pieces.values())
@@ -522,7 +488,6 @@ export_kwargs = dict(
     export_yup=True,
     export_normals=True,
     export_texcoords=False,
-    export_vertex_color="ACTIVE",   # leva o peso de borda gravado em `falloff`
 
     export_skins=False,
     export_animations=False,
