@@ -158,7 +158,9 @@ export default function ExerciseList() {
   }, [exerciseList.length, groups]);
 
   return (
-    <div ref={containerRef} className="flex-1 w-full max-w-6xl mx-auto py-4 space-y-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 160px)' }}>
+    <div ref={containerRef} className="flex-1 w-full max-w-6xl mx-auto py-4 space-y-4" // 160px reservavam DUAS barras de rodapé. O Finalizar deixou de ser barra e
+    // virou pill (44pt + respiro), então sobrava ~50px de vazio no fim da lista.
+    style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 124px)' }}>
       {/* Team progress panel — inline accordion, scrolls with content (no floating overlay) */}
       <TeamProgressPanel exercises={exerciseList} />
 

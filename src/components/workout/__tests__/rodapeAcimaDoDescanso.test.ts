@@ -46,7 +46,10 @@ describe('rodapé do treino × barra do descanso', () => {
     it('o rodapé posiciona o bottom pela variável, com fallback 0px', () => {
         // Sem o fallback, um treino SEM descanso deixaria o rodapé sem bottom
         // definido — a barra sairia do lugar na tela inteira.
-        expect(footer).toMatch(/bottom:\s*['"]var\(--it-rest-bar-h,\s*0px\)['"]/)
+        // Aceita o `calc(... + Npx)`: o respiro entre o pill e a barra faz
+        // parte do posicionamento. O que não pode mudar é CONSUMIR a variável
+        // com fallback 0px — sem descanso na tela, nada se move.
+        expect(footer).toMatch(/bottom:\s*['"](?:var\(--it-rest-bar-h,\s*0px\)|calc\(var\(--it-rest-bar-h,\s*0px\)[^'"]*\))['"]/)
     })
 
     it('o rodapé NÃO fixa mais bottom-0 na classe (a classe venceria o style inline?) — regressão', () => {

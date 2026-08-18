@@ -70,7 +70,9 @@ describe('barras fixas no rodapé do treino ativo', () => {
             expect(src).toMatch(/setProperty\(\s*['"]--it-rest-bar-h['"]/)
             expect(src).toMatch(/removeProperty\(\s*['"]--it-rest-bar-h['"]/)
         } else {
-            expect(src).toMatch(/bottom:\s*['"]var\(--it-rest-bar-h,\s*0px\)['"]/)
+            // `calc(var(...) + Npx)` conta: o respiro entre os dois faz parte
+            // do posicionamento. O invariante é consumir a variável.
+            expect(src).toMatch(/bottom:\s*['"](?:var\(--it-rest-bar-h,\s*0px\)|calc\(var\(--it-rest-bar-h,\s*0px\)[^'"]*\))['"]/)
         }
     })
 
