@@ -51,8 +51,7 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
     //
     // Reaproveitar herda logs que o teste não escreveu. Partir do zero é a
     // única forma de o caso medir o que ele diz medir.
-    const rodape = page.getByRole('button', { name: /Descartar treino/i })
-    if (await rodape.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    if (await emSessaoAtiva(page, 5_000)) {
         await descartarSessao(page)
     }
 
@@ -89,14 +88,38 @@ async function iniciarPrimeiroTreino(page: Page): Promise<void> {
         await pularCheckin.click()
     }
 
-    // A sessão abriu quando o rodapé do treino ativo existe.
-    await expect(page.getByRole('button', { name: /Descartar treino/i })).toBeVisible({ timeout: 30_000 })
+    // A sessão abriu quando o rodapé do treino ativo existe — hoje o marcador
+    // é o FINALIZAR, única ação que sobrou lá.
+    await expect(page.getByRole('button', { name: /Finalizar/i }).first()).toBeVisible({ timeout: 30_000 })
 }
 
-/** Descarta a sessão para o próximo caso começar do zero. */
+/** Há sessão de treino aberta? O rodapé do treino ativo mostra o FINALIZAR. */
+async function emSessaoAtiva(page: Page, timeout = 3_000): Promise<boolean> {
+    return page.getByRole('button', { name: /Finalizar/i }).first()
+        .isVisible({ timeout }).catch(() => false)
+}
+
+/**
+ * Descarta a sessão para o próximo caso começar do zero.
+ *
+ * ⚠️ Descartar MUDOU DE LUGAR em 18/08/2026: era um X no rodapé (mudo, colado
+ * no "Finalizar") e passou a viver no menu "…" do cabeçalho, com rótulo por
+ * extenso. Quem marca a presença de uma sessão ativa agora é o FINALIZAR — o
+ * rodapé tem uma ação só.
+ */
 async function descartarSessao(page: Page): Promise<void> {
+    // SEMPRE recarrega antes: o caso anterior pode ter terminado com um modal
+    // aberto (editor completo) ou no meio da EXECUÇÃO de uma série — e nesse
+    // estado o cabeçalho esconde as ações (opacity-0 + pointer-events-none),
+    // então o menu "…" fica inalcançável. Recarregar não perde a sessão, que é
+    // sincronizada pelo servidor.
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' }).catch(() => {})
+    if (!(await emSessaoAtiva(page, 10_000))) return
+    const menu = page.getByRole('button', { name: /Mais opções/i })
+    if (!(await menu.isVisible({ timeout: 5_000 }).catch(() => false))) return
+    await menu.click()
     const x = page.getByRole('button', { name: /Descartar treino/i })
-    if (!(await x.isVisible().catch(() => false))) return
+    if (!(await x.isVisible({ timeout: 5_000 }).catch(() => false))) return
     await x.click()
     const confirmar = page.getByRole('button', { name: /^Descartar$/i })
     if (await confirmar.isVisible({ timeout: 5_000 }).catch(() => false)) await confirmar.click()
@@ -213,7 +236,8 @@ test.describe('Jornada do treino (UI autenticada)', () => {
         // a série, mexe em outra coisa, depois volta para corrigir a carga). Sem
         // este passo o campo continua focado do `fill` acima e um segundo clique
         // não gera novo `focusin`: o teste mediria um cenário que não existe.
-        await page.getByRole('button', { name: /Descartar treino/i }).focus()
+        // (era o X do rodapé; ele foi para o menu "…" em 18/08/2026)
+        await page.getByRole('button', { name: /Finalizar/i }).first().focus()
         await expect(peso).not.toBeFocused()
 
         // BUG DE 15/08: ao voltar, tocar posicionava o cursor e a tecla INSERIA
