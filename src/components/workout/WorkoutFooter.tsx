@@ -1,73 +1,34 @@
 'use client';
 
 import React from 'react';
-import { Save, X, Pause, Play, Zap } from 'lucide-react';
+import { Save, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
-import { logError, logWarn } from '@/lib/logger';
 import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
 
 export default function WorkoutFooter() {
   const {
-    session,
     finishing,
     finishWorkout,
-    confirm,
-    cancelWorkout,
     completedSets,
     totalSets,
     remainingSets,
   } = useWorkoutContext();
 
-  // Separate guards for Cancel and Finalizar — shared ref would make one block the other
-  const cancelBusyRef = React.useRef(false);
   const finishBusyRef = React.useRef(false);
 
-  const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
-
-  // Team pause/resume — gracefully degrades if no team session
-  const teamCtx = useTeamWorkout() as unknown as {
-    teamSession: { id: string } | null
-    sessionPaused: boolean
-    pauseSession: () => void
-    resumeSession: () => void
-  }
-  const inTeamSession = !!teamCtx?.teamSession?.id
-  const teamPaused = inTeamSession && !!teamCtx?.sessionPaused
-
-  // Solo pause/resume — freezes display timer locally (team uses broadcast instead)
-  const { isPaused: timerPaused, togglePause } = useWorkoutTimer()
-  const isPaused = teamPaused || timerPaused
+  const { elapsedSeconds } = useWorkoutTimer();
 
   const allSets = totalSets;
   const allDone = allSets > 0 && completedSets >= allSets;
 
-  const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-  const ui = isRecord(session?.ui) ? (session?.ui as Record<string, unknown>) : null
-  const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null
-  const startedAtMs = activeExec ? Number(activeExec.startedAtMs) : 0
-  const isExecuting = Number.isFinite(startedAtMs) && startedAtMs > 0
-
   /**
-   * ⚠️ O DESCANSO NÃO É DESENHADO AQUI — e isso é decisão, não esquecimento.
-   *
-   * Esta barra já mostrou "RECUPERAÇÃO 0:14" com anel colorido enquanto a
-   * barra do RestTimerOverlay, logo abaixo, mostrava "0:13 DESC" com outro
-   * anel: o MESMO descanso, dois relógios, e discordando em 1 segundo porque
-   * cada um arredondava por conta própria (`Math.ceil` aqui, outro lá).
-   *
-   * A duplicação sempre existiu, escondida — as duas barras se cobriam. Quando
-   * elas passaram a conviver (17/08/2026), ficou à vista e o dono apontou.
-   *
-   * O corte segue a regra da casa (docs/DESIGN_HIERARCHY.md): um fato aparece
-   * UMA vez, e no lugar mais próximo da ação. O tempo restante mora na barra
-   * de baixo, colado no START, que é quem encerra o descanso. Aqui fica o
-   * tempo de TREINO — que, de quebra, sumia justamente durante o descanso.
+   * O contador "Exercício" (tempo da série em execução) saiu junto com o
+   * cronômetro. Ele só existia aqui, e era o mesmo caso das outras duas
+   * redundâncias: informação de acompanhamento no lugar da ação. Quem precisa
+   * de tempo DURANTE a série — prancha e cardio — tem o timer próprio da série
+   * e a barra do RestTimerOverlay, que já rotula 'prancha'/'cardio'.
    */
-  const displaySeconds = isExecuting ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : elapsedSeconds
-  const displayLabel = isExecuting ? 'Exercício' : 'Treino'
-  const displayTime = formatElapsed(displaySeconds)
 
   // Com o teclado aberto, esta barra (fixed bottom-0) fica ATRÁS dele e a barra de
   // acessórios do iOS a corta ao meio — "vazando" meia barra na tela. Enquanto o
@@ -76,6 +37,20 @@ export default function WorkoutFooter() {
   // acima do teclado por conta própria.
   const keyboardOpen = useKeyboardOpen()
 
+  // ⚠️ ESTE RODAPÉ TEM UMA AÇÃO SÓ: Finalizar. Ele já teve quatro coisas —
+  // X (descartar), cronômetro, pausa e Finalizar — e o dono apontou as duas
+  // redundâncias em 18/08/2026:
+  //
+  //   • o TEMPO era o mesmo `elapsedSeconds` desenhado aqui e no topo;
+  //   • X e Finalizar pareciam "dois botões que fazem a mesma coisa". Não
+  //     fazem: um DESCARTA e o outro SALVA — e é exatamente por parecerem
+  //     iguais que o arranjo era perigoso, com o destrutivo sendo o mudo (só
+  //     ícone) e colado no de salvar.
+  //
+  // O cronômetro e a pausa foram para o topo (a pausa acompanha o número que
+  // ela controla); descartar foi para o menu "…", com rótulo por extenso —
+  // ação rara e destrutiva não mora ao lado da ação primária.
+  //
   // Com o DESCANSO rolando, a barra do RestTimerOverlay (fixed bottom-0,
   // z-[2100], renderizada na raiz) ficava POR CIMA deste rodapé — e o
   // "Finalizar" virava inalcançável: para terminar o treino o usuário tinha
@@ -92,79 +67,7 @@ export default function WorkoutFooter() {
       style={{ bottom: 'var(--it-rest-bar-h, 0px)' }}
       className={`fixed left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
     >
-      <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-        {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
-        <button aria-label="Descartar treino"
-          type="button"
-          onClick={async () => {
-            if (cancelBusyRef.current) return;
-            cancelBusyRef.current = true;
-            try {
-              // O diálogo era: título "Cancelar", pergunta "Cancelar treino em
-              // andamento?", botões [Cancelar] [Confirmar]. A MESMA palavra
-              // significava abandonar o treino no título e desistir de abandonar
-              // no botão — e o gold (ação positiva) ficava justamente na opção
-              // que apaga a sessão. Agora o rótulo diz o que cada botão FAZ.
-              const ok = await confirm(
-                'Você perde as séries registradas nesta sessão. Isso não pode ser desfeito.',
-                'Descartar este treino?',
-                { confirmText: 'Descartar', cancelText: 'Continuar treinando', destructive: true },
-              );
-              if (!ok) { cancelBusyRef.current = false; return; }
-              // cancelWorkout bypasses the exit animation guard (exitTimerRef)
-              // which can be permanently blocked after a failed Finalizar attempt.
-              if (typeof cancelWorkout === 'function') {
-                cancelWorkout();
-              } else {
-                logWarn('WorkoutFooter', 'cancelWorkout is not available');
-              }
-            } catch (e) {
-              logError('WorkoutFooter.cancel', e);
-            } finally {
-              // Always reset after a delay so the user can retry if navigation fails
-              setTimeout(() => { cancelBusyRef.current = false; }, 1500);
-            }
-          }}
-          className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-400 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all shrink-0"
-          title="Cancelar treino"
-        >
-          <X size={18} />
-        </button>
-
-        {/* ── Timer display — center ── */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Time + label */}
-          <div className="flex flex-col items-center min-w-0">
-            <span className="text-[9px] uppercase tracking-widest text-yellow-500 font-black leading-tight">
-              {isPaused ? 'Pausado' : displayLabel}
-            </span>
-            <span className={`text-lg font-black font-mono leading-tight ${isPaused ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>
-              {displayTime}
-            </span>
-          </div>
-
-          {/* Pause/resume — team broadcasts to teammates; solo freezes local timer */}
-          <button
-            type="button"
-            onClick={() => {
-              if (inTeamSession) {
-                teamPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()
-              } else {
-                togglePause()
-              }
-            }}
-            className={[
-              'tap-44 w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
-              isPaused
-                ? 'bg-yellow-500 text-black'
-                : 'bg-neutral-800 border border-neutral-700 text-neutral-300',
-            ].join(' ')}
-            title={isPaused ? 'Retomar treino' : 'Pausar treino'}
-          >
-            {isPaused ? <Play size={12} /> : <Pause size={12} />}
-          </button>
-        </div>
-
+      <div className="max-w-6xl mx-auto flex items-center justify-end gap-2">
         {/* Finalizar — with glow celebration ring when allDone */}
         <div className="relative shrink-0">
           {allDone && !finishing && (

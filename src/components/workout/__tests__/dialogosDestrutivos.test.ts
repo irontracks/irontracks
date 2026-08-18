@@ -21,7 +21,13 @@ import { describe, it, expect } from 'vitest'
  */
 
 const SRC = join(__dirname, '..', '..', '..')
-const footer = readFileSync(join(SRC, 'components', 'workout', 'WorkoutFooter.tsx'), 'utf8')
+/**
+ * ⚠️ O diálogo mudou de casa em 18/08/2026: descartar saiu do rodapé (onde era
+ * um X mudo colado no "Finalizar") e foi para o menu "…" do cabeçalho, com
+ * rótulo por extenso. Os invariantes abaixo são os mesmos — só o arquivo é
+ * outro. Se ele mudar de lar de novo, é aqui que se aponta o novo caminho.
+ */
+const footer = readFileSync(join(SRC, 'components', 'workout', 'WorkoutHeader.tsx'), 'utf8')
 const dialogo = readFileSync(join(SRC, 'components', 'GlobalDialog.tsx'), 'utf8')
 const contexto = readFileSync(join(SRC, 'contexts', 'DialogContext.tsx'), 'utf8')
 

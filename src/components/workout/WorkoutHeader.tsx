@@ -1,13 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, MoreHorizontal, Plus, Satellite, UserPlus } from 'lucide-react';
+import { Clock, GripVertical, MoreHorizontal, Pause, Play, Plus, Satellite, Trash2, UserPlus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
 import { stripDayPrefix } from '@/lib/workout/workoutTitle'
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import { logError, logWarn } from '@/lib/logger';
 
 export default function WorkoutHeader() {
   const {
@@ -25,8 +27,47 @@ export default function WorkoutHeader() {
     session,
     _exitOnBack: exitOnBack,
     openCardioGps,
+    confirm,
+    cancelWorkout,
   } = useWorkoutContext();
-  const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
+  const { ticker, elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
+
+  // Pausa em equipe transmite ao parceiro; sozinho congela o cronômetro local.
+  // Degrada sem provider (o hook devolve o contexto vazio).
+  const teamCtx = useTeamWorkout() as unknown as {
+    teamSession: { id: string } | null
+    sessionPaused: boolean
+    pauseSession: () => void
+    resumeSession: () => void
+  };
+  const inTeamSession = !!teamCtx?.teamSession?.id;
+  const teamPaused = inTeamSession && !!teamCtx?.sessionPaused;
+  const isPaused = teamPaused || timerPaused;
+
+  // Descartar treino: veio do rodapé em 18/08/2026. Lá ele era um X mudo colado
+  // no "Finalizar" — dois botões de sair lado a lado, e o destrutivo sem
+  // rótulo. Aqui mora com os outros itens secundários, escrito por extenso.
+  const cancelBusyRef = React.useRef(false);
+  const descartarTreino = React.useCallback(async () => {
+    if (cancelBusyRef.current) return;
+    cancelBusyRef.current = true;
+    try {
+      // A polaridade importa: o `confirm` resolve `false` ao fechar por fora,
+      // então DESCARTAR é o confirmText e continuar é o caminho do `false`.
+      const ok = await confirm(
+        'Você perde as séries registradas nesta sessão. Isso não pode ser desfeito.',
+        'Descartar este treino?',
+        { confirmText: 'Descartar', cancelText: 'Continuar treinando', destructive: true },
+      );
+      if (!ok) { cancelBusyRef.current = false; return; }
+      if (typeof cancelWorkout === 'function') cancelWorkout();
+      else logWarn('WorkoutHeader', 'cancelWorkout is not available');
+    } catch (e) {
+      logError('WorkoutHeader.descartar', e);
+    } finally {
+      setTimeout(() => { cancelBusyRef.current = false; }, 1500);
+    }
+  }, [confirm, cancelWorkout]);
 
   // Detect if a set is actively being executed — collapse action buttons to reduce distraction
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -126,6 +167,15 @@ export default function WorkoutHeader() {
                       <UserPlus size={15} />
                       Convidar
                     </button>
+                    <div className="h-px bg-neutral-800" />
+                    <button
+                      type="button"
+                      onClick={() => { setOverflowOpen(false); void descartarTreino(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-red-400 hover:bg-neutral-800 transition-colors"
+                    >
+                      <Trash2 size={15} />
+                      Descartar treino
+                    </button>
                   </div>
                 )}
               </div>
@@ -178,7 +228,26 @@ export default function WorkoutHeader() {
                   </>
                 )}
                 <Clock size={13} className="text-yellow-500/80" />
-                <span className="font-mono tabular-nums text-yellow-400">{formatElapsed(elapsedSeconds)}</span>
+                <span className={`font-mono tabular-nums ${isPaused ? 'text-yellow-300 animate-pulse' : 'text-yellow-400'}`}>
+                  {formatElapsed(elapsedSeconds)}
+                </span>
+                {/* A pausa acompanha o número que ela controla — no rodapé ela
+                    ficava órfã depois que o cronômetro subiu para cá. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (inTeamSession) { teamPaused ? teamCtx.resumeSession() : teamCtx.pauseSession() }
+                    else { togglePause() }
+                  }}
+                  aria-label={isPaused ? 'Retomar treino' : 'Pausar treino'}
+                  title={isPaused ? 'Retomar treino' : 'Pausar treino'}
+                  className={[
+                    'tap-44 -my-1 ml-0.5 w-6 h-6 flex items-center justify-center rounded-md shrink-0 transition-all active:scale-90',
+                    isPaused ? 'bg-yellow-500 text-black' : 'text-neutral-400 hover:text-yellow-400',
+                  ].join(' ')}
+                >
+                  {isPaused ? <Play size={11} /> : <Pause size={11} />}
+                </button>
               </span>
             </div>
           </div>
