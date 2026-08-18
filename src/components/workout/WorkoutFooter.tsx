@@ -73,7 +73,7 @@ export default function WorkoutFooter() {
       // Agora é um pill flutuante ancorado à direita: ocupa a altura de um
       // alvo de toque e nada mais. `pointer-events-none` no contêiner para a
       // faixa transparente não roubar o toque do conteúdo atrás dela.
-      style={{ bottom: 'calc(var(--it-rest-bar-h, 0px) + 10px)' }}
+      style={{ bottom: 'calc(var(--it-rest-bar-h, 0px) + 8px)' }}
       className={`fixed left-0 right-0 z-50 px-4 md:px-6 pointer-events-none transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
     >
       {/* ── Uma barra, um botão, largura inteira ────────────────────────────
@@ -102,10 +102,15 @@ export default function WorkoutFooter() {
               finishWorkout(elapsedSeconds);
             }}
             className={[
-              // Pill: alvo de 44pt de altura, largura do conteúdo. A sombra é
-              // o que o separa da lista que passa por baixo — sem ela, texto
-              // sobre texto em qualquer rolagem.
-              'inline-flex items-center gap-2 h-11 px-4 rounded-full font-black text-sm shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
+              // 36px de altura VISUAL com alvo de 44pt: `.tap-44` estende a
+              // área pelo ::after sem mover um pixel. É o mesmo recurso do PR
+              // #778 — ergonomia de academia não se paga engordando o botão.
+              //
+              // ⚠️ Nada de `pb-safe` neste contêiner: safe-area é para quem
+              // encosta no CHÃO da tela. Aqui o rodapé está elevado pela
+              // `--it-rest-bar-h`, e o inset virava ~34px de preto só embaixo —
+              // o botão parecia descentralizado porque estava mesmo.
+              'tap-44 inline-flex items-center gap-2 h-9 px-4 rounded-full font-black text-[13px] shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
               // O sólido é RESERVADO para o treino completo. Antes disso,
               // "Finalizar" gritava mais que "Concluir" — o botão de sair com
               // mais peso que o de trabalhar. Agora o rodapé fica discreto
@@ -118,7 +123,7 @@ export default function WorkoutFooter() {
                   : 'bg-neutral-900/90 border border-neutral-700/70 text-neutral-300 hover:border-yellow-500/40 hover:text-white',
             ].join(' ')}
           >
-            <Save size={16} />
+            <Save size={14} />
             {allDone && !finishing && <Zap size={14} className="text-yellow-300" />}
             <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR' : remainingSets <= 3 && remainingSets > 0 ? `Finalizar (${remainingSets})` : 'Finalizar'}</span>
           </button>

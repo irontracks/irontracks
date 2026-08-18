@@ -153,15 +153,26 @@ describe('forma do Finalizar', () => {
         expect(footer, 'o botão precisa voltar a receber toque').toMatch(/pointer-events-auto/)
     })
 
-    it('é um pill com alvo de 44pt', () => {
-        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
-        expect(bloco).toMatch(/h-11/)
+    it('é um pill fino, com alvo de 44pt garantido pelo tap-44', () => {
+        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size='))
+        expect(bloco, '36px de altura visual').toMatch(/\bh-9\b/)
+        expect(bloco, 'a área de toque não pode encolher junto').toMatch(/tap-44/)
         expect(bloco).toMatch(/rounded-full/)
         expect(bloco, 'largura total era a barra que acabou de sair').not.toMatch(/\bw-full\b/)
     })
 
+    /**
+     * `pb-safe` num elemento ELEVADO (o rodapé sobe a altura da barra do
+     * descanso) vira ~34px de preto só embaixo — foi o que fez o botão parecer
+     * descentralizado no #861. Safe-area é para quem encosta no chão da tela.
+     */
+    it('não aplica safe-area num rodapé que não toca o chão', () => {
+        const contêiner = footer.slice(footer.indexOf('fixed left-0 right-0'), footer.indexOf('max-w-6xl'))
+        expect(contêiner).not.toMatch(/pb-safe/)
+    })
+
     it('a sombra separa o pill da lista que passa por baixo', () => {
-        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
+        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size='))
         expect(bloco, 'sem faixa, é a sombra que impede texto sobre texto').toMatch(/shadow-lg/)
     })
 
@@ -173,6 +184,6 @@ describe('forma do Finalizar', () => {
     it('a lista reserva espaço para o rodapé que existe HOJE', () => {
         const lista = readFileSync('src/components/workout/ExerciseList.tsx', 'utf8')
         // 160px reservavam duas barras. Com o pill, sobrava vazio no fim.
-        expect(lista).toMatch(/paddingBottom:\s*'calc\(env\(safe-area-inset-bottom, 0px\) \+ 124px\)'/)
+        expect(lista).toMatch(/paddingBottom:\s*'calc\(env\(safe-area-inset-bottom, 0px\) \+ 112px\)'/)
     })
 })
