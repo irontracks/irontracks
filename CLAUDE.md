@@ -156,7 +156,39 @@ Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a *
 
 **Gestos:** o gesto pertence a quem ele NASCE em cima (`isPointOverBrand`) — sem isso a pinça no logo escalava o story inteiro, porque o 2º dedo cai fora da caixa pequena da marca e o overlay assumia. Guias de alinhamento (`snapBrandToCenter`) grudam no centro; no BLOCO o alvo é o offset ZERO (ele não tem caixa estável — cada layout desenha em coordenadas próprias) e só o eixo X acende linha, porque a altura de repouso dele não é o meio da tela.
 
-**Treino em dupla** (atrás da flag `featureTeamworkV2`) — ⚠️ **AS TABELAS NÃO EXISTEM NO BANCO (verificado 02/08/2026; reconfirmado 04/08/2026 — `information_schema` segue sem `invites`/`team_sessions`/`team_session_presence`/`team_chat_messages`).** `information_schema` não retorna NADA com "team"/"invite" em nenhum schema, e a RPC `can_view_team_session` também sumiu. O código, os hooks e a flag continuam no repo (1 conta com a flag ON), mas em produção a feature quebra com "relation does not exist" — ela não pode estar funcionando. Suspeita não confirmada: perda na reescrita de histórico do repo (a mesma que fechou os PRs #323/#336 e gerou os recriados #505/#506). **Antes de mexer em qualquer coisa dessa área, investigue as migrations e descubra quando/por que as tabelas saíram — não recrie de memória a partir deste parágrafo.** O PR #506 (tornar o canal `team_logs` privado) foi FECHADO sem merge — a armadilha que o bloqueava continua de pé para quem tentar de novo: marcar `private: true` sem as policies de `realtime.messages` — que também não existem — derruba o sync em vez de protegê-lo. A descrição abaixo é o desenho ORIGINAL da feature, mantido como referência do que deveria existir: `contexts/TeamWorkoutContext.tsx` compõe os hooks de `contexts/team/*` (invites/session/presence/broadcast). Tabelas c/ RLS e na publication realtime: `invites`, `team_sessions`, `team_session_presence`, `team_chat_messages`. RPCs SECURITY DEFINER: `accept_team_invite`, `leave_team_session`, `can_view_team_session`. Participantes são gravados como `{uid,name,photo}` no banco mas lidos como `{user_id,display_name,photo_url}` no cliente → **sempre use `normalizeParticipant`** (`contexts/team/types.ts`). Sync ao vivo é **broadcast efêmero** do Supabase (sem replay — perde eventos se o parceiro fica em background). Máx. 5 participantes (`MAX_TEAM_PARTICIPANTS`, host incluso).
+**Treino em dupla (TeamworkV2) — APOSENTADO. Não é bug, não é regressão.**
+A feature foi removida do código no **PR #428 (commit `96300aad`, 14/07/2026)** —
+43 arquivos, −4.690 linhas — e as tabelas foram dropadas no dia seguinte pela
+migration `20260715153440_drop_teamwork_v2_and_feature_flags.sql`, que registra
+"**Confirmado pelo dono**". Saíram juntas: `invites`, `team_sessions`,
+`team_session_presence`, `team_chat_messages`, as RPCs (`accept_team_invite`,
+`leave_team_session`, `can_view_team_session`) e a entrada na publication
+realtime. O sistema de feature-flags (`utils/featureFlags.ts`) foi removido
+depois, no #436 — por isso `featureTeamworkV2` não existe mais em lugar nenhum.
+
+**O ponto de entrada era o menu "…" do treino ativo** (`WorkoutHeader.tsx`): um
+item com ícone `UserPlus` que abria o `InviteManager`. Quem procurar "o botão de
+treino em equipe" está procurando por ele — sumiu em 14/07/2026, junto com o
+resto, e nunca voltou (`git log -S "UserPlus" -- WorkoutHeader.tsx` desde então
+não devolve nada).
+
+⚠️ **Esta seção já esteve errada e custou investigação.** Ela dizia "as tabelas
+não existem, mas o código e a flag continuam no repo" e mandava investigar as
+migrations — texto escrito em 02/08, quando a remoção já tinha um mês. Em
+17/08/2026 o dono relatou o botão como regressão recente; a investigação
+encontrou a data, o PR e a migration acima. Fica registrado para ninguém
+reinvestigar nem tentar "consertar" o sumiço.
+
+**Restaurar custa mais do que voltar um botão:** é reverter o #428 (~4,6k linhas)
+E recriar as 4 tabelas com RLS, as 3 RPCs `SECURITY DEFINER` e a publication —
+migration em produção. O desenho original, se um dia for reconstruído: contexto
+compondo hooks de invites/session/presence/broadcast; participantes gravados como
+`{uid,name,photo}` e lidos como `{user_id,display_name,photo_url}` (havia um
+`normalizeParticipant` justamente por isso); sync por **broadcast efêmero** do
+Supabase (sem replay — perde evento se o parceiro fica em background); máximo de
+5 participantes com o host incluso. E a armadilha que fechou o PR #506 continua
+valendo: marcar o canal como `private: true` sem as policies de
+`realtime.messages` derruba o sync em vez de protegê-lo.
 
 **Dashboard shell:** `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx` é o client component central; navega por estado `view` ('dashboard'|'active'|'edit'|'assessments'|'community'|'vip'). Boot: `/api/dashboard/bootstrap` (RPC `get_dashboard_bootstrap`) + `useBootstrap` + `useWorkoutFetch`. **Toda hidratação da lista de treinos (SSR inicial, bootstrap, refetch) deve ordenar por `sortWorkoutsByOrder`** (`utils/mapWorkoutRow.ts`) — senão a lista pisca desordenada.
 
