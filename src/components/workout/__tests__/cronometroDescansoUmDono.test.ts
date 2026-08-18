@@ -129,32 +129,50 @@ describe('rodapé do treino — uma ação', () => {
 })
 
 /**
- * A forma do CTA que sobrou.
+ * A forma do CTA que sobrou — segunda revisão (18/08/2026).
  *
- * Depois que o rodapé ficou com uma ação só, o botão herdou o `justify-end` da
- * época em que era um de quatro — e virou um retângulo pequeno encostado na
- * quina de uma barra de borda a borda. O dono viu na hora: "todo torto,
- * sozinho ali no card".
+ * Primeiro ele era um retângulo pequeno na quina de uma barra de borda a borda
+ * ("todo torto, sozinho ali no card"). Virou largura total — e aí o rodapé
+ * ficou com DUAS barras empilhadas, ~220px de preto no pé da tela para uma
+ * ação tocada uma vez por sessão ("muito grosso e muita área preta sobrando").
  *
- * Uma superfície inteira que hospeda um elemento ocupando um terço dela não lê
- * como decisão; lê como sobra. O CTA ocupa a barra — mesma anatomia do START
- * do descanso logo abaixo —, e a hierarquia entre os dois continua vindo da
- * COR (neutro com série pendente, dourado quando fecha), não da largura.
+ * As duas críticas apontam para a mesma regra: **peso de superfície tem que
+ * ser proporcional à frequência de uso.** O descanso é permanente e ganha
+ * barra; o Finalizar é terminal e ganha um pill — altura de um alvo de toque,
+ * largura do conteúdo, sem faixa.
  */
 describe('forma do Finalizar', () => {
-    it('ocupa a barra inteira', () => {
-        const bloco = footer.slice(footer.indexOf('finishWorkout(elapsedSeconds)'))
-        expect(bloco).toMatch(/w-full inline-flex items-center justify-center/)
+    it('não tem faixa: nada de fundo sólido ou borda de topo no contêiner', () => {
+        const contêiner = footer.slice(footer.indexOf('fixed left-0 right-0'), footer.indexOf('max-w-6xl'))
+        expect(contêiner, 'a segunda barra dobrava a altura do rodapé').not.toMatch(/bg-neutral-950|border-t/)
     })
 
-    it('não sobrou alinhamento de fileira no contêiner', () => {
-        expect(footer, 'justify-end era para quando havia quatro elementos')
-            .not.toMatch(/max-w-6xl mx-auto flex items-center justify-end/)
+    it('a faixa transparente não rouba o toque do conteúdo atrás', () => {
+        const contêiner = footer.slice(footer.indexOf('fixed left-0 right-0'), footer.indexOf('max-w-6xl'))
+        expect(contêiner).toMatch(/pointer-events-none/)
+        expect(footer, 'o botão precisa voltar a receber toque').toMatch(/pointer-events-auto/)
+    })
+
+    it('é um pill com alvo de 44pt', () => {
+        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
+        expect(bloco).toMatch(/h-11/)
+        expect(bloco).toMatch(/rounded-full/)
+        expect(bloco, 'largura total era a barra que acabou de sair').not.toMatch(/\bw-full\b/)
+    })
+
+    it('a sombra separa o pill da lista que passa por baixo', () => {
+        const bloco = footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
+        expect(bloco, 'sem faixa, é a sombra que impede texto sobre texto').toMatch(/shadow-lg/)
     })
 
     it('o peso continua na cor, não no tamanho', () => {
-        // Dourado sólido só quando o treino fecha; antes disso, neutro.
         expect(footer).toMatch(/allDone[\s\S]{0,200}from-yellow-400 to-amber-400/)
-        expect(footer).toMatch(/bg-neutral-900 border border-neutral-700/)
+        expect(footer).toMatch(/bg-neutral-900\/90 border border-neutral-700/)
+    })
+
+    it('a lista reserva espaço para o rodapé que existe HOJE', () => {
+        const lista = readFileSync('src/components/workout/ExerciseList.tsx', 'utf8')
+        // 160px reservavam duas barras. Com o pill, sobrava vazio no fim.
+        expect(lista).toMatch(/paddingBottom:\s*'calc\(env\(safe-area-inset-bottom, 0px\) \+ 124px\)'/)
     })
 })

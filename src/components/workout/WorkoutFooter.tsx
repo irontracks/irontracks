@@ -64,8 +64,17 @@ export default function WorkoutFooter() {
   // publicada pelo RestTimerOverlay enquanto o descanso existe.
   return (
     <div
-      style={{ bottom: 'var(--it-rest-bar-h, 0px)' }}
-      className={`fixed left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
+      // Sem FAIXA. O rodapé do treino já tem uma barra permanente — a do
+      // descanso, com START e AUTO. Uma segunda barra de borda a borda,
+      // empilhada, dobrava a altura do rodapé (~220px) e enchia de preto o pé
+      // da tela para hospedar UMA ação, tocada uma vez por sessão. Peso de
+      // superfície tem que ser proporcional à frequência de uso.
+      //
+      // Agora é um pill flutuante ancorado à direita: ocupa a altura de um
+      // alvo de toque e nada mais. `pointer-events-none` no contêiner para a
+      // faixa transparente não roubar o toque do conteúdo atrás dela.
+      style={{ bottom: 'calc(var(--it-rest-bar-h, 0px) + 10px)' }}
+      className={`fixed left-0 right-0 z-50 px-4 md:px-6 pointer-events-none transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
     >
       {/* ── Uma barra, um botão, largura inteira ────────────────────────────
           Quando o rodapé tinha quatro elementos, o `justify-end` fazia sentido:
@@ -76,8 +85,8 @@ export default function WorkoutFooter() {
           O CTA passa a ocupar a barra, mesma anatomia do START do descanso
           logo abaixo. Peso continua vindo da COR, não da largura: neutro
           enquanto há série pendente, dourado quando o treino fecha. */}
-      <div className="max-w-6xl mx-auto">
-        <div className="relative">
+      <div className="max-w-6xl mx-auto flex justify-end">
+        <div className="relative pointer-events-auto">
           {allDone && !finishing && (
             <div className="absolute inset-0 rounded-xl pointer-events-none animate-pulse-glow" />
           )}
@@ -93,7 +102,10 @@ export default function WorkoutFooter() {
               finishWorkout(elapsedSeconds);
             }}
             className={[
-              'w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-black text-sm transition-all duration-300 active:scale-[0.99]',
+              // Pill: alvo de 44pt de altura, largura do conteúdo. A sombra é
+              // o que o separa da lista que passa por baixo — sem ela, texto
+              // sobre texto em qualquer rolagem.
+              'inline-flex items-center gap-2 h-11 px-4 rounded-full font-black text-sm shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
               // O sólido é RESERVADO para o treino completo. Antes disso,
               // "Finalizar" gritava mais que "Concluir" — o botão de sair com
               // mais peso que o de trabalhar. Agora o rodapé fica discreto
@@ -102,8 +114,8 @@ export default function WorkoutFooter() {
               finishing
                 ? 'bg-yellow-500/60 text-black cursor-wait'
                 : allDone
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 text-black shadow-lg shadow-yellow-500/40'
-                  : 'bg-neutral-900 border border-neutral-700 text-neutral-300 hover:border-yellow-500/40 hover:text-white',
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 text-black shadow-yellow-500/40'
+                  : 'bg-neutral-900/90 border border-neutral-700/70 text-neutral-300 hover:border-yellow-500/40 hover:text-white',
             ].join(' ')}
           >
             <Save size={16} />
