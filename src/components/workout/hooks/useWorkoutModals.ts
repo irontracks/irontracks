@@ -41,6 +41,7 @@ export function useWorkoutModals(collapsedKey: string | null) {
 
     // ---- Notes & UI ----
     const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
+    const [inviteOpen, setInviteOpen] = useState<boolean>(false);
     const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(new Set());
     const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
     const [finishing, setFinishing] = useState<boolean>(false);
@@ -198,6 +199,7 @@ export function useWorkoutModals(collapsedKey: string | null) {
         collapsed, setCollapsed,
         // Notes & UI flags
         openNotesKeys, setOpenNotesKeys,
+        inviteOpen, setInviteOpen,
         linkedWeightExercises, setLinkedWeightExercises,
         currentExerciseIdx, setCurrentExerciseIdx,
         finishing, setFinishing,

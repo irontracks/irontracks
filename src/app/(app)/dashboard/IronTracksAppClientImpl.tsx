@@ -11,6 +11,8 @@ import CommunityLoading from '@/app/(app)/community/loading';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
 const TeacherControlHost = dynamic(() => import('@/components/teacher/TeacherControlHost'), { ssr: false });
+const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
+const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
 import { DashboardHeader } from './DashboardHeader';
 import { pathnameToView, viewToPath } from './viewPath';
 
@@ -1086,6 +1088,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 watchDashboard={watchDashboard}
                 watchGyms={watchGyms}
                 onWatchRefresh={() => { fetchWorkouts().catch(() => {}) }}
+                teamUser={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null}
+                onStartSession={handleStartSession as unknown as (w: Record<string, unknown>) => void | Promise<void>}
             >
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
                 <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
@@ -1110,6 +1114,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         design system, não valor avulso. Reverter: volte para
                         `bg-neutral-900`. */}
                     <div className="w-full bg-depth-2 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                        <IncomingInviteModal
+                            onStartSession={handleStartSession}
+                            savedWorkouts={workouts}
+                            onWorkoutSaved={() => { fetchWorkouts().catch(() => {}) }}
+                        />
+                        <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour

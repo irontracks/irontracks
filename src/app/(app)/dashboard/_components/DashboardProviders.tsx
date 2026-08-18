@@ -5,7 +5,8 @@
  * Cadeia (de fora pra dentro):
  *   InAppNotificationsProvider
  *     ├── InAppNotifyBinder (binda fn `notify` num ref externo)
- *     └── WatchSyncProvider (push pro Apple Watch)
+ *     ├── WatchSyncProvider (push pro Apple Watch)
+ *     └── TeamWorkoutProvider (treinos em grupo)
  *
  * Inner-most envolve children (a UI propriamente dita).
  */
@@ -13,6 +14,7 @@
 
 import { useEffect } from 'react'
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext'
+import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext'
 import WatchSyncProvider from '@/components/WatchSyncProvider'
 import { AndroidBackButtonInit } from '@/components/native/AndroidBackButtonInit'
 import type { WatchDashboard, WatchGym } from '@/hooks/useWatchBridge'
@@ -32,6 +34,10 @@ interface DashboardProvidersProps {
   watchGyms: WatchGym[]
   /** Callback de refresh disparado pelo Watch. */
   onWatchRefresh: () => void
+  /** User mínimo aceito pelo TeamWorkoutProvider. */
+  teamUser: { id: string; email: string | null } | null
+  /** Iniciar sessão a partir de invite/team. */
+  onStartSession: (workout: Record<string, unknown>) => void | Promise<void>
 }
 
 export function DashboardProviders({
@@ -43,6 +49,8 @@ export function DashboardProviders({
   watchDashboard,
   watchGyms,
   onWatchRefresh,
+  teamUser,
+  onStartSession,
 }: DashboardProvidersProps) {
   return (
     <InAppNotificationsProvider
@@ -59,7 +67,9 @@ export function DashboardProviders({
         nearestGyms={watchGyms}
         onRefresh={onWatchRefresh}
       />
-      {children}
+      <TeamWorkoutProvider user={teamUser} settings={settings ?? undefined} onStartSession={onStartSession}>
+        {children}
+      </TeamWorkoutProvider>
     </InAppNotificationsProvider>
   )
 }

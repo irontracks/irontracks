@@ -386,6 +386,7 @@ export function SettingsWorkoutSection({ draft, setValue }: SettingsSectionProps
 export function SettingsSoundSection({ draft, setValue }: SettingsSectionProps) {
     const enableSounds = Boolean(draft?.enableSounds ?? true)
     const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
+    const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
     return (
         <SectionCard>
             <SectionHeader icon={Volume2} label="Som" />
@@ -400,6 +401,10 @@ export function SettingsSoundSection({ draft, setValue }: SettingsSectionProps) 
                         <input type="range" min={0} max={100} step={5} value={soundVolume} onChange={(e) => setValue('soundVolume', Number(e.target.value))} className="w-full accent-yellow-500" aria-label="Volume dos sons" />
                         <div className="font-mono text-xs font-bold text-neutral-200 w-10 text-right">{soundVolume}%</div>
                     </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-bold text-white">Convites de Treino em Equipe</div><div className="text-xs text-neutral-400">Permite receber convites no modal &quot;BORA!&quot;.</div></div>
+                    <ToggleSwitch checked={allowTeamInvites} onChange={() => setValue('allowTeamInvites', !allowTeamInvites)} />
                 </div>
             </div>
         </SectionCard>

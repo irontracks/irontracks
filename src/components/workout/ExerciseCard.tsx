@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy, Weight } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import { stripRedundantOpening, noteNeedsExpand } from './helpers/exerciseNotePreview';
@@ -32,11 +32,20 @@ import { PlankSetInput } from './PlankSetInput';
 import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
 import PlateCalculatorSheet from './PlateCalculatorSheet'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 import { resolveIncrement } from '@/utils/autoload/plateMath';
 import { inventoryFromSettings, type PlateInventory } from '@/utils/plates/plateInventory';
+
+function useSafeTeamWorkout() {
+  try {
+    return useTeamWorkout()
+  } catch {
+    return null
+  }
+}
 
 type GroupPos = 'first' | 'middle' | 'last';
 
@@ -74,6 +83,8 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     updateLog,
     onSavePlateSetup,
   } = useWorkoutContext();
+
+  const teamCtx = useSafeTeamWorkout();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
   // Aviso proativo de deload deste exercício (estagnação/regressão com histórico
@@ -677,6 +688,34 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
           >
             <Trash2 size={14} />
           </button>
+          {/* Share with partner — only when team session is active */}
+          {teamCtx?.teamSession && (
+            <button
+              type="button"
+              onClick={(e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch { }
+                try {
+                  // Collect current logs for this exercise
+                  const exerciseLogs: Record<string, unknown> = {}
+                  for (let i = 0; i < setsCount; i++) {
+                    const key = `${exIdx}-${i}`
+                    exerciseLogs[key] = getLog(key)
+                  }
+                  teamCtx.shareExerciseWithPartner(exIdx, ex as Record<string, unknown>, exerciseLogs, null)
+                } catch (err) {
+                  logError('ExerciseCard', 'Failed to share exercise', { exIdx, err })
+                }
+              }}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors active:scale-95 flex-shrink-0"
+              title="Compartilhar com parceiro"
+              aria-label="Compartilhar exercício com parceiro"
+            >
+              <Share2 size={14} />
+            </button>
+          )}
         </div>
       </div>
 

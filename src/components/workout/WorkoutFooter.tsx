@@ -4,6 +4,7 @@ import React from 'react';
 import { Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { logError, logWarn } from '@/lib/logger';
 import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
 
@@ -25,9 +26,19 @@ export default function WorkoutFooter() {
 
   const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
 
-  // Solo pause/resume — freezes display timer locally
+  // Team pause/resume — gracefully degrades if no team session
+  const teamCtx = useTeamWorkout() as unknown as {
+    teamSession: { id: string } | null
+    sessionPaused: boolean
+    pauseSession: () => void
+    resumeSession: () => void
+  }
+  const inTeamSession = !!teamCtx?.teamSession?.id
+  const teamPaused = inTeamSession && !!teamCtx?.sessionPaused
+
+  // Solo pause/resume — freezes display timer locally (team uses broadcast instead)
   const { isPaused: timerPaused, togglePause } = useWorkoutTimer()
-  const isPaused = timerPaused
+  const isPaused = teamPaused || timerPaused
 
   const allSets = totalSets;
   const allDone = allSets > 0 && completedSets >= allSets;
@@ -132,10 +143,16 @@ export default function WorkoutFooter() {
             </span>
           </div>
 
-          {/* Pause/resume — freezes local timer */}
+          {/* Pause/resume — team broadcasts to teammates; solo freezes local timer */}
           <button
             type="button"
-            onClick={() => { togglePause() }}
+            onClick={() => {
+              if (inTeamSession) {
+                teamPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()
+              } else {
+                togglePause()
+              }
+            }}
             className={[
               'tap-44 w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
               isPaused
