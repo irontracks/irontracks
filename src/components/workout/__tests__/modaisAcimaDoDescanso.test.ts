@@ -72,3 +72,30 @@ describe('modais do treino ativo × barra do descanso', () => {
         }
     })
 })
+
+/**
+ * Um dono para a família de modais.
+ *
+ * O revert do #428 (restauração do Treino em Dupla, 18/08/2026) trouxe a linha
+ * `<Modals />` inline de volta SEM conflito — o git a somou ao
+ * `createPortal(<Modals />)` que o #833 tinha posto no lugar dela. Resultado:
+ * a família inteira montada DUAS vezes, uma dentro do contexto z-50 e outra na
+ * raiz. Nada quebrou em `tsc`, ESLint ou `next build`; quem pegou foi o E2E
+ * logado, com "strict mode violation: resolved to 2 elements" ao procurar o
+ * botão "Adicionar Exercício".
+ *
+ * Dois editores montados significam dois estados de rascunho para o mesmo
+ * treino — o usuário digita num e salva o outro.
+ */
+describe('a família de modais é montada UMA vez', () => {
+    const src = stripComments(read('src/components/ActiveWorkout.tsx'))
+
+    it('só existe uma montagem de <Modals />', () => {
+        const montagens = [...src.matchAll(/<Modals\s*\/>/g)].length
+        expect(montagens, 'duplicar a família duplica o estado dos modais').toBe(1)
+    })
+
+    it('e ela é a do portal', () => {
+        expect(src).toMatch(/createPortal\(\s*<Modals\s*\/>\s*,\s*document\.body\s*\)/)
+    })
+})

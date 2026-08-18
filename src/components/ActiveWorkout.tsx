@@ -464,7 +464,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             contexto; os z de cada um (2250–2350) vencem a barra NA RAIZ. Os
             alerts do GlobalDialog (z-10000, raiz) continuam acima de tudo. */}
         {typeof document !== 'undefined' && createPortal(<Modals />, document.body)}
-        <Modals />
 
         {inTeamSession && (
           <TeamChatDrawer
