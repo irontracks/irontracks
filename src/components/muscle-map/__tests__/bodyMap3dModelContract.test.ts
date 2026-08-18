@@ -62,20 +62,31 @@ describe('contrato do modelo 3D do mapa muscular', () => {
   })
 })
 
-describe('peso de borda (falloff) gravado no modelo', () => {
-  it('cada grupo carrega COLOR_0 — é o peso que desvanece a borda', () => {
+describe('o modelo é anatômico, não pintado', () => {
+  it('cada grupo tem geometria PRÓPRIA e substancial', () => {
+    // Regiões recortadas da pele por proximidade davam manchas sem forma — o
+    // dono resumiu como "manequim pintado por uma criança". Agora cada malha é
+    // o músculo de verdade, e um grupo com pouquíssimos vértices seria sinal de
+    // que alguém voltou a recortar pele.
     const gltf = readGlbJson(GLB)
-    const semPeso = (gltf.meshes || [])
+    const acessores = gltf.accessors || []
+    const magros = (gltf.meshes || [])
       .filter((m: { name: string }) => m.name !== 'body')
-      .filter((m: { primitives: { attributes: Record<string, number> }[] }) =>
-        m.primitives[0].attributes.COLOR_0 === undefined)
-      .map((m: { name: string }) => m.name)
-    expect(semPeso).toEqual([])
+      .map((m: { name: string; primitives: { attributes: { POSITION: number } }[] }) => ({
+        nome: m.name,
+        verts: acessores[m.primitives[0].attributes.POSITION]?.count ?? 0,
+      }))
+      .filter((g: { verts: number }) => g.verts < 300)
+      .map((g: { nome: string }) => g.nome)
+    expect(magros).toEqual([])
   })
 
-  it('o manequim NÃO carrega peso — ele não é pintado por grupo nenhum', () => {
+  it('nenhuma malha depende de cor de vértice — a forma vem da geometria', () => {
     const gltf = readGlbJson(GLB)
-    const body = (gltf.meshes || []).find((m: { name: string }) => m.name === 'body')
-    expect(body?.primitives?.[0]?.attributes?.COLOR_0).toBeUndefined()
+    const comCor = (gltf.meshes || [])
+      .filter((m: { primitives: { attributes: Record<string, number> }[] }) =>
+        m.primitives[0].attributes.COLOR_0 !== undefined)
+      .map((m: { name: string }) => m.name)
+    expect(comCor).toEqual([])
   })
 })
