@@ -100,6 +100,7 @@
     "react": "19.2.7",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.7",
+    "three": "^0.180.0",
     "tus-js-client": "^4.3.1",
     "zod": "^3.25.76",
     "zustand": "^5.0.14"
@@ -120,6 +121,7 @@
     "@types/react": "19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/testing-library__jest-dom": "^5.14.9",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/coverage-v8": "^4.1.9",
     "@vitest/ui": "^4.1.9",

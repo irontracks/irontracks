@@ -1,8 +1,9 @@
 'use client'
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Crown, Loader2, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronDown, Crown, Loader2, Rotate3d, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
+import dynamic from 'next/dynamic'
 import { MUSCLE_BY_ID, type MuscleId } from '@/utils/muscleMapConfig'
 import { getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { translateAiError } from '@/utils/ai/clientErrors'
@@ -10,6 +11,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { pluralize } from '@/utils/format/plural'
+
+// three.js (~170 KB) só desce para quem realmente abre o 3D. `ssr: false`
+// porque WebGL não existe no servidor.
+const BodyMap3D = dynamic(() => import('@/components/muscle-map/BodyMap3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-[280px] mx-auto aspect-square rounded-2xl bg-black flex items-center justify-center">
+      <Loader2 size={20} className="animate-spin text-neutral-600" />
+    </div>
+  ),
+})
 
 type ApiMuscle = {
   label: string
@@ -137,6 +149,8 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
   const [period, setPeriod] = useState<'day' | 'week'>(props.defaultViewMode || 'week')
   const [selectedDate, setSelectedDate] = useState(localIsoDate)
   const [view, setView] = useState<'front' | 'back'>('front')
+  // Começa no 2D: é o mapa que os usuários conhecem, e o 3D custa download.
+  const [is3d, setIs3d] = useState(false)
   const [selected, setSelected] = useState<MuscleId | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [state, setState] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: ApiPayload | null; error: string }>({
@@ -514,15 +528,71 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 transition={{ duration: 0.25 }}
                 className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3 overflow-hidden"
               >
-                <BodyMapSvg
-                  view={view}
-                  muscles={musclesForView}
-                  selected={selected}
-                  gender={gender}
-                  onSelect={(id) => {
-                    setSelected((prev) => (prev === id ? null : id))
-                  }}
-                />
+                {is3d ? (
+                  <BodyMap3D
+                    view={view}
+                    muscles={musclesForView}
+                    selected={selected}
+                    onSelect={(id) => {
+                      setSelected((prev) => (prev === id ? null : id))
+                    }}
+                  />
+                ) : (
+                  <BodyMapSvg
+                    view={view}
+                    muscles={musclesForView}
+                    selected={selected}
+                    gender={gender}
+                    onSelect={(id) => {
+                      setSelected((prev) => (prev === id ? null : id))
+                    }}
+                  />
+                )}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIs3d((v) => !v)
+                    }}
+                    aria-pressed={is3d}
+                    className="tap-44 min-h-[32px] px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 font-black text-[10px] uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-1.5"
+                  >
+                    <Rotate3d size={13} aria-hidden />
+                    {is3d ? 'Ver em 2D' : 'Ver em 3D'}
+                  </button>
+                  {is3d && (
+                    <span className="text-[9px] leading-none font-black uppercase tracking-wider text-neutral-400">
+                      Arraste para girar
+                    </span>
+                  )}
+                </div>
+                {/* Atribuição exigida pela CC BY-SA 4.0 do modelo. Só aparece
+                    com o 3D na tela, que é quando o modelo está em uso. */}
+                {is3d && (
+                  <p className="mt-2 text-[10px] leading-tight text-neutral-400">
+                    Modelo 3D:{' '}
+                    <a
+                      href="https://www.z-anatomy.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 hover:text-neutral-400"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Z-Anatomy
+                    </a>{' '}
+                    ·{' '}
+                    <a
+                      href="https://creativecommons.org/licenses/by-sa/4.0/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 hover:text-neutral-400"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      CC BY-SA 4.0
+                    </a>
+                  </p>
+                )}
                 {/* Legenda de intensidade (escala contínua — não é filtro) */}
                 <div className="mt-3" aria-hidden>
                   <div
