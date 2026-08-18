@@ -243,6 +243,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         pendingNutritionRef.current = false
         setNutritionOpen(true)
     }, [view, setNutritionOpen])
+    // ⚠️ MEMOIZADO, e isso não é micro-otimização: passar `{ id, email }` como
+    // objeto literal cria uma referência NOVA a cada render, e os efeitos do
+    // TeamWorkoutProvider (que dependem de `user`) re-disparam em cadeia —
+    // setState → render → novo objeto → setState. O E2E pegou como
+    // "element is not stable ... detached from the DOM": o card de treino
+    // remontava sem parar e nenhum clique conseguia acertá-lo.
+    const teamUser = useMemo(
+        () => (user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null),
+        [user?.id, user?.email],
+    )
+
     // "Histórico de refeições" no menu: abre a nutrição JÁ no histórico. A flag
     // é consumida na abertura e zerada ao fechar — sem isso, reabrir a aba pela
     // barra cairia no histórico de novo, sem ninguém ter pedido.
@@ -1088,7 +1099,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 watchDashboard={watchDashboard}
                 watchGyms={watchGyms}
                 onWatchRefresh={() => { fetchWorkouts().catch(() => {}) }}
-                teamUser={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null}
+                teamUser={teamUser}
                 onStartSession={handleStartSession as unknown as (w: Record<string, unknown>) => void | Promise<void>}
             >
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
