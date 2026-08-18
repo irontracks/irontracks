@@ -32,13 +32,25 @@ describe('Concluir — o botão mais tocado', () => {
 })
 
 describe('Finalizar — o botão tocado uma vez', () => {
+    /**
+     * ⚠️ O corte é pelo `disabled={finishing}` (a âncora estável do botão), não
+     * pela string da className. A primeira versão fatiava por
+     * `'inline-flex items-center gap-2 px-5 py-3'` e, quando o botão virou
+     * `w-full` em 18/08/2026, o `indexOf` devolveu -1: o bloco virou string
+     * vazia e os dois casos passaram a medir NADA. Guard cego por migração é o
+     * 6º jeito de escrever guard falso deste repo.
+     */
+    const blocoDoBotao = () =>
+        footer.slice(footer.indexOf('disabled={finishing}'), footer.indexOf('<Save size={16} />'))
+
     it('só fica sólido quando o treino está completo', () => {
-        const bloco = footer.slice(footer.indexOf("'inline-flex items-center gap-2 px-5 py-3"), footer.indexOf('<Save size={16} />'))
+        const bloco = blocoDoBotao()
+        expect(bloco.length, 'o corte não pode devolver bloco vazio').toBeGreaterThan(200)
         expect(bloco).toMatch(/allDone[\s\S]*?bg-gradient-to-r from-yellow-400/)
     })
 
     it('com série pendente, é discreto', () => {
-        const bloco = footer.slice(footer.indexOf("'inline-flex items-center gap-2 px-5 py-3"), footer.indexOf('<Save size={16} />'))
+        const bloco = blocoDoBotao()
         // O ramo final do ternário (sem allDone, sem finishing) é a linha que
         // vale: ela não pode ser gold, senão a inversão volta.
         const ramoPendente = bloco.split('\n').find((l) => l.includes('bg-neutral-900')) || ''
