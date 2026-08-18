@@ -33,8 +33,40 @@ const DRACO_PATH = '/draco/'
 
 const MUSCLE_IDS = new Set<string>(MUSCLE_GROUPS.map((m) => m.id))
 
-const BODY_COLOR = 0x3a3a3c
-const UNTRAINED_COLOR = 0x434347
+/**
+ * O corpo é UM corpo. O material nunca muda de cor — o volume da semana entra
+ * como LUZ PRÓPRIA (emissive) sobre esta base. Pintar o albedo de laranja é o
+ * que fazia o manequim parecer plástico: em 2D a cor é um véu translúcido sobre
+ * uma textura que já tem sombra; a tradução física disso em 3D é emissão.
+ *
+ * Warm black, da mesma família dos fundos do app (#0f0f0e / #151514 / #1a1a18).
+ * O cinza azulado anterior (#3a3a3c) destoava de toda a paleta.
+ */
+const BODY_COLOR = 0x4a4a42
+/**
+ * Fundo do palco. Precisa ser MAIS FUNDO que o corpo, senão o manequim neutro
+ * some: metade da superfície não pertence a grupo nenhum, e se ela não é
+ * visível as ilhas coloridas ficam boiando no vazio. Medido em tela.
+ */
+const STAGE_COLOR = 0x0f0f0e
+
+/**
+ * A cor entra por DOIS canais, e cada um faz uma coisa que o outro não faz:
+ *
+ *  - `tint` mistura a cor no ALBEDO. É o que preserva o sombreamento: superfície
+ *    tingida ainda recebe luz, então o relevo do corpo continua legível.
+ *  - `glow` é a EMISSÃO. É o que faz o grupo "acender" e dá vida ao dado.
+ *
+ * Emissão sozinha não recebe shading e achata o corpo numa silhueta chapada
+ * (medido); tinta sozinha é plástico pintado, que foi a primeira versão.
+ */
+const MAX_TINT = 0.46
+const MIN_TINT = 0.12
+const MAX_GLOW = 0.34
+const MIN_GLOW = 0.06
+/** Quanto os outros grupos recuam quando um está selecionado. Hierarquia se
+ *  faz tirando: o escolhido não precisa gritar se os demais sussurram. */
+const DIMMED = 0.3
 
 type MuscleState = { color?: string; sets?: number; ratio?: number; label?: string }
 
@@ -62,13 +94,22 @@ type Stage = {
 }
 
 function buildLights(scene: THREE.Scene) {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75))
-  const key = new THREE.DirectionalLight(0xffffff, 1.5)
+  // Luz baixa de propósito: quem informa é a EMISSÃO do músculo, não o quanto
+  // a lâmpada bate na pele. Com key forte, a luz difusa lava a cor e o volume
+  // da semana some — foi o que aconteceu na primeira versão.
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+
+  const key = new THREE.DirectionalLight(0xfff4e0, 0.95)
   key.position.set(2, 3, 4)
-  const fill = new THREE.DirectionalLight(0xffffff, 0.6)
+
+  const fill = new THREE.DirectionalLight(0xdfe6ff, 0.3)
   fill.position.set(-3, 1, 2)
-  const rim = new THREE.DirectionalLight(0xffffff, 0.9)
-  rim.position.set(0, 1, -4)
+
+  // Contraluz: separa a silhueta do fundo. É o que dá corpo ao manequim escuro
+  // e evita que ele vire mancha chapada sobre a superfície do card.
+  const rim = new THREE.DirectionalLight(0xffffff, 0.7)
+  rim.position.set(0, 2, -4)
+
   scene.add(key, fill, rim)
 }
 
@@ -88,23 +129,37 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
   const paint = useCallback(() => {
     const stage = stageRef.current
     if (!stage) return
+    const selectedId = selectedRef.current
     stage.materials.forEach((mat, name) => {
-      if (name === 'body') {
-        mat.color.setHex(BODY_COLOR)
+      // Base idêntica para tudo, sempre: manequim e músculo são a mesma pele.
+      mat.color.setHex(BODY_COLOR)
+
+      if (name === 'body' || !MUSCLE_IDS.has(name)) {
+        mat.emissive.setHex(0x000000)
+        mat.emissiveIntensity = 0
         return
       }
-      if (!MUSCLE_IDS.has(name)) return
+
       const state = musclesRef.current[name]
       const ratio = Number(state?.ratio || 0)
-      const isSelected = name === selectedRef.current
       if (ratio <= 0) {
-        mat.color.setHex(UNTRAINED_COLOR)
-      } else {
-        mat.color.set(state?.color || '#434347')
-        // Selecionado clareia, não muda de matiz — a cor codifica o volume.
-        if (isSelected) mat.color.offsetHSL(0, 0.05, 0.12)
+        // Sem volume não é cinza diferente — é corpo. Silêncio, não ruído.
+        mat.emissive.setHex(0x000000)
+        mat.emissiveIntensity = 0
+        return
       }
-      mat.emissive.setHex(isSelected ? 0x241a08 : 0x000000)
+
+      // A cor é a MESMA que o 2D recebe do servidor. O que muda é o papel dela.
+      const c = new THREE.Color(state?.color || '#eab308')
+
+      // sqrt abre a faixa baixa, onde mora a maioria das semanas reais; linear
+      // achatava tudo que não fosse volume alto.
+      const t = Math.sqrt(Math.min(1, Math.max(0, ratio)))
+      const dim = selectedId && name !== selectedId ? DIMMED : 1
+
+      mat.color.lerp(c, (MIN_TINT + (MAX_TINT - MIN_TINT) * t) * dim)
+      mat.emissive.copy(c)
+      mat.emissiveIntensity = (MIN_GLOW + (MAX_GLOW - MIN_GLOW) * t) * dim
     })
     needsRenderRef.current = true
   }, [])
@@ -117,8 +172,13 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
     let disposed = false
     let frame = 0
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'low-power' })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    // Sem tone mapping, laranja e vermelho saturados estouram sem rolloff — é
+    // metade da sensação de "plástico pintado". ACES devolve o ombro da curva.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.05
+    renderer.setClearColor(STAGE_COLOR, 1)
     renderer.setSize(host.clientWidth || 280, host.clientHeight || 280, false)
     renderer.domElement.style.width = '100%'
     renderer.domElement.style.height = '100%'
@@ -171,9 +231,11 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
         gltf.scene.traverse((child: THREE.Object3D) => {
           if (!(child instanceof THREE.Mesh)) return
           const mat = new THREE.MeshStandardMaterial({
-            color: child.name === 'body' ? BODY_COLOR : UNTRAINED_COLOR,
-            roughness: 0.78,
-            metalness: 0.02,
+            color: BODY_COLOR,
+            roughness: 0.92,   // pele fosca; brilho especular aqui lê como plástico
+            metalness: 0,
+            emissive: 0x000000,
+            emissiveIntensity: 0,
           })
           child.material = mat
           stage.materials.set(child.name, mat)
@@ -277,7 +339,7 @@ const BodyMap3D = memo(function BodyMap3D({ view, muscles, onSelect, selected, c
     <div
       ref={hostRef}
       onPointerUp={onSelect ? handlePointerUp : undefined}
-      className={className ?? 'relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black aspect-square'}
+      className={className ?? 'relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-depth-1 aspect-square'}
       style={{ touchAction: 'none' }}
       role="img"
       aria-label={label}
