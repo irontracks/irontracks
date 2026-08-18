@@ -709,7 +709,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                   logError('ExerciseCard', 'Failed to share exercise', { exIdx, err })
                 }
               }}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors active:scale-95 flex-shrink-0"
+              className="tap-44 h-9 w-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors active:scale-95 flex-shrink-0"
               title="Compartilhar com parceiro"
               aria-label="Compartilhar exercício com parceiro"
             >

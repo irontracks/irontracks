@@ -412,7 +412,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               <span className="text-yellow-300 font-bold flex items-center gap-1.5"><Pause size={13} className="shrink-0" /> Parceiro pausou o treino</span>
               <button
                 onClick={() => teamCtx.resumeSession()}
-                className="text-[11px] font-black bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
+                className="text-[11px] t-action bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
               >
                 Retomar
               </button>
@@ -431,13 +431,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={handleAcceptWorkoutEdit}
-                  className="text-[11px] font-black bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-400 transition-colors"
+                  className="text-[11px] t-action bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-400 transition-colors"
                 >
                   Aceitar
                 </button>
                 <button
                   onClick={() => teamCtx.dismissWorkoutEdit()}
-                  className="text-[11px] font-black bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
+                  className="text-[11px] t-action bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
                 >
                   Ignorar
                 </button>

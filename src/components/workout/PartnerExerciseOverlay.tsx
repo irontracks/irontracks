@@ -9,6 +9,8 @@ import { ModalsComplexMethods } from './ModalsComplexMethods'
 import { ModalsSimpleMethods } from './ModalsSimpleMethods'
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers'
 import type { WorkoutExercise, UnknownRecord } from './types'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { dialogProps } from '@/utils/a11y/backdrop'
 
 interface PartnerExerciseOverlayProps {
     share: ExerciseSharePayload
@@ -17,6 +19,9 @@ interface PartnerExerciseOverlayProps {
 }
 
 export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: PartnerExerciseOverlayProps) {
+    // Tela cheia, não folha com véu: não há backdrop para fechar — o `onEnd`
+    // (botão Sair) é a saída, e o Escape passa por ele.
+    const focusTrapRef = useFocusTrap(true, onEnd);
     const exercise = useMemo(() => share.exercise || {}, [share.exercise])
     const exerciseIdx = share.exerciseIdx
     const name = String(exercise.name || '').trim() || `Exercício ${exerciseIdx + 1}`
@@ -294,7 +299,11 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
     }
 
     return (
-        <div className="fixed inset-0 z-[1500] bg-black/95 backdrop-blur-xl flex flex-col">
+        <div
+            ref={focusTrapRef}
+            {...dialogProps('Exercício compartilhado pelo parceiro')}
+            className="fixed inset-0 z-[1500] bg-black/95 backdrop-blur-xl flex flex-col"
+        >
             {/* Header */}
             <div className="relative px-4 pt-safe pb-3 border-b border-amber-500/30 bg-gradient-to-b from-amber-950/50 to-transparent">
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
@@ -304,7 +313,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                             <Dumbbell size={18} className="text-amber-400" />
                         </div>
                         <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400/70 leading-none mb-0.5">Modo Spotter</div>
+                            <div className="t-meta-inherit text-[10px] tracking-[0.25em] text-amber-400/70 leading-none mb-0.5">Modo Spotter</div>
                             <h2 className="font-black text-white text-lg leading-snug truncate">{name}</h2>
                             <div className="text-[11px] text-amber-300/60 font-bold">
                                 Controlando para <span className="text-amber-300">{share.fromName}</span>
@@ -313,7 +322,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                     </div>
                     <button
                         onClick={onEnd}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wider transition-all active:scale-95"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs t-action uppercase tracking-wider transition-all active:scale-95"
                     >
                         <X size={14} />
                         Sair
@@ -326,7 +335,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                         style={{ width: `${progressPct}%` }}
                     />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[10px] text-neutral-500 font-bold">
+                <div className="mt-1 flex items-center justify-between text-[10px] text-neutral-400 font-bold">
                     <span>{doneSets}/{setsCount} séries</span>
                     <span>{method}</span>
                 </div>

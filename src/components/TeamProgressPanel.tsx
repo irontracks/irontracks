@@ -47,14 +47,14 @@ export function TeamProgressPanel({ exercises, participants }: TeamProgressPanel
                     <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
                         <Users size={10} className="text-black" />
                     </div>
-                    <span className="text-xs font-black text-yellow-400 uppercase tracking-wider">Equipe ao vivo</span>
-                    <span className="text-[10px] text-neutral-500">
+                    <span className="t-meta-inherit text-xs text-yellow-400 tracking-wider">Equipe ao vivo</span>
+                    <span className="text-[10px] text-neutral-400">
                         {partnerIds.length} parceiro{partnerIds.length !== 1 ? 's' : ''}
                     </span>
                 </div>
                 {collapsed
-                    ? <ChevronDown size={13} className="text-neutral-500 shrink-0" />
-                    : <ChevronUp size={13} className="text-neutral-500 shrink-0" />
+                    ? <ChevronDown size={13} className="text-neutral-400 shrink-0" />
+                    : <ChevronUp size={13} className="text-neutral-400 shrink-0" />
                 }
             </button>
 
@@ -80,7 +80,7 @@ export function TeamProgressPanel({ exercises, participants }: TeamProgressPanel
                                 </div>
 
                                 {logEntries.length === 0 ? (
-                                    <p className="text-[10px] text-neutral-500 italic">Aguardando primeira série…</p>
+                                    <p className="text-[10px] text-neutral-400 italic">Aguardando primeira série…</p>
                                 ) : (
                                     <div className="space-y-0.5">
                                         {logEntries.slice(0, 4).map((entry) => {

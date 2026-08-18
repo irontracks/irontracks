@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { teamInsightsGenerationConfig } from '@/utils/team/insightsContract'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,7 +93,10 @@ export async function POST(req: Request) {
             'Regras: pt-BR, objetivo, positivo mas honesto, 1-2 frases por campo. Não invente números.',
         ].join('\n')
 
-        const model = getGeminiModel(apiKey, TEAM_AI_MODEL)
+        // Contrato na CHAMADA, não só no texto do prompt — ver
+        // utils/team/insightsContract.ts para o porquê e para a exceção do
+        // `perParticipant` (mapa de chaves dinâmicas).
+        const model = getGeminiModel(apiKey, TEAM_AI_MODEL, teamInsightsGenerationConfig())
         const geminiResult = await safeGemini('team-workout-insights', () =>
             model.generateContent(prompt),
         )

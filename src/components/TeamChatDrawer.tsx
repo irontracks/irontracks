@@ -128,7 +128,7 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                 >
                     <MessageCircle size={20} />
                     {unread > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                             {unread > 9 ? '9+' : unread}
                         </span>
                     )}
@@ -149,9 +149,9 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                     <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                         <div className="flex items-center gap-2">
                             <MessageCircle size={14} className="text-yellow-400" />
-                            <span className="text-[10px] font-black text-yellow-500/80 uppercase tracking-[0.2em]">Chat da equipe</span>
+                            <span className="t-meta-inherit text-[10px] text-yellow-500/80 tracking-[0.2em]">Chat da equipe</span>
                         </div>
-                        <button onClick={() => setOpen(false)} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar chat da equipe" title="Fechar chat">
+                        <button onClick={() => setOpen(false)} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar chat da equipe" title="Fechar chat">
                             <ChevronDown size={14} />
                         </button>
                     </div>
@@ -159,7 +159,7 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
                         {chatMessages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center gap-2 text-neutral-600">
+                            <div className="h-full flex flex-col items-center justify-center gap-2 text-neutral-400">
                                 <MessageCircle size={24} />
                                 <p className="text-xs text-center">Nenhuma mensagem ainda.<br />Seja o primeiro a mandar fogo! 🔥</p>
                             </div>
@@ -178,14 +178,14 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                                             {photo ? (
                                                 <Image src={photo} alt={name} width={24} height={24} className="object-cover" unoptimized />
                                             ) : (
-                                                <div className="w-full h-full bg-yellow-500 flex items-center justify-center text-[9px] font-black text-black">
+                                                <div className="w-full h-full bg-yellow-500 flex items-center justify-center text-[11px] font-bold text-black">
                                                     {name[0]?.toUpperCase() ?? '?'}
                                                 </div>
                                             )}
                                         </div>
                                         {/* Bubble */}
                                         <div className={`max-w-[70%] rounded-2xl px-3 py-2 text-xs ${isMine ? 'bg-yellow-500 text-black rounded-br-sm' : 'bg-neutral-800 text-white rounded-bl-sm'}`}>
-                                            {showName && <p className="text-[10px] font-black text-yellow-400 mb-0.5">{name}</p>}
+                                            {showName && <p className="text-[10px] font-bold text-yellow-400 mb-0.5">{name}</p>}
                                             <p className="leading-snug break-words">{msg.text}</p>
                                         </div>
                                     </div>
@@ -201,7 +201,7 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                             <button
                                 key={emoji}
                                 onClick={() => sendChatMessage(emoji)}
-                                className="flex-1 text-base h-8 rounded-lg hover:bg-neutral-700 transition-colors active:scale-90"
+                                className="tap-44 flex-1 text-base h-8 rounded-lg hover:bg-neutral-700 transition-colors active:scale-90"
                             >
                                 {emoji}
                             </button>
@@ -218,12 +218,13 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                             onKeyDown={handleKeyDown}
                             placeholder="Mensagem…"
                             maxLength={200}
-                            className="flex-1 bg-neutral-800 text-white text-xs rounded-xl px-3 py-2 outline-none placeholder:text-neutral-500 border border-neutral-700 focus:border-yellow-500/40 transition-colors"
+                            className="flex-1 bg-neutral-800 text-white text-xs rounded-xl px-3 py-2 outline-none placeholder:text-neutral-400 border border-neutral-700 focus:border-yellow-500/40 transition-colors"
                         />
                         <button
                             onClick={handleSend}
                             disabled={!input.trim()}
-                            className="w-8 h-8 rounded-xl bg-yellow-500 text-black flex items-center justify-center disabled:opacity-30 hover:bg-yellow-400 transition-colors active:scale-95"
+                            aria-label="Enviar mensagem"
+                            className="tap-44 w-8 h-8 rounded-xl bg-yellow-500 text-black flex items-center justify-center disabled:opacity-30 hover:bg-yellow-400 transition-colors active:scale-95"
                         >
                             <Send size={13} />
                         </button>

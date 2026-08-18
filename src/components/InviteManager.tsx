@@ -6,6 +6,9 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 
 interface InviteCandidate {
     id: string
@@ -32,6 +35,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
     const [nowMs, setNowMs] = useState(0);
 
     useBackHandler(isOpen, onClose);
+    const focusTrapRef = useFocusTrap(isOpen, onClose);
 
     useEffect(() => {
         alertRef.current = alert;
@@ -262,8 +266,10 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" {...backdropProps(onClose)}>
             <div
+              ref={focusTrapRef}
+              {...dialogProps('Convidar parceiro de treino')}
               className="w-full max-w-md rounded-2xl border shadow-2xl flex flex-col max-h-[80vh] relative overflow-hidden"
               style={{
                 background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
@@ -273,7 +279,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
             >
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                 <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80 flex items-center gap-2">
+                    <h3 className="t-meta-inherit text-xs tracking-[0.2em] text-yellow-500/80 flex items-center gap-2">
                         <UserPlus size={16} />
                         Convidar Parceiro
                     </h3>
@@ -286,6 +292,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                     <div className="relative">
                         <Search className="absolute left-3 top-3 text-neutral-400" size={18} />
                         <input
+                            {...properNameFieldProps}
                             aria-label="Buscar atleta"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}

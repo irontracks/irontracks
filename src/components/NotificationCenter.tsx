@@ -356,13 +356,13 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     <div className="flex gap-2 mt-3">
                                         <button
                                             onClick={() => handleAccept(item)}
-                                            className="flex-1 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-900/30"
+                                            className="flex-1 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white text-xs t-action py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-900/30"
                                         >
                                             <Check size={12} /> Aceitar
                                         </button>
                                         <button
                                             onClick={() => handleReject(item)}
-                                            className="flex-1 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-300 text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-neutral-700"
+                                            className="flex-1 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-300 text-xs t-action py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-neutral-700"
                                         >
                                             <X size={12} /> Recusar
                                         </button>
