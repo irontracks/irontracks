@@ -67,9 +67,17 @@ export default function WorkoutFooter() {
       style={{ bottom: 'var(--it-rest-bar-h, 0px)' }}
       className={`fixed left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe transition-[bottom] duration-150 ${keyboardOpen ? 'hidden' : ''}`}
     >
-      <div className="max-w-6xl mx-auto flex items-center justify-end gap-2">
-        {/* Finalizar — with glow celebration ring when allDone */}
-        <div className="relative shrink-0">
+      {/* ── Uma barra, um botão, largura inteira ────────────────────────────
+          Quando o rodapé tinha quatro elementos, o `justify-end` fazia sentido:
+          o Finalizar era a âncora à direita de uma fileira. Sozinho, virou um
+          botão pequeno encostado na quina de uma barra de borda a borda — e
+          uma superfície inteira existindo para hospedar um elemento que ocupa
+          um terço dela não lê como decisão, lê como sobra.
+          O CTA passa a ocupar a barra, mesma anatomia do START do descanso
+          logo abaixo. Peso continua vindo da COR, não da largura: neutro
+          enquanto há série pendente, dourado quando o treino fecha. */}
+      <div className="max-w-6xl mx-auto">
+        <div className="relative">
           {allDone && !finishing && (
             <div className="absolute inset-0 rounded-xl pointer-events-none animate-pulse-glow" />
           )}
@@ -85,7 +93,7 @@ export default function WorkoutFooter() {
               finishWorkout(elapsedSeconds);
             }}
             className={[
-              'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-sm transition-all duration-300',
+              'w-full inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-black text-sm transition-all duration-300 active:scale-[0.99]',
               // O sólido é RESERVADO para o treino completo. Antes disso,
               // "Finalizar" gritava mais que "Concluir" — o botão de sair com
               // mais peso que o de trabalhar. Agora o rodapé fica discreto

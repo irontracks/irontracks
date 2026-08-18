@@ -127,3 +127,34 @@ describe('rodapé do treino — uma ação', () => {
         expect(footer, 'pausa sem cronômetro ao lado é botão órfão').not.toMatch(/togglePause/)
     })
 })
+
+/**
+ * A forma do CTA que sobrou.
+ *
+ * Depois que o rodapé ficou com uma ação só, o botão herdou o `justify-end` da
+ * época em que era um de quatro — e virou um retângulo pequeno encostado na
+ * quina de uma barra de borda a borda. O dono viu na hora: "todo torto,
+ * sozinho ali no card".
+ *
+ * Uma superfície inteira que hospeda um elemento ocupando um terço dela não lê
+ * como decisão; lê como sobra. O CTA ocupa a barra — mesma anatomia do START
+ * do descanso logo abaixo —, e a hierarquia entre os dois continua vindo da
+ * COR (neutro com série pendente, dourado quando fecha), não da largura.
+ */
+describe('forma do Finalizar', () => {
+    it('ocupa a barra inteira', () => {
+        const bloco = footer.slice(footer.indexOf('finishWorkout(elapsedSeconds)'))
+        expect(bloco).toMatch(/w-full inline-flex items-center justify-center/)
+    })
+
+    it('não sobrou alinhamento de fileira no contêiner', () => {
+        expect(footer, 'justify-end era para quando havia quatro elementos')
+            .not.toMatch(/max-w-6xl mx-auto flex items-center justify-end/)
+    })
+
+    it('o peso continua na cor, não no tamanho', () => {
+        // Dourado sólido só quando o treino fecha; antes disso, neutro.
+        expect(footer).toMatch(/allDone[\s\S]{0,200}from-yellow-400 to-amber-400/)
+        expect(footer).toMatch(/bg-neutral-900 border border-neutral-700/)
+    })
+})
