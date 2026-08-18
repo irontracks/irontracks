@@ -33,6 +33,7 @@
 -- `enforce_invite_whitelist_v2`, `team_sessions_set_updated_at` e
 -- `set_updated_at_team_session_presence`. As tabelas caíram; as funções ficaram.
 --
+-- Aplicada via MCP em 2026-08-18 (produção).
 -- Rollback: reaplicar `20260715153440_drop_teamwork_v2_and_feature_flags.sql`.
 
 -- ── 1) Tabelas ───────────────────────────────────────────────────────────────
@@ -369,6 +370,9 @@ end;
 $function$;
 
 -- Higiene de grants (20260711092326): anon não chama RPC de dupla.
+-- ⚠️ Isto NÃO é suficiente sozinho — o EXECUTE vem de PUBLIC, que inclui anon.
+-- A migration 20260818093000 (aplicada logo em seguida) revoga de PUBLIC e
+-- concede a `authenticated`, que é o que fecha de verdade.
 REVOKE EXECUTE ON FUNCTION public.accept_team_invite(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.leave_team_session(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.join_team_session_by_code(text) FROM anon;
