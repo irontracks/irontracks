@@ -209,29 +209,13 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               <Pencil size={14} />
               <span className="text-xs font-black">Abrir</span>
             </button>
-            {/* `overflow-hidden`: sem ele o rótulo do método (que é `shrink-0`)
-                TRANSBORDA do contêiner flex-1 e é desenhado POR CIMA do chip de
-                falha — "DROP" e "FALHA" sobrepostos, visto no aparelho quando o
-                chip ganhou rótulo (19/08/2026). `min-w-0` encolhe a caixa, não o
-                conteúdo dela. */}
-            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden ml-1">
-              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
-                {modeLabel || 'Drop'}
-                <HelpHint
-                  title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
-                  text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
-                  tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
-                  className="h-4 w-4 text-[10px]"
-                />
-              </span>
-              {/* Só o contador fica inline — a linha é apertada (Abrir + notas +
-                  Concluir) e qualquer texto maior era COLAPSADO pelo truncate, que
-                  foi o que escondeu o peso das etapas na validação de 2026-07-24.
-                  O peso vai na linha de baixo, onde sempre cabe. */}
-              <span className="text-xs truncate text-neutral-400">
-                {stagesCount} etapas{total ? ` • ${total} reps` : ''}
-              </span>
-            </div>
+            {/* Espaçador. O rótulo do método e o contador de etapas VIVEM NA LINHA
+                DE BAIXO desde 19/08/2026: com o chip de falha ganhando rótulo, os
+                cinco controles não cabiam mais aqui — o "DROP" transbordava e era
+                desenhado POR CIMA do "FALHA", e cortá-lo com `overflow-hidden`
+                apagava o nome do método. Espaço se ganha movendo o que é INFORMAÇÃO
+                para onde sobra, não espremendo o que é CONTROLE. */}
+            <div className="flex-1 min-w-0" />
             <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
@@ -266,13 +250,25 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
       {/* Peso das etapas na linha de baixo — sem isso o drop era o ÚNICO método que
           não mostrava peso algum na tela, e a carga automática parecia não funcionar
           (só aparecia ao abrir o modal). Violeta quando as etapas vieram do motor. */}
-      {!done && stageWeightSummary && (
-        <div className="pl-12">
+      {!done && (
+        <div className="pl-12 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
+            {modeLabel || 'Drop'}
+            <HelpHint
+              title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
+              text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
+              tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
+              className="h-4 w-4 text-[10px]"
+            />
+          </span>
+          <span className="text-xs text-neutral-400">
+            {stagesCount} etapas{total ? ` • ${total} reps` : ''}
+          </span>
           {/* Pílula com a MESMA marcação do input de peso dos outros métodos
               (AUTO_INPUT_CLASS). Antes era só texto violeta solto: ao lado da
               caixa violeta da série normal não lia como "o motor preencheu", e
               o dono reportou que "o drop não marca em roxo igual o rest-pause". */}
-          <span
+          {stageWeightSummary && <span
             className={[
               'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
               stagesFilledByMotor
@@ -282,7 +278,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           >
             {stagesFilledByMotor && <span aria-hidden>🧠</span>}
             {stageWeightSummary} kg
-          </span>
+          </span>}
         </div>
       )}
 
