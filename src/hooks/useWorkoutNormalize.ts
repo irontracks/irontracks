@@ -54,6 +54,12 @@ const snapshotDe = (w: Record<string, unknown>): SnapshotTreino => ({
  * confirmasse por engano refazia o nome de cada treino à mão. O snapshot é
  * tirado ANTES de aplicar e regravado pelo mesmo caminho do save — nada de
  * lógica inversa, que erraria em silêncio no primeiro caso que ninguém previu.
+ *
+ * Limite conhecido, e é de propósito: a restauração passa pelo
+ * `normalizeWorkoutTitle` do save, como qualquer escrita do app. Um título que
+ * só existiria por fora do app ("Treino B - peito") volta na forma que o app
+ * grava ("B - peito"). Burlar isso exigiria um segundo caminho de escrita — o
+ * tipo de atalho que aqui sempre cobrou juros depois.
  */
 const restaurar = async (snaps: SnapshotTreino[]): Promise<number> => {
     let voltaram = 0
@@ -137,7 +143,7 @@ export function useWorkoutNormalize({
             }
             if (
                 !(await confirm(
-                    `Renomear ${mudancas.length} treino(s)? Não dá para desfazer.${preview(mudancas)}`,
+                    `Renomear ${mudancas.length} treino(s)?${preview(mudancas)}`,
                     'Padronizar títulos'
                 ))
             )

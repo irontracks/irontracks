@@ -59,7 +59,9 @@ describe('confirmação mostra o que vai mudar', () => {
 
   it('a padronização de títulos lista os renomes antes de aplicar', () => {
     expect(corpo).toMatch(/preview\(mudancas\)/)
-    expect(HOOK).toMatch(/Não dá para desfazer/i)
+    // A frase "Não dá para desfazer" saiu quando o desfazer entrou — aviso que
+    // contradiz o botão ao lado é pior que aviso nenhum.
+    expect(executavel(HOOK)).not.toMatch(/Não dá para desfazer/i)
   })
 
   it('não pergunta mais só "em N treinos?"', () => {
@@ -194,6 +196,12 @@ describe('desfazer — as ações em massa têm volta', () => {
   it('as duas ações oferecem desfazer ao concluir', () => {
     const chamadas = corpo.match(/ofereceDesfazer\(/g) ?? []
     expect(chamadas.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('assume o limite da normalização em vez de criar um segundo caminho de escrita', () => {
+    expect(HOOK).toMatch(/normalizeWorkoutTitle/)
+    const fn = corpo.slice(corpo.indexOf('const restaurar'), corpo.indexOf('interface UseWorkoutNormalizeOptions'))
+    expect(fn, 'restaurar só pode escrever pelo save comum').not.toMatch(/supabase|from\(/)
   })
 
   it('restaura pelo mesmo caminho do save, sem lógica inversa', () => {
