@@ -19,11 +19,21 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 const apenasAtivos = (list: Array<Record<string, unknown>>) =>
     list.filter((w) => !(w?.archived_at ?? w?.archivedAt))
 
-/** Lista de mudanças para o diálogo: no máximo 8 linhas + "(+N)". */
+/**
+ * Lista de mudanças para o diálogo: no máximo 8 linhas + "(+N)".
+ *
+ * Agrupa repetição em "×N": o mesmo exercício aparece em vários treinos, e no
+ * aparelho o diálogo mostrava "Panturrilha sentado → Elevação de panturrilha
+ * sentada" duas vezes seguidas. Linha repetida gasta o espaço que a próxima
+ * troca precisava para ser lida.
+ */
 const preview = (linhas: string[], max = 8): string => {
     if (!linhas.length) return ''
-    const mostradas = linhas.slice(0, max).map((l) => `• ${l}`).join('\n')
-    const resto = linhas.length > max ? `\n(+${linhas.length - max} outras)` : ''
+    const contagem = new Map<string, number>()
+    for (const l of linhas) contagem.set(l, (contagem.get(l) ?? 0) + 1)
+    const unicas = [...contagem.entries()].map(([l, n]) => (n > 1 ? `${l} (×${n})` : l))
+    const mostradas = unicas.slice(0, max).map((l) => `• ${l}`).join('\n')
+    const resto = unicas.length > max ? `\n(+${unicas.length - max} outras)` : ''
     return `\n\n${mostradas}${resto}`
 }
 
