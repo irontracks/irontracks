@@ -78,6 +78,22 @@ const GlobalDialog = () => {
 					confirmCls: 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-900/30 text-black',
 				};
 			default:
+				// Alerta: o TOM decide o ícone. Verde é sucesso — usá-lo em
+				// "Erro ao salvar" fazia a cor contradizer o texto.
+				if (dialog.tone === 'error') {
+					return {
+						bg: 'bg-red-500/15 border border-red-500/30',
+						icon: <AlertTriangle className="text-red-400" size={32} />,
+						confirmCls: 'bg-red-500 hover:bg-red-400 shadow-lg shadow-red-900/30 text-white',
+					};
+				}
+				if (dialog.tone === 'info') {
+					return {
+						bg: 'bg-neutral-500/15 border border-neutral-500/30',
+						icon: <AlertCircle className="text-neutral-300" size={32} />,
+						confirmCls: 'bg-neutral-700 hover:bg-neutral-600 shadow-lg shadow-black/30 text-white',
+					};
+				}
 				return {
 					bg: 'bg-green-500/15 border border-green-500/30',
 					icon: <CheckCircle2 className="text-green-400" size={32} />,

@@ -100,35 +100,73 @@ export const stripWeekdayHint = (value: unknown): string => {
   return stripLeadingDayPrefix(noTrailing)
 }
 
-export const formatProgramWorkoutTitle = (draftTitle: unknown, index: unknown, options: unknown): string => {
+/**
+ * Remove a letra de ordem do começo do título PRESERVANDO a caixa do resto.
+ * Mesmos formatos que `extractLeadingLetter` reconhece ("Treino A - X",
+ * "(A) X", "A - X"), só que sem passar o título por `toLowerCase`.
+ */
+const stripLeadingLetterKeepCase = (raw: string): string => {
+  const s = normalizeDash(raw).trim()
+  if (!s) return ''
+  const padroes = [
+    /^treino\s*\(?\s*[a-z]\s*\)?\s*[-:]?\s*(.*)$/i,
+    /^\(?\s*[a-z]\s*\)?\s*[-:]\s*(.*)$/i,
+    /^\(?\s*[a-z]\s*\)?\s+(.*)$/i,
+  ]
+  for (const re of padroes) {
+    const m = s.match(re)
+    if (m?.[1]) return normalizeSpaces(m[1])
+  }
+  return s
+}
+
+/** Abreviações que o app usa no prefixo, na ordem da semana começando na segunda. */
+const WEEKDAY_PREFIXES = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM']
+
+const START_DAY_INDEX: Record<string, number> = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6,
+}
+
+/**
+ * Título de treino no padrão VIGENTE do app: `SEG · Upper B - Peito + Braços`.
+ *
+ * O formato anterior era `A - UPPER B - PEITO + BRAÇOS (SEGUNDA)` — letra na
+ * frente, tudo em caixa alta e o dia por extenso no fim. Ele nasceu antes de o
+ * app passar a tratar o dia como PREFIXO (é o que o ORGANIZAR mantém, via
+ * `reassignDaysByOrder`, e o que o selo HOJE lê), e ficou sendo a única parte do
+ * produto ainda escrevendo do jeito antigo: quem apertasse "Padronizar títulos"
+ * via os cinco treinos trocarem de cara (auditoria de 19/08/2026).
+ *
+ * Duas escolhas dentro dele:
+ * · **preserva o texto do nome** em vez de forçar maiúsculas — a assinatura do
+ *   app é o peso da fonte, não a caixa, e o título em caixa alta custa ~12% de
+ *   largura numa lista onde o nome já é longo;
+ * · **remove o dia antigo dos dois lados** (`stripWeekdayHint`), senão o
+ *   prefixo novo conviveria com o dia que já estava lá.
+ */
+export const formatWeekdayWorkoutTitle = (draftTitle: unknown, index: unknown, options?: unknown): string => {
   const idx = Number(index)
   const safeIndex = Number.isFinite(idx) && idx >= 0 ? Math.floor(idx) : 0
-  const letter = String.fromCharCode(65 + Math.min(25, safeIndex))
-  const weekday = (() => {
-    const days = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
-    const o: UnknownRecord = options && typeof options === 'object' ? (options as UnknownRecord) : ({} as UnknownRecord)
-    const start = String(o?.startDay || 'monday').toLowerCase()
-    const map: Record<string, number> = {
-      monday: 0,
-      tuesday: 1,
-      wednesday: 2,
-      thursday: 3,
-      friday: 4,
-      saturday: 5,
-      sunday: 6,
-    }
-    const startIndex = Number.isFinite(map[start]) ? map[start] : 0
-    const idx = (startIndex + safeIndex) % 7
-    return days[idx] || `DIA ${safeIndex + 1}`
-  })()
+  const o: UnknownRecord = options && typeof options === 'object' ? (options as UnknownRecord) : ({} as UnknownRecord)
+  const start = String(o?.startDay || 'monday').toLowerCase()
+  const startIndex = Number.isFinite(START_DAY_INDEX[start]) ? START_DAY_INDEX[start] : 0
+  const prefix = WEEKDAY_PREFIXES[(startIndex + safeIndex) % 7]
 
   const raw = String(draftTitle || '').trim()
-  const extracted = extractLeadingLetter(raw)
-  // `stripWeekdayHint`, não `stripTrailingDayHint`: o app de hoje escreve o dia
-  // como PREFIXO ("SEG · Upper B"), e tirar só o sufixo produzia
-  // "A - SEG · UPPER B (SEGUNDA)" — o dia duas vezes no mesmo título
-  // (auditoria de 19/08/2026). A função que remove os dois lados já existia
-  // aqui ao lado; o formatador é que não a chamava.
-  const base = stripWeekdayHint(extracted?.rest || raw) || 'Treino'
-  return `${letter} - ${base.toUpperCase()} (${weekday})`
+  // A letra à frente ("A - Peito") era do formato antigo: quem marca a ordem
+  // hoje é o dia, então ela sai junto para não virar "SEG · A - Peito".
+  //
+  // ⚠️ Não dá para reusar o `rest` do `extractLeadingLetter`: ele minúsculo o
+  // título inteiro para casar a letra, e usá-lo aqui devolvia "SEG · força"
+  // para "Treino A - Força". A caixa do nome é do usuário — este formatador
+  // reordena o título, não o reescreve.
+  const semLetra = stripLeadingLetterKeepCase(raw)
+  const base = stripWeekdayHint(semLetra) || 'Treino'
+  return `${prefix} · ${base}`
 }

@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
+import { formatWeekdayWorkoutTitle } from '@/utils/workoutTitle'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 
 const raiz = process.cwd()
@@ -67,32 +67,53 @@ describe('confirmação mostra o que vai mudar', () => {
   })
 })
 
-describe('título padronizado não repete o dia da semana', () => {
-  it('prefixo "SEG ·" some em vez de conviver com "(SEGUNDA)"', () => {
-    expect(formatProgramWorkoutTitle('SEG · Upper B - Peito + Braços', 0, { startDay: 'monday' }))
-      .toBe('A - UPPER B - PEITO + BRAÇOS (SEGUNDA)')
+describe('título padronizado sai no padrão VIGENTE do app', () => {
+  // O formato antigo ("A - UPPER B - PEITO + BRAÇOS (SEGUNDA)") duplicava o dia
+  // e trocava a cara dos treinos de quem já usa "SEG · Nome" — que é o padrão
+  // que o ORGANIZAR mantém e o selo HOJE lê.
+  it('quem já está no padrão não muda', () => {
+    expect(formatWeekdayWorkoutTitle('SEG · Upper B - Peito + Braços', 0, { startDay: 'monday' }))
+      .toBe('SEG · Upper B - Peito + Braços')
   })
 
-  it('vale para a semana inteira, não só a segunda', () => {
-    const titulos = [
-      ['TER · Lower A - Quadríceps', 1, 'B - LOWER A - QUADRÍCEPS (TERÇA)'],
-      ['QUA · Upper A - Costas', 2, 'C - UPPER A - COSTAS (QUARTA)'],
-      ['QUI · Lower B - Posterior', 3, 'D - LOWER B - POSTERIOR (QUINTA)'],
-      ['SEX · Pump - Ombros', 4, 'E - PUMP - OMBROS (SEXTA)'],
+  it('o dia acompanha a posição na lista, sem repetir', () => {
+    const casos = [
+      ['TER · Lower A - Quadríceps', 1, 'TER · Lower A - Quadríceps'],
+      ['QUA · Upper A - Costas', 2, 'QUA · Upper A - Costas'],
+      ['QUI · Lower B - Posterior', 3, 'QUI · Lower B - Posterior'],
+      ['SEX · Pump - Ombros', 4, 'SEX · Pump - Ombros'],
     ] as const
-    for (const [entrada, idx, esperado] of titulos) {
-      expect(formatProgramWorkoutTitle(entrada, idx, { startDay: 'monday' })).toBe(esperado)
+    for (const [entrada, idx, esperado] of casos) {
+      expect(formatWeekdayWorkoutTitle(entrada, idx, { startDay: 'monday' })).toBe(esperado)
     }
   })
 
-  it('o sufixo antigo continua sendo removido', () => {
-    expect(formatProgramWorkoutTitle('A - empurrar a (segunda)', 0, { startDay: 'monday' }))
-      .toBe('A - EMPURRAR A (SEGUNDA)')
+  it('converte o formato ANTIGO (letra + dia no fim) para o novo', () => {
+    expect(formatWeekdayWorkoutTitle('A - empurrar a (segunda)', 0, { startDay: 'monday' }))
+      .toBe('SEG · empurrar a')
   })
 
-  it('título sem dia nenhum não perde palavra', () => {
-    expect(formatProgramWorkoutTitle('Peito e tríceps', 0, { startDay: 'monday' }))
-      .toBe('A - PEITO E TRÍCEPS (SEGUNDA)')
+  it('preserva a caixa que o usuário escreveu', () => {
+    // Reusar o `rest` do extractLeadingLetter devolvia "SEG · força": ele
+    // minúscula o título todo para casar a letra.
+    expect(formatWeekdayWorkoutTitle('Treino A - Força', 0, { startDay: 'monday' }))
+      .toBe('SEG · Força')
+    expect(formatWeekdayWorkoutTitle('B - Peito + Tríceps', 1, { startDay: 'monday' }))
+      .toBe('TER · Peito + Tríceps')
+  })
+
+  it('não força caixa alta — a assinatura do app é o peso, não a caixa', () => {
+    expect(formatWeekdayWorkoutTitle('Peito e tríceps', 0, { startDay: 'monday' }))
+      .toBe('SEG · Peito e tríceps')
+  })
+
+  it('respeita o dia de início escolhido nas configurações', () => {
+    expect(formatWeekdayWorkoutTitle('Peito', 0, { startDay: 'wednesday' })).toBe('QUA · Peito')
+    expect(formatWeekdayWorkoutTitle('Costas', 5, { startDay: 'wednesday' })).toBe('SEG · Costas')
+  })
+
+  it('título vazio não vira prefixo solto', () => {
+    expect(formatWeekdayWorkoutTitle('', 0, { startDay: 'monday' })).toBe('SEG · Treino')
   })
 })
 
@@ -151,5 +172,63 @@ describe('prévia agrupa repetição', () => {
     // seguidas, gastando o espaço da troca seguinte.
     expect(HOOK).toMatch(/\(×\$\{n\}\)/)
     expect(HOOK).toMatch(/contagem\.set\(/)
+  })
+})
+
+describe('desfazer — as ações em massa têm volta', () => {
+  const corpo = executavel(HOOK)
+
+  it('tira snapshot ANTES de escrever', () => {
+    // Se o snapshot fosse tirado depois, ele guardaria o estado JÁ alterado —
+    // um desfazer que não desfaz nada.
+    // Fatiar a partir do PRIMEIRO `await updateWorkout` do arquivo pegaria o da
+    // função `restaurar`, que vem antes — o slice sairia vazio e o caso passaria
+    // por acidente. Procura o updateWorkout que vem DEPOIS do snapshot.
+    const ini = corpo.indexOf('const desfazer')
+    const fim = corpo.indexOf('await updateWorkout', ini)
+    expect(ini).toBeGreaterThan(-1)
+    expect(fim).toBeGreaterThan(ini)
+    expect(corpo.slice(ini, fim)).toMatch(/desfazer\.push\(snapshotDe\(w\)\)/)
+  })
+
+  it('as duas ações oferecem desfazer ao concluir', () => {
+    const chamadas = corpo.match(/ofereceDesfazer\(/g) ?? []
+    expect(chamadas.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('restaura pelo mesmo caminho do save, sem lógica inversa', () => {
+    const fn = corpo.slice(corpo.indexOf('const restaurar'), corpo.indexOf('interface UseWorkoutNormalizeOptions'))
+    expect(fn).toMatch(/updateWorkout\(snap\.id/)
+    expect(fn).toMatch(/title: snap\.title/)
+    expect(fn).toMatch(/exercises: snap\.exercises/)
+  })
+
+  it('fechar o diálogo por fora MANTÉM o resultado (desfazer é explícito)', () => {
+    // `confirm` resolve false ao fechar por fora — então desfazer precisa ser o
+    // confirmText, nunca o caminho do false.
+    const fn = corpo.slice(corpo.indexOf('const ofereceDesfazer'), corpo.indexOf('const handleApplyTitleRule'))
+    expect(fn).toMatch(/confirmText: 'Desfazer'/)
+    expect(fn).toMatch(/cancelText: 'Manter'/)
+    expect(fn).toMatch(/if \(!querDesfazer\) return/)
+  })
+})
+
+describe('a cor do alerta não contradiz o texto', () => {
+  const DIALOG = readFileSync(join(raiz, 'src/components/GlobalDialog.tsx'), 'utf8')
+
+  it('erro sai em vermelho, não com o check verde de sucesso', () => {
+    expect(executavel(HOOK)).toMatch(/'Erro ao padronizar títulos: ' \+ message, 'Atenção', 'error'/)
+    expect(executavel(HOOK)).toMatch(/'Erro ao normalizar exercícios: ' \+ message, 'Atenção', 'error'/)
+    expect(DIALOG).toMatch(/dialog\.tone === 'error'/)
+  })
+
+  it('"não encontrei nada" é informação, não sucesso', () => {
+    expect(executavel(HOOK)).toMatch(/'Nenhum exercício para normalizar foi encontrado\.', 'Atenção', 'info'/)
+    expect(DIALOG).toMatch(/dialog\.tone === 'info'/)
+  })
+
+  it('o padrão do app segue sendo o verde (nada muda sem pedir)', () => {
+    const CTX = readFileSync(join(raiz, 'src/contexts/DialogContext.tsx'), 'utf8')
+    expect(CTX).toMatch(/tone: 'success' \| 'info' \| 'error' = 'success'/)
   })
 })

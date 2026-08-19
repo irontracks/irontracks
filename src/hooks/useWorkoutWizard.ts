@@ -3,7 +3,7 @@
 import { useCallback } from 'react'
 import { createWorkout } from '@/actions/workout-actions'
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
-import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
+import { formatWeekdayWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import type { ActiveSession, Exercise } from '@/types/app'
@@ -86,7 +86,7 @@ export function useWorkoutWizard({
       for (let i = 0; i < list.length; i += 1) {
         const d = list[i]
         const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
-        const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: programTitleStartDay ?? undefined })
+        const finalTitle = formatWeekdayWorkoutTitle(baseTitle, i, { startDay: programTitleStartDay ?? undefined })
         const exercises = Array.isArray(d?.exercises) ? d.exercises : []
         const res = await createWorkout({ title: finalTitle, exercises })
         if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))

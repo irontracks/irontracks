@@ -3,7 +3,7 @@ import { logWarn } from '@/lib/logger'
 
 import { useCallback } from 'react'
 import { updateWorkout } from '@/actions/workout-actions'
-import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
+import { formatWeekdayWorkoutTitle } from '@/utils/workoutTitle'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -37,12 +37,44 @@ const preview = (linhas: string[], max = 8): string => {
     return `\n\n${mostradas}${resto}`
 }
 
+/** Estado de um treino ANTES da ação, o bastante para reescrevê-lo de volta. */
+type SnapshotTreino = { id: string; title: string; notes: unknown; exercises: unknown[] }
+
+const snapshotDe = (w: Record<string, unknown>): SnapshotTreino => ({
+    id: String(w?.id || '').trim(),
+    title: String(w?.title || '').trim(),
+    notes: w?.notes ?? '',
+    exercises: Array.isArray(w?.exercises) ? (w.exercises as unknown[]) : [],
+})
+
+/**
+ * Desfazer das ferramentas de manutenção.
+ *
+ * As duas ações reescrevem N treinos de uma vez e não tinham volta: quem
+ * confirmasse por engano refazia o nome de cada treino à mão. O snapshot é
+ * tirado ANTES de aplicar e regravado pelo mesmo caminho do save — nada de
+ * lógica inversa, que erraria em silêncio no primeiro caso que ninguém previu.
+ */
+const restaurar = async (snaps: SnapshotTreino[]): Promise<number> => {
+    let voltaram = 0
+    for (const snap of snaps) {
+        if (!snap.id) continue
+        const res = await updateWorkout(snap.id, {
+            title: snap.title,
+            notes: snap.notes,
+            exercises: snap.exercises,
+        })
+        if (res?.ok) voltaram += 1
+    }
+    return voltaram
+}
+
 interface UseWorkoutNormalizeOptions {
     workouts: Array<Record<string, unknown>>
     programTitleStartDay?: string
     fetchWorkouts: () => Promise<void>
-    alert: (msg: string, title?: string) => Promise<unknown>
-    confirm: (msg: string, title?: string) => Promise<boolean>
+    alert: (msg: string, title?: string, tone?: 'success' | 'info' | 'error') => Promise<unknown>
+    confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>
 }
 
 interface UseWorkoutNormalizeReturn {
@@ -58,11 +90,34 @@ export function useWorkoutNormalize({
     confirm,
 }: UseWorkoutNormalizeOptions): UseWorkoutNormalizeReturn {
 
+    /**
+     * Diálogo de conclusão COM saída. Polaridade deliberada: fechar por fora
+     * resolve `false` e MANTÉM o que o usuário acabou de pedir — desfazer é
+     * escolha explícita, nunca consequência de um toque no vazio.
+     */
+    const ofereceDesfazer = useCallback(async (mensagem: string, snaps: SnapshotTreino[]) => {
+        if (!snaps.length) {
+            await alert(mensagem, 'Pronto', 'success')
+            return
+        }
+        const querDesfazer = await confirm(
+            mensagem,
+            'Pronto',
+            { confirmText: 'Desfazer', cancelText: 'Manter' },
+        )
+        if (!querDesfazer) return
+        const voltaram = await restaurar(snaps)
+        try {
+            await fetchWorkouts()
+        } catch (e) { logWarn('useWorkoutNormalize', 'silenced error', e) }
+        await alert(`Desfeito: ${voltaram} treino(s) voltaram como estavam.`, 'Desfeito', 'success')
+    }, [alert, confirm, fetchWorkouts])
+
     const handleApplyTitleRule = useCallback(async () => {
         try {
             const list = apenasAtivos(Array.isArray(workouts) ? workouts : [])
             if (!list.length) {
-                await alert('Nenhum treino ativo encontrado.')
+                await alert('Nenhum treino ativo encontrado.', 'Atenção', 'info')
                 return
             }
             // Mostra o resultado ANTES de aplicar: renomear todos os treinos é
@@ -70,14 +125,14 @@ export function useWorkoutNormalize({
             const mudancas = list
                 .map((w, i) => {
                     const oldTitle = String(w?.title || '').trim()
-                    const nextTitle = formatProgramWorkoutTitle(oldTitle || 'Treino', i, {
+                    const nextTitle = formatWeekdayWorkoutTitle(oldTitle || 'Treino', i, {
                         startDay: programTitleStartDay,
                     })
                     return nextTitle && nextTitle !== oldTitle ? `${oldTitle} → ${nextTitle}` : null
                 })
                 .filter((v): v is string => !!v)
             if (!mudancas.length) {
-                await alert('Os títulos já estão no padrão.')
+                await alert('Os títulos já estão no padrão.', 'Atenção', 'info')
                 return
             }
             if (
@@ -87,16 +142,20 @@ export function useWorkoutNormalize({
                 ))
             )
                 return
+            const desfazer: SnapshotTreino[] = []
             let updated = 0
             for (let i = 0; i < list.length; i += 1) {
                 const w = list[i]
                 const id = String(w?.id || '').trim()
                 if (!id) continue
                 const oldTitle = String(w?.title || '').trim()
-                const nextTitle = formatProgramWorkoutTitle(oldTitle || 'Treino', i, {
+                const nextTitle = formatWeekdayWorkoutTitle(oldTitle || 'Treino', i, {
                     startDay: programTitleStartDay,
                 })
                 if (!nextTitle || nextTitle === oldTitle) continue
+                // Snapshot ANTES da escrita: se o save falhar no meio, o que já
+                // mudou continua tendo volta.
+                desfazer.push(snapshotDe(w))
                 const res = await updateWorkout(id, {
                     title: nextTitle,
                     notes: w?.notes ?? '',
@@ -108,12 +167,12 @@ export function useWorkoutNormalize({
             try {
                 await fetchWorkouts()
             } catch (e) { logWarn('useWorkoutNormalize', 'silenced error', e) }
-            await alert(`Padronização concluída: ${updated} treinos atualizados.`)
+            await ofereceDesfazer(`Padronização concluída: ${updated} treino(s) atualizado(s).`, desfazer)
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao padronizar títulos: ' + message)
+            await alert('Erro ao padronizar títulos: ' + message, 'Atenção', 'error')
         }
-    }, [alert, confirm, fetchWorkouts, programTitleStartDay, workouts])
+    }, [alert, confirm, fetchWorkouts, ofereceDesfazer, programTitleStartDay, workouts])
 
     const handleNormalizeExercises = useCallback(async () => {
         try {
@@ -140,7 +199,7 @@ export function useWorkoutNormalize({
                 .filter(Boolean)
 
             if (!candidates.length) {
-                await alert('Nenhum exercício para normalizar foi encontrado.')
+                await alert('Nenhum exercício para normalizar foi encontrado.', 'Atenção', 'info')
                 return
             }
             // O nome do exercício é a CHAVE do histórico: renomear desliga a
@@ -156,6 +215,7 @@ export function useWorkoutNormalize({
             )
                 return
 
+            const desfazer: SnapshotTreino[] = []
             let updated = 0
             const updatedWorkouts: Array<{ title: string; changesCount: number }> = []
             for (const item of candidates) {
@@ -166,6 +226,7 @@ export function useWorkoutNormalize({
                 const title =
                     String(w?.title || '').trim() || `Treino ${id.slice(0, 8)}`
                 const notes = w?.notes ?? ''
+                desfazer.push(snapshotDe(w))
                 const res = await updateWorkout(id, {
                     title,
                     notes,
@@ -190,14 +251,15 @@ export function useWorkoutNormalize({
                     ? `\n(+${updatedWorkouts.length - 10} outros)`
                     : ''
             const detail = lines ? `\n\nTreinos atualizados:\n${lines}${more}` : ''
-            await alert(
-                `Normalização concluída: ${updated} treinos atualizados.${detail}`
+            await ofereceDesfazer(
+                `Normalização concluída: ${updated} treino(s) atualizado(s).${detail}`,
+                desfazer,
             )
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao normalizar exercícios: ' + message)
+            await alert('Erro ao normalizar exercícios: ' + message, 'Atenção', 'error')
         }
-    }, [alert, confirm, fetchWorkouts, workouts])
+    }, [alert, confirm, fetchWorkouts, ofereceDesfazer, workouts])
 
     return {
         handleApplyTitleRule,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeWorkoutTitle, workoutTitleKey, formatProgramWorkoutTitle, stripWeekdayHint } from '../workoutTitle'
+import { normalizeWorkoutTitle, workoutTitleKey, formatWeekdayWorkoutTitle, stripWeekdayHint } from '../workoutTitle'
 
 describe('Workout Title Utils', () => {
   describe('normalizeWorkoutTitle', () => {
@@ -38,17 +38,19 @@ describe('Workout Title Utils', () => {
     })
   })
 
-  describe('formatProgramWorkoutTitle', () => {
-    it('should format title with letter and day', () => {
+  describe('formatWeekdayWorkoutTitle', () => {
+    // Formato vigente do app: "SEG · Nome". O antigo ("A - NOME (SEGUNDA)") foi
+    // aposentado em 19/08/2026 — ver o comentário da função.
+    it('prefixa o dia conforme a posição', () => {
       const options = { startDay: 'monday' }
-      // Input must be formatted like "Treino A - ..." to work correctly with current implementation
-      expect(formatProgramWorkoutTitle('Treino A - Força', 0, options)).toBe('A - FORÇA (SEGUNDA)')
-      expect(formatProgramWorkoutTitle('Treino B - Cardio', 1, options)).toBe('B - CARDIO (TERÇA)')
+      expect(formatWeekdayWorkoutTitle('Treino A - Força', 0, options)).toBe('SEG · Força')
+      expect(formatWeekdayWorkoutTitle('Treino B - Cardio', 1, options)).toBe('TER · Cardio')
     })
 
-    it('should strip existing day hints', () => {
+    it('remove o dia que já estava no título, dos dois lados', () => {
       const options = { startDay: 'monday' }
-      expect(formatProgramWorkoutTitle('Treino A (segunda)', 0, options)).toBe('A - TREINO (SEGUNDA)')
+      expect(formatWeekdayWorkoutTitle('Treino A (segunda)', 0, options)).toBe('SEG · Treino')
+      expect(formatWeekdayWorkoutTitle('QUI · Pernas', 0, options)).toBe('SEG · Pernas')
     })
   })
 
