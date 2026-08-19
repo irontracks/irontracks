@@ -18,6 +18,13 @@ interface ConfirmOptions {
 
 interface DialogState {
     type: 'confirm' | 'alert' | 'prompt' | 'loading'
+    /**
+     * Aparência do alerta. O padrão continua 'success' (o check verde de
+     * sempre), mas um alerta que diz "Erro ao..." saindo com ícone de sucesso
+     * é a cor MENTINDO sobre o conteúdo — quem informa ou avisa de falha passa
+     * o tom junto (auditoria do menu Ferramentas, 19/08/2026).
+     */
+    tone?: 'success' | 'info' | 'error'
     title: string
     message: string
     confirmText?: string | null
@@ -31,7 +38,7 @@ interface DialogState {
 interface DialogContextValue {
     dialog: DialogState | null
     confirm: (message: string, title?: string, options?: ConfirmOptions | null) => Promise<boolean>
-    alert: (message: string, title?: string) => Promise<boolean>
+    alert: (message: string, title?: string, tone?: 'success' | 'info' | 'error') => Promise<boolean>
     prompt: (message: string, title?: string, defaultValue?: string) => Promise<string | null>
     showLoading: (message: string, title?: string) => void
     closeDialog: () => void
@@ -78,12 +85,13 @@ export const DialogProvider = ({ children }: { children: React.ReactNode }) => {
         });
     }, [closeDialog]);
 
-    const alert = useCallback((message: string, title = 'Atenção') => {
+    const alert = useCallback((message: string, title = 'Atenção', tone: 'success' | 'info' | 'error' = 'success') => {
         return new Promise<boolean>((resolve) => {
             setDialog({
                 type: 'alert',
                 title,
                 message,
+                tone,
                 onConfirm: () => {
                     closeDialog();
                     resolve(true);

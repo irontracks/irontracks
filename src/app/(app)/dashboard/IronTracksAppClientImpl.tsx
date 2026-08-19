@@ -708,7 +708,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // Normalização de títulos e exercícios — extraído para useWorkoutNormalize
     // programTitleStartDay é salvo como nome do dia ('monday'|'tuesday'|...),
-    // não número — formatProgramWorkoutTitle espera a string. Antes usava
+    // não número — formatWeekdayWorkoutTitle espera a string. Antes usava
     // Number(), que dava NaN e caía sempre em 'monday' (select morto).
     const programTitleStartDay = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
         ? (() => {
