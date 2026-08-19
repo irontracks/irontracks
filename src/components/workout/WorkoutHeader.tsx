@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, MoreHorizontal, Pause, Play, Plus, Satellite, Trash2, UserPlus } from 'lucide-react';
+import { Clock, GripVertical, MoreHorizontal, Pause, Play, Plus, Satellite, UserPlus, X } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
@@ -44,9 +44,13 @@ export default function WorkoutHeader() {
   const teamPaused = inTeamSession && !!teamCtx?.sessionPaused;
   const isPaused = teamPaused || timerPaused;
 
-  // Descartar treino: veio do rodapé em 18/08/2026. Lá ele era um X mudo colado
-  // no "Finalizar" — dois botões de sair lado a lado, e o destrutivo sem
-  // rótulo. Aqui mora com os outros itens secundários, escrito por extenso.
+  // Descartar treino: saiu do rodapé em 18/08/2026 — lá era um X colado no
+  // "Finalizar", dois botões de sair lado a lado. Foi para o menu "…", e aí o
+  // dono não achou mais ("estamos sem o botão de encerrar sem salvar", 19/08).
+  // Voltou a ser um X, agora AQUI no header: longe do "Finalizar" (não há como
+  // confundir a saída com o encerramento que grava) e visível sem abrir menu.
+  // Fica em UM lugar só — dois caminhos para a mesma ação destrutiva é convite
+  // ao toque errado.
   const cancelBusyRef = React.useRef(false);
   const descartarTreino = React.useCallback(async () => {
     if (cancelBusyRef.current) return;
@@ -167,18 +171,23 @@ export default function WorkoutHeader() {
                       <UserPlus size={15} />
                       Convidar
                     </button>
-                    <div className="h-px bg-neutral-800" />
-                    <button
-                      type="button"
-                      onClick={() => { setOverflowOpen(false); void descartarTreino(); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-red-400 hover:bg-neutral-800 transition-colors"
-                    >
-                      <Trash2 size={15} />
-                      Descartar treino
-                    </button>
                   </div>
                 )}
               </div>
+
+              {/* Sair sem gravar no histórico. Mudo de propósito: a palavra
+                  "Descartar" ao lado de "Editar treino" competiria com a ação
+                  principal do header — quem confirma é o diálogo, que diz o que
+                  se perde. */}
+              <button
+                type="button"
+                aria-label="Descartar treino"
+                title="Descartar treino (sai sem salvar no histórico)"
+                onClick={() => { void descartarTreino(); }}
+                className="inline-flex items-center justify-center tap-44 w-9 h-9 rounded-xl bg-neutral-900 border border-red-500/20 text-red-500 hover:bg-red-500/10 hover:border-red-500/40 transition-colors active:scale-95"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
 

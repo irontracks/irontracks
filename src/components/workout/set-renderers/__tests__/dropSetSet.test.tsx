@@ -91,6 +91,18 @@ describe('linha do drop — o rótulo do método não disputa espaço com os con
     expect(abaixo?.textContent).toMatch(/2 etapas/)
   })
 
+  it('o chip de falha fica na linha de baixo, não entre os controles', () => {
+    // Pedido do dono (19/08/2026): falha é MARCAÇÃO sobre a série, não ação de
+    // execução como Abrir/Concluir. Na linha de cima ele disputava espaço com
+    // quem executa; embaixo ocupa o vão que a linha de informação já tinha.
+    plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
+    const { container } = renderDrop({ name: 'Pullover no cabo' })
+    const linha = container.querySelector('.rounded-xl.border')
+    const abaixo = container.querySelector('.pl-12')
+    expect(linha?.textContent).not.toMatch(/falha/i)
+    expect(abaixo?.textContent).toMatch(/falha/i)
+  })
+
   it('a linha dos controles não hospeda mais o rótulo', () => {
     plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
     const { container } = renderDrop({ name: 'Pullover no cabo' })
