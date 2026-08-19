@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { pluralize } from '@/utils/format/plural'
+import { formatWeekRangeLabel, insightsPendingMessage } from '@/utils/format/weekLabel'
 
 type ApiMuscle = {
   label: string
@@ -75,16 +76,10 @@ const localIsoDate = () => {
 }
 
 const formatWeek = (start: string, end: string) => {
-  const s = String(start || '').trim()
-  const e = String(end || '').trim()
-  if (!s || !e) return 'Semana'
-  const format = (iso: string) => {
-    const d = new Date(`${iso}T00:00:00.000Z`)
-    const ok = Number.isFinite(d.getTime())
-    if (!ok) return iso
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-  }
-  return `${format(s)}–${format(e)}`
+  // Delegado ao helper puro: a versão que morava aqui virava o dia-calendário
+  // em timestamp UTC e formatava no fuso do aparelho, então a semana aparecia
+  // um dia atrasada ("16/08–22/08" para a semana que começa 17/08).
+  return formatWeekRangeLabel(start, end)
 }
 
 const formatDay = (dateIso: string) => {
@@ -627,7 +622,9 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                           ))}
                         </ul>
                       ) : (
-                        <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
+                        <div className="mt-3 text-sm text-neutral-400">
+                          {insightsPendingMessage(isWeekPayload(state.data) ? state.data.weekEndDate : '')}
+                        </div>
                       )}
                       {insights?.imbalanceAlerts?.length ? (
                         <div className="mt-4 space-y-2">
