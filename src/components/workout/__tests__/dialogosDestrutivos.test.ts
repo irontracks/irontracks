@@ -22,10 +22,11 @@ import { describe, it, expect } from 'vitest'
 
 const SRC = join(__dirname, '..', '..', '..')
 /**
- * ⚠️ O diálogo mudou de casa em 18/08/2026: descartar saiu do rodapé (onde era
- * um X mudo colado no "Finalizar") e foi para o menu "…" do cabeçalho, com
- * rótulo por extenso. Os invariantes abaixo são os mesmos — só o arquivo é
- * outro. Se ele mudar de lar de novo, é aqui que se aponta o novo caminho.
+ * ⚠️ O gatilho já mudou de casa DUAS vezes e o arquivo é o mesmo desde 18/08:
+ * saiu do rodapé (X mudo colado no "Finalizar") para o menu "…" do cabeçalho e,
+ * em 19/08/2026, virou um X próprio no cabeçalho — dentro do menu o dono não o
+ * encontrava ("estamos sem o botão de encerrar sem salvar"). Os invariantes do
+ * DIÁLOGO são os mesmos nas três casas; o que mudou é só quem o dispara.
  */
 const footer = readFileSync(join(SRC, 'components', 'workout', 'WorkoutHeader.tsx'), 'utf8')
 const dialogo = readFileSync(join(SRC, 'components', 'GlobalDialog.tsx'), 'utf8')
@@ -79,5 +80,28 @@ describe('iniciar treino — sem pedágio', () => {
 
     it('mas CONTINUA perguntando ao trocar de treino em andamento (há trabalho a perder)', () => {
         expect(crud).toContain("'Trocar de treino?'")
+    })
+})
+
+describe('descartar treino — onde mora o gatilho', () => {
+    it('é alcançável sem abrir menu nenhum', () => {
+        expect(footer).toContain('aria-label="Descartar treino"')
+    })
+
+    it('não é item de menu (item de menu fecha o dropdown ao disparar)', () => {
+        // O que distingue um item do "…" de um botão do cabeçalho é o
+        // `setOverflowOpen(false)` no mesmo handler. Se ele voltar a aparecer
+        // junto do descarte, o botão voltou para dentro do menu.
+        const chamadas = footer.match(/onClick=\{[^}]*descartarTreino\(\)[^}]*\}/g) ?? []
+        expect(chamadas).toHaveLength(1)
+        expect(chamadas[0]).not.toContain('setOverflowOpen')
+    })
+
+    it('o X não usa a cor da ação positiva', () => {
+        const botao = footer.slice(footer.indexOf('aria-label="Descartar treino"'))
+            .slice(0, footer.slice(footer.indexOf('aria-label="Descartar treino"')).indexOf('</button>'))
+        expect(botao).toMatch(/text-red-/)
+        expect(botao, 'gold é a cor de quem AVANÇA o treino, não de quem o joga fora')
+            .not.toMatch(/text-yellow-|bg-yellow-500\b/)
     })
 })

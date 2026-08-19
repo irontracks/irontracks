@@ -216,7 +216,6 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                 apagava o nome do método. Espaço se ganha movendo o que é INFORMAÇÃO
                 para onde sobra, não espremendo o que é CONTROLE. */}
             <div className="flex-1 min-w-0" />
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -279,6 +278,14 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             {stagesFilledByMotor && <span aria-hidden>🧠</span>}
             {stageWeightSummary} kg
           </span>}
+          {/* O chip de falha mora AQUI, à direita, e não na linha dos controles
+              (pedido do dono, 19/08/2026). Ele não é ação de execução como
+              "Abrir"/"Concluir" — é uma MARCAÇÃO sobre a série que acabou de sair,
+              e na linha de cima disputava espaço com quem executa. `ml-auto`
+              encosta na direita, no vão que a linha de informação já tinha. */}
+          <span className="ml-auto shrink-0">
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
+          </span>
         </div>
       )}
 
