@@ -1393,14 +1393,38 @@ entregar UI descrevendo o que deveria aparecer, nem substituir a conferência po
 mock/teste de render (eles provam comportamento, não o resultado na tela). **Device
 padrão: iPhone 17 Pro Max** — é o aparelho do dono; só usar outro se ele pedir.
 
-**O simulador mostra PRODUÇÃO, não o seu código local.** `capacitor.config.ts` tem
-`url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br'`, então o app
-nativo carrega o front do servidor remoto. Consequências práticas:
-- **Depois do merge**, o simulador confere a mudança de verdade, sem `.env.local` e
-  sem rebuild — basta relançar o app. É o caminho barato e o default.
-- **Antes do merge**, é preciso `CAPACITOR_SERVER_URL=<url do preview da Vercel>` +
-  `npm run cap:sync` + build nova. Só vale quando o risco de mergear errado é alto.
-- Um `.app` já instalado serve para qualquer mudança **web/JS** — não rebuilde à toa.
+**O simulador aponta para onde você mandar — inclusive o `npm run dev` (19/08/2026).**
+`capacitor.config.ts` fixa `url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br'`,
+então o default continua sendo PRODUÇÃO. O que mudou é o custo de sair dele:
+
+```bash
+npm run dev          # servidor local na 3000 (deixe rodando)
+npm run sim:local    # aponta o simulador para http://localhost:3000 e relança
+npm run sim:prod     # devolve para produção ao terminar
+npm run sim:status   # para onde está apontando agora
+```
+
+`scripts/sim-server.mjs` reescreve o `server.url` do `capacitor.config.json` **dentro
+do bundle já instalado** (o bundle do simulador é um diretório no disco do Mac, sem
+assinatura para invalidar) e relança o app. Leva menos de um segundo: nada de
+`cap sync`, `out/` ou Xcode. **Hot reload funciona** — editar um `.tsx` aparece na
+tela do simulador em segundos, sem relançar (provado em 19/08 mudando um texto do
+LoginScreen).
+
+Isso muda o fluxo padrão: **verificação visual passa a ser ANTES do commit**. O
+caminho antigo (mergear → esperar deploy → olhar) custava PR + CI + deploy por
+rodada, e três correções seguidas de UI pagaram esse pedágio em 19/08.
+
+Duas coisas para não tropeçar:
+- **Em local você precisa LOGAR de novo.** `localhost:3000` é outra origem, então
+  cookie e storage não vêm de produção. O agente não digita senha — quem loga é o
+  dono, uma vez; a sessão fica no simulador enquanto ele estiver apontado para local.
+- **Termine com `npm run sim:prod`.** Esquecer deixa o app preso no seu localhost:
+  na próxima abertura, sem `npm run dev` no ar, ele não carrega.
+
+Continua valendo: `.app` já instalado serve para qualquer mudança **web/JS** — só
+código NATIVO (Swift/plugin) exige build nova. E, depois do merge, apontar para
+produção segue sendo a conferência final.
 
 **Acesso ao device é concedido pelo dono**, uma vez por aparelho, no link
 "Let Claude use it" do painel. Se `attach`/`launch` responder que falta permissão,
