@@ -215,8 +215,7 @@ em 18/08/2026 (`grep -rn "FEATURE_KEYS" src` não devolve nada). Esta linha
 descrevia o sistema como se ele existisse e custou uma busca. **Feature nova não
 tem onde se esconder atrás de flag**: ou entra ligada para todos, ou o gating é
 explícito na UI (um botão que o usuário aciona), ou lê `user_settings.preferences`
-por conta própria. O mapa muscular 3D usa a segunda forma — um toggle 2D/3D no
-card, começando no 2D.
+por conta própria.
 
 **VIP/pagamentos:** o status VIP NÃO é uma flag persistida — é **derivado em tempo de leitura** por `getVipPlanLimits` (`utils/vip/limits.ts`), em 3 camadas: `profiles.role` (admin/teacher → elite) → `user_entitlements` (fonte de verdade, expira sozinho por `valid_until`) → `app_subscriptions` (fallback legado, filtra `current_period_end`). **Toda escrita de status passa por service-role** (webhook RevenueCat, `revenuecat/sync`, checkout usam `createAdminClient`); o client autenticado só tem SELECT — nunca reintroduzir policy/GRANT de INSERT/UPDATE nessas tabelas pro usuário (foi a brecha de self-grant corrigida em 2026-07-11, migration `lock_down_vip_self_grant_and_usage`). Cotas de IA são contabilizadas SÓ pelos RPCs `SECURITY DEFINER` `increment/decrement_vip_usage_daily` — `vip_usage_daily` também é read-only pro client. Webhook autentica em tempo constante (`safeEqual`) e reconfirma o entitlement na API do RevenueCat antes de conceder.
 
