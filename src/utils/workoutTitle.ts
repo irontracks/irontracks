@@ -124,6 +124,11 @@ export const formatProgramWorkoutTitle = (draftTitle: unknown, index: unknown, o
 
   const raw = String(draftTitle || '').trim()
   const extracted = extractLeadingLetter(raw)
-  const base = stripTrailingDayHint(extracted?.rest || raw) || 'Treino'
+  // `stripWeekdayHint`, não `stripTrailingDayHint`: o app de hoje escreve o dia
+  // como PREFIXO ("SEG · Upper B"), e tirar só o sufixo produzia
+  // "A - SEG · UPPER B (SEGUNDA)" — o dia duas vezes no mesmo título
+  // (auditoria de 19/08/2026). A função que remove os dois lados já existia
+  // aqui ao lado; o formatador é que não a chamava.
+  const base = stripWeekdayHint(extracted?.rest || raw) || 'Treino'
   return `${letter} - ${base.toUpperCase()} (${weekday})`
 }

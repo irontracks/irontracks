@@ -124,8 +124,11 @@ const ALIASES: Record<string, string> = {
   'rosca direta barra': 'Rosca direta',
   'rosca direta halteres': 'Rosca alternada',
   'rosca alternada': 'Rosca alternada',
-  'rosca scott': 'Rosca scott',
-  'scott': 'Rosca scott',
+  // Scott é NOME PRÓPRIO (o banco Scott). O destino nascia com "s" minúsculo,
+  // então a normalização "corrigia" um nome que já estava certo — visto no
+  // aparelho em 19/08/2026: "Rosca Scott" virava "Rosca scott".
+  'rosca scott': 'Rosca Scott',
+  'scott': 'Rosca Scott',
   'rosca martelo': 'Rosca martelo',
   'hammer curl': 'Rosca martelo',
   'rosca concentrada': 'Rosca concentrada',
@@ -162,11 +165,20 @@ const ALIASES: Record<string, string> = {
   'deadlift': 'Levantamento terra',
   'terra romeno': 'Terra romeno',
   'levantamento terra romeno': 'Terra romeno',
-  'mesa flexora': 'Cadeira flexora',
+  // ⚠️ MESA flexora (deitado) e CADEIRA flexora (sentado) são aparelhos
+  // DIFERENTES, com cargas diferentes. Fundir as duas renomeava o template e
+  // cortava a ponte com o histórico — o exercício voltava "sem histórico" e o
+  // motor de carga perdia a referência (reproduzido no aparelho em 19/08/2026,
+  // numa conta com 27 sessões de "Mesa flexora"). O músculo ser o mesmo não faz
+  // do aparelho o mesmo.
+  'mesa flexora': 'Mesa flexora',
+  'leg curl deitado': 'Mesa flexora',
+  'flexora deitado': 'Mesa flexora',
   'cadeira flexora': 'Cadeira flexora',
+  // "flexora" e "leg curl" soltos são ambíguos: ficam no sentado, que é o
+  // aparelho mais comum, em vez de virar palpite.
   'flexora': 'Cadeira flexora',
   'leg curl': 'Cadeira flexora',
-  'leg curl deitado': 'Cadeira flexora',
   // ── GLÚTEOS ──────────────────────────────────────────────────────────
   'hip thrust': 'Hip thrust',
   'passada': 'Passada',
