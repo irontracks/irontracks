@@ -79,36 +79,39 @@ describe('DropSetSet — override por série (per_set_method)', () => {
   })
 })
 
-describe('linha do drop — o rótulo do método não disputa espaço com os controles', () => {
-  // jsdom não faz layout: o que se prova aqui é ONDE cada coisa é renderizada,
-  // não o pixel. No aparelho (19/08/2026) o "DROP" transbordava e era desenhado
-  // POR CIMA do "FALHA"; cortá-lo com overflow-hidden apagava o nome do método.
-  it('o rótulo do método fica na linha de baixo, junto do resumo de etapas', () => {
+describe('drop no molde da série normal', () => {
+  // jsdom não faz layout: o que se prova aqui é ONDE cada coisa é renderizada.
+  // Histórico: com o chip de falha ganhando rótulo, o "DROP" transbordava e era
+  // desenhado POR CIMA do "FALHA" no aparelho (19/08/2026); cortá-lo com
+  // overflow-hidden apagava o nome do método. A saída foi padronizar o card pelo
+  // da série normal — controles em cima, informação e falha no rodapé.
+  const montar = () => {
     plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
-    const { container } = renderDrop({ name: 'Pullover no cabo' })
-    const abaixo = container.querySelector('.pl-12')
-    expect(abaixo?.textContent).toMatch(/Drop/i)
-    expect(abaixo?.textContent).toMatch(/2 etapas/)
+    return renderDrop({ name: 'Pullover no cabo' })
+  }
+  const grade = (c: HTMLElement) => c.querySelector('.grid')
+  const rodape = (c: HTMLElement) => c.querySelector('.grid')?.parentElement?.querySelector('.mt-1')
+
+  it('a linha de controles tem as MESMAS colunas da série normal, com o Abrir no lugar dos campos', () => {
+    const { container } = montar()
+    const g = grade(container) as HTMLElement
+    // 32px (nº) · 36px (notas) · 1fr (Abrir, ocupando a faixa dos campos) · 92px (Concluir)
+    expect(g.style.gridTemplateColumns).toBe('32px 36px minmax(0,1fr) 92px')
+    expect(g.textContent).toMatch(/Abrir/)
   })
 
-  it('o chip de falha fica na linha de baixo, não entre os controles', () => {
-    // Pedido do dono (19/08/2026): falha é MARCAÇÃO sobre a série, não ação de
-    // execução como Abrir/Concluir. Na linha de cima ele disputava espaço com
-    // quem executa; embaixo ocupa o vão que a linha de informação já tinha.
-    plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
-    const { container } = renderDrop({ name: 'Pullover no cabo' })
-    const linha = container.querySelector('.rounded-xl.border')
-    const abaixo = container.querySelector('.pl-12')
-    expect(linha?.textContent).not.toMatch(/falha/i)
-    expect(abaixo?.textContent).toMatch(/falha/i)
+  it('a linha de controles não hospeda rótulo, etapas nem falha', () => {
+    const { container } = montar()
+    const g = grade(container) as HTMLElement
+    expect(g.textContent).not.toMatch(/etapas/)
+    expect(g.textContent).not.toMatch(/falha/i)
   })
 
-  it('a linha dos controles não hospeda mais o rótulo', () => {
-    plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
-    const { container } = renderDrop({ name: 'Pullover no cabo' })
-    const linha = container.querySelector('.rounded-xl.border')
-    // "Abrir" e "Falha" seguem na linha; "etapas" saiu dela.
-    expect(linha?.textContent).toMatch(/Abrir/)
-    expect(linha?.textContent).not.toMatch(/etapas/)
+  it('rótulo, etapas e chip de falha ficam no rodapé do card', () => {
+    const { container } = montar()
+    const r = rodape(container) as HTMLElement
+    expect(r.textContent).toMatch(/Drop/i)
+    expect(r.textContent).toMatch(/2 etapas/)
+    expect(r.textContent).toMatch(/falha/i)
   })
 })

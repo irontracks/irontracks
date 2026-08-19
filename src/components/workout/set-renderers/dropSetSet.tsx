@@ -133,6 +133,52 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
     }),
   );
 
+  // Ação de abrir o modal das etapas — o "peso" do drop mora lá dentro, então
+  // este botão ocupa a MESMA faixa que peso/reps/RPE ocupam na série normal.
+  const abrirModal = () => {
+    // Preenche etapas de peso AINDA vazias com a sugestão atual do motor,
+    // preservando o que já foi digitado. Sem isto, um rascunho salvo com o
+    // peso vazio (modal aberto antes do histórico carregar, ou fechado sem
+    // preencher) CONGELA o campo vazio: reabrir usava o rascunho e ignorava
+    // a sugestão — mesmo já estando disponível. Era um dos jeitos de o drop
+    // aparecer "sem peso automático".
+    const fillEmptyWithSuggestion = (list: unknown[]) =>
+      list.map((st, idx) => {
+        const st2 = isObject(st) ? (st as UnknownRecord) : {};
+        if (String(st2.weight ?? '').trim()) return st2;
+        const autoW = autoStageWeight(idx);
+        return autoW ? { ...st2, weight: autoW } : st2;
+      });
+
+    const draft = dropSetDraftsRef?.current?.[key];
+    if (draft && typeof draft === 'object' && Array.isArray((draft as UnknownRecord).stages)) {
+      const mergedStages = fillEmptyWithSuggestion((draft as UnknownRecord).stages as unknown[]);
+      setDropSetModal({ ...(draft as UnknownRecord), stages: mergedStages, error: '' });
+      return;
+    }
+    const baseStages = stages.map((st) => ({
+      weight: String(st?.weight ?? '').trim(),
+      reps: parseTrainingNumber(st?.reps) ?? null,
+    }));
+    const restSec = parseTrainingNumber(ex.rest_time ?? (ex as unknown as Record<string, unknown>).restTime) ?? 0;
+    setDropSetModal({ key, label: modeLabel, stages: baseStages, restSec, rpe: log.rpe ?? '', error: '' });
+  };
+
+  const notesButton = (
+    <button
+      type="button"
+      aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
+      onClick={() => toggleNotes(key)}
+      className={
+        isNotesOpen || hasAnyNote
+          ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+          : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+      }
+    >
+      <MessageSquare size={12} />
+    </button>
+  );
+
   return (
     <div key={key} className="space-y-1">
       <div
@@ -143,151 +189,102 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             : 'bg-neutral-900/50 border-neutral-800/80',
         ].join(' ')}
       >
-        {done ? (
-          /* ── Collapsed green row when done ── */
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
-            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel || 'Drop'}</span>
-            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={
-                isNotesOpen || hasAnyNote
-                  ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-              }
-            >
-              <MessageSquare size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleDone}
-              className="inline-flex items-center justify-center gap-1 tap-44 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
-            >
-              <Check size={13} />
-              Feito
-            </button>
-          </div>
-        ) : (
-          /* ── Expanded row when not done ── */
-          <div className="flex items-center gap-2">
-            <div className="w-7 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
-            <button
-              type="button"
-              onClick={() => {
-                // Preenche etapas de peso AINDA vazias com a sugestão atual do motor,
-                // preservando o que já foi digitado. Sem isto, um rascunho salvo com o
-                // peso vazio (modal aberto antes do histórico carregar, ou fechado sem
-                // preencher) CONGELA o campo vazio: reabrir usava o rascunho e ignorava
-                // a sugestão — mesmo já estando disponível. Era um dos jeitos de o drop
-                // aparecer "sem peso automático".
-                const fillEmptyWithSuggestion = (list: unknown[]) =>
-                  list.map((st, idx) => {
-                    const s = isObject(st) ? (st as UnknownRecord) : {};
-                    if (String(s.weight ?? '').trim()) return s;
-                    const auto = autoStageWeight(idx);
-                    return auto ? { ...s, weight: auto } : s;
-                  });
-
-                const draft = dropSetDraftsRef?.current?.[key];
-                if (draft && typeof draft === 'object' && Array.isArray((draft as UnknownRecord).stages)) {
-                  const mergedStages = fillEmptyWithSuggestion((draft as UnknownRecord).stages as unknown[]);
-                  setDropSetModal({ ...(draft as UnknownRecord), stages: mergedStages, error: '' });
-                  return;
-                }
-                const baseStages = stages.map((s) => ({
-                  weight: String(s?.weight ?? '').trim(),
-                  reps: parseTrainingNumber(s?.reps) ?? null,
-                }));
-                const restSec = parseTrainingNumber(ex.rest_time ?? (ex as unknown as Record<string, unknown>).restTime) ?? 0;
-                setDropSetModal({ key, label: modeLabel, stages: baseStages, restSec, rpe: log.rpe ?? '', error: '' });
-              }}
-              className="shrink-0 min-h-[44px] bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-            >
-              <Pencil size={14} />
-              <span className="text-xs font-black">Abrir</span>
-            </button>
-            {/* Espaçador. O rótulo do método e o contador de etapas VIVEM NA LINHA
-                DE BAIXO desde 19/08/2026: com o chip de falha ganhando rótulo, os
-                cinco controles não cabiam mais aqui — o "DROP" transbordava e era
-                desenhado POR CIMA do "FALHA", e cortá-lo com `overflow-hidden`
-                apagava o nome do método. Espaço se ganha movendo o que é INFORMAÇÃO
-                para onde sobra, não espremendo o que é CONTROLE. */}
-            <div className="flex-1 min-w-0" />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={
-                isNotesOpen || hasAnyNote
-                  ? 'shrink-0 tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-              }
-            >
-              <MessageSquare size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={!canDone}
-              onClick={handleToggleDone}
-              aria-label="Concluir série"
-              className={
-                canDone
-                  ? 'shrink-0 tap-44 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
-                  : 'shrink-0 h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed'
-              }
-            >
-              <Check size={16} />
-              {/* Antes era só o ✓, sem texto — era o único método assim. */}
-              <span className="text-xs">Concluir</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Peso das etapas na linha de baixo — sem isso o drop era o ÚNICO método que
-          não mostrava peso algum na tela, e a carga automática parecia não funcionar
-          (só aparecia ao abrir o modal). Violeta quando as etapas vieram do motor. */}
-      {!done && (
-        <div className="pl-12 flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
-            {modeLabel || 'Drop'}
-            <HelpHint
-              title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
-              text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
-              tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
-              className="h-4 w-4 text-[10px]"
-            />
-          </span>
-          <span className="text-xs text-neutral-400">
-            {stagesCount} etapas{total ? ` • ${total} reps` : ''}
-          </span>
-          {/* Pílula com a MESMA marcação do input de peso dos outros métodos
-              (AUTO_INPUT_CLASS). Antes era só texto violeta solto: ao lado da
-              caixa violeta da série normal não lia como "o motor preencheu", e
-              o dono reportou que "o drop não marca em roxo igual o rest-pause". */}
-          {stageWeightSummary && <span
+        {/* MESMA grade da série normal (# | 💬 | campos | Concluir), pedido do
+            dono em 19/08/2026: "deixe os cards iguais, o do drop igual do normal;
+            no lugar do peso fica o botão de abrir, preenchendo todo o espaço".
+            As três colunas de campo (peso/reps/RPE) viram UMA só aqui — no drop
+            esses números moram no modal, e o botão que leva até eles ocupa a
+            faixa inteira em vez de deixar um vão no meio da linha. */}
+        <div
+          className="grid items-center gap-1.5"
+          style={{ gridTemplateColumns: '32px 36px minmax(0,1fr) 92px' }}
+        >
+          <div
+            aria-hidden="true"
             className={[
-              'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
-              stagesFilledByMotor
-                ? AUTO_INPUT_CLASS
-                : 'border-neutral-700 bg-black/30 text-neutral-300',
+              'h-7 inline-flex items-center justify-center rounded-lg text-[11px] font-black tracking-tight border select-none',
+              done
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/40',
             ].join(' ')}
           >
-            {stagesFilledByMotor && <span aria-hidden>🧠</span>}
-            {stageWeightSummary} kg
-          </span>}
-          {/* O chip de falha mora AQUI, à direita, e não na linha dos controles
-              (pedido do dono, 19/08/2026). Ele não é ação de execução como
-              "Abrir"/"Concluir" — é uma MARCAÇÃO sobre a série que acabou de sair,
-              e na linha de cima disputava espaço com quem executa. `ml-auto`
-              encosta na direita, no vão que a linha de informação já tinha. */}
-          <span className="ml-auto shrink-0">
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-          </span>
+            {setIdx + 1}
+          </div>
+
+          {notesButton}
+
+          <button
+            type="button"
+            onClick={abrirModal}
+            aria-label={`Abrir etapas do ${modeLabel || 'Drop'} – série ${setIdx + 1}`}
+            className={[
+              'w-full tap-44 h-9 rounded-lg border text-sm outline-none inline-flex items-center justify-center gap-2 transition-colors',
+              done
+                ? 'bg-black/20 border-emerald-500/25 text-emerald-200 hover:border-emerald-500/50'
+                : 'bg-black/30 border-neutral-700 text-white hover:border-yellow-500/60 hover:text-yellow-500',
+            ].join(' ')}
+          >
+            <Pencil size={14} />
+            <span className="text-xs font-black">{done ? summaryText : 'Abrir'}</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={!done && !canDone}
+            onClick={handleToggleDone}
+            aria-label={done ? 'Desfazer série concluída' : 'Concluir série'}
+            className={[
+              'inline-flex items-center justify-center gap-1 tap-44 h-9 w-[92px] rounded-xl t-action text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+              done
+                ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
+                : canDone
+                  ? 'bg-yellow-500/10 border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20'
+                  : 'bg-neutral-800/40 border border-neutral-800 text-neutral-400 cursor-not-allowed',
+            ].join(' ')}
+          >
+            <Check size={13} />
+            {done ? 'Feito' : 'Concluir'}
+          </button>
         </div>
-      )}
+
+        {/* Rodapé do card, no molde da série normal: informação à esquerda,
+            chip de falha à direita. No normal a esquerda é a nota do motor e o
+            seletor de método; aqui é o método + etapas + os pesos das etapas. */}
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
+              {modeLabel || 'Drop'}
+              <HelpHint
+                title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
+                text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
+                tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
+                className="h-4 w-4 text-[10px]"
+              />
+            </span>
+            <span className="text-xs text-neutral-400">
+              {stagesCount} etapas{total ? ` • ${total} reps` : ''}
+            </span>
+            {/* Pílula com a MESMA marcação do input de peso dos outros métodos
+                (AUTO_INPUT_CLASS). Antes era só texto violeta solto: ao lado da
+                caixa violeta da série normal não lia como "o motor preencheu", e
+                o dono reportou que "o drop não marca em roxo igual o rest-pause". */}
+            {!done && stageWeightSummary && (
+              <span
+                className={[
+                  'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+                  stagesFilledByMotor
+                    ? AUTO_INPUT_CLASS
+                    : 'border-neutral-700 bg-black/30 text-neutral-300',
+                ].join(' ')}
+              >
+                {stagesFilledByMotor && <span aria-hidden>🧠</span>}
+                {stageWeightSummary} kg
+              </span>
+            )}
+          </div>
+          <FailureToggle exIdx={exIdx} setIdx={setIdx} />
+        </div>
+      </div>
 
       {!done && !canDone && (
         <div className="pl-12 text-[11px] text-neutral-400 font-semibold">
