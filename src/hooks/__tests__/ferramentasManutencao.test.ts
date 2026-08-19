@@ -144,3 +144,12 @@ describe('menu enxuto — o que saiu não volta por distração', () => {
     expect(executavel(EXPORT_HOOK)).not.toMatch(/temporariamente indisponível/i)
   })
 })
+
+describe('prévia agrupa repetição', () => {
+  it('mesma troca em vários treinos vira uma linha com "×N"', () => {
+    // Visto no aparelho: "Panturrilha sentado → Elevação…" aparecia duas vezes
+    // seguidas, gastando o espaço da troca seguinte.
+    expect(HOOK).toMatch(/\(×\$\{n\}\)/)
+    expect(HOOK).toMatch(/contagem\.set\(/)
+  })
+})
