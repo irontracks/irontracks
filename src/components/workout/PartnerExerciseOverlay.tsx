@@ -210,6 +210,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         openEditExercise: noopAsync,
         addExtraSetToExercise: noopWithArg,
         removeExtraSetFromExercise: noopWithArg,
+        removeSetAtIndex: async (_a: unknown, _b: unknown) => {},
         linkedWeightExercises: new Set<number>(),
         toggleLinkWeights: noopWithArg,
         // Funções que o ExerciseCard/set-renderers/AI-swap chamam sem guard —

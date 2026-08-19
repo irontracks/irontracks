@@ -70,7 +70,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">Stripping</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -101,7 +101,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Stripping</span>
               <span className="text-xs text-neutral-400 truncate">Etapas {defaultCount} • Total: {total || 0} reps</span>
             </div>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"

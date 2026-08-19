@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DropSetSet } from '../dropSetSet'
 
 // HelpHint usa useDialog (precisa de DialogProvider) — irrelevante pro teste.
@@ -7,9 +7,10 @@ vi.mock('@/components/ui/HelpHint', () => ({ HelpHint: () => null }))
 
 // Mock do WorkoutContext (mesmo hook dos outros set-renderers)
 let plannedSet: Record<string, unknown> | null = null
+let logValue: Record<string, unknown> = {}
 vi.mock('../../WorkoutContext', () => ({
   useWorkoutContext: () => ({
-    getLog: () => ({}),
+    getLog: () => logValue,
     updateLog: vi.fn(),
     getPlannedSet: () => plannedSet,
     setDropSetModal: vi.fn(),
@@ -22,6 +23,11 @@ vi.mock('../../WorkoutContext', () => ({
 
 const renderDrop = (ex: Record<string, unknown>) =>
   render(<DropSetSet ex={ex as never} exIdx={0} setIdx={0} />)
+
+beforeEach(() => {
+  plannedSet = null
+  logValue = {}
+})
 
 describe('DropSetSet — drop-set pelo método do exercício (sem advanced_config)', () => {
   it('método "Drop-set" sem config → renderiza (defaulta 2 etapas), não fica em branco', () => {
@@ -49,5 +55,24 @@ describe('DropSetSet — drop-set pelo método do exercício (sem advanced_confi
     plannedSet = { advanced_config: [{ weight: '30', reps: 10 }, { weight: '20', reps: 8 }] }
     renderDrop({ name: 'X' })
     expect(screen.getByText('Abrir')).toBeInTheDocument()
+  })
+})
+
+describe('DropSetSet — override por série (per_set_method)', () => {
+  it('série virada em Drop-Set pelo seletor NÃO some da tela', () => {
+    // Bug relatado pelo dono (19/08/2026): "criei uma série nova e, ao clicar em
+    // Drop, a série é excluída". Nada era apagado — o exercício continua com
+    // method 'Normal', então `stagesCount` dava 0 e a linha renderizava null.
+    plannedSet = null
+    logValue = { per_set_method: 'Drop-Set' }
+    renderDrop({ name: 'Rosca direta', method: 'Normal' })
+    expect(screen.getByText('Abrir')).toBeInTheDocument()
+  })
+
+  it('sem override e sem método drop, segue devolvendo null', () => {
+    plannedSet = null
+    logValue = { per_set_method: '' }
+    const { container } = renderDrop({ name: 'X', method: 'Normal' })
+    expect(container).toBeEmptyDOMElement()
   })
 })

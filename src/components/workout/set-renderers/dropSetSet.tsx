@@ -49,7 +49,16 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   // escolheu "Drop-set" no dropdown, que NÃO cria advanced_config), defaulta a 2
   // etapas — drop-set mínimo. Sem isto, renderizava null (série em branco). O
   // usuário edita/adiciona etapas pelo botão "Abrir".
-  const isDropMethod = /^drop-?set$/i.test(String((ex as UnknownRecord)?.method ?? '').trim());
+  //
+  // O override POR SÉRIE (`per_set_method`, o seletor no rodapé da série normal)
+  // conta igual ao método do exercício: sem ele, transformar uma série em Drop-Set
+  // pelo seletor caía aqui com stagesCount 0 e a linha renderizava `null` — a série
+  // SUMIA da tela, e do lado de quem estava treinando isso lê como "o app apagou
+  // minha série" (relato do dono, 19/08/2026). O dado nunca era perdido: só não
+  // havia o que desenhar.
+  const DROP_METHOD_RE = /^drop-?set$/i;
+  const isDropMethod = DROP_METHOD_RE.test(String((ex as UnknownRecord)?.method ?? '').trim())
+    || DROP_METHOD_RE.test(String(log.per_set_method ?? '').trim());
   const stagesCount = rawStagesCount || (isDropMethod ? 2 : 0);
 
   if (!stagesCount) {
@@ -140,7 +149,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel || 'Drop'}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -218,7 +227,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                 {stagesCount} etapas{total ? ` • ${total} reps` : ''}
               </span>
             </div>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
