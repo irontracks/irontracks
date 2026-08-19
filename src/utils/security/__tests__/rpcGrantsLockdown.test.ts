@@ -50,6 +50,9 @@ describe('classe: função nova em migration precisa fechar EXECUTE', () => {
         // 20260818093000, escrita minutos depois porque o advisor 0028 mostrou
         // que `revoke ... from anon` não basta — o EXECUTE vem de PUBLIC.
         '20260818090000_restore_teamwork_v2.sql',
+        // Import de treino por foto (19/08): só a função de trigger
+        // touch_updated_at. Revoke autocontido na própria migration.
+        '20260819210000_workout_photo_imports.sql',
     ]
 
     it('as migrations que criam função têm lockdown correspondente', () => {

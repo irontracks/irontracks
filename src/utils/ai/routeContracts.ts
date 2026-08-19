@@ -546,3 +546,62 @@ export const wizardGenerationConfig = (mode: 'single' | 'program') => ({
     maxOutputTokens: 8192,
     temperature: 0.7,
 })
+
+// ─── workout-photo-extract (importar treino por foto/PDF) ────────────────────
+// Espelha `WorkoutPhotoExtractedSchema` (src/schemas/workoutPhotoImport.ts).
+//
+// ⚠️ SEM `maxItems` de propósito, pela mesma razão medida no muscle-map: este
+// schema tem DOIS níveis de array aninhado (treinos → exercícios → 9 campos), e
+// foi exatamente essa forma que estourou o limite de estados do structured
+// output ("too many states for serving", 400). Os tetos reais (7 treinos, 25
+// exercícios) são aplicados pelo normalizador da rota, que é o juiz de verdade.
+//
+// `reps` é STRING aqui e INTEGER na voz: ficha manuscrita escreve "8-12", e
+// forçar número descartaria a faixa.
+const PHOTO_IMPORT_EXERCISE = {
+    type: 'OBJECT',
+    properties: {
+        name: STR,
+        sets: nullable({ type: 'INTEGER' }),
+        reps: nullable(STR),
+        weightKg: nullable(NUM),
+        cadence: nullable(STR),
+        restSeconds: nullable({ type: 'INTEGER' }),
+        rpe: nullable(NUM),
+        method: nullable({
+            type: 'STRING',
+            enum: ['normal', 'drop_set', 'rest_pause', 'super_set', 'cluster', 'giant_set'],
+        }),
+        notes: nullable(STR),
+    },
+    required: ['name', 'sets', 'reps', 'weightKg', 'cadence', 'restSeconds', 'rpe', 'method', 'notes'],
+    propertyOrdering: ['name', 'sets', 'reps', 'weightKg', 'cadence', 'restSeconds', 'rpe', 'method', 'notes'],
+} as const
+
+export const WORKOUT_PHOTO_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        workouts: {
+            type: 'ARRAY',
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    title: STR,
+                    exercises: { type: 'ARRAY', items: PHOTO_IMPORT_EXERCISE },
+                },
+                required: ['title', 'exercises'],
+                propertyOrdering: ['title', 'exercises'],
+            },
+        },
+    },
+    required: ['workouts'],
+} as const
+
+export const workoutPhotoGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: WORKOUT_PHOTO_RESPONSE_SCHEMA,
+    maxOutputTokens: 8192,
+    // Leitura de documento é transcrição, não criação: temperatura baixa reduz
+    // a chance de o modelo "completar" um exercício que a ficha não tem.
+    temperature: 0.1,
+})
