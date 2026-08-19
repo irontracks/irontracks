@@ -616,15 +616,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         exportWorkout, setExportWorkout,
         showExportModal, setShowExportModal,
         exportingAll,
-        showImportModal, setShowImportModal,
         showJsonImportModal, setShowJsonImportModal,
-        importCode, setImportCode,
         shareCode, setShareCode,
         handleShareWorkout,
         handleExportPdf,
         handleExportJson,
         handleExportAllWorkouts,
-        handleImportWorkout,
         handleJsonUpload,
     } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: appHandlers.alertVoid, confirm })
 
@@ -720,7 +717,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         })()
         : undefined
     const {
-        handleNormalizeAiWorkoutTitles,
         handleApplyTitleRule,
         handleNormalizeExercises,
     } = useWorkoutNormalize({
@@ -1290,7 +1286,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onExportAll={handleExportAllWorkouts}
                                     streakStats={streakStats}
                                     onOpenJsonImport={() => setShowJsonImportModal(true)}
-                                    onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
                                     onNormalizeExercises={handleNormalizeExercises}
                                     onApplyTitleRule={handleApplyTitleRule}
                                     onMyStoryStateChange={handleMyStoryStateChange}
@@ -1635,11 +1630,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             setProfileDraftName={setProfileDraftName}
                             savingProfile={appHandlers.savingProfile}
                             handleSaveProfile={handleSaveProfile}
-                            showImportModal={showImportModal}
-                            setShowImportModal={setShowImportModal}
-                            importCode={importCode}
-                            setImportCode={setImportCode}
-                            handleImportWorkout={handleImportWorkout}
                             showJsonImportModal={showJsonImportModal}
                             setShowJsonImportModal={setShowJsonImportModal}
                             handleJsonUpload={handleJsonUpload}

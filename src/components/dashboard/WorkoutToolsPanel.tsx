@@ -9,34 +9,26 @@ type MaybePromise<T> = T | Promise<T>
 
 interface WorkoutToolsPanelProps {
     onClose: () => void
-    onCreateWorkout: () => MaybePromise<void>
     onOpenJsonImport: () => void
     onExportAll: () => MaybePromise<void>
     exportingAll?: boolean
-    onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
     onNormalizeExercises?: () => MaybePromise<void>
     onApplyTitleRule?: () => MaybePromise<void>
-    normalizingAiTitles: boolean
     normalizingExercises: boolean
     applyingTitleRule: boolean
-    setNormalizingAiTitles: (v: boolean) => void
     setNormalizingExercises: (v: boolean) => void
     setApplyingTitleRule: (v: boolean) => void
 }
 
 export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
     onClose,
-    onCreateWorkout,
     onOpenJsonImport,
     onExportAll,
     exportingAll,
-    onNormalizeAiWorkoutTitles,
     onNormalizeExercises,
     onApplyTitleRule,
-    normalizingAiTitles,
     normalizingExercises,
     applyingTitleRule,
-    setNormalizingAiTitles,
     setNormalizingExercises,
     setApplyingTitleRule,
 }: WorkoutToolsPanelProps) {
@@ -68,26 +60,11 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
 
                     <div className="p-2 space-y-0.5">
 
-                        {/* ── GROUP: Criar ──────────────────────────────── */}
-                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Criar</p>
-
-                        {/* Criar automaticamente */}
-                        <button
-                            onClick={() => { onClose(); onCreateWorkout() }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                        >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/25 flex items-center justify-center flex-shrink-0">
-                                <Sparkles size={14} className="text-yellow-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Criar automaticamente</p>
-                                <p className="text-[10px] text-neutral-400">Wizard com IA</p>
-                            </div>
-                        </button>
-
-                        {/* Divisor */}
-                        <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
-
+                        {/* O grupo CRIAR saiu em 19/08/2026: "Criar automaticamente"
+                            abria o MESMO wizard do botão "Criar treino" da tela — que é
+                            maior, dourado e é a ação primária da aba. Duas portas para a
+                            mesma função, e a do menu ainda prometia "com IA" numa tela que
+                            abre no modo manual. */}
                         {/* ── GROUP: Importar / Exportar ─────────────────── */}
                         <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Importar / Exportar</p>
 
@@ -133,31 +110,9 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                         {/* ── GROUP: Manutenção ─────────────────────────── */}
                         <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Manutenção</p>
 
-                        {/* Padronizar nomes IA */}
-                        <button
-                            onClick={async () => {
-                                onClose()
-                                if (typeof onNormalizeAiWorkoutTitles !== 'function') return
-                                try { setNormalizingAiTitles(true); await onNormalizeAiWorkoutTitles() }
-                                finally { setNormalizingAiTitles(false) }
-                            }}
-                            disabled={normalizingAiTitles}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-                        >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/15 to-amber-700/10 border border-yellow-600/20 flex items-center justify-center flex-shrink-0">
-                                {normalizingAiTitles
-                                    ? <Loader2 size={14} className="text-yellow-400 animate-spin" />
-                                    : <Sparkles size={14} className="text-yellow-500" />
-                                }
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
-                                    {normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}
-                                </p>
-                                <p className="text-[10px] text-neutral-400">Uniformizar com IA</p>
-                            </div>
-                        </button>
-
+                        {/* "Padronizar nomes IA" saiu junto: não usava IA nenhuma
+                            (filtrava "(Dia N)" e chamava a mesma função determinística de
+                            "Padronizar títulos") e o ✨ do app significa IA. */}
                         {/* Normalizar exercícios */}
                         <button
                             onClick={async () => {

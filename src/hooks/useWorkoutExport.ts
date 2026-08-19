@@ -16,6 +16,8 @@ import { workoutPlanHtml } from '@/utils/report/templates'
 import { importData } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
+import { exportJsonFile } from '@/utils/export/exportJsonFile'
+import { buildWorkoutBackup, buildSingleWorkoutBackup, parseWorkoutBackup } from '@/utils/export/workoutBackupPayload'
 import { z } from 'zod'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -35,19 +37,14 @@ export type UseWorkoutExportReturn = {
     showExportModal: boolean
     setShowExportModal: React.Dispatch<React.SetStateAction<boolean>>
     exportingAll: boolean
-    showImportModal: boolean
-    setShowImportModal: React.Dispatch<React.SetStateAction<boolean>>
     showJsonImportModal: boolean
     setShowJsonImportModal: React.Dispatch<React.SetStateAction<boolean>>
-    importCode: string
-    setImportCode: React.Dispatch<React.SetStateAction<string>>
     shareCode: string | null
     setShareCode: React.Dispatch<React.SetStateAction<string | null>>
     handleShareWorkout: (workout: unknown) => void
     handleExportPdf: () => Promise<void>
-    handleExportJson: () => void
+    handleExportJson: () => Promise<void>
     handleExportAllWorkouts: () => Promise<void>
-    handleImportWorkout: () => Promise<void>
     handleJsonUpload: (e: unknown) => void
 }
 
@@ -61,9 +58,7 @@ export function useWorkoutExport({
     const [exportWorkout, setExportWorkout] = useState<ActiveSession | null>(null)
     const [showExportModal, setShowExportModal] = useState(false)
     const [exportingAll, setExportingAll] = useState(false)
-    const [showImportModal, setShowImportModal] = useState(false)
     const [showJsonImportModal, setShowJsonImportModal] = useState(false)
-    const [importCode, setImportCode] = useState('')
     const [shareCode, setShareCode] = useState<string | null>(null)
 
     const handleShareWorkout = useCallback((workout: unknown) => {
@@ -92,94 +87,57 @@ export function useWorkoutExport({
         }
     }, [exportWorkout, user, alert])
 
-    const handleExportJson = useCallback(() => {
+    const handleExportJson = useCallback(async () => {
         if (!exportWorkout) return
-        const json = JSON.stringify(
-            {
-                workout: {
-                    title: exportWorkout.title,
-                    exercises: (exportWorkout.exercises || []).map((ex: unknown) => {
-                        const e = isRecord(ex) ? ex : ({} as Record<string, unknown>)
-                        return {
-                            name: e.name,
-                            sets: e.sets,
-                            reps: e.reps,
-                            rpe: e.rpe,
-                            cadence: e.cadence,
-                            restTime: e.restTime,
-                            method: e.method,
-                            videoUrl: e.videoUrl,
-                            notes: e.notes,
-                        }
-                    }),
-                },
-            },
-            null,
-            2
+        // Formato v2 (com setDetails): o backup de um treino leva peso, reps,
+        // RPE e `advanced_config` de cada série — sem isso um Drop-set voltava
+        // sem as etapas. Entrega pelo caminho nativo: `<a download>` não baixa
+        // nada no WebView do iOS.
+        const backup = buildSingleWorkoutBackup(
+            user ? { id: user.id, email: user.email } : null,
+            exportWorkout,
+            new Date().toISOString(),
         )
-        const blob = new Blob([json], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${(exportWorkout.title || 'treino').replace(/\s+/g, '_')}.json`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        setShowExportModal(false)
-    }, [exportWorkout])
+        const title = String((exportWorkout as unknown as Record<string, unknown>)?.title || 'treino').trim() || 'treino'
+        const res = await exportJsonFile({
+            json: JSON.stringify(backup, null, 2),
+            baseFileName: title,
+            title: `${title} • IronTracks`,
+            alert: (msg: string) => { void alert(msg) },
+        })
+        if (res.ok || res.via === 'cancelled') setShowExportModal(false)
+    }, [exportWorkout, user, alert])
 
     const handleExportAllWorkouts = useCallback(async () => {
         try {
             setExportingAll(true)
-            const payload = {
-                user: { id: user?.id || '', email: user?.email || '' },
-                workouts: (workouts || []).map((w: Record<string, unknown>) => ({
-                    id: w.id,
-                    title: w.title,
-                    notes: w.notes,
-                    is_template: true,
-                    exercises: (Array.isArray(w.exercises) ? (w.exercises as unknown[]) : []).map(
-                        (ex: unknown) => {
-                            const e = isRecord(ex) ? ex : ({} as Record<string, unknown>)
-                            return {
-                                name: e.name,
-                                sets: e.sets,
-                                reps: e.reps,
-                                rpe: e.rpe,
-                                cadence: e.cadence,
-                                restTime: e.restTime,
-                                method: e.method,
-                                videoUrl: e.videoUrl,
-                                notes: e.notes,
-                            }
-                        }
-                    ),
-                })),
+            const backup = buildWorkoutBackup(
+                user ? { id: user.id, email: user.email } : null,
+                workouts,
+                new Date().toISOString(),
+            )
+            const res = await exportJsonFile({
+                json: JSON.stringify(backup, null, 2),
+                baseFileName: `irontracks_treinos_${new Date().toISOString().slice(0, 10)}`,
+                title: 'Backup de treinos • IronTracks',
+                alert: (msg: string) => { void alert(msg) },
+            })
+            // Falha silenciosa era o defeito original: o usuário tocava e nada
+            // acontecia — nem arquivo, nem erro.
+            if (!res.ok && res.via === 'failed') {
+                await alert('Não consegui gerar o backup: ' + (res.error || 'erro desconhecido'))
             }
-            const json = JSON.stringify(payload, null, 2)
-            const blob = new Blob([json], { type: 'application/json' })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `irontracks_workouts_${new Date().toISOString()}.json`
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-        } catch {
-            // silencioso — export não critico
+        } catch (e) {
+            await alert('Não consegui gerar o backup: ' + getErrorMessage(e))
         } finally {
             setExportingAll(false)
         }
-    }, [user, workouts])
+    }, [user, workouts, alert])
 
-    const handleImportWorkout = useCallback(async () => {
-        await alert(
-            'Funcionalidade de importar código temporariamente indisponível na migração.',
-            'Em Manutenção'
-        )
-    }, [alert])
+    // "Importar por CÓDIGO" foi removido em 19/08/2026: o modal não tinha
+    // nenhum acionador na UI (`setShowImportModal(true)` não era chamado em
+    // lugar nenhum) e o handler respondia "temporariamente indisponível na
+    // migração" desde então. Restaurar treino é pelo arquivo .json.
 
     const handleJsonUpload = useCallback(
         (e: unknown) => {
@@ -197,13 +155,17 @@ export function useWorkoutExport({
                     if (!json) throw new Error('invalid_json')
                     const jsonObj = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
                     const userObj = jsonObj.user && typeof jsonObj.user === 'object' ? (jsonObj.user as Record<string, unknown>) : {}
+                    const parsed = parseWorkoutBackup(jsonObj)
+                    if (!parsed.workouts.length) throw new Error('nenhum treino no arquivo')
                     if (
                         await confirm(
-                            `Importar dados de ${String(userObj.email || 'Unknown')}? Isso criará novos treinos.`,
+                            `Importar ${parsed.workouts.length} treino(s) de ${String(userObj.email || 'origem desconhecida')}? Isso criará novos treinos.`,
                             'Importar Backup'
                         )
                     ) {
-                        await importData(jsonObj)
+                        // `parseWorkoutBackup` aceita o formato antigo E o novo —
+                        // quem exportou antes do v2 continua conseguindo restaurar.
+                        await importData({ workouts: parsed.workouts })
                         await fetchWorkouts()
                         await alert('Dados importados com sucesso!', 'Sucesso')
                     }
@@ -226,19 +188,14 @@ export function useWorkoutExport({
         showExportModal,
         setShowExportModal,
         exportingAll,
-        showImportModal,
-        setShowImportModal,
         showJsonImportModal,
         setShowJsonImportModal,
-        importCode,
-        setImportCode,
         shareCode,
         setShareCode,
         handleShareWorkout,
         handleExportPdf,
         handleExportJson,
         handleExportAllWorkouts,
-        handleImportWorkout,
         handleJsonUpload,
     }
 }

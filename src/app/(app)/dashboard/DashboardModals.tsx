@@ -52,11 +52,6 @@ export interface DashboardModalsProps {
     handleSaveProfile: () => void
 
     // Import Workout
-    showImportModal: boolean
-    setShowImportModal: (v: boolean) => void
-    importCode: string
-    setImportCode: (v: string) => void
-    handleImportWorkout: () => void
 
     // JSON Import
     showJsonImportModal: boolean
@@ -127,7 +122,7 @@ export interface DashboardModalsProps {
     setShowExportModal: (v: boolean) => void
     exportWorkout: unknown
     handleExportPdf: () => void
-    handleExportJson: () => void
+    handleExportJson: () => void | Promise<void>
 
     // VIP
     vipAccess: Record<string, unknown> | null
@@ -144,8 +139,8 @@ export interface DashboardModalsProps {
 export default function DashboardModals(props: DashboardModalsProps) {
     const {
         user, showCompleteProfile, setShowCompleteProfile, profileDraftName, setProfileDraftName,
-        savingProfile, handleSaveProfile, showImportModal, setShowImportModal, importCode, setImportCode,
-        handleImportWorkout, showJsonImportModal, setShowJsonImportModal, handleJsonUpload,
+        savingProfile, handleSaveProfile,
+        showJsonImportModal, setShowJsonImportModal, handleJsonUpload,
         shareCode, setShareCode, quickViewWorkout, setQuickViewWorkout, handleStartSession,
         showNotifCenter, setShowNotifCenter, activeSession, handleCloseTimer, handleTimerFinish, handleStartFromRestTimer,
         view, setView, sessionTicker, parseStartedAtMs, calculateExerciseDuration, toMinutesRounded,
@@ -248,19 +243,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
             )}
 
             {/* Import Workout */}
-            {showImportModal && (
-                <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                        <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                        <input {...codeFieldProps} value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase" />
-                        <div className="flex gap-2">
-                            <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
-                            <button onClick={handleImportWorkout} className="flex-1 p-3 bg-amber-500 hover:bg-amber-400 rounded-xl font-bold text-black">Importar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* JSON Import */}
             {showJsonImportModal && (
                 <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">

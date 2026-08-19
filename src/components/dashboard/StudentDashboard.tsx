@@ -118,7 +118,6 @@ type Props = {
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
   onNormalizeExercises?: () => MaybePromise<void>
-  onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
   onApplyTitleRule?: () => MaybePromise<void>
   /** Called when user's own story active state changes (for header story ring) */
   onMyStoryStateChange?: (hasActiveStory: boolean) => void
@@ -161,7 +160,6 @@ export default function StudentDashboard(props: Props) {
   const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
   const [periodizationCreateOpen, setPeriodizationCreateOpen] = useState(false)
-  const [normalizingAiTitles, setNormalizingAiTitles] = useState(false)
   const [normalizingExercises, setNormalizingExercises] = useState(false)
   const [applyingTitleRule, setApplyingTitleRule] = useState(false)
   const [editListOpen, setEditListOpen] = useState(false)
@@ -708,17 +706,13 @@ export default function StudentDashboard(props: Props) {
                     {toolsOpen && (
                       <WorkoutToolsPanel
                         onClose={() => setToolsOpen(false)}
-                        onCreateWorkout={props.onCreateWorkout}
                         onOpenJsonImport={props.onOpenJsonImport}
                         onExportAll={props.onExportAll}
                         exportingAll={props.exportingAll}
-                        onNormalizeAiWorkoutTitles={props.onNormalizeAiWorkoutTitles}
                         onNormalizeExercises={props.onNormalizeExercises}
                         onApplyTitleRule={props.onApplyTitleRule}
-                        normalizingAiTitles={normalizingAiTitles}
                         normalizingExercises={normalizingExercises}
                         applyingTitleRule={applyingTitleRule}
-                        setNormalizingAiTitles={setNormalizingAiTitles}
                         setNormalizingExercises={setNormalizingExercises}
                         setApplyingTitleRule={setApplyingTitleRule}
                       />
