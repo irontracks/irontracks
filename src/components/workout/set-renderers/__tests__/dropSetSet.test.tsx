@@ -79,13 +79,24 @@ describe('DropSetSet — override por série (per_set_method)', () => {
   })
 })
 
-describe('linha do drop — o rótulo do método não invade o chip de falha', () => {
-  it('o contêiner do rótulo corta o que transborda', () => {
-    // jsdom não faz layout: o que se prova aqui é a REGRA de CSS, não o pixel.
-    // Com o chip de falha ganhando rótulo, o "DROP" (`shrink-0`) passou a
-    // transbordar do contêiner `flex-1 min-w-0` e era desenhado POR CIMA do
-    // "FALHA" — visto no iPhone 17 Pro Max em 19/08/2026.
-    const SRC = readFileSync(join(process.cwd(), 'src/components/workout/set-renderers/dropSetSet.tsx'), 'utf8')
-    expect(SRC).toMatch(/flex-1 min-w-0 overflow-hidden/)
+describe('linha do drop — o rótulo do método não disputa espaço com os controles', () => {
+  // jsdom não faz layout: o que se prova aqui é ONDE cada coisa é renderizada,
+  // não o pixel. No aparelho (19/08/2026) o "DROP" transbordava e era desenhado
+  // POR CIMA do "FALHA"; cortá-lo com overflow-hidden apagava o nome do método.
+  it('o rótulo do método fica na linha de baixo, junto do resumo de etapas', () => {
+    plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
+    const { container } = renderDrop({ name: 'Pullover no cabo' })
+    const abaixo = container.querySelector('.pl-12')
+    expect(abaixo?.textContent).toMatch(/Drop/i)
+    expect(abaixo?.textContent).toMatch(/2 etapas/)
+  })
+
+  it('a linha dos controles não hospeda mais o rótulo', () => {
+    plannedSet = { advanced_config: [{ weight: '50', reps: 10 }, { weight: '40', reps: 8 }] }
+    const { container } = renderDrop({ name: 'Pullover no cabo' })
+    const linha = container.querySelector('.rounded-xl.border')
+    // "Abrir" e "Falha" seguem na linha; "etapas" saiu dela.
+    expect(linha?.textContent).toMatch(/Abrir/)
+    expect(linha?.textContent).not.toMatch(/etapas/)
   })
 })
