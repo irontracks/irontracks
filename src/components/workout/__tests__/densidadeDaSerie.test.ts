@@ -49,9 +49,14 @@ describe('rodapé da série', () => {
 
 describe('chip de falha', () => {
     it('é um estado, não uma pergunta', () => {
-        expect(failureToggle, '"Falha?" lia como se o app perguntasse algo')
-            .not.toContain("'Falha?'")
-        expect(failureToggle).toContain("'Falha'")
+        // `executavel` tira comentários: o cabeçalho do módulo EXPLICA por que
+        // "Falha?" saiu, e um guard que casa com a própria documentação acusa o
+        // texto que o defende (armadilha nº 2 do repo).
+        expect(executavel(failureToggle), '"Falha?" lia como se o app perguntasse algo')
+            .not.toContain('Falha?')
+        // O rótulo é texto JSX direto desde que a variante só-ícone caiu
+        // (19/08/2026) — antes era a string `'Falha'` condicionada ao `compact`.
+        expect(failureToggle).toMatch(/\bFalha\b/)
     })
 
     it('o rótulo não muda de largura ao alternar', () => {
