@@ -162,7 +162,7 @@ const RestPauseSetInner = ({
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -227,7 +227,7 @@ const RestPauseSetInner = ({
                 <Pencil size={14} />
                 <span className="text-xs font-black hidden sm:inline">Abrir</span>
               </button>
-              <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+              <FailureToggle exIdx={exIdx} setIdx={setIdx} />
               <button
                 type="button"
                 onClick={() => toggleNotes(key)}

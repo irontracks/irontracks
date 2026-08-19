@@ -59,9 +59,20 @@ describe('FailureToggle — rótulo não quebra em duas linhas', () => {
     expect(cls).not.toContain('tracking-widest')
   })
 
-  it('a variante compacta continua só com o ícone (linhas apertadas dos métodos)', () => {
-    render(<FailureToggle exIdx={0} setIdx={1} compact />)
-    expect(screen.getByRole('button').textContent).not.toMatch(/falha/i)
+  it('mostra o rótulo "Falha" — forma ÚNICA, sem variante só-ícone', () => {
+    // Havia um modo compacto (só a chama) nos 12 renderers avançados: o mesmo
+    // controle tinha duas caras na mesma tela e, no drop, era uma chama muda.
+    // Se alguém reintroduzir a amputação do rótulo, este caso fica vermelho.
+    render(<FailureToggle exIdx={0} setIdx={1} />)
+    expect(screen.getByRole('button').textContent).toMatch(/falha/i)
+  })
+
+  it('nenhum renderer de série pede uma variante compacta do chip', () => {
+    const dir = join(process.cwd(), 'src/components/workout/set-renderers')
+    const offenders = readdirSync(dir)
+      .filter((f) => f.endsWith('.tsx') && f !== 'FailureToggle.tsx')
+      .filter((f) => /<FailureToggle[^>]*\bcompact\b/.test(readFileSync(join(dir, f), 'utf8')))
+    expect(offenders).toEqual([])
   })
 
   it('segue acessível por rótulo, não pelo texto visual', () => {

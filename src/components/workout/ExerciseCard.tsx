@@ -72,7 +72,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     getPlanConfig,
     getLog,
     alert,
-    removeExtraSetFromExercise,
+    removeSetAtIndex,
     linkedWeightExercises,
     toggleLinkWeights,
     deleteConfirmIdx,
@@ -131,6 +131,10 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   // Nota recolhida por padrão, e o estado é por CARD: abrir a técnica de um
   // exercício não deve abrir a dos outros sete.
   const [noteOpen, setNoteOpen] = useState(false);
+  // Qual série remover. A lixeira apagava sempre a ÚLTIMA, então tirar a 2ª de
+  // quatro exigia apagar as de cima e refazer — o dono reportou isso justamente
+  // num exercício onde a série do meio era a que ele queria fora (19/08/2026).
+  const [removeSetOpen, setRemoveSetOpen] = useState(false);
   const isBarbell = useMemo(
     () => resolveIncrement(inferEquipmentFromName(name)).equipmentClass === 'barbell',
     [name],
@@ -786,18 +790,63 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               <Plus size={16} />
               <span className="text-sm">Série extra</span>
             </button>
-            <button aria-label="Remover exercício"
+            <button aria-label="Remover série"
               type="button"
-              onClick={() => {
-                removeExtraSetFromExercise(exIdx);
-              }}
-              className="min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900/50 border border-red-500/20 text-red-500 hover:bg-red-500/10 active:scale-95 transition-colors disabled:opacity-30"
+              onClick={() => setRemoveSetOpen((v) => !v)}
+              aria-expanded={removeSetOpen}
+              className={[
+                'min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border active:scale-95 transition-colors disabled:opacity-30',
+                removeSetOpen
+                  ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                  : 'bg-neutral-900/50 border-red-500/20 text-red-500 hover:bg-red-500/10',
+              ].join(' ')}
               disabled={setsCount <= 1}
-              title="Remover última série"
+              title="Remover uma série"
             >
               <Trash2 size={16} />
             </button>
           </div>
+
+          {/* Escolha da série a remover. Fica FORA da linha dos botões (uma lixeira
+              por série apertaria 14 renderers diferentes; aqui a mesma escolha vale
+              para todos os métodos, sem tocar em nenhum deles). */}
+          {removeSetOpen && setsCount > 1 && (
+            <div className="rounded-xl border border-red-500/25 p-3" style={{ background: 'rgba(239,68,68,0.07)' }}>
+              <div className="text-xs font-black uppercase tracking-widest text-red-300 mb-2">Remover qual série?</div>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: setsCount }).map((_, sIdx) => {
+                  const sDone = !!getLog(`${exIdx}-${sIdx}`).done;
+                  return (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      aria-label={`Remover série ${sIdx + 1}`}
+                      onClick={() => {
+                        setRemoveSetOpen(false);
+                        void removeSetAtIndex(exIdx, sIdx);
+                      }}
+                      className={[
+                        'tap-44 min-w-[44px] h-9 px-3 inline-flex items-center justify-center gap-1 rounded-xl border text-sm font-bold transition-colors',
+                        sDone
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300'
+                          : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300',
+                      ].join(' ')}
+                    >
+                      #{sIdx + 1}
+                      {sDone && <CheckCircle2 size={12} aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setRemoveSetOpen(false)}
+                className="mt-2 w-full min-h-[44px] rounded-xl text-sm text-neutral-400 hover:text-neutral-300 active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

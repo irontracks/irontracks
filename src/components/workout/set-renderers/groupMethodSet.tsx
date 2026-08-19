@@ -121,7 +121,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             <div className="w-8 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{effectiveMethod}</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -182,7 +182,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 {effectiveMethod}
                 <ChevronDown size={10} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
               </button>
-              <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+              <FailureToggle exIdx={exIdx} setIdx={setIdx} />
               <button
                 type="button"
                 onClick={() => toggleNotes(key)} aria-label="Observações"

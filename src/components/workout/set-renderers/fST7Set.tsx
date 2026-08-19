@@ -63,7 +63,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
             <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">FST-7</span>
             <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
@@ -95,7 +95,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">FST-7</span>
               <span className="text-xs text-neutral-400 truncate">7 blocos • {intraSec}s intra • {total || 0} reps total</span>
             </div>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} compact />
+            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
             <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
               <MessageSquare size={14} />
             </button>

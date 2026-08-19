@@ -178,11 +178,27 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     }
   };
 
-  const removeExtraSetFromExercise = async (exIdx: unknown) => {
+  /**
+   * Remove UMA série pelo índice — não só a última.
+   *
+   * A lixeira do card sempre foi um `pop()` cego: quem precisava tirar a 2ª de
+   * quatro séries tinha que apagar as três de cima e refazer (relato do dono,
+   * 19/08/2026). Com métodos avançados isso é pior ainda, porque a série do meio
+   * costuma ser justamente a que carrega a configuração (drop, cluster…).
+   *
+   * O que vai junto e é a parte que quebra em silêncio: os logs são um mapa
+   * `"exIdx-setIdx"`, então remover do MEIO precisa DESLOCAR as chaves seguintes.
+   * Sem isso, apagar a série 2 deixaria a série 3 exibindo o log da 4 (o índice
+   * some, os vizinhos escorregam) — dado certo na chave errada, que é pior que
+   * dado perdido.
+   */
+  const removeSetAtIndex = async (exIdx: unknown, setIdx: unknown) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
+    const sIdx = Number(setIdx);
     if (!Number.isFinite(idx) || idx < 0) return;
     if (idx >= exercises.length) return;
+    if (!Number.isFinite(sIdx) || sIdx < 0) return;
     try {
       const nextExercises = [...exercises];
       const exRaw = nextExercises[idx] && typeof nextExercises[idx] === 'object' ? nextExercises[idx] : {};
@@ -193,19 +209,35 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
 
       // Prevent deleting if there are only 0 or 1 sets left
       if (setsCount <= 1) return;
+      if (sIdx >= setsCount) return;
 
-      sdArr.pop();
+      // O header pode ser maior que a lista de detalhes (séries "virtuais", sem
+      // detalhe próprio). Só há o que tirar do array quando o índice existe nele.
+      if (sIdx < sdArr.length) sdArr.splice(sIdx, 1);
+      // Renumera o que sobrou: `set_number` é 1-based e vira rótulo no relatório.
+      for (let i = 0; i < sdArr.length; i += 1) {
+        const d = sdArr[i];
+        if (d && typeof d === 'object') sdArr[i] = { ...(d as UnknownRecord), set_number: i + 1 };
+      }
+
       nextExercises[idx] = {
         ...exRaw,
         sets: setsCount - 1,
         setDetails: sdArr,
       };
 
-      const nextLogs: Record<string, unknown> = { ...(logs && typeof logs === 'object' ? logs : {}) };
-      const discardedKey = `${idx}-${setsCount - 1}`;
-      try {
-        delete nextLogs[discardedKey];
-      } catch { }
+      const prevLogs: Record<string, unknown> = (logs && typeof logs === 'object' ? logs : {}) as Record<string, unknown>;
+      const nextLogs: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(prevLogs)) {
+        const m = /^(\d+)-(\d+)$/.exec(k);
+        if (!m) { nextLogs[k] = v; continue; }
+        const kEx = Number(m[1]);
+        const kSet = Number(m[2]);
+        if (kEx !== idx) { nextLogs[k] = v; continue; }
+        if (kSet === sIdx) continue;              // a série removida
+        if (kSet > sIdx) nextLogs[`${kEx}-${kSet - 1}`] = v;  // desliza pra baixo
+        else nextLogs[k] = v;
+      }
 
       onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
       await askPersistSetChange('remove', { ...workout, exercises: nextExercises });
@@ -215,6 +247,18 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         await alert('Não foi possível remover a série: ' + msg);
       } catch { }
     }
+  };
+
+  /** Atalho legado: remove a ÚLTIMA série. Um caminho só, para não divergirem. */
+  const removeExtraSetFromExercise = async (exIdx: unknown) => {
+    const idx = Number(exIdx);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= exercises.length) return;
+    const exRaw = exercises[idx] && typeof exercises[idx] === 'object' ? exercises[idx] : ({} as WorkoutExercise);
+    const setsHeader = Math.max(0, Number.parseInt(String(exRaw?.sets ?? '0'), 10) || 0);
+    const sdArrRaw = Array.isArray(exRaw?.setDetails) ? exRaw.setDetails : Array.isArray((exRaw as UnknownRecord)?.set_details) ? ((exRaw as UnknownRecord).set_details as unknown[]) : [];
+    const setsCount = Math.max(setsHeader, Array.isArray(sdArrRaw) ? sdArrRaw.length : 0);
+    if (setsCount <= 1) return;
+    await removeSetAtIndex(idx, setsCount - 1);
   };
 
   const openEditExercise = async (exIdx: unknown) => {
@@ -585,6 +629,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     toggleLinkWeights,
     addExtraSetToExercise,
     removeExtraSetFromExercise,
+    removeSetAtIndex,
     openEditExercise,
     saveEditExercise,
     addExtraExerciseToWorkout,
