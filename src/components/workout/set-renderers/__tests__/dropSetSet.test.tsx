@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { DropSetSet } from '../dropSetSet'
 
 // HelpHint usa useDialog (precisa de DialogProvider) — irrelevante pro teste.
@@ -74,5 +76,16 @@ describe('DropSetSet — override por série (per_set_method)', () => {
     logValue = { per_set_method: '' }
     const { container } = renderDrop({ name: 'X', method: 'Normal' })
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('linha do drop — o rótulo do método não invade o chip de falha', () => {
+  it('o contêiner do rótulo corta o que transborda', () => {
+    // jsdom não faz layout: o que se prova aqui é a REGRA de CSS, não o pixel.
+    // Com o chip de falha ganhando rótulo, o "DROP" (`shrink-0`) passou a
+    // transbordar do contêiner `flex-1 min-w-0` e era desenhado POR CIMA do
+    // "FALHA" — visto no iPhone 17 Pro Max em 19/08/2026.
+    const SRC = readFileSync(join(process.cwd(), 'src/components/workout/set-renderers/dropSetSet.tsx'), 'utf8')
+    expect(SRC).toMatch(/flex-1 min-w-0 overflow-hidden/)
   })
 })

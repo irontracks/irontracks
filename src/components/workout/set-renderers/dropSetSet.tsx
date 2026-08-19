@@ -209,7 +209,12 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               <Pencil size={14} />
               <span className="text-xs font-black">Abrir</span>
             </button>
-            <div className="flex items-center gap-2 flex-1 min-w-0 ml-1">
+            {/* `overflow-hidden`: sem ele o rótulo do método (que é `shrink-0`)
+                TRANSBORDA do contêiner flex-1 e é desenhado POR CIMA do chip de
+                falha — "DROP" e "FALHA" sobrepostos, visto no aparelho quando o
+                chip ganhou rótulo (19/08/2026). `min-w-0` encolhe a caixa, não o
+                conteúdo dela. */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden ml-1">
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
                 {modeLabel || 'Drop'}
                 <HelpHint
