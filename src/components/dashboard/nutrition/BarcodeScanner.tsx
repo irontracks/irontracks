@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
+import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 
 type Props = {
   onResult: (ean: string) => void
@@ -114,7 +115,11 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
     onClose()
   }, [cleanup, onClose])
 
+  // Portal pelo mesmo motivo do histórico: montado dentro do overlay rolável da
+  // Nutrição, a câmera em tela cheia ficaria presa ao contêiner e rolaria com a
+  // página.
   return (
+    <FullscreenPortal>
     <div className="fixed inset-0 z-50 flex flex-col bg-black/95">
       <div className="relative flex-1 overflow-hidden">
         <video
@@ -158,5 +163,6 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
         </button>
       </div>
     </div>
+  </FullscreenPortal>
   )
 }
