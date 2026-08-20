@@ -20,6 +20,14 @@ const rendererFiles = readdirSync(join(process.cwd(), DIR))
 
 const sourceOf = (file: string) => readFileSync(join(process.cwd(), DIR, file), 'utf8')
 
+/**
+ * Renderer que DELEGA a linha ao molde compartilhado (`AdvancedSetRow`) cumpre o
+ * invariante nele, não no próprio arquivo. O molde é verificado à parte, uma vez
+ * — é o ponto da extração: um rótulo, não catorze.
+ */
+const MOLDE = 'AdvancedSetRow.tsx'
+const delega = (src: string) => /<AdvancedSetRow/.test(src)
+
 describe('rótulo do botão de concluir série', () => {
   it('existe um conjunto de renderers pra checar (o glob não pode silenciar)', () => {
     expect(rendererFiles.length).toBeGreaterThanOrEqual(14)
@@ -43,10 +51,20 @@ describe('rótulo do botão de concluir série', () => {
   it('todo renderer com botão de concluir diz "Concluir"', () => {
     const semConcluir = rendererFiles.filter((f) => {
       const src = sourceOf(f)
+      if (delega(src)) return false // o rótulo mora no molde (caso abaixo)
       const temBotaoDone = /handleToggleDone|handleComplete|onComplete/.test(src)
       return temBotaoDone && !src.includes('Concluir')
     })
     expect(semConcluir).toEqual([])
+  })
+
+  it('o molde compartilhado é quem carrega o rótulo dos que delegam', () => {
+    // Sem este caso, migrar todos para o molde deixaria o guard verde e CEGO —
+    // ninguém mais checaria o rótulo em lugar nenhum (armadilha nº 6 do repo).
+    const molde = readFileSync(join(process.cwd(), DIR, MOLDE), 'utf8')
+    expect(molde).toContain('Concluir')
+    expect(molde).toContain('Feito')
+    expect(molde).not.toMatch(/>\s*OK\s*</)
   })
 
   it('o estado concluído diz "Feito" (e não outro sinônimo)', () => {

@@ -2,10 +2,8 @@
 
 import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
-import { FailureToggle } from './FailureToggle';
-import { HelpHint } from '@/components/ui/HelpHint';
+import { AdvancedSetRow } from './AdvancedSetRow';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
   isObject,
@@ -31,8 +29,6 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
     clusterRefs,
     deloadSuggestions,
     reportHistory,
-    openNotesKeys,
-    toggleNotes,
     settings,
   } = useWorkoutContext();
 
@@ -123,16 +119,6 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   };
 
   const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
-  const notesValue = String(log.notes ?? '');
-  const hasNotes = notesValue.trim().length > 0;
-  const isNotesOpen = openNotesKeys.has(key);
-  const prevNote = (() => {
-    const entry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
-    const latest = entry?.items?.length ? [...entry.items].sort((a, b) => b.ts - a.ts)[0] : null;
-    return latest?.setNotes?.[setIdx] ?? null;
-  })();
-  const hasAnyNote = hasNotes || !!prevNote;
-
   const savedWeight = String(log.weight ?? cfg?.weight ?? '').trim();
   const summaryText = `${savedWeight ? savedWeight + 'kg' : '—'} • ${blocks.map(b => b ?? '?').join('+')} = ${total} reps`;
 
@@ -152,144 +138,93 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
     });
   };
 
-  return (
-    <div key={key} className="space-y-1">
-      <div
-        className={[
-          'rounded-xl border transition-all duration-300 shadow-sm shadow-black/20',
-          done ? 'px-2.5 py-2 bg-emerald-950/30 border-emerald-500/30' : 'px-3 py-2.5 space-y-2 bg-neutral-900/50 border-neutral-800/80',
-        ].join(' ')}
-      >
-        {done ? (
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
-            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 inline-flex items-center gap-1 shrink-0">
-              Cluster
-            </span>
-            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-            >
-              <MessageSquare size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleUndo}
-              className="inline-flex items-center justify-center gap-1 tap-44 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
-            >
-              <Check size={13} />
-              Feito
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-              <input
-                inputMode="decimal"
-                aria-label={`Peso em kg – série ${setIdx + 1}`}
-                value={String(log?.weight ?? cfg?.weight ?? '')}
-                onChange={(e) => {
-                  const v = e?.target?.value ?? '';
-                  updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
-                }}
-                placeholder={weightPlaceholder}
-                title={isAutoWeight ? (autoRationale || undefined) : undefined}
-                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const baseWeight = String(log?.weight ?? cfg?.weight ?? plannedWeight ?? '').trim();
-                  const baseRpe = String(log?.rpe ?? '').trim();
-                  const planned = {
-                    total_reps: totalRepsPlanned ?? null,
-                    cluster_size: clusterSize ?? null,
-                    intra_rest_sec: intra ?? null,
-                  };
-                  const plannedBlocksModal = buildPlannedBlocks(totalRepsPlanned, clusterSize);
-                  const restsByGap = plannedBlocksModal.length > 1 ? Array.from({ length: plannedBlocksModal.length - 1 }).map(() => intra) : [];
-                  const blocksInput = plannedBlocksModal.map((plannedBlock, idx) => ({ planned: plannedBlock, weight: baseWeight, reps: blocks?.[idx] ?? plannedBlock ?? null }));
-                  setClusterModal({
-                    key,
-                    planned,
-                    plannedBlocks: plannedBlocksModal,
-                    intra,
-                    restsByGap,
-                    blocks: blocksInput,
-                    baseWeight,
-                    rpe: baseRpe,
-                    cfg: cfg ?? log.advanced_config ?? null,
-                    error: '',
-                  });
-                }}
-                className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-              >
-                <Pencil size={14} />
-                <span className="text-xs font-black hidden sm:inline">Abrir</span>
-              </button>
-              <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-              <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
-                <MessageSquare size={12} />
-              </button>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
-                  Cluster
-                  <HelpHint title={HELP_TERMS.cluster.title} text={HELP_TERMS.cluster.text} tooltip={HELP_TERMS.cluster.tooltip} className="h-4 w-4 text-[10px]" />
-                </span>
-                <span className="text-xs text-neutral-400 whitespace-normal">
-                  {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={!canDone}
-                onClick={() => {
-                  const nowMs = Date.now();
-                  const startedRaw = (log as UnknownRecord)?.startedAtMs;
-                  const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
-                  const executionSeconds =
-                    Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
-                  updateLog(key, {
-                    done: true,
-                    completedAtMs: nowMs,
-                    executionSeconds,
-                    reps: String(total || ''),
-                    cluster: {
-                      planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
-                      blocks,
-                      last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
-                    },
-                    advanced_config: cfg ?? log.advanced_config ?? null,
-                  });
-                  if (restTime && restTime > 0) {
-                    const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                    const nextKey = nextPlanned
-                      ? `${exIdx}-${setIdx + 1}`
-                      : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
-                    startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
-                  }
-                }}
-                className={
-                  canDone
-                    ? 'inline-flex items-center justify-center gap-2 tap-44 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
-                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed sm:w-auto'
-                }
-              >
-                <Check size={16} />
-                <span className="text-xs">Concluir</span>
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+  const abrirModal = () => {
+    const baseWeight = String(log?.weight ?? cfg?.weight ?? plannedWeight ?? '').trim();
+    const baseRpe = String(log?.rpe ?? '').trim();
+    const planned = {
+      total_reps: totalRepsPlanned ?? null,
+      cluster_size: clusterSize ?? null,
+      intra_rest_sec: intra ?? null,
+    };
+    const plannedBlocksModal = buildPlannedBlocks(totalRepsPlanned, clusterSize);
+    const restsByGap = plannedBlocksModal.length > 1 ? Array.from({ length: plannedBlocksModal.length - 1 }).map(() => intra) : [];
+    const blocksInput = plannedBlocksModal.map((plannedBlock, idx) => ({ planned: plannedBlock, weight: baseWeight, reps: blocks?.[idx] ?? plannedBlock ?? null }));
+    setClusterModal({
+      key,
+      planned,
+      plannedBlocks: plannedBlocksModal,
+      intra,
+      restsByGap,
+      blocks: blocksInput,
+      baseWeight,
+      rpe: baseRpe,
+      cfg: cfg ?? log.advanced_config ?? null,
+      error: '',
+    });
+  };
 
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
+  const handleConcluir = () => {
+    if (done) {
+      handleUndo();
+      return;
+    }
+    // Handler de clique, não render: o `Date.now()` só corre quando o usuário
+    // toca em Concluir. (Mesmo padrão dos demais renderers.)
+    // eslint-disable-next-line react-hooks/purity
+    const nowMs = Date.now();
+    const startedRaw = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+    const executionSeconds =
+      Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
+    updateLog(key, {
+      done: true,
+      completedAtMs: nowMs,
+      executionSeconds,
+      reps: String(total || ''),
+      cluster: {
+        planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
+        blocks,
+        last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
+      },
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+    if (restTime && restTime > 0) {
+      const nextPlanned = getPlannedSet(ex, setIdx + 1);
+      const nextKey = nextPlanned
+        ? `${exIdx}-${setIdx + 1}`
+        : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
+      startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+    }
+  };
+
+  return (
+    <AdvancedSetRow
+      exIdx={exIdx}
+      setIdx={setIdx}
+      done={done}
+      canDone={canDone}
+      methodLabel="Cluster"
+      help={{ title: HELP_TERMS.cluster.title, text: HELP_TERMS.cluster.text, tooltip: HELP_TERMS.cluster.tooltip }}
+      info={`${notation ? `(${notation}) • ` : ''}Intra ${intra || 0}s • Total: ${total || 0} reps`}
+      doneSummary={summaryText}
+      hint={!canDone ? 'Preencha as reps de todos os blocos para concluir.' : ''}
+      onOpen={abrirModal}
+      onToggleDone={handleConcluir}
+      weightSlot={
+        <input
+          inputMode="decimal"
+          aria-label={`Peso em kg – série ${setIdx + 1}`}
+          value={String(log?.weight ?? cfg?.weight ?? '')}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
+          }}
+          placeholder={weightPlaceholder}
+          title={isAutoWeight ? (autoRationale || undefined) : undefined}
+          className={`w-[68px] shrink-0 h-9 bg-black/30 border border-neutral-700 rounded-lg px-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
+        />
+      }
+    >
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {/* Anilhas por lado do peso do método, que é único para os blocos. */}
       <PlateHintLine
@@ -338,28 +273,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           })}
         </div>
       )}
-      {isNotesOpen && (
-        <div className="space-y-1.5">
-          {prevNote && (
-            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
-            </div>
-          )}
-          <textarea
-            aria-label={`Observações – série ${setIdx + 1}`}
-            value={notesValue}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
-            }}
-            placeholder="Observações da série"
-            rows={2}
-            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
-          />
-        </div>
-      )}
-    </div>
+    </AdvancedSetRow>
   );
 };
 
