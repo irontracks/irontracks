@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CalendarDays, Clapperboard, UtensilsCrossed } from 'lucide-react'
+import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -119,7 +120,13 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
 
   if (!open) return null
 
+  // Portal: este modal nasce dentro do `NutritionOverlay`, que é
+  // `fixed … z-[25] overflow-y-auto`. Sem sair de lá, o `fixed` daqui passa a
+  // se ancorar naquele contêiner rolável — o modal ROLA junto com a página e o
+  // topo (com o botão Voltar) sai da tela. Relatado pelo dono com a lista
+  // rolada: sobrava só o rodapé (20/08/2026).
   return (
+    <FullscreenPortal>
     <div className="fixed inset-0 z-[1600] flex items-end justify-center sm:items-center" {...dialogProps('Histórico de nutrição')}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" {...backdropProps(onClose)} />
 
@@ -260,5 +267,6 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
         )}
       </div>
     </div>
+  </FullscreenPortal>
   )
 }
