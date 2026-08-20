@@ -237,7 +237,7 @@ export function AdvancedSetRow({
         <div className="space-y-1.5">
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] t-meta shrink-0 mt-0.5">Anterior</span>
+              <span className="text-[10px] t-meta shrink-0 mt-0.5">Anterior</span>
               <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
