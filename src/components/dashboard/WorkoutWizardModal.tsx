@@ -2,12 +2,17 @@
 // v2: voice workout integration
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic, Camera } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { type VoiceExerciseDraft } from './VoiceWorkoutModal'
+import { type ImportedWorkout } from './WorkoutPhotoImportModal'
+import { METHOD_TO_EDITOR } from '@/utils/ai/workoutPhotoNormalize'
 // Lazy: o VoiceWorkoutModal (854 linhas + deps de áudio/IA) só carrega quando o usuário abre
 // a captura por voz (showVoice) — sai do chunk inicial do Wizard.
 const VoiceWorkoutModal = dynamic(() => import('./VoiceWorkoutModal'), { ssr: false })
+// Mesmo motivo do lazy acima: o import por foto carrega upload + compressão de
+// imagem, peso morto para quem nunca abre a opção.
+const WorkoutPhotoImportModal = dynamic(() => import('./WorkoutPhotoImportModal'), { ssr: false })
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { VipUpsellCard } from '@/components/vip/VipUpsellCard'
 import { useVipCredits } from '@/hooks/useVipCredits'
@@ -171,6 +176,36 @@ function voiceToWorkoutDraft(exercises: VoiceExerciseDraft[]): WorkoutDraft {
   }
 }
 
+/**
+ * Ficha importada → drafts do wizard.
+ *
+ * O peso lido da ficha vai para as NOTAS, não para uma coluna de carga: o
+ * template guarda o PLANO (o que fazer), e a carga real de cada série nasce na
+ * sessão. Gravar 60kg no template faria o motor de carga automática competir
+ * com um número que veio de um papel, possivelmente de meses atrás.
+ */
+function importedToWorkoutDrafts(workouts: ImportedWorkout[]): WorkoutDraft[] {
+  return workouts.map((w) => ({
+    title: w.title,
+    exercises: w.exercises.map((e) => {
+      const noteParts: string[] = []
+      if (e.weightKg != null) noteParts.push(`${e.weightKg}kg`)
+      if (e.notes) noteParts.push(e.notes)
+      return {
+        id: e.id,
+        name: e.name,
+        sets: e.sets ?? 3,
+        reps: e.reps,
+        rpe: e.rpe,
+        method: e.method ? METHOD_TO_EDITOR[e.method] : null,
+        restTime: e.restSeconds,
+        cadence: e.cadence,
+        notes: noteParts.length ? noteParts.join(' • ') : null,
+      }
+    }),
+  }))
+}
+
 // ── Main Component ─────────────────────────────────────────────────────
 export default function WorkoutWizardModal(props: Props) {
   const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
@@ -194,6 +229,7 @@ export default function WorkoutWizardModal(props: Props) {
   const [savingAll, setSavingAll] = useState(false)
   const [error, setError] = useState('')
   const [showVoice, setShowVoice] = useState(false)
+  const [showPhotoImport, setShowPhotoImport] = useState(false)
   /** Limite semanal batido → card de venda inline (era um confirm() seco). */
   const [showUpsell, setShowUpsell] = useState(false)
 
@@ -486,6 +522,30 @@ export default function WorkoutWizardModal(props: Props) {
                   <div>
                     <div className="font-black text-sm text-amber-400">Por Voz</div>
                     <div className="text-[11px] text-neutral-400 mt-0.5">Dite os exercícios e a IA transcreve e estrutura automaticamente.</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Por Foto/PDF — mesma forma do "Por Voz": entrada que abre um
+                  modal próprio, em vez de entrar no fluxo de 4 perguntas. */}
+              <button
+                type="button"
+                aria-label="Importar treino por foto ou PDF"
+                onClick={() => setShowPhotoImport(true)}
+                className="group w-full text-left rounded-xl p-4 border transition-all active:scale-[0.97]"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  boxShadow: '0 0 20px rgba(245,158,11,0.06)',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                    <Camera size={20} className="text-amber-400" />
+                  </span>
+                  <div>
+                    <div className="font-black text-sm text-amber-400">Por Foto/PDF</div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5">Fotografe a ficha do seu personal e a IA estrutura os treinos.</div>
                   </div>
                 </div>
               </button>
@@ -822,6 +882,22 @@ export default function WorkoutWizardModal(props: Props) {
           </div>
         </div>
       </div>
+      {showPhotoImport && (
+        <WorkoutPhotoImportModal
+          isOpen={showPhotoImport}
+          onClose={() => setShowPhotoImport(false)}
+          onComplete={async (imported) => {
+            const drafts = importedToWorkoutDrafts(imported)
+            setShowPhotoImport(false)
+            props.onClose()
+            // Vários treinos → o caminho de salvar em lote que o plano semanal
+            // já usa. Um treino só → abre o editor, para o usuário conferir no
+            // mesmo lugar onde revisa um treino gerado pela IA.
+            if (drafts.length > 1 && props.onSaveDrafts) await props.onSaveDrafts(drafts)
+            else if (drafts[0]) props.onUseDraft(drafts[0])
+          }}
+        />
+      )}
       {showVoice && (
         <VoiceWorkoutModal
           isOpen={showVoice}
