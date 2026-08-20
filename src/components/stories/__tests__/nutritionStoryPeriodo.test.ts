@@ -69,3 +69,81 @@ describe('o renderer do período', () => {
     expect(codigo).toMatch(/content\.goalCalories > 0/)
   })
 })
+
+/**
+ * "MÊS" mostrando só um número de dia (relato do dono, 19/08/2026: "deveria
+ * mostrar o total do mês, não? do jeito que está só mostra o do dia").
+ *
+ * A média por dia continua sendo o número grande — é ela que se compara com a
+ * meta DIÁRIA. O que faltava era (a) o total do período e (b) deixar claro que
+ * os macros também são média, não soma.
+ */
+describe('período mostra média E total, sem confundir os dois', () => {
+  const comTotais = {
+    ...resumo,
+    totalCalories: 10900,
+    totalProtein: 860,
+    totalCarbs: 1050,
+    totalFat: 340,
+  }
+
+  it('o adapter repassa os totais prontos do summarize', () => {
+    const c = periodToContent(comTotais, { calories: 2676 }, { periodLabel: 'Mês', rangeText: '21 jul – 19 ago' })
+    expect(c).toMatchObject({
+      calories: 2180, // média/dia continua sendo o hero
+      totalCalories: 10900,
+      totalProtein: 860,
+      totalCarbs: 1050,
+      totalFat: 340,
+    })
+  })
+
+  it('resumo antigo (sem totais) não quebra — vira 0 e a linha some', () => {
+    const c = periodToContent(resumo, { calories: 2676 }, { periodLabel: 'Mês', rangeText: '—' })
+    expect(c).toMatchObject({ totalCalories: 0, totalProtein: 0 })
+  })
+
+  it('o desenho rotula os macros do período como POR DIA', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/stories/nutritionStory.ts'), 'utf8')
+    // Sem o sufixo, "144g" ao lado de um título "MÊS" lê como total do mês.
+    expect(src).toContain("'PROTEÍNA/DIA'")
+    expect(src).toContain("'CARBO/DIA'")
+    expect(src).toContain("'GORDURA/DIA'")
+  })
+
+  it('o desenho só imprime o total quando ele existe', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/stories/nutritionStory.ts'), 'utf8')
+    expect(src).toMatch(/content\.kind === 'period' && content\.totalCalories > 0/)
+  })
+})
+
+describe('o editor de story escapa do stacking context', () => {
+  // Bug: "sem botão para sair dessa tela". O composer nasce dentro do
+  // NutritionOverlay (`fixed … z-[25]`), que cria stacking context — o
+  // `z-[2500]` do composer virava 25 contra o resto da página, o cabeçalho do
+  // app cobria o topo e o botão Voltar ficava inalcançável.
+  const composers = [
+    'src/components/NutritionStoryComposer.tsx',
+    'src/components/CardioStoryComposer.tsx',
+    'src/components/MetricsStoryComposer.tsx',
+  ]
+
+  it('os TRÊS composers renderizam em portal', () => {
+    for (const arquivo of composers) {
+      const src = readFileSync(join(process.cwd(), arquivo), 'utf8')
+      expect(src, `${arquivo} sem portal`).toContain('<FullscreenPortal>')
+    }
+  })
+
+  it('o portal vai para o document.body, não para um container qualquer', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/stories/FullscreenPortal.tsx'), 'utf8')
+    expect(src).toMatch(/createPortal\(children, document\.body\)/)
+  })
+
+  it('cada composer mantém um botão de sair com nome acessível', () => {
+    for (const arquivo of composers) {
+      const src = readFileSync(join(process.cwd(), arquivo), 'utf8')
+      expect(src, `${arquivo} sem botão de voltar`).toMatch(/aria-label="Voltar"/)
+    }
+  })
+})

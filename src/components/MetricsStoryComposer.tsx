@@ -27,6 +27,7 @@ import { drawMetricsStory, metricsToContent, type MetricsStoryItem } from '@/com
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
+import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 
@@ -147,7 +148,11 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
 
   if (!open) return null
 
+  // Portal: o composer é montado DENTRO de overlays que criam stacking context
+  // próprio (ver FullscreenPortal). Sem sair de lá, o `z-[2500]` abaixo não vale
+  // contra o resto da página e o topo — com o botão Voltar — fica encoberto.
   return (
+    <FullscreenPortal>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -362,5 +367,6 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
 
       <StoryComposerIosSavePanel key="ios-save-panel" saveImageUrl={saveImageUrl} onClose={() => setSaveImageUrl(null)} />
     </AnimatePresence>
+    </FullscreenPortal>
   )
 }

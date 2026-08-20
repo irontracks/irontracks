@@ -64,8 +64,38 @@ describe('summarizeHistory', () => {
     expect(r.windowDays).toBe(30)
   })
 
-  it('janela sem nenhum lançamento não inventa média', () => {
-    expect(summarizeHistory([], 7)).toEqual({ loggedDays: 0, windowDays: 7, avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 })
+  it('janela sem nenhum lançamento não inventa média nem total', () => {
+    expect(summarizeHistory([], 7)).toEqual({
+      loggedDays: 0, windowDays: 7,
+      avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0,
+      totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
+    })
+  })
+
+  it('devolve o TOTAL da janela, além da média por dia registrado', () => {
+    // O story de período mostra os dois: a média se compara com a meta diária,
+    // o total responde "quanto no mês" — que foi como o dono leu o card.
+    const dias = [
+      { date: '2026-08-01', calories: 2000, protein: 150, carbs: 200, fat: 70 },
+      { date: '2026-08-02', calories: 2400, protein: 160, carbs: 240, fat: 80 },
+    ]
+    const r = summarizeHistory(dias, 30)
+    expect(r.totalCalories).toBe(4400)
+    expect(r.totalProtein).toBe(310)
+    expect(r.totalCarbs).toBe(440)
+    expect(r.totalFat).toBe(150)
+    expect(r.avgCalories).toBe(2200)
+  })
+
+  it('média e total saem da MESMA soma — não podem divergir', () => {
+    const dias = [
+      { date: '2026-08-01', calories: 1999, protein: 0, carbs: 0, fat: 0 },
+      { date: '2026-08-02', calories: 2000, protein: 0, carbs: 0, fat: 0 },
+      { date: '2026-08-03', calories: 2002, protein: 0, carbs: 0, fat: 0 },
+    ]
+    const r = summarizeHistory(dias, 30)
+    expect(r.totalCalories).toBe(6001)
+    expect(r.avgCalories).toBe(Math.round(r.totalCalories / r.loggedDays))
   })
 })
 

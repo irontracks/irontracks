@@ -63,6 +63,16 @@ export type NutritionStoryContent =
       fat: number
       loggedDays: number
       windowDays: number
+      /**
+       * SOMA do período. O hero continua sendo a MÉDIA POR DIA (é ela que se
+       * compara com a meta diária), mas um story que diz "MÊS" e mostra só um
+       * número de dia lia como o dia de hoje — foi exatamente a leitura do dono
+       * ao ver o card pronto (19/08/2026). O total responde "quanto no mês".
+       */
+      totalCalories: number
+      totalProtein: number
+      totalCarbs: number
+      totalFat: number
     }
 
 const nf = (n: unknown): string => Math.round(Number(n) || 0).toLocaleString('pt-BR')
@@ -362,12 +372,55 @@ export const drawNutritionStory = ({
   ctx.fillText(tail, left + calW + 12, heroNumY + heroSize - 44)
   ctx.restore()
 
+  // ── Total do período (só no modo período) ─────────────────────────────────
+  // Vai ACIMA do hero, no vão que a lista de alimentos ocupa no modo refeição.
+  // O hero segue sendo a média por dia — é ela que se compara com a meta —, e
+  // esta linha responde a pergunta que o título "MÊS" levanta: quanto no total.
+  if (content.kind === 'period' && content.totalCalories > 0) {
+    ctx.save()
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.shadowBlur = 10
+    ctx.textBaseline = 'top'
+    // 140 = altura do bloco (rótulo 22 + valor 46 + macros 26, com respiros) e
+    // ainda sobra ar antes do hero. Com 96 o bloco encostava no "MÉDIA POR DIA".
+    const totalLabelY = heroLabelY - 140
+    ctx.font = f(F.labelWeight, 22)
+    ctx.fillStyle = C.cardLabel
+    ctx.letterSpacing = F.labelLetterSpacing
+    ctx.fillText(`TOTAL ${String(content.periodLabel || '').toUpperCase()}`.trim(), left, totalLabelY)
+    ctx.letterSpacing = '0px'
+
+    ctx.font = f(F.valueWeight, 46)
+    ctx.fillStyle = C.value
+    const totalStr = `${nf(content.totalCalories)} kcal`
+    ctx.fillText(totalStr, left, totalLabelY + 30)
+
+    // Macros somados, em texto menor: quem quer o número do mês quer os três.
+    ctx.font = f(F.subtitleWeight, 26)
+    ctx.fillStyle = C.subtitle
+    ctx.fillText(
+      `${nf(content.totalProtein)}g P · ${nf(content.totalCarbs)}g C · ${nf(content.totalFat)}g G`,
+      left,
+      totalLabelY + 84,
+    )
+    ctx.restore()
+  }
+
   // ── 3 cards P/C/G ──────────────────────────────────────────────────────────
   const cardW = Math.floor((right - left - gap * 2) / 3)
   const mg = (v: number) => `${nf(v)}g`
   const dg = (v: number, goal: number) => `${nf(v)}/${nf(goal)}g`
+  // No PERÍODO o rótulo carrega o "/DIA": os números dos cards são média, igual
+  // ao hero, e sem o sufixo eles liam como total do mês ao lado de um título
+  // que diz "MÊS".
   const cards: Array<{ label: string; value: string }> =
-    content.kind === 'meal' || content.kind === 'period'
+    content.kind === 'period'
+      ? [
+          { label: 'PROTEÍNA/DIA', value: mg(content.protein) },
+          { label: 'CARBO/DIA', value: mg(content.carbs) },
+          { label: 'GORDURA/DIA', value: mg(content.fat) },
+        ]
+      : content.kind === 'meal'
       ? [
           { label: 'PROTEÍNA', value: mg(content.protein) },
           { label: 'CARBO', value: mg(content.carbs) },
@@ -474,7 +527,11 @@ export const dayToContent = (
  * o que foi postado.
  */
 export const periodToContent = (
-  summary: { loggedDays: number; windowDays: number; avgCalories: number; avgProtein: number; avgCarbs: number; avgFat: number },
+  summary: {
+    loggedDays: number; windowDays: number
+    avgCalories: number; avgProtein: number; avgCarbs: number; avgFat: number
+    totalCalories?: number; totalProtein?: number; totalCarbs?: number; totalFat?: number
+  },
   goals: { calories?: number } | null | undefined,
   labels: { periodLabel: string; rangeText: string },
 ): NutritionStoryContent => ({
@@ -488,4 +545,8 @@ export const periodToContent = (
   fat: Number(summary?.avgFat) || 0,
   loggedDays: Number(summary?.loggedDays) || 0,
   windowDays: Number(summary?.windowDays) || 0,
+  totalCalories: Number(summary?.totalCalories) || 0,
+  totalProtein: Number(summary?.totalProtein) || 0,
+  totalCarbs: Number(summary?.totalCarbs) || 0,
+  totalFat: Number(summary?.totalFat) || 0,
 })

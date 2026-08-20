@@ -51,7 +51,6 @@ const NAO_E_JANELA: Record<string, string> = {
   'components/HistoryList.tsx': 'tela de histórico',
   'components/WorkoutReport.tsx': 'tela de relatório do treino',
   'components/LoadingScreen.tsx': 'splash de carregamento — não há nada para anunciar nem foco a prender',
-  'components/ServiceWorkerRegister.tsx': 'falso positivo: a string aparece dentro de um COMENTÁRIO, não há overlay',
   'components/dashboard/WeeklyMuscleSummary.tsx': 'tela do resumo semanal',
   'components/teacher-area/TeacherArea.tsx': 'tela da área do professor',
   'components/CardioSessionModal.tsx': 'apesar do nome, é tela cheia sem véu — sessão de cardio em andamento',
@@ -80,9 +79,22 @@ const listarTsx = (dir: string): string[] =>
 
 const TEM_JANELA = /role="dialog"|dialogProps\(/
 
+/**
+ * Só o código EXECUTÁVEL. Um arquivo que apenas EXPLICA `fixed inset-0` num
+ * comentário — como o `FullscreenPortal`, que documenta o bug de stacking
+ * context que ele resolve — não é um overlay, e acusá-lo é o guard reprovando
+ * a documentação que o defende (armadilha nº 2 do repo).
+ */
+const executavel = (src: string) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((l) => l.replace(/\/\/.*$/, ''))
+    .join('\n')
+
 const comOverlay = listarTsx('components')
   .map((rel) => ({ rel, src: readFileSync(join(SRC, rel), 'utf8') }))
-  .filter((f) => f.src.includes('fixed inset-0'))
+  .filter((f) => executavel(f.src).includes('fixed inset-0'))
 
 describe('ratchet de semântica de janela', () => {
   it('a varredura encontrou os overlays — a busca não quebrou', () => {
