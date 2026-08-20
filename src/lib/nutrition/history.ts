@@ -79,6 +79,19 @@ export type NutritionHistorySummary = {
   avgProtein: number
   avgCarbs: number
   avgFat: number
+  /**
+   * SOMA da janela — o que a pessoa comeu no período inteiro.
+   *
+   * Existe porque "MÊS: 2.208 kcal" lia como o dia de hoje para quem abriu o
+   * story (relato do dono, 19/08/2026): a média é a métrica comparável com a
+   * meta diária, mas sozinha ela não parece um mês. O total sai daqui, e não
+   * de `avg × loggedDays` no consumidor — duas contas para o mesmo número é
+   * como nasce divergência entre a tela e o que foi postado.
+   */
+  totalCalories: number
+  totalProtein: number
+  totalCarbs: number
+  totalFat: number
 }
 
 /**
@@ -96,16 +109,35 @@ export type NutritionHistorySummary = {
 export function summarizeHistory(days: NutritionHistoryDay[] | null | undefined, windowDays: number): NutritionHistorySummary {
   const lista = Array.isArray(days) ? days : []
   const loggedDays = lista.length
-  if (!loggedDays) return { loggedDays: 0, windowDays, avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0 }
-  const media = (pega: (d: NutritionHistoryDay) => number) =>
-    Math.round(lista.reduce((a, d) => a + num(pega(d)), 0) / loggedDays)
+  if (!loggedDays) {
+    return {
+      loggedDays: 0, windowDays,
+      avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0,
+      totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
+    }
+  }
+  const soma = (pega: (d: NutritionHistoryDay) => number) =>
+    Math.round(lista.reduce((a, d) => a + num(pega(d)), 0))
+  // A média sai da MESMA soma — sem uma segunda varredura que pudesse divergir
+  // por arredondamento.
+  const media = (total: number) => Math.round(total / loggedDays)
+
+  const totalCalories = soma((d) => d.calories)
+  const totalProtein = soma((d) => d.protein)
+  const totalCarbs = soma((d) => d.carbs)
+  const totalFat = soma((d) => d.fat)
+
   return {
     loggedDays,
     windowDays,
-    avgCalories: media((d) => d.calories),
-    avgProtein: media((d) => d.protein),
-    avgCarbs: media((d) => d.carbs),
-    avgFat: media((d) => d.fat),
+    avgCalories: media(totalCalories),
+    avgProtein: media(totalProtein),
+    avgCarbs: media(totalCarbs),
+    avgFat: media(totalFat),
+    totalCalories,
+    totalProtein,
+    totalCarbs,
+    totalFat,
   }
 }
 
