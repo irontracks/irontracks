@@ -3,16 +3,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 
-import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { normalizeMiniSets } from '../helpers/restPauseRules';
 import { useWorkoutContext } from '../WorkoutContext';
-import { FailureToggle } from './FailureToggle';
-import { HelpHint } from '@/components/ui/HelpHint';
+import { AdvancedSetRow } from './AdvancedSetRow';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
-  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
@@ -37,9 +34,6 @@ const RestPauseSetInner = ({
     setRestPauseModal,
     restPauseDraftsRef,
     deloadSuggestions,
-    openNotesKeys,
-    toggleNotes,
-    reportHistory,
     settings,
   } = useWorkoutContext();
 
@@ -75,17 +69,6 @@ const RestPauseSetInner = ({
     String(log?.weight ?? cfg?.weight ?? ''),
     (v) => updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
-  const notesExternal = String(log.notes ?? '');
-  const notesField = useLocalField(
-    notesExternal,
-    (v) => updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
-  const hasNotes = notesExternal.trim().length > 0;
-  const isNotesOpen = openNotesKeys.has(key);
-  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
-  const lastItem = histEntry?.items?.length ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0] : null;
-  const prevNote = lastItem?.setNotes?.[setIdx] ?? null;
-  const hasAnyNote = hasNotes || !!prevNote;
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
   // SST override takes priority for the label
@@ -149,149 +132,88 @@ const RestPauseSetInner = ({
     });
   };
 
+  const abrirModal = () => {
+    const draft = restPauseDraftsRef?.current?.[key];
+    if (draft && typeof draft === 'object') {
+      setRestPauseModal({ ...(draft as UnknownRecord), error: '' });
+      return;
+    }
+    const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
+    const baseRpe = String(log?.rpe ?? '').trim();
+    const minisInput = Array.from({ length: miniSets }).map((_, idx) => {
+      const v = minisArrRaw?.[idx];
+      const n = parseTrainingNumber(v);
+      return n != null && n > 0 ? n : null;
+    });
+    setRestPauseModal({
+      key,
+      label: modeLabel,
+      pauseSec,
+      miniSets,
+      weight: baseWeight,
+      activationReps: null,
+      minis: minisInput,
+      rpe: baseRpe,
+      cfg: cfg ?? null,
+      error: '',
+    });
+  };
+
+  const handleConcluir = () => {
+    if (done) {
+      handleUndo();
+      return;
+    }
+    const nowMs = Date.now();
+    const startedRaw = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+    const executionSeconds =
+      Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
+    updateLog(key, {
+      done: true,
+      completedAtMs: nowMs,
+      executionSeconds,
+      reps: String(total || ''),
+      rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+    if (restTime && restTime > 0) {
+      const nextPlanned = getPlannedSet(ex, setIdx + 1);
+      const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+      startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+    }
+  };
+
+  const rotulo = modeLabel === 'SST' ? 'SST' : 'Rest-P';
+  const verbete = modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause;
+
   return (
-    <div key={key} className="space-y-1">
-      <div
-        className={[
-          'rounded-xl border transition-all duration-300 shadow-sm shadow-black/20',
-          done ? 'px-2.5 py-2 bg-emerald-950/30 border-emerald-500/30' : 'px-3 py-2.5 space-y-2 bg-neutral-900/50 border-neutral-800/80',
-        ].join(' ')}
-      >
-        {done ? (
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
-            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
-            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-            >
-              <MessageSquare size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleUndo}
-              className="inline-flex items-center justify-center gap-1 tap-44 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
-            >
-              <Check size={13} />
-              Feito
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-              <input
-                inputMode="decimal"
-                aria-label={`Peso em kg – série ${setIdx + 1}`}
-                value={weightField.value}
-                onChange={weightField.onChange}
-                onFocus={weightField.onFocus}
-                onBlur={weightField.onBlur}
-                placeholder={weightPlaceholder}
-                title={isAutoWeight ? (autoRationale || undefined) : undefined}
-                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const draft = restPauseDraftsRef?.current?.[key];
-                  if (draft && typeof draft === 'object') {
-                    setRestPauseModal({ ...(draft as UnknownRecord), error: '' });
-                    return;
-                  }
-                  const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
-                  const baseRpe = String(log?.rpe ?? '').trim();
-                  const minisInput = Array.from({ length: miniSets }).map((_, idx) => {
-                    const v = minisArrRaw?.[idx];
-                    const n = parseTrainingNumber(v);
-                    return n != null && n > 0 ? n : null;
-                  });
-                  setRestPauseModal({
-                    key,
-                    label: modeLabel,
-                    pauseSec,
-                    miniSets,
-                    weight: baseWeight,
-                    activationReps: null,
-                    minis: minisInput,
-                    rpe: baseRpe,
-                    cfg: cfg ?? null,
-                    error: '',
-                  });
-                }}
-                className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-              >
-                <Pencil size={14} />
-                <span className="text-xs font-black hidden sm:inline">Abrir</span>
-              </button>
-              <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-              <button
-                type="button"
-                onClick={() => toggleNotes(key)}
-                aria-label="Observações"
-                className={isNotesOpen || hasAnyNote
-                  ? 'shrink-0 tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40'
-                  : 'shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-              >
-                <MessageSquare size={12} />
-              </button>
-            </div>
-            {/* Botão AO LADO, nunca embaixo. Era `flex-col sm:flex-row`: no celular
-                empilhava e o Concluir descia pra uma linha própria, destoando dos
-                demais métodos (reportado pelo dono). */}
-            <div className="flex flex-row items-center gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
-                  {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
-                  <HelpHint
-                    title={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).title}
-                    text={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).text}
-                    tooltip={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).tooltip}
-                    className="h-4 w-4 text-[10px]"
-                  />
-                </span>
-                <span className="text-xs text-neutral-400 whitespace-normal">{modeLabel === 'SST' ? 'SST' : 'REST-P'} • Intra {pauseSec || 0}s • Total: {total || 0} reps</span>
-              </div>
-              <button
-                type="button"
-                disabled={!canDone}
-                onClick={() => {
-                  const nowMs = Date.now();
-                  const startedRaw = (log as UnknownRecord)?.startedAtMs;
-                  const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
-                  const executionSeconds =
-                    Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
-                  updateLog(key, {
-                    done: true,
-                    completedAtMs: nowMs,
-                    executionSeconds,
-                    reps: String(total || ''),
-                    rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
-                    advanced_config: cfg ?? log.advanced_config ?? null,
-                  });
-                  if (restTime && restTime > 0) {
-                    const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                    const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
-                    startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
-                  }
-                }}
-                className={
-                  canDone
-                    ? 'inline-flex items-center justify-center gap-2 tap-44 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 shrink-0'
-                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed shrink-0'
-                }
-              >
-                <Check size={16} />
-                <span className="text-xs">Concluir</span>
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps de todos os mini-sets no modal para concluir.</div>}
+    <AdvancedSetRow
+      exIdx={exIdx}
+      setIdx={setIdx}
+      done={done}
+      canDone={canDone}
+      methodLabel={rotulo}
+      help={{ title: verbete.title, text: verbete.text, tooltip: verbete.tooltip }}
+      info={`Intra ${pauseSec || 0}s • Total: ${total || 0} reps`}
+      doneSummary={summaryText}
+      hint={!canDone ? 'Preencha peso e reps de todos os mini-sets no modal para concluir.' : ''}
+      onOpen={abrirModal}
+      onToggleDone={handleConcluir}
+      weightSlot={
+        <input
+          inputMode="decimal"
+          aria-label={`Peso em kg – série ${setIdx + 1}`}
+          value={weightField.value}
+          onChange={weightField.onChange}
+          onFocus={weightField.onFocus}
+          onBlur={weightField.onBlur}
+          placeholder={weightPlaceholder}
+          title={isAutoWeight ? (autoRationale || undefined) : undefined}
+          className={`w-[68px] shrink-0 h-9 bg-black/30 border border-neutral-700 rounded-lg px-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
+        />
+      }
+    >
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {/* Anilhas por lado do peso do método, que é único para as mini-séries. */}
       <PlateHintLine
@@ -300,27 +222,7 @@ const RestPauseSetInner = ({
         inventory={inventoryFromSettings(settings)}
         className="pl-12"
       />
-      {isNotesOpen && (
-        <div className="space-y-1.5">
-          {prevNote && (
-            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
-            </div>
-          )}
-          <textarea
-            aria-label={`Observações – série ${setIdx + 1}`}
-            value={notesField.value}
-            onChange={notesField.onChange}
-            onFocus={notesField.onFocus}
-            onBlur={notesField.onBlur}
-            placeholder="Observações da série"
-            rows={2}
-            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
-          />
-        </div>
-      )}
-    </div>
+    </AdvancedSetRow>
   );
 };
 

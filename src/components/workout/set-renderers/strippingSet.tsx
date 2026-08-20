@@ -2,13 +2,9 @@
 
 import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
-import { FailureToggle } from './FailureToggle';
-import {
-  isObject,
-  normalizeExerciseKey,
-} from '../utils';
+import { AdvancedSetRow } from './AdvancedSetRow';
+import { isObject } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 import { AutoloadNote } from './AutoloadNote';
@@ -16,7 +12,7 @@ import { PlateHintLine } from './PlateHintLine';
 import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 
 const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, getPlannedSet, setStrippingModal, openNotesKeys, toggleNotes, startTimer, reportHistory, settings } = useWorkoutContext();
+  const { getLog, updateLog, getPlannedSet, setStrippingModal, startTimer, settings } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
@@ -39,14 +35,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const total = stages.reduce<number>((acc, s) => acc + (typeof s.reps === 'number' ? s.reps : 0), 0);
   const done = !!log.done;
   const canDone = stages.every((s) => !!String(s.weight || '').trim() && (typeof s.reps === 'number' ? s.reps : 0) > 0);
-  const notesValue = String(log.notes ?? '');
-  const hasNotes = notesValue.trim().length > 0;
-  const isNotesOpen = openNotesKeys.has(key);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
-  const lastItem = histEntry?.items?.length ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0] : null;
-  const prevNote = lastItem?.setNotes?.[setIdx] ?? null;
-  const hasAnyNote = hasNotes || !!prevNote;
 
   const summaryText = stages.map((s) => `${s.weight || '?'}kg×${s.reps ?? '?'}`).join(' → ');
 
@@ -58,70 +47,18 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   };
 
   return (
-    <div key={key} className="space-y-2">
-      <div
-        className={[
-          'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
-          done ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-neutral-900/50 border-neutral-800/80',
-        ].join(' ')}
-      >
-        {done ? (
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
-            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">Stripping</span>
-            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'tap-44 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-            >
-              <MessageSquare size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleDone}
-              className="inline-flex items-center justify-center gap-1 tap-44 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
-            >
-              <Check size={13} />Feito
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-            <button
-              type="button"
-              onClick={() => setStrippingModal({ key, stages: stages.map((s) => ({ weight: s.weight, reps: s.reps ?? null })), error: '' })}
-              className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-            >
-              <Pencil size={14} />
-              <span className="text-xs font-black">Abrir</span>
-            </button>
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Stripping</span>
-              <span className="text-xs text-neutral-400 truncate">Etapas {defaultCount} • Total: {total || 0} reps</span>
-            </div>
-            <FailureToggle exIdx={exIdx} setIdx={setIdx} />
-            <button
-              type="button"
-              onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-            >
-              <MessageSquare size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={!canDone}
-              onClick={handleToggleDone}
-              className={canDone ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed'}
-            >
-              <Check size={16} />
-              <span className="text-xs">Concluir</span>
-            </button>
-          </div>
-        )}
-      </div>
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps em todas as etapas no modal para concluir.</div>}
+    <AdvancedSetRow
+      exIdx={exIdx}
+      setIdx={setIdx}
+      done={done}
+      canDone={canDone}
+      methodLabel="Stripping"
+      info={`Etapas ${defaultCount} • Total: ${total || 0} reps`}
+      doneSummary={summaryText}
+      hint={!canDone ? 'Preencha peso e reps em todas as etapas no modal para concluir.' : ''}
+      onOpen={() => setStrippingModal({ key, stages: stages.map((s) => ({ weight: s.weight, reps: s.reps ?? null })), error: '' })}
+      onToggleDone={handleToggleDone}
+    >
       <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {/* Anilhas por lado do peso da primeira faixa — é a que se monta. */}
       <PlateHintLine
@@ -130,18 +67,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         inventory={inventoryFromSettings(settings)}
         className="pl-12"
       />
-      {isNotesOpen && (
-        <div className="space-y-1.5">
-          {prevNote && (
-            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
-            </div>
-          )}
-          <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
-        </div>
-      )}
-    </div>
+    </AdvancedSetRow>
   );
 };
 

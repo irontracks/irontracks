@@ -58,6 +58,14 @@ describe('porta de conclusão da série (canDone)', () => {
     // (`!canDone && <hint>`). Uma menção solta a "preencher" em outro ponto do
     // arquivo não vale: foi assim que a primeira versão deste guard passou com
     // a dica de fato removida.
+    // Quem delega ao molde compartilhado passa a dica pela prop `hint` — o
+    // molde a renderiza condicionada a `!done && hint`. O invariante é o mesmo
+    // (existe texto explicando o que falta); muda só onde ele é escrito.
+    const viaProp = src.match(/hint=\{[^}]*!canDone[^}]*\?\s*'([^']{4,})'/)
+    if (viaProp) {
+      expect(viaProp[1]).toMatch(/[A-Za-zÀ-ÿ]{4,}/)
+      return
+    }
     const hint = src.match(/!canDone\s*&&\s*([\s\S]{0,200})/)
     expect(hint, `${file} não renderiza nada condicionado a !canDone`).not.toBeNull()
     expect(hint?.[1]).toMatch(/[A-Za-zÀ-ÿ]{4,}/)
