@@ -156,39 +156,37 @@ Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a *
 
 **Gestos:** o gesto pertence a quem ele NASCE em cima (`isPointOverBrand`) — sem isso a pinça no logo escalava o story inteiro, porque o 2º dedo cai fora da caixa pequena da marca e o overlay assumia. Guias de alinhamento (`snapBrandToCenter`) grudam no centro; no BLOCO o alvo é o offset ZERO (ele não tem caixa estável — cada layout desenha em coordenadas próprias) e só o eixo X acende linha, porque a altura de repouso dele não é o meio da tela.
 
-**Treino em dupla (TeamworkV2) — APOSENTADO. Não é bug, não é regressão.**
-A feature foi removida do código no **PR #428 (commit `96300aad`, 14/07/2026)** —
-43 arquivos, −4.690 linhas — e as tabelas foram dropadas no dia seguinte pela
-migration `20260715153440_drop_teamwork_v2_and_feature_flags.sql`, que registra
-"**Confirmado pelo dono**". Saíram juntas: `invites`, `team_sessions`,
-`team_session_presence`, `team_chat_messages`, as RPCs (`accept_team_invite`,
-`leave_team_session`, `can_view_team_session`) e a entrada na publication
-realtime. O sistema de feature-flags (`utils/featureFlags.ts`) foi removido
-depois, no #436 — por isso `featureTeamworkV2` não existe mais em lugar nenhum.
+**Treino em dupla (TeamworkV2) — ESTÁ NO AR de novo desde 18/08/2026.**
+Linha do tempo, porque esta seção já esteve errada DUAS vezes e custou
+investigação nas duas: aposentado no **PR #428** (`96300aad`, 14/07/2026, −4.690
+linhas), tabelas dropadas em 15/07 — e **restaurado no PR #859** (`24524529`,
+18/08/2026), com as migrations `20260818090000_restore_teamwork_v2.sql` e
+`20260818093000_teamwork_rpc_revoke_public_grant_authenticated.sql`. **Conferido
+no banco em 22/08/2026**: `invites`, `team_sessions`, `team_session_presence` e
+`team_chat_messages` existem. O que NÃO voltou foi o sistema de feature-flags
+(`utils/featureFlags.ts`, removido no #436) — a feature entra ligada para todos.
 
-**O ponto de entrada era o menu "…" do treino ativo** (`WorkoutHeader.tsx`): um
-item com ícone `UserPlus` que abria o `InviteManager`. Quem procurar "o botão de
-treino em equipe" está procurando por ele — sumiu em 14/07/2026, junto com o
-resto, e nunca voltou (`git log -S "UserPlus" -- WorkoutHeader.tsx` desde então
-não devolve nada).
+**O ponto de entrada é o menu "…" do treino ativo** (`WorkoutHeader.tsx`): item
+com ícone `UserPlus` → `InviteManager` → `/api/team/invite-candidates` +
+`contexts/team/useTeamInvites`. Quem procurar "o botão de treino em equipe" está
+procurando por ele.
 
-⚠️ **Esta seção já esteve errada e custou investigação.** Ela dizia "as tabelas
-não existem, mas o código e a flag continuam no repo" e mandava investigar as
-migrations — texto escrito em 02/08, quando a remoção já tinha um mês. Em
-17/08/2026 o dono relatou o botão como regressão recente; a investigação
-encontrou a data, o PR e a migration acima. Fica registrado para ninguém
-reinvestigar nem tentar "consertar" o sumiço.
+⚠️ **Se ele sumir da tela, suspeite do HEADER antes de suspeitar da feature.**
+Em 22/08/2026 o dono reportou "perdemos os botões de cima" e nada tinha sido
+removido: o bloco inteiro de ações do header ficava `opacity-0
+pointer-events-none` durante a "execução de série", e esse estado
+(`ui.activeExecution`) só era limpo ao concluir aquela série específica. Quem
+iniciava a série e não a concluía perdia Convidar, Descartar e Editar treino pelo
+resto da sessão. Corrigido: nada mais some do header. Guard em
+`components/workout/__tests__/headerBotoesSempreAlcancaveis.test.tsx`.
 
-**Restaurar custa mais do que voltar um botão:** é reverter o #428 (~4,6k linhas)
-E recriar as 4 tabelas com RLS, as 3 RPCs `SECURITY DEFINER` e a publication —
-migration em produção. O desenho original, se um dia for reconstruído: contexto
-compondo hooks de invites/session/presence/broadcast; participantes gravados como
-`{uid,name,photo}` e lidos como `{user_id,display_name,photo_url}` (havia um
-`normalizeParticipant` justamente por isso); sync por **broadcast efêmero** do
-Supabase (sem replay — perde evento se o parceiro fica em background); máximo de
-5 participantes com o host incluso. E a armadilha que fechou o PR #506 continua
-valendo: marcar o canal como `private: true` sem as policies de
-`realtime.messages` derruba o sync em vez de protegê-lo.
+Desenho: contexto compondo hooks de invites/session/presence/broadcast;
+participantes gravados como `{uid,name,photo}` e lidos como
+`{user_id,display_name,photo_url}` (daí o `normalizeParticipant`); sync por
+**broadcast efêmero** do Supabase (sem replay — perde evento se o parceiro fica
+em background); máximo de 5 participantes com o host incluso. E a armadilha que
+fechou o PR #506 continua valendo: marcar o canal como `private: true` sem as
+policies de `realtime.messages` derruba o sync em vez de protegê-lo.
 
 **Dashboard shell:** `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx` é o client component central; navega por estado `view` ('dashboard'|'active'|'edit'|'assessments'|'community'|'vip'). Boot: `/api/dashboard/bootstrap` (RPC `get_dashboard_bootstrap`) + `useBootstrap` + `useWorkoutFetch`. **Toda hidratação da lista de treinos (SSR inicial, bootstrap, refetch) deve ordenar por `sortWorkoutsByOrder`** (`utils/mapWorkoutRow.ts`) — senão a lista pisca desordenada.
 

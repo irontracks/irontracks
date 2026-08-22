@@ -24,13 +24,12 @@ export default function WorkoutHeader() {
     completedSets,
     totalSets,
     progressPct,
-    session,
     _exitOnBack: exitOnBack,
     openCardioGps,
     confirm,
     cancelWorkout,
   } = useWorkoutContext();
-  const { ticker, elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
+  const { elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
 
   // Pausa em equipe transmite ao parceiro; sozinho congela o cronômetro local.
   // Degrada sem provider (o hook devolve o contexto vazio).
@@ -73,12 +72,7 @@ export default function WorkoutHeader() {
     }
   }, [confirm, cancelWorkout]);
 
-  // Detect if a set is actively being executed — collapse action buttons to reduce distraction
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-  const ui = isRecord(session?.ui) ? (session?.ui as Record<string, unknown>) : null;
-  const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null;
-  const startedAtMs = activeExec ? Number(activeExec.startedAtMs) : 0;
-  const isExecuting = Number.isFinite(startedAtMs) && startedAtMs > 0 && ticker > startedAtMs;
 
   const [overflowOpen, setOverflowOpen] = React.useState(false);
   const overflowRef = React.useRef<HTMLDivElement>(null);
@@ -109,10 +103,15 @@ export default function WorkoutHeader() {
           <div className="flex items-center gap-2">
             <BackButton onClick={exitOnBack} className="!py-0.5" />
 
-            {/* Action buttons — hidden during active set execution to reduce distraction */}
-            <div
-              className={`flex items-center gap-2 transition-opacity duration-200 ${isExecuting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-            >
+            {/* Estes botões JÁ SUMIRAM uma vez, e não por remoção: até 22/08/2026
+                o bloco ficava `opacity-0 pointer-events-none` "durante a execução
+                da série, para reduzir distração". Só que `ui.activeExecution` nasce
+                ao iniciar a série pelo timer de descanso e só morre quando AQUELA
+                série é concluída — quem inicia e não conclui (trocou de exercício,
+                foi editar, largou o aparelho) perde Descartar, "…" e Editar treino
+                pelo resto da sessão. Esconder a única saída do treino não paga a
+                distração que evita. Guard: headerBotoesSempreAlcancaveis.test.tsx */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => openFullEditor?.()}
