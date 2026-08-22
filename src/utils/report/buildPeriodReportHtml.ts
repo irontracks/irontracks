@@ -99,6 +99,10 @@ export function buildPeriodReportHtml(input: unknown) {
   const listByVol = (Array.isArray(stats?.topExercisesByVolume) ? stats.topExercisesByVolume : []).slice(0, 8)
   const listByFreq = (Array.isArray(stats?.topExercisesByFrequency) ? stats.topExercisesByFrequency : []).slice(0, 8)
   const sessions = (Array.isArray(stats?.sessionSummaries) ? stats.sessionSummaries : []).slice(0, 60)
+  // Detalhe série a série. Vive FORA de `stats` de propósito: `stats` inteiro é
+  // enviado ao prompt da IA de insights, e o detalhe do mês estouraria o payload
+  // sem acrescentar nada ao que a IA precisa (ela já recebe os agregados).
+  const sessionDetails = (Array.isArray(data.sessions) ? data.sessions : []) as Array<Record<string, unknown>>
 
   const aiList = (key: string) => {
     const arr = ai && Array.isArray(ai?.[key]) ? ai[key] : []
@@ -142,6 +146,66 @@ export function buildPeriodReportHtml(input: unknown) {
       label,
       `<table class="table"><thead><tr><th>Exercício</th><th>Sets</th><th>Sessões</th><th>Volume (kg)</th></tr></thead><tbody>${body}</tbody></table>`
     )
+  }
+
+  /**
+   * Treino a treino, série a série — o miolo do arquivo.
+   *
+   * O relatório mensal existia sem isto: quem baixava recebia só o agregado
+   * (métricas do mês + top exercícios + data/duração/volume por sessão) e não
+   * encontrava lá um único peso levantado. Cada treino vira um bloco com a
+   * tabela das suas séries, na mesma leitura do PDF da sessão.
+   */
+  const sessionDetailsBlocks = () => {
+    if (!sessionDetails.length) return ''
+    const blocks = sessionDetails
+      .map((s) => {
+        const detail = s && typeof s === 'object' ? (s as Record<string, unknown>) : {}
+        const exercises = Array.isArray(detail.exercises) ? detail.exercises : []
+        if (!exercises.length) return ''
+        const head = `${escapeHtml(formatDate(detail.date) || '')} • ${escapeHtml(detail.title || 'Treino')}`
+        const meta = [
+          safeNumber(detail.minutes) > 0 ? `${toLocaleInt(detail.minutes)} min` : '',
+          safeNumber(detail.volumeKg) > 0 ? `${toLocaleInt(detail.volumeKg)} kg` : '',
+          safeNumber(detail.setsCount) > 0 ? `${toLocaleInt(detail.setsCount)} séries` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+
+        const rows = exercises
+          .map((exRaw) => {
+            const ex = exRaw && typeof exRaw === 'object' ? (exRaw as Record<string, unknown>) : {}
+            const sets = Array.isArray(ex.sets) ? ex.sets : []
+            if (!sets.length) return ''
+            const methodLabel = String(ex.method || '').trim()
+            const exHead = `<tr class="ex-row"><td class="name" colspan="5">${escapeHtml(ex.name || 'Exercício')}${
+              methodLabel ? ` <span class="method">${escapeHtml(methodLabel)}</span>` : ''
+            }</td></tr>`
+            const setRows = sets
+              .map((setRaw) => {
+                const st = setRaw && typeof setRaw === 'object' ? (setRaw as Record<string, unknown>) : {}
+                const tag = String(st.tag || '').trim()
+                // Falha muscular é marcação MANUAL do usuário e alimenta o motor
+                // de carga automática — some do arquivo e o registro mente.
+                const flags = [tag ? `<span class="tag">${escapeHtml(tag)}</span>` : '', st.failure ? '<span class="tag fail">Falha</span>' : '']
+                  .filter(Boolean)
+                  .join(' ')
+                return `<tr><td class="mono idx">${toLocaleInt(st.index)}</td><td class="mono">${escapeHtml(st.weight || '—')}</td><td class="mono">${escapeHtml(
+                  st.reps || '—'
+                )}</td><td class="mono">${escapeHtml(String(st.rpe || '').trim() || '—')}</td><td>${flags || ''}</td></tr>`
+              })
+              .join('')
+            return exHead + setRows
+          })
+          .join('')
+
+        return `<div class="session"><div class="session-head">${head}</div><div class="session-meta">${escapeHtml(meta)}</div>
+          <table class="table"><thead><tr><th style="width:40px">#</th><th>Carga (kg)</th><th>Reps</th><th>RPE</th><th>Obs.</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      })
+      .filter(Boolean)
+      .join('')
+    if (!blocks) return ''
+    return section('Treinos do período (detalhado)', blocks)
   }
 
   const sessionsTable = () => {
@@ -220,6 +284,14 @@ export function buildPeriodReportHtml(input: unknown) {
       .list.accent li{color:#0b0b0c}
       .list.warn li{color:#a16207}
       .two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+      .session{margin-bottom:14px;border:1px solid #e5e7eb;border-radius:12px;padding:10px;break-inside:avoid;page-break-inside:avoid}
+      .session-head{font-size:13px;font-weight:900;color:#0b0b0c}
+      .session-meta{font-size:11px;color:#6b7280;font-weight:700;margin:2px 0 8px}
+      .ex-row td{background:#fafafa;font-size:12px;padding-top:8px}
+      .method{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:#6b7280;margin-left:6px}
+      td.idx{color:#6b7280;width:40px}
+      .tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 6px}
+      .tag.fail{color:#a16207;border-color:#fde68a;background:#fefce8}
       .footer{margin-top:18px;padding-top:12px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.18em}
       @media (max-width:920px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
       @media print{
@@ -256,6 +328,7 @@ export function buildPeriodReportHtml(input: unknown) {
       ${topExercisesTable('Top exercícios (por volume)', listByVol)}
       ${topExercisesTable('Top exercícios (por frequência)', listByFreq)}
       ${sessionsTable()}
+      ${sessionDetailsBlocks()}
 
       ${insights ? section('Insights', `<div class="two-col">${insights}</div>`) : ''}
 

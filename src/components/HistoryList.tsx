@@ -71,7 +71,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
     const report = useHistoryPeriodReport({ historyItems, user, alert, hydrateSessions: data.hydrateSessions });
     const {
         periodReport, periodAi, periodPdf, shareError, buildShareText,
-        openPeriodReport, closePeriodReport, downloadPeriodPdf, handleShareReport,
+        openPeriodReport, closePeriodReport, downloadPeriodPdf, copyShareText,
     } = report;
 
     // ── Virtualized list ─────────────────────────────────────────────────────
@@ -428,7 +428,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                 <HistoryListPeriodReportModal
                     periodReport={periodReport} periodAi={periodAi} periodPdf={periodPdf}
                     shareError={shareError} buildShareText={buildShareText}
-                    onClose={closePeriodReport} onDownloadPdf={downloadPeriodPdf} onShareReport={handleShareReport}
+                    onClose={closePeriodReport} onDownloadPdf={downloadPeriodPdf} onCopyText={copyShareText}
                 />
             )}
 
