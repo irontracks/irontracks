@@ -88,6 +88,36 @@ contexto mockado estável, o harness remonta por `key`.
 
 **Orçamento de payload das rotas quentes (histórico + bootstrap).** Como a sessão inteira mora em `workouts.notes`, qualquer rota que selecione essa coluna e repasse a linha crua serve centenas de KB sem parecer errada. O histórico já engordou assim uma vez (corrigido em ago/2026 por `utils/history/slimHistoryRow.ts` — a rota resume no servidor e o JSON completo é buscado sob demanda). Guards de CI: `utils/history/__tests__/historyPayloadBudget.test.ts` (teto de 450 B por linha de treino, allowlist de chaves, source-guard do `select`) e `app/api/dashboard/__tests__/bootstrapPayloadShape.test.ts` (allowlist de workout/exercise/set nos DOIS caminhos — RPC e fallback TS —, teto por template e source-guard das chaves do `jsonb_build_object` na migration mais recente da RPC). Fixtures realistas em `src/__tests__/fixtures/hotRoutePayloads.ts`. **Campo novo nessas rotas = teste vermelho de propósito**: é o pedido de revisão, não um falso positivo — atualizar a allowlist é uma decisão consciente. Dívida conhecida travada por ratchet: usuário SEM template cai no 2º branch do bootstrap (rota e RPC), que devolve "qualquer workout do user" — inclusive sessões concluídas com o `notes` inteiro.
 
+**Salvar arquivo no iPhone tem UM caminho: `utils/report/exportHtmlAsPdf.ts`.**
+`window.print()` **não existe no WKWebView** — quem o chama direto entrega um
+botão inerte no aparelho, e em silêncio. O helper tenta, nesta ordem: PDF nativo
+(`sharePdfFromHtml`, abre o share sheet do iOS) → Web Share com arquivo →
+Filesystem → nova aba + print (desktop). Como no iOS ele já abre o share sheet,
+**"baixar" e "compartilhar" são o MESMO gesto**: um botão só, e o destino
+(Arquivos, WhatsApp) é escolhido lá. Compartilhar TEXTO solto vira `.txt` no
+share sheet — nunca é a resposta para "quero o relatório".
+
+⚠️ **O guard desse helper já falhou uma vez por ser da INSTÂNCIA.** O PR de
+jul/2026 travou os três chamadores daquele dia numa lista, e o **relatório
+semanal/mensal do histórico nasceu depois** com `window.open` + `print()` — o
+botão "Baixar PDF" ficou inerte no iPhone até 22/08/2026, com um `catch {}`
+vazio engolindo a falha. Hoje há um caso de CLASSE em
+`exportHtmlAsPdf.guard.test.ts`: quem chama `print()` precisa desviar o nativo
+antes. A checagem é pela **CHAMADA, não pelo nome** — com o nome solto, um
+arquivo que só IMPORTA o helper e segue imprimindo à mão passa verde (medido ao
+repor o bug).
+
+**Relatório de PERÍODO (semanal/mensal) ≠ relatório de sessão.** Modal em
+`HistoryListPeriodReportModal`, hook em `history/hooks/useHistoryPeriodReport.ts`,
+HTML em `utils/report/buildPeriodReportHtml.ts`. O arquivo exportado tem duas
+metades: os **agregados** (`stats`) e o **detalhe treino a treino**
+(`utils/report/periodSessionDetails.ts` — série a série, pela fonte única do
+`setVolume.ts`). O detalhe fica **fora de `stats` de propósito**: `stats` inteiro
+vai ao prompt da IA de insights, e o mês de séries custaria dinheiro sem melhorar
+o insight. Guard de FIAÇÃO em `periodReportExport.test.tsx` — ele anda pelo hook
+e lê o HTML que chegou ao exportador, porque `buildPeriodSessionDetails` e
+`buildPeriodReportHtml` passam verdes isoladamente com o botão morto.
+
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
 **Os INGREDIENTES da kcal têm fonte única: `utils/calories/sessionKcalInputs.ts`**
