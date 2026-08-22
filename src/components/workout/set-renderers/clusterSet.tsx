@@ -35,7 +35,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
@@ -217,7 +217,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           value={String(log?.weight ?? cfg?.weight ?? '')}
           onChange={(e) => {
             const v = e?.target?.value ?? '';
-            updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
+            setUserWeight(v, { advanced_config: cfg ?? log.advanced_config ?? null });
           }}
           placeholder={weightPlaceholder}
           title={isAutoWeight ? (autoRationale || undefined) : undefined}

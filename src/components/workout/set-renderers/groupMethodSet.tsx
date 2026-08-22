@@ -48,7 +48,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const method = String(ex?.method || '').trim();
   const perSetMethod = String(log.per_set_method || '').trim();
   const effectiveMethod = perSetMethod || method;
@@ -150,7 +150,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 inputMode="decimal"
                 aria-label={`Peso em kg – série ${setIdx + 1}`}
                 value={weightValue}
-                onChange={(e) => updateLog(key, { weight: e?.target?.value ?? '' })}
+                onChange={(e) => setUserWeight(e?.target?.value ?? '')}
                 placeholder={histWeight != null ? `${histWeight} kg` : plannedWeight != null ? `${plannedWeight} kg` : 'Peso (kg)'}
                 title={isAutoWeight ? (autoRationale || undefined) : undefined}
                 className={`flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
