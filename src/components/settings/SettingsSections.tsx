@@ -5,6 +5,7 @@ import { Camera, Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell,
 import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } from './settingsShared'
 import { createClient } from '@/utils/supabase/client'
 import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { resolveGymPermissionOutcome } from '@/lib/gps/gymPermissionOutcome'
 
 // ── Perfil ───────────────────────────────────────────────────────────────────
 interface SettingsProfileSectionProps extends SettingsSectionProps {
@@ -1096,12 +1097,15 @@ export function SettingsGymGeofenceSection({
     const hasGym = !!gymName && lat != null && lng != null
     const [busy, setBusy] = React.useState(false)
     const [error, setError] = React.useState<string>('')
+    /** Salvou, mas só com "Durante o Uso do App" — a tela promete app fechado. */
+    const [warning, setWarning] = React.useState<string>('')
     const [nameDraft, setNameDraft] = React.useState(gymName)
 
     React.useEffect(() => { setNameDraft(gymName) }, [gymName])
 
     const handleSetCurrent = async () => {
         setError('')
+        setWarning('')
         // O nome era opcional e caía num fallback silencioso: quem apertava o botão
         // com o campo vazio levava "Minha academia" sem nunca ter digitado isso. O
         // placeholder ("Smart Fit Centro") parecia valor preenchido e escondia que o
@@ -1113,9 +1117,14 @@ export function SettingsGymGeofenceSection({
         }
         setBusy(true)
         try {
-            const status = await onRequestAlwaysPermission()
-            if (status === 'denied' || status === 'restricted') {
-                setError('Permissão de localização negada. Habilite "Sempre" em Ajustes.')
+            // `authorizedWhenInUse` (e o `timeout` que o iOS deixa pendurado)
+            // NÃO são falha: o geofence ainda registra e dispara com o app
+            // aberto. Antes, o único desfecho tratado era "negado" e o resto
+            // seguia calado — quem ficasse com "Durante o Uso" salvava a
+            // academia achando que teria aviso com o app fechado.
+            const outcome = resolveGymPermissionOutcome(await onRequestAlwaysPermission())
+            if (!outcome.proceed) {
+                setError(outcome.error)
                 return
             }
             const coords = await onCaptureCurrentLocation()
@@ -1127,6 +1136,7 @@ export function SettingsGymGeofenceSection({
             setValue('favoriteGymLng', coords.lng)
             setValue('favoriteGymName', safeName)
             setValue('gymGeofenceEnabled', true)
+            if (outcome.warning) setWarning(outcome.warning)
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Erro inesperado.')
         } finally {
@@ -1203,6 +1213,23 @@ export function SettingsGymGeofenceSection({
 
             {error ? (
                 <div className="rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3 py-2 mb-3">{error}</div>
+            ) : null}
+
+            {/* Âmbar, não vermelho: a academia FOI salva e o check-in funciona
+                com o app aberto. Vermelho é erro — aqui o que falta é alcance. */}
+            {warning ? (
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs px-3 py-2 mb-3">
+                    {warning}
+                    {onOpenAppSettings ? (
+                        <button
+                            type="button"
+                            onClick={onOpenAppSettings}
+                            className="mt-2 block min-h-[44px] w-full rounded-lg border border-amber-500/40 px-3 py-2 font-black text-amber-200 hover:bg-amber-500/10"
+                        >
+                            Abrir Ajustes do iOS
+                        </button>
+                    ) : null}
+                </div>
             ) : null}
 
             <div className="flex flex-col sm:flex-row gap-2">

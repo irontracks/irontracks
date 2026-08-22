@@ -1149,12 +1149,51 @@ export interface GeofenceStatus {
   gymName: string
 }
 
-/** Requests CLAuthorizationStatus.authorizedAlways. Two-prompt flow on iOS. */
+/**
+ * Teto para o pedido de permissão "Sempre".
+ *
+ * 25 s: o prompt do iOS fica na tela até o usuário responder, e ler as três
+ * opções leva tempo. O teto não existe para apressá-lo — existe para o caso em
+ * que o iOS **nunca fecha o pedido** (ver abaixo), que sem isto trava a tela.
+ */
+const ALWAYS_PERMISSION_TIMEOUT_MS = 25_000
+
+/**
+ * Pede `CLAuthorizationStatus.authorizedAlways`. Fluxo de DOIS prompts no iOS.
+ *
+ * ⚠️ **Nunca aguarde esta chamada sem teto.** Reproduzido no aparelho em
+ * 22/08/2026: com "Permitir Durante o Uso do App", o plugin Swift pede o
+ * upgrade para "Sempre" e fica esperando um segundo callback de autorização
+ * que o iOS **não manda** — a `CAPPluginCall` nunca é resolvida e a promise
+ * fica pendurada para sempre. O botão "Usar localização atual" morria em
+ * "Capturando…" (o `finally` que desliga o `busy` nunca rodava), e o Auto
+ * Check-in nunca chegava a ser salvo.
+ *
+ * O lado Swift também foi corrigido, mas isso só vale com build nova no
+ * TestFlight; este teto conserta todos os aparelhos JÁ INSTALADOS no próximo
+ * deploy web. Vale a regra geral: chamada nativa que espera resposta do
+ * USUÁRIO tem teto, sempre.
+ *
+ * Devolve `'timeout'` quando estoura — quem chama decide (ver
+ * `lib/gps/gymPermissionOutcome.ts`); tratar como negado seria mentira, o
+ * usuário quase sempre está com "Durante o Uso".
+ */
 export const requestAlwaysLocationPermission = async (): Promise<string> => {
   try {
     if (!isIosNative()) return 'denied'
-    const r = await Native.requestAlwaysLocationPermission()
-    return String(r?.status || 'denied')
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const timeout = new Promise<string>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), ALWAYS_PERMISSION_TIMEOUT_MS)
+    })
+    try {
+      const winner = await Promise.race([
+        Native.requestAlwaysLocationPermission().then((r) => String(r?.status || 'denied')),
+        timeout,
+      ])
+      return winner
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
   } catch { return 'denied' }
 }
 

@@ -1336,6 +1336,14 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             call.resolve(["status": "denied"])
             return
         }
+        // A call anterior JAMAIS pode ser abandonada: sobrescrever `pendingAlwaysAuthCall`
+        // sem resolver deixa a promise do JS pendurada para sempre (o botão da tela
+        // fica em "Capturando…"). Fecha a antiga com o status corrente antes de assumir
+        // a nova.
+        if let orphan = pendingAlwaysAuthCall {
+            orphan.resolve(["status": Self.authorizationName(status)])
+            pendingAlwaysAuthCall = nil
+        }
         // Request "always" — iOS may show only a "while-using" prompt first,
         // then require the user to upgrade in Settings later. We resolve the
         // call from didChangeAuthorization once iOS reaches a terminal state.
@@ -1345,6 +1353,38 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         } else {
             // We already have whenInUse — request the upgrade.
             locationManager.requestAlwaysAuthorization()
+        }
+        // ⚠️ TETO. Reproduzido no aparelho em 22/08/2026: escolhendo "Permitir Durante
+        // o Uso do App", o delegate chega com .authorizedWhenInUse, pedimos o upgrade
+        // para "Sempre" — e o iOS NÃO reapresenta aquele prompt, então o segundo
+        // callback nunca vem. Sem este teto a call morre pendurada e a tela do Auto
+        // Check-in trava, sem erro e sem saída.
+        //
+        // Resolver com o status REAL (quase sempre authorizedWhenInUse) é o desfecho
+        // honesto: o geofence ainda registra e dispara com o app aberto, e é o JS quem
+        // avisa que o modo "app fechado" exige "Sempre" nos Ajustes.
+        let guarded = call
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.alwaysAuthTimeoutSeconds) { [weak self] in
+            guard let self = self, let pending = self.pendingAlwaysAuthCall,
+                  pending.callbackId == guarded.callbackId else { return }
+            pending.resolve(["status": Self.authorizationName(self.locationManager.authorizationStatus)])
+            self.pendingAlwaysAuthCall = nil
+        }
+    }
+
+    /// Teto do pedido de "Sempre". Generoso: o prompt do iOS fica na tela até o
+    /// usuário responder, e o teto só existe para o caso em que o sistema não
+    /// fecha o pedido (ver `requestAlwaysLocationPermission`).
+    private static let alwaysAuthTimeoutSeconds: Double = 20
+
+    /// Nome estável do status, igual ao vocabulário que o JS espera.
+    private static func authorizationName(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways:    return "authorizedAlways"
+        case .authorizedWhenInUse: return "authorizedWhenInUse"
+        case .denied, .restricted: return "denied"
+        case .notDetermined:       return "notDetermined"
+        @unknown default:          return "unknown"
         }
     }
 
@@ -1413,16 +1453,32 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
 
     // CLLocationManagerDelegate
 
+    /// iOS 14+ (o app tem deployment target 15/16.1). Quando este existe, o
+    /// `didChangeAuthorization:` abaixo — deprecado desde o iOS 14 — não é
+    /// chamado; os dois delegam para a MESMA rotina para não divergirem.
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        handleAuthorizationChange(manager, status: manager.authorizationStatus)
+    }
+
     public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        handleAuthorizationChange(manager, status: status)
+    }
+
+    private func handleAuthorizationChange(_ manager: CLLocationManager, status: CLAuthorizationStatus) {
         guard let pending = pendingAlwaysAuthCall else { return }
         switch status {
         case .authorizedAlways:
             pending.resolve(["status": "authorizedAlways"])
             pendingAlwaysAuthCall = nil
         case .authorizedWhenInUse:
-            // Got whenInUse — escalate to always now (system prompt step 2).
+            // Pede o upgrade para "Sempre" (passo 2 do fluxo do iOS) e NÃO resolve
+            // aqui: se o prompt aparecer, o próximo callback traz a resposta.
+            //
+            // ⚠️ Mas o iOS frequentemente NÃO reapresenta esse prompt — foi exatamente
+            // o que travou a tela do Auto Check-in em "Capturando…" (22/08/2026). Quem
+            // fecha esse caminho é o teto agendado em `requestAlwaysLocationPermission`,
+            // que resolve com o status real. Sem ele, esta linha é um beco sem saída.
             manager.requestAlwaysAuthorization()
-            // Don't clear pendingAlwaysAuthCall — wait for the next callback.
         case .denied, .restricted:
             pending.resolve(["status": "denied"])
             pendingAlwaysAuthCall = nil
