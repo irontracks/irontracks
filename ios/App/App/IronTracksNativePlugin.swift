@@ -617,7 +617,13 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     // pra "Hora de Treinar" no fim vem do push do servidor (api/rest/fire,
                     // formato de data corrigido) + a auto-cura do widget (endDate <= Date()).
                     let staleDate = endDate.addingTimeInterval(300)
-                    let content = ActivityContent(state: state, staleDate: staleDate)
+                    // relevanceScore: o descanso fica ACIMA do card do treino na tela
+                    // bloqueada e leva a Ilha Dinâmica (ver LiveActivityRelevance).
+                    let content = ActivityContent(
+                        state: state,
+                        staleDate: staleDate,
+                        relevanceScore: LiveActivityRelevance.rest
+                    )
                     // pushType: .token = ask APNs to issue a push token so the backend
                     // can update this activity remotely (used by Feature 11).
                     let activity = try Activity<RestTimerAttributes>.request(
@@ -661,7 +667,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     // depois a Live Activity é DISPENSADA (abaixo), não fica pendurada.
                     let finishedContent = ActivityContent(
                         state: finishedState,
-                        staleDate: Date().addingTimeInterval(120)
+                        staleDate: Date().addingTimeInterval(120),
+                        relevanceScore: LiveActivityRelevance.rest
                     )
                     for activity in Activity<RestTimerAttributes>.activities
                         where activity.attributes.timerID == capturedId {
@@ -716,7 +723,13 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             let staleDate = isFinished
                 ? Date().addingTimeInterval(120)
                 : endDate.addingTimeInterval(300)
-            let content = ActivityContent(state: state, staleDate: staleDate)
+            // Sem relevanceScore aqui, o primeiro update do descanso derrubaria o card
+            // para baixo do treino no meio da contagem (a relevância mora no conteúdo).
+            let content = ActivityContent(
+                state: state,
+                staleDate: staleDate,
+                relevanceScore: LiveActivityRelevance.rest
+            )
             Task {
                 for activity in Activity<RestTimerAttributes>.activities
                     where activity.attributes.timerID == id {
@@ -806,7 +819,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                 )
                 // staleDate = 12 h after start (safety cap; far longer than any workout)
                 let staleDate = startDate.addingTimeInterval(12 * 3600)
-                let content = ActivityContent(state: state, staleDate: staleDate)
+                let content = ActivityContent(
+                    state: state,
+                    staleDate: staleDate,
+                    relevanceScore: LiveActivityRelevance.workout
+                )
                 do {
                     // pushType: .token enables remote updates via APNs (Feature 11).
                     let activity = try Activity<WorkoutLiveActivityAttributes>.request(
@@ -859,7 +876,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                 elapsedAnchorDate: current?.elapsedAnchorDate
             )
             let staleDate = Date().addingTimeInterval(12 * 3600)
-            let content = ActivityContent(state: state, staleDate: staleDate)
+            let content = ActivityContent(
+                state: state,
+                staleDate: staleDate,
+                relevanceScore: LiveActivityRelevance.workout
+            )
             Task {
                 for activity in Activity<WorkoutLiveActivityAttributes>.activities {
                     await activity.update(content)
@@ -891,7 +912,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                         pausedElapsedSeconds: cur.pausedElapsedSeconds,
                         elapsedAnchorDate: cur.elapsedAnchorDate
                     )
-                    await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
+                    await activity.update(ActivityContent(
+                        state: next,
+                        staleDate: Date().addingTimeInterval(12 * 3600),
+                        relevanceScore: LiveActivityRelevance.workout
+                    ))
                 }
             }
             call.resolve()
@@ -930,7 +955,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                         pausedElapsedSeconds: paused ? elapsedSeconds : nil,
                         elapsedAnchorDate: paused ? cur.elapsedAnchorDate : Date().addingTimeInterval(-Double(elapsedSeconds))
                     )
-                    await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
+                    await activity.update(ActivityContent(
+                        state: next,
+                        staleDate: Date().addingTimeInterval(12 * 3600),
+                        relevanceScore: LiveActivityRelevance.workout
+                    ))
                 }
             }
             call.resolve()

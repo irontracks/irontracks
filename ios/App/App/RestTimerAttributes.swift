@@ -1,6 +1,24 @@
 import ActivityKit
 import Foundation
 
+/// Ordem das Live Activities quando as DUAS estão no ar ao mesmo tempo.
+///
+/// O treino nasce primeiro e o descanso depois; com relevância IGUAL (o default
+/// é 0 para todas), o iOS empilha na tela bloqueada por ordem de início e o card
+/// do descanso — o único com ação e contagem regressiva — ficava EMBAIXO do card
+/// do treino (relatado pelo dono em 21/08/2026, print da tela bloqueada).
+///
+/// `relevanceScore` é o que decide isso: maior fica em cima na tela bloqueada e
+/// é quem ocupa a Ilha Dinâmica quando há mais de uma. Precisa ir em TODO
+/// `ActivityContent` — inclusive nos updates —, porque o valor mora no CONTEÚDO:
+/// um update sem ele volta ao default e o card desce de novo no meio do descanso.
+enum LiveActivityRelevance {
+    /// Descanso: sempre por cima — é o que está contando e tem botão de ação.
+    static let rest: Double = 100
+    /// Treino: pano de fundo da sessão, cede o topo para o descanso.
+    static let workout: Double = 10
+}
+
 /// Shared ActivityKit model used by both the main App target and the
 /// IronTracksWidgets extension. Must match exactly in both targets.
 @available(iOS 16.1, *)
