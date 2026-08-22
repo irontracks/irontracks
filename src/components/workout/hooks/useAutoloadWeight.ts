@@ -11,7 +11,7 @@
  * atual AINDA seja igual à sugestão — assim que o usuário edita, o valor deixa de
  * bater e o destaque some sozinho (não precisa instrumentar o onChange de cada renderer).
  */
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useWorkoutContext } from '../WorkoutContext'
 import { plateHintForExercise } from '@/utils/autoload/plateBreakdown'
 import type { WorkoutExercise } from '../types'
@@ -36,6 +36,16 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
   suggestedWeight: number | null
   /** "8×20 + 1×2,5 por lado" — só em barra/máquina de anilha; '' nos demais. */
   plateHint: string
+  /**
+   * Grava um peso DIGITADO pelo usuário. Use SEMPRE isto no onChange do campo
+   * de peso — `updateLog(key, { weight })` cru deixa o log com a fonte anterior
+   * ('auto'), e aí o efeito acima reescreve o valor de volta para a sugestão a
+   * cada passada: o campo "não deixa trocar o peso" (relato do dono em
+   * 22/08/2026, num Bi-Set). Marca sempre, inclusive com a carga automática
+   * desligada — se ela for ligada no meio da sessão, o que o usuário assumiu
+   * continua sendo dele.
+   */
+  setUserWeight: (value: string, extra?: Record<string, unknown>) => void
 } {
   const { autoLoadEnabled, autoLoadSuggestions, getLog, updateLog, getPlanConfig } = useWorkoutContext()
 
@@ -76,11 +86,19 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
   // Dica de montagem: só faz sentido enquanto o peso na tela É o do motor.
   const plateHint = isAutoWeight ? (plateHintForExercise(ex?.name, sugWeight) ?? '') : ''
 
+  const setUserWeight = useCallback(
+    (value: string, extra?: Record<string, unknown>) => {
+      updateLog(key, { weight: value, weightSource: 'user', ...(extra ?? {}) })
+    },
+    [key, updateLog],
+  )
+
   return {
     isAutoWeight,
     rationale: suggestion?.rationale ?? '',
     autoInputClass: isAutoWeight ? AUTO_INPUT_CLASS : '',
     suggestedWeight: sugWeight,
     plateHint,
+    setUserWeight,
   }
 }

@@ -42,7 +42,7 @@ const RestPauseSetInner = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
 
   // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
   function useLocalField(external: string, onSave: (v: string) => void) {
@@ -67,7 +67,7 @@ const RestPauseSetInner = ({
 
   const weightField = useLocalField(
     String(log?.weight ?? cfg?.weight ?? ''),
-    (v) => updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+    (v) => setUserWeight(v, { advanced_config: cfg ?? log.advanced_config ?? null }),
   );
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
