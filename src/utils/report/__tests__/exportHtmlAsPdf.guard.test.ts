@@ -63,11 +63,51 @@ describe('guard: navigator.share nunca recebe blob: URL', () => {
       'components/WorkoutReport.tsx',
       'hooks/useWorkoutExport.ts',
       'components/admin-panel/hooks/useAdminTemplateOps.ts',
+      // 22/08/2026: o relatório semanal/mensal do histórico. Ele reimplementava
+      // `window.open` + `print()` e o botão "Baixar PDF" era inerte no iPhone.
+      'components/history/hooks/useHistoryPeriodReport.ts',
     ]
     for (const rel of callers) {
       const code = readFileSync(join(SRC, rel), 'utf8')
       expect(code, `${rel} deve usar exportHtmlAsPdf`).toContain('exportHtmlAsPdf')
     }
+  })
+
+  it('quem chama print() tem um caminho nativo ANTES', () => {
+    // A lista acima é guard da INSTÂNCIA: cobre as telas que já se conhecia, e
+    // foi por isso que o relatório de período passou meses com o botão morto —
+    // o PR de jul/2026 listou os três chamadores daquele dia e o quarto nasceu
+    // depois. Este caso é o guard da CLASSE.
+    //
+    // A regra NÃO é "print() é proibido": no desktop ele é o caminho certo, e é
+    // o último passo do próprio helper. A regra é que `print()` **não existe no
+    // WKWebView**, então quem o chama sem antes desviar o app nativo entrega um
+    // botão inerte no iPhone — exatamente o defeito relatado. Basta o arquivo
+    // ter um ramo nativo (`isNativePlatform`/`isNativeApp`) ou delegar ao
+    // helper único.
+    //
+    // A checagem é pela CHAMADA, não pelo nome: com `/exportHtmlAsPdf/` solto,
+    // um arquivo que apenas IMPORTA o helper e continua imprimindo à mão passa
+    // verde — medido ao repor o bug neste guard (o import ficou, a chamada foi
+    // embora, e ele não acusou nada).
+    const NATIVE_BRANCH = /\b(isNativePlatform|isNativeApp|exportHtmlAsPdf|sharePdfFromHtml)\s*\(/
+    const offenders: string[] = []
+    for (const file of walk(SRC)) {
+      const rel = file.replace(SRC, 'src')
+      const raw = readFileSync(file, 'utf8')
+      // Strings e templates fora: `onclick="window.print()"` dentro do HTML
+      // GERADO roda no documento aberto (Safari), não na WebView do app — sem
+      // isto o guard acusa todo builder de relatório. Mesma armadilha do guard
+      // que casava com o próprio comentário.
+      const code = stripComments(raw)
+        .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+        .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+        .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+      if (!/\.\s*print\s*\(/.test(code)) continue
+      if (NATIVE_BRANCH.test(code)) continue
+      offenders.push(rel)
+    }
+    expect(offenders, 'print() não existe no WKWebView — desvie o nativo (ou use exportHtmlAsPdf)').toEqual([])
   })
 })
 

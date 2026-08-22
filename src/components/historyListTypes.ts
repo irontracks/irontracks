@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database';
 import { isRecord } from '@/utils/guards';
 import { PeriodStats } from '@/types/workout';
+import type { PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,11 @@ export type NewWorkoutState = {
     exercises: ManualExercise[];
 };
 
-export type PeriodReport = { type: 'week' | 'month'; stats: PeriodStats };
+/**
+ * `sessions` é o detalhe série a série do período — vai SÓ para o arquivo
+ * exportado, nunca para o prompt da IA (que recebe `stats`).
+ */
+export type PeriodReport = { type: 'week' | 'month'; stats: PeriodStats; sessions?: PeriodSessionDetail[] };
 export type PeriodAiState = { status: 'idle' | 'loading' | 'ready' | 'error'; ai: Record<string, unknown> | null; error: string };
 export type PeriodPdfState = { status: 'idle' | 'loading' | 'ready' | 'error'; url: string | null; blob: Blob | null; error: string };
 

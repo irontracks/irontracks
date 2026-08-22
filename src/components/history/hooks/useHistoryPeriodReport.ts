@@ -8,6 +8,8 @@ import { PeriodStats } from '@/types/workout';
 import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, RawSessionObjectSchema } from '@/components/historyListTypes';
 import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
 import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
+import { buildPeriodSessionDetails, PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -30,7 +32,13 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
     const [shareError, setShareError] = useState('');
 
     // ── buildPeriodStats ─────────────────────────────────────────────────────
-    const buildPeriodStats = (days: unknown, listOverride?: WorkoutSummary[]): PeriodStats | null => {
+    // Devolve os agregados (que vão ao prompt da IA) E o detalhe série a série
+    // (que vai só ao arquivo exportado) — separados de propósito: mandar o mês
+    // inteiro de séries ao modelo custa dinheiro e não melhora o insight.
+    const buildPeriodStats = (
+        days: unknown,
+        listOverride?: WorkoutSummary[],
+    ): { stats: PeriodStats; sessions: PeriodSessionDetail[] } | null => {
         try {
             const historyList = Array.isArray(listOverride) ? listOverride : (Array.isArray(historyItems) ? historyItems : []);
             const daysNumber = Number(days);
@@ -50,6 +58,7 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
             const uniqueDays = new Set<string>();
             const exerciseMap = new Map<string, { name: string; sets: number; reps: number; volumeKg: number; sessions: Set<string> }>();
             const sessionSummaries: Array<{ date: unknown; minutes: number; volumeKg: number }> = [];
+            const detailSources: Array<{ date: unknown; totalTime: unknown; title: unknown; logs: unknown; exercises: unknown }> = [];
 
             list.forEach((item) => {
                 const rawParsed = RawSessionObjectSchema.safeParse(item?.rawSession);
@@ -67,6 +76,13 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
                 } catch { }
                 const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
                 sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
+                detailSources.push({
+                    date: dateValue,
+                    totalTime: item?.totalTime ?? raw?.totalTime ?? 0,
+                    title: raw?.workoutTitle ?? item?.title ?? item?.name ?? '',
+                    logs,
+                    exercises,
+                });
                 Object.entries(logs || {}).forEach(([key, log]) => {
                     if (!isRecord(log)) return;
                     // setTopWeightReps/setVolume tratam unilateral (L_/R_).
@@ -92,11 +108,17 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
             const topExercisesByFrequency = [...exercisesList].sort((a, b) => (b.sessionsCount || 0) - (a.sessionsCount || 0) || (b.sets || 0) - (a.sets || 0)).slice(0, TOP_EXERCISES_LIMIT);
 
             return {
-                days: daysNumber, count, totalMinutes, avgMinutes,
-                totalVolumeKg: Math.max(0, Math.round(totalVolumeKg)), avgVolumeKg,
-                totalSets, totalReps, uniqueDaysCount: uniqueDays.size,
-                topExercisesByVolume, topExercisesByFrequency,
-                sessionSummaries: sessionSummaries.slice(0, PERIOD_SESSIONS_LIMIT),
+                stats: {
+                    days: daysNumber, count, totalMinutes, avgMinutes,
+                    totalVolumeKg: Math.max(0, Math.round(totalVolumeKg)), avgVolumeKg,
+                    totalSets, totalReps, uniqueDaysCount: uniqueDays.size,
+                    topExercisesByVolume, topExercisesByFrequency,
+                    sessionSummaries: sessionSummaries.slice(0, PERIOD_SESSIONS_LIMIT),
+                },
+                // Sem `slice`: o arquivo é o registro do período INTEIRO. O teto de
+                // `sessionSummaries` existe por causa do payload da IA, e o detalhe
+                // não passa por lá.
+                sessions: buildPeriodSessionDetails(detailSources),
             };
         } catch { return null; }
     };
@@ -122,9 +144,10 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
             const key = type === 'week' ? REPORT_DAYS_WEEK : REPORT_DAYS_MONTH;
             // Lista magra não tem os logs — hidrata (1 query) antes de agregar.
             const list = hydrateSessions ? await hydrateSessions() : undefined;
-            const stats = buildPeriodStats(key, list);
-            if (!stats) { await alert('Sem treinos suficientes nesse período para gerar um relatório.'); return; }
-            setPeriodReport({ type, stats });
+            const built = buildPeriodStats(key, list);
+            if (!built) { await alert('Sem treinos suficientes nesse período para gerar um relatório.'); return; }
+            const { stats, sessions } = built;
+            setPeriodReport({ type, stats, sessions });
             setPeriodAi({ status: 'loading', ai: null, error: '' });
             try {
                 const res = await generatePeriodReportInsights({ type, stats });
@@ -148,47 +171,65 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
     };
 
     // ── downloadPeriodPdf ────────────────────────────────────────────────────
-    const downloadPeriodPdf = async () => {
+    /**
+     * Gera o arquivo do período e entrega ao usuário pelo caminho ÚNICO de
+     * export (`exportHtmlAsPdf`).
+     *
+     * Até 22/08/2026 este hook reimplementava a sequência antiga —
+     * `window.open(blobUrl)` + `printWindow.print()` — que **não existe no
+     * WKWebView**: no iPhone o botão "Baixar PDF" simplesmente não fazia nada, e
+     * o `catch {}` vazio logo abaixo engolia a falha, então nem a mensagem de
+     * erro aparecia. É a mesma família de bug que criou o
+     * `exportHtmlAsPdf` em jul/2026 para as outras três telas; esta ficou de
+     * fora porque o guard daquele PR listava os chamadores que já se conhecia.
+     */
+    const buildCurrentHtml = (current: PeriodReport) => {
+        const baseUrl = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';
+        const userName = String(user?.displayName || user?.name || user?.email || '').trim();
+        return buildPeriodReportHtml({
+            type: current.type,
+            stats: current.stats,
+            // O detalhe treino a treino é o que o dono pediu no arquivo — sem ele
+            // o export volta a ser só o agregado do mês.
+            sessions: current.sessions ?? [],
+            ai: periodAi?.ai || null,
+            baseUrl,
+            userName,
+        });
+    };
+
+    const exportCurrentReport = async () => {
         const current = periodReport && typeof periodReport === 'object' ? periodReport : null;
         if (!current || periodPdf.status === 'loading') return;
         setPeriodPdf((prev) => ({ ...prev, status: 'loading', error: '' }));
         try {
-            const baseUrl = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';
-            const userName = String(user?.displayName || user?.name || user?.email || '').trim();
-            const html = buildPeriodReportHtml({ type: current.type, stats: current.stats, ai: periodAi?.ai || null, baseUrl, userName });
+            const html = buildCurrentHtml(current);
             const dateLabel = new Date().toISOString().slice(0, 10);
             const kind = current.type === 'week' ? 'Semanal' : 'Mensal';
-            const fileName = `Relatorio_${kind}_${dateLabel}`;
-            try {
-                const blobPrint = new Blob([html], { type: 'text/html' });
-                const blobPrintUrl = URL.createObjectURL(blobPrint);
-                const printWindow = window.open(blobPrintUrl, '_blank');
-                if (printWindow) {
-                    setTimeout(() => {
-                        try { printWindow.focus(); printWindow.print(); } catch { }
-                        setTimeout(() => URL.revokeObjectURL(blobPrintUrl), 60_000);
-                    }, 500);
-                } else {
-                    URL.revokeObjectURL(blobPrintUrl);
-                    const blob = new Blob([html], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = `${fileName}.html`;
-                    document.body.appendChild(a); a.click(); a.remove();
-                    URL.revokeObjectURL(url);
-                }
-                setPeriodPdf({ status: 'ready', url: null, blob: null, error: '' });
-            } catch { }
+            const res = await exportHtmlAsPdf({
+                html,
+                title: `Relatório ${kind.toLowerCase()}`,
+                baseFileName: `IronTracks_Relatorio_${kind}_${dateLabel}`,
+                alert: (msg) => { void alert(msg); },
+            });
+            if (res.ok) { setPeriodPdf({ status: 'ready', url: null, blob: null, error: '' }); return; }
+            if (res.via === 'cancelled') { setPeriodPdf({ status: 'idle', url: null, blob: null, error: '' }); return; }
+            setPeriodPdf({ status: 'error', url: null, blob: null, error: res.error || 'Falha ao gerar o arquivo do relatório.' });
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            setPeriodPdf((prev) => ({ ...prev, status: 'error', error: msg || 'Falha ao gerar PDF' }));
-        } finally {
-            setTimeout(() => setPeriodPdf((prev) => (prev?.status === 'loading' ? { ...prev, status: 'idle' } : prev)), 400);
+            setPeriodPdf({ status: 'error', url: null, blob: null, error: msg || 'Falha ao gerar PDF' });
         }
     };
 
-    // ── handleShareReport ────────────────────────────────────────────────────
-    const handleShareReport = async () => {
+    const downloadPeriodPdf = exportCurrentReport;
+
+    // ── copyShareText ────────────────────────────────────────────────────────
+    // O botão "Compartilhar" saiu do rodapé: ele chamava `navigator.share({ text })`
+    // com as 6 linhas de `buildShareText`, e o share sheet do iOS transforma
+    // texto solto em `.txt` — era isso que chegava do outro lado (relato do
+    // dono, 22/08/2026). Compartilhar o ARQUIVO é o que o export já faz no iOS,
+    // então sobrou aqui só a cópia do resumo, para quem quer colar num chat.
+    const copyShareText = async () => {
         const current = periodReport && typeof periodReport === 'object' ? periodReport : null;
         if (!current) return;
         const text = buildShareText(current);
@@ -206,35 +247,32 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
             } catch { return false; }
         };
 
-        try {
-            const nav = typeof navigator !== 'undefined' ? navigator : null;
-            if (nav && typeof nav.share === 'function') { await nav.share({ text }); setShareError(''); return; }
-        } catch { }
-
+        // Só clipboard — `navigator.share({ text })` era o caminho que virava
+        // `.txt` no share sheet do iOS. Quem quer arquivo usa Compartilhar.
         try {
             const nav = typeof navigator !== 'undefined' ? navigator : null;
             if (nav?.clipboard && typeof nav.clipboard.writeText === 'function') {
                 await nav.clipboard.writeText(text); setShareError('');
-                await alert('Texto do relatório copiado para a área de transferência.'); return;
+                await alert('Resumo copiado para a área de transferência.'); return;
             }
             const copied = await legacyCopy();
-            if (copied) { setShareError(''); await alert('Texto do relatório copiado para a área de transferência.'); return; }
+            if (copied) { setShareError(''); await alert('Resumo copiado para a área de transferência.'); return; }
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             const copied = await legacyCopy();
-            if (copied) { setShareError(''); await alert('Texto do relatório copiado para a área de transferência.'); return; }
-            setShareError(msg || 'Falha ao compartilhar');
-            await alert('Seu navegador bloqueou o compartilhamento/cópia automática. Copie o texto manualmente abaixo.', 'Compartilhamento indisponível');
+            if (copied) { setShareError(''); await alert('Resumo copiado para a área de transferência.'); return; }
+            setShareError(msg || 'Falha ao copiar');
+            await alert('Seu navegador bloqueou a cópia automática. Selecione o texto abaixo e copie manualmente.', 'Cópia indisponível');
             return;
         }
-        setShareError('O compartilhamento nativo não está disponível neste navegador.');
-        await alert('Compartilhamento nativo indisponível. Copie o texto manualmente abaixo.', 'Compartilhamento indisponível');
+        setShareError('A cópia automática não está disponível neste navegador.');
+        await alert('Cópia automática indisponível. Selecione o texto abaixo e copie manualmente.', 'Cópia indisponível');
     };
 
     return {
         periodReport, periodAi, periodPdf, shareError,
         buildPeriodStats, buildShareText,
         openPeriodReport, closePeriodReport,
-        downloadPeriodPdf, handleShareReport,
+        downloadPeriodPdf, copyShareText,
     };
 }

@@ -1,28 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Download, Loader2 } from 'lucide-react';
-import { PeriodStats } from '@/types/workout';
+import { Copy, Download, Loader2 } from 'lucide-react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
+// Os três tipos viviam DUPLICADOS aqui e em `historyListTypes` — estruturalmente
+// iguais até o dia em que um ganhou campo (`sessions`) e o outro não, e o
+// `tsc` reprovou a passagem de props entre dois tipos com o mesmo nome.
+import type { PeriodReport, PeriodAiState, PeriodPdfState } from '@/components/historyListTypes';
 
-export interface PeriodReport {
-    type: 'week' | 'month';
-    stats: PeriodStats;
-}
-
-export interface PeriodAiState {
-    status: 'idle' | 'loading' | 'ready' | 'error';
-    ai: Record<string, unknown> | null;
-    error: string;
-}
-
-export interface PeriodPdfState {
-    status: 'idle' | 'loading' | 'ready' | 'error';
-    url: string | null;
-    blob: Blob | null;
-    error: string;
-}
+export type { PeriodReport, PeriodAiState, PeriodPdfState };
 
 interface PeriodReportModalProps {
     periodReport: PeriodReport;
@@ -31,8 +18,14 @@ interface PeriodReportModalProps {
     shareError: string;
     buildShareText: (report: PeriodReport | null) => string;
     onClose: () => void;
+    /**
+     * Gera o arquivo COMPLETO do período (todos os treinos, série a série) e o
+     * entrega pelo caminho único de export. No iOS isso abre o share sheet
+     * nativo — daí não existir um botão "Compartilhar" separado: o destino
+     * (Arquivos, WhatsApp, e-mail) é escolhido lá, já com o PDF em mãos.
+     */
     onDownloadPdf: () => void;
-    onShareReport: () => void;
+    onCopyText: () => void;
 }
 
 // ─── Sparkline SVG helper ─────────────────────────────────────────────────────
@@ -73,7 +66,7 @@ export function HistoryListPeriodReportModal({
     buildShareText,
     onClose,
     onDownloadPdf,
-    onShareReport,
+    onCopyText,
 }: PeriodReportModalProps) {
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
@@ -114,7 +107,14 @@ export function HistoryListPeriodReportModal({
         >
             <div
                 role="none"
-                className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                /**
+                 * `max-h` + coluna flex: o corpo tinha `max-h-[72vh]` FIXO e o
+                 * rodapé empilhava três botões — a soma passava da altura da
+                 * tela no iPhone e o botão dourado ficava fora do alcance,
+                 * embaixo do indicador de home. Agora quem rola é o corpo; o
+                 * rodapé é `shrink-0` e nunca sai da tela.
+                 */
+                className="bg-neutral-900 w-full max-w-lg max-h-[calc(100dvh-2rem)] rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
             <div
@@ -122,9 +122,10 @@ export function HistoryListPeriodReportModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={typeLabel}
+                className="flex flex-col min-h-0"
             >
                 {/* Header */}
-                <div className="p-4 border-b border-neutral-800 bg-gradient-to-r from-neutral-900 to-neutral-900/60">
+                <div className="shrink-0 p-4 border-b border-neutral-800 bg-gradient-to-r from-neutral-900 to-neutral-900/60">
                     <div className="text-[11px] uppercase tracking-wider text-neutral-400 font-bold">Relatório de evolução</div>
                     <div className="text-lg font-black text-white">{typeLabel}</div>
                     {uniqueDays > 0 && (
@@ -137,7 +138,7 @@ export function HistoryListPeriodReportModal({
                 </div>
 
                 {/* Body */}
-                <div className="p-4 space-y-4 max-h-[72vh] overflow-y-auto">
+                <div className="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
                     {/* Primary stat grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {[
@@ -274,7 +275,17 @@ export function HistoryListPeriodReportModal({
 
                     {/* Share text */}
                     <div>
-                        <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold mb-1">Texto para compartilhar</div>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">Resumo em texto</div>
+                            <button
+                                type="button"
+                                onClick={onCopyText}
+                                className="tap-44 inline-flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-[11px] font-bold text-neutral-300 hover:bg-neutral-900"
+                            >
+                                <Copy size={13} />
+                                Copiar
+                            </button>
+                        </div>
                         <textarea
                             readOnly
                             aria-label="Texto para compartilhar"
@@ -286,7 +297,7 @@ export function HistoryListPeriodReportModal({
                     {/* Errors */}
                     {shareError ? (
                         <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
-                            <div className="font-black">Falha ao compartilhar</div>
+                            <div className="font-black">Falha ao copiar</div>
                             <div className="text-xs text-red-200/90">{String(shareError).slice(0, 260)}</div>
                         </div>
                     ) : null}
@@ -298,11 +309,11 @@ export function HistoryListPeriodReportModal({
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 bg-neutral-900/50 flex flex-col sm:flex-row gap-2">
+                <div className="shrink-0 p-4 modal-footer-safe bg-neutral-900/50 border-t border-neutral-800 flex gap-2">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
+                        className="py-3 px-5 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
                     >
                         Fechar
                     </button>
@@ -310,17 +321,10 @@ export function HistoryListPeriodReportModal({
                         type="button"
                         onClick={onDownloadPdf}
                         disabled={periodPdf.status === 'loading'}
-                        className="flex-1 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-bold hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                        className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400 disabled:opacity-60 inline-flex items-center justify-center gap-2"
                     >
                         {periodPdf.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                        Baixar PDF
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onShareReport}
-                        className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
-                    >
-                        Compartilhar
+                        {periodPdf.status === 'loading' ? 'Gerando…' : 'Baixar PDF completo'}
                     </button>
                 </div>
             </div>
