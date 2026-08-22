@@ -41,11 +41,38 @@ scripts/        # Scripts de build e utilitários
 
 **Carregamento remoto (crítico p/ decidir o que precisa de build):** o app nativo carrega o front do **servidor remoto** (`capacitor.config.*` → `server.url` = `https://irontracks.com.br`), NÃO dos assets embutidos. Logo: mudanças de **web/JS/servidor entram em produção pra todos os apps já instalados via deploy web (Vercel)**; **só mudanças nativas (Swift/plugin em `ios/`) exigem nova build no TestFlight**. Classifique toda tarefa por esse eixo.
 
-**Treino ativo** (`src/components/ActiveWorkout.tsx`): estado em `useActiveWorkoutController` (retorna `{ value, logs }`). O `value` (estável) vai no `WorkoutProvider`; os `logs` (mudam a cada tecla) num `WorkoutLogsProvider` separado (`components/workout/WorkoutContext.tsx`) — por performance. **`ExerciseCard` consome os DOIS**; renderizar fora de um deles lança erro (foi um crash real no overlay do parceiro). Logs = mapa com chave `"exIdx-setIdx"`. CRUD/organizar/editor-completo em `components/workout/hooks/useWorkoutExerciseCrud.ts`; editar mid-sessão remapeia os logs por índice (`helpers/reconcileEditedExercises.ts`).
+**Treino ativo** (`src/components/ActiveWorkout.tsx`): estado em `useActiveWorkoutController` (retorna `{ value, logs }`). O `value` (estável) vai no `WorkoutProvider`; os `logs` (mudam a cada tecla) num `WorkoutLogsProvider` separado (`components/workout/WorkoutContext.tsx`) — por performance. **`ExerciseCard` consome os DOIS**; renderizar fora de um deles lança erro (foi um crash real no overlay do parceiro). Logs = mapa com chave `"exIdx-setIdx"`. **Nada some do header do treino ativo** (`WorkoutHeader.tsx`): até 22/08/2026 o
+bloco de ações — Editar treino, menu "…" (Organizar/Cardio GPS/**Convidar**) e o
+X de descartar — ficava `opacity-0 pointer-events-none` enquanto durasse
+`ui.activeExecution`, estado que nasce ao iniciar a série pelo timer de descanso
+e só morre quando AQUELA série é concluída. Quem iniciava e não concluía perdia
+os três pelo resto da sessão, inclusive a única saída sem gravar. Guard:
+`components/workout/__tests__/headerBotoesSempreAlcancaveis.test.tsx`.
+
+CRUD/organizar/editor-completo em `components/workout/hooks/useWorkoutExerciseCrud.ts`; editar mid-sessão remapeia os logs por índice (`helpers/reconcileEditedExercises.ts`).
 
 **Renderers de série — 14 irmãos que divergem em SILÊNCIO** (`components/workout/set-renderers/`): `ExerciseCard.renderSet` roteia cada série pro renderer do método (normal, drop, rest-pause, cluster, grupo/Bi-Set, stripping, FST-7, ponto zero, forçadas, negativas, parciais, sistema 21, onda, cardio/plank). Cada um reimplementa peso/reps/RPE/concluir **por conta própria** — e é aí que nascem os bugs: em jul/2026 o Bi-Set exigia reps pra concluir (a normal não exige) e travava o botão sem explicar, e o drop escondia o peso das etapas porque o `truncate` colapsava o texto inline. **Mexeu em comportamento de série, varra os 14** (`grep` no diretório) — o que parece bug de um método quase sempre é divergência da família. Widgets compartilhados (ex.: `FailureToggle`) existem pra não replicar 14×.
 
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
+
+**Escrever peso sem dizer a FONTE trava o campo (22/08/2026).** O dono relatou
+"não deixa trocar o peso" num Bi-Set: digitava e o valor voltava para a
+sugestão. Não era o motor — era a marca. Enquanto o log disser
+`weightSource: 'auto'`, o efeito do `useAutoloadWeight` RE-SINCRONIZA o campo
+com a sugestão, e isso é proposital (o histórico chega do cache primeiro e da
+rede depois; sem isso o número congela desatualizado). Quem manda o motor parar
+é `'user'`. O `normalSet` marcava ao digitar e os savers de modal marcam na
+fronteira (`useWorkoutMethodSavers`) — faltavam os TRÊS renderers cujo peso é
+campo **inline**: `groupMethodSet` (Bi-Set, Super-Set, Tri-Set, Giant-Set,
+pré/pós-exaustão), `clusterSet` e `restPauseSet`. Os outros 11 editam por modal
+e já estavam certos. Hoje a marca sai de `setUserWeight()`, exposto pelo próprio
+`useAutoloadWeight` — fronteira única, não 14 cópias. Guard de classe em
+`set-renderers/__tests__/pesoEditavelComAutoload.test.tsx`: varre os 14 e reprova
+`updateLog` com `weight` sem `weightSource` (dispensa só patch de conclusão, em
+que o efeito nem roda). **Teste que só confere o patch do `updateLog` passa
+verde com o bug vivo** — o caso precisa do ciclo (digita → grava →
+re-renderiza → efeito roda), e como os renderers são `React.memo` sobre um
+contexto mockado estável, o harness remonta por `key`.
 
 **O motor aprende os pesos que a MÁQUINA tem** (`machineGrid.ts`). `plateMath` assume máquina de 5 em 5 kg — falso em boa parte dos aparelhos: a "Mesa flexora" desta base registra 18, 23, 27, 32, 36, 41… (stack em LIBRAS, 10 lb = 4,54 kg), e o motor pedia 20/25/30/35/40, valores que não existem ali. Agora os pesos JÁ REGISTRADOS são a verdade sobre o que é montável (`collectKnownWeights` varre TODAS as sessões, sem filtrar deload/treino — um peso registrado prova que o furo do pino existe). Snap só desce ou iguala; acima do topo extrapola pelo passo aprendido; **desiste (volta ao plateMath) quando o alvo cai num buraco do histórico** — snapar 45 para 30 seria regressão inventada por falta de dado.
 
@@ -1252,6 +1279,12 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   deixa de medir o que diz medir.
 - Regra geral: **teste E2E que divide conta com gente de verdade precisa partir
   de estado que ele mesmo criou.** Estado herdado é flake com cara de bug.
+- **O sintoma nem sempre aparece dentro do treino.** Em 22/08/2026 a jornada
+  morreu no `INICIAR TREINO` do DASHBOARD, com `element is not stable` — o
+  botão não parava de se mover, porque o estado remoto seguia chegando e
+  re-renderizando. Parecia regressão do PR (que mexia em renderers de série) e
+  não era: o clique nem chegava perto do código alterado. **Antes de investigar
+  o diff, re-rode o job**; passou de primeira no rerun, sem tocar em nada.
 
 ### Armadilhas de ambiente (custaram mais que o spec)
 
@@ -1539,7 +1572,13 @@ Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a sess
        for new build submissions
 ```
 
-Aconteceu em 31/07/2026 (1.18 → 1.19). Se for subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION` ANTES — evita um ciclo inteiro de archive perdido (~5 min).
+Aconteceu em 31/07/2026 (1.18 → 1.19) e **de novo em 22/08/2026 (1.20 → 1.21)** —
+nas duas vezes o archive rodou inteiro antes de o upload ser recusado. Se for
+subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION`
+ANTES — evita um ciclo perdido (~5 min). **Estado em 22/08/2026: versão 1.21,
+build 77 no TestFlight** (leva a ordem das Live Activities; ver a seção da LA).
+O bump é `sed` nas 10 ocorrências do `pbxproj`, e o release refaz com
+`npm run ios:release <build>` para não pular número.
 
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
