@@ -20,6 +20,7 @@ import {
 } from './types';
 import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
 import { buildWeightReference } from '@/lib/workout/weightOutlier';
+import { resolveWorkoutKey } from '@/lib/workout/workoutKey';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
@@ -335,6 +336,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     applyDeloadToExercise,
   } = deload;
 
+  /**
+   * Identidade do treino em curso — a MESMA chave que o histórico grava.
+   *
+   * Fonte única (`lib/workout/workoutKey.ts`): antes cada consumidor montava a
+   * sua lendo `workout?.name`, campo que não existe na sessão (o mapper grava
+   * em `title`), e as duas saíam vazias. Declarada aqui em cima porque o
+   * autoload logo abaixo depende dela.
+   */
+  const workoutDeloadKey = useMemo(() => resolveWorkoutKey(workout, session), [workout, session])
+
   // ── Carga automática (autoload) — reusa reportHistory + motor suggestWeight ──
   const { autoLoadEnabled, autoLoadSuggestions } = useWorkoutAutoload({
     exercises,
@@ -348,7 +359,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // Escopa o histórico pelo treino em curso: o mesmo exercício vive em treinos
     // diferentes com cargas incomparáveis, e sem isto o motor ancorava na sessão
     // de outro treino.
-    workoutName: String((workout as Record<string, unknown>)?.name ?? (session as Record<string, unknown>)?.name ?? ''),
+    //
+    // ⚠️ Lia `workout?.name`, que NÃO EXISTE na sessão — `mapWorkoutRow` grava o
+    // nome em `title`. A chave saía vazia e `pickUsableHistory` pulava a
+    // priorização inteira (ela só roda `if (wanted)`), então o escopo por treino
+    // que este comentário descreve nunca aconteceu de fato. Fonte única agora.
+    workoutName: workoutDeloadKey,
   });
 
   // ── Deload por-exercício (o botão do card) ──────────────────────────────────
@@ -369,11 +385,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
    * sozinho, sem arrastar o Supino de outros treinos junto — que era o efeito
    * colateral de chavear por exercício.
    */
-  const workoutDeloadKey = useMemo(
-    () => normalizeExerciseKey(String((workout as Record<string, unknown>)?.name
-      ?? (session as Record<string, unknown>)?.name ?? '')),
-    [workout, session],
-  )
 
   const workoutDeloadOff = useMemo(() => {
     const list = Array.isArray((settings as Record<string, unknown> | null)?.autoLoadDeloadOffWorkouts)
