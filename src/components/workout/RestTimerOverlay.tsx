@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { shouldAutoAdvanceRest, shouldAbandonRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
+import { shouldSuppressFinishedFlash } from './helpers/flashSuppression';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
@@ -122,6 +123,33 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // flash automatically shows again — no setState-in-effect needed.
     const [flashDismissedForTarget, setFlashDismissedForTarget] = useState<number | null>(null);
     const flashDismissed = targetTime != null && flashDismissedForTarget === targetTime;
+    // Modal de método aberto (Drop-Set, Cluster, Rest-Pause…): o flash não
+    // nasce. Ele é `fixed inset-0` atrás de um backdrop `bg-black/80`, então
+    // não comunicava nada — só pintava de verde escuro a tela de quem estava
+    // preenchendo as etapas (print do dono, 22/08/2026). A barra inferior
+    // continua avisando: contador, "+X além do planejado" e START.
+    //
+    // Reusa o `flashDismissedForTarget`, e é por isso que o flash não volta
+    // quando o modal fecha: o descanso já acabou faz tempo e um "BORA!" tardio
+    // seria susto, não aviso. O próximo descanso traz outro `targetTime` e o
+    // flash volta a nascer normalmente.
+    useEffect(() => {
+        if (!isFinished || flashDismissed || targetTime == null) return;
+        const doc = typeof document !== 'undefined' ? document : null;
+        if (!doc) return;
+        const check = () => {
+            if (shouldSuppressFinishedFlash({ isFinished: true, alreadyDismissed: false, doc })) {
+                setFlashDismissedForTarget(targetTime);
+            }
+        };
+        check();
+        // O modal pode abrir DEPOIS do flash (o usuário toca em "preencher" com
+        // o verde na tela). Sem observar, só o caso "modal já aberto" era pego.
+        const MO = typeof MutationObserver !== 'undefined' ? MutationObserver : null;
+        const mo = MO ? new MO(check) : null;
+        mo?.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-modal'] });
+        return () => mo?.disconnect();
+    }, [isFinished, flashDismissed, targetTime]);
     // AUTO — fonte única de verdade: a preferência `restTimerAutoStart` das
     // Configurações (chega via prop `autoStartEnabled`). Antes o overlay guardava um
     // SEGUNDO estado próprio em localStorage ('irontracks.restTimerAuto.v1') e ignorava
