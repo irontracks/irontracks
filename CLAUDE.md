@@ -314,8 +314,8 @@ silêncio**, sem erro e sem aviso no build. Quatro provas independentes:
 | 07/03/2026 | `ebfb2606` | "restore all missing root config files … middleware … (deploy fix)" recria como **`middleware.ts` na raiz**, versão reduzida (46 linhas): sem gate de API, sem CSRF, sem lista de rotas públicas. E na raiz não carrega |
 
 Mesmo padrão de perda por reescrita de histórico que sumiu com as tabelas de
-treino em dupla — vale suspeitar dele em qualquer "isso deveria existir e não
-existe" datado de fev–mar/2026.
+treino em dupla (aquelas foram recriadas no #859) — vale suspeitar dele em
+qualquer "isso deveria existir e não existe" datado de fev–mar/2026.
 
 **O que está de fato quebrado (medido, não presumido):**
 
@@ -1339,7 +1339,7 @@ outra". O que foi copiado de `djmkapple` → `djmkbrasil`:
 | Perfil / objetivo / fase | **sim** | antropometria, `fitnessGoal`, `nutritionPhase`, `autoLoad`, `plateInventory` |
 | Avaliações corporais + fotos | **não** | dado corporal e arquivos no storage; o ganho não paga |
 | Resto do histórico (117 sessões) | **não** | 1,5 MB de JSON, e faria a conta de teste aparecer no **ranking e na comunidade** com 2,4 M kg falsos |
-| Telefone, cidade, academia, notificações, feature flags | **não** | `featureTeamworkV2` ligaria uma feature cujas tabelas não existem |
+| Telefone, cidade, academia, notificações, feature flags | **não** | na época, `featureTeamworkV2` ligaria uma feature sem tabelas; hoje nem a flag existe (#436) nem a feature está desligada (#859) |
 
 **Os IDs dos clones são determinísticos** — `md5(<id de origem> || ':clone-teste-v1')::uuid`.
 Isso torna a cópia idempotente (rodar de novo não duplica) e o rollback exato:
@@ -1782,6 +1782,16 @@ tabelas CASCATEIA no `deleteUser`; `error_reports` é ON DELETE RESTRICT (sem
 o delete manual dela, a exclusão de quem já reportou erro FALHA — foi bug
 vivo); storage nunca cascateia; tabela nova sem decisão no catálogo reprova
 no guard — o vermelho é o pedido de decisão.
+
+⚠️ **Esse "reprova" depende de uma FOTO, e a foto envelhece (22/08/2026).** O
+guard compara o catálogo com `PROD_TABLES_SNAPSHOT`, uma lista fixa no arquivo
+de teste — ele não pergunta nada ao banco. Entre 14/08 e 22/08 passaram SEIS
+tabelas sem decisão nenhuma: as quatro do treino em equipe (#859) e as duas do
+import de ficha por foto (#881, que guarda IMAGEM do usuário), mais o bucket
+`workout-imports`. Todas cascateiam, então o delete nunca esteve quebrado — mas
+o EXPORT LGPD ignorava esses dados, porque a rota itera o catálogo. **Migration
+nova = re-rodar o SQL do cabeçalho do catálogo e comparar com o snapshot**, na
+mesma tarefa.
 
 **Xcode Cloud — o workflow 'App | Default' (push na main, só Archive) ficou
 verde depois de 4 bloqueios em cadeia**, todos diagnosticados pela ASC API
