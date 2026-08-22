@@ -118,6 +118,11 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   workout_sync_subscriptions: { mechanism: 'manual', ownerCols: ['student_id', 'teacher_id'], export: own(['student_id', 'teacher_id']) },
   workout_sync_mappings: { mechanism: 'child-cascade', export: skip('mapeamento técnico treino↔treino, sem dado do titular além dos ids já exportados') },
   rest_day_intents: { mechanism: 'cascade', export: own(['user_id']) },
+  // Import de ficha por foto/PDF (#881). Os ARQUIVOS ficam no bucket
+  // workout-imports (prefixo userId) — storage nunca cascateia, é o varrimento
+  // por prefixo que os remove.
+  workout_photo_imports: { mechanism: 'cascade', export: own(['user_id']) },
+  workout_photo_import_files: { mechanism: 'child-cascade', export: via('workout_photo_imports', 'import_id') },
   muscle_weekly_summaries: { mechanism: 'cascade', export: own(['user_id']) },
   user_achievements: { mechanism: 'cascade', export: own(['user_id']) },
   cardio_tracks: { mechanism: 'cascade', export: own(['user_id']) },
@@ -143,7 +148,6 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
 
   // ── Avaliações e saúde ─────────────────────────────────────────────────────
   assessments: { mechanism: 'manual', ownerCols: ['student_id', 'trainer_id'], export: own(['student_id', 'trainer_id'], 2000) },
-  assessment_photos: { mechanism: 'child-cascade', export: via('assessments', 'assessment_id') },
   body_photo_assessments: { mechanism: 'cascade', export: own(['user_id']) },
   body_photo_assessment_photos: { mechanism: 'child-cascade', export: via('body_photo_assessments', 'assessment_id') },
   lab_exams: { mechanism: 'cascade', export: own(['user_id']) },
@@ -167,6 +171,16 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   notifications: { mechanism: 'manual', ownerCols: ['recipient_id', 'sender_id'], export: own(['user_id', 'recipient_id'], 10000) },
   whatsapp_conversations: { mechanism: 'manual', ownerCols: ['user_id'], export: own(['user_id']) },
   coach_inbox_states: { mechanism: 'cascade', export: own(['student_user_id']) },
+
+  // ── Treino em equipe ──────────────────────────────────────────────────────
+  // Aposentado em 14/07/2026 e RESTAURADO no PR #859 (18/08/2026). As 4 FKs
+  // para auth.users são ON DELETE CASCADE (conferidas no banco em 22/08/2026),
+  // então a exclusão da conta limpa sozinha — mas a decisão precisa constar
+  // aqui, e o chat é conteúdo escrito pelo titular: vai no export.
+  invites: { mechanism: 'cascade', export: own(['from_uid', 'to_uid']) },
+  team_sessions: { mechanism: 'cascade', export: own(['host_uid']) },
+  team_session_presence: { mechanism: 'cascade', export: own(['user_id']) },
+  team_chat_messages: { mechanism: 'cascade', export: own(['user_id'], 20000) },
 
   // ── Professor / marketplace ────────────────────────────────────────────────
   teachers: {
@@ -276,6 +290,7 @@ export const USER_PREFIX_BUCKETS = [
   'bioimpedance-files',
   'social-stories',
   'execution-videos',
+  'workout-imports',
 ] as const
 
 /** Decisão por bucket — o guard exige que todo bucket de produção conste. */
@@ -285,5 +300,6 @@ export const BUCKET_DECISIONS: Record<string, string> = {
   'bioimpedance-files': 'prefixo userId — varrido na exclusão',
   'social-stories': 'prefixo userId — varrido na exclusão',
   'execution-videos': 'prefixo userId — varrido na exclusão',
+  'workout-imports': 'prefixo userId (`${userId}/imports/...`) — varrido na exclusão',
   'chat-media': 'path por canal — objetos resolvidos via direct_messages antes do cascade',
 }

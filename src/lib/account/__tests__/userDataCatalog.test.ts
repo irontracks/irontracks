@@ -3,11 +3,19 @@
  * precisa cobrir TODA tabela de produção, com decisão de exclusão E de
  * exportação — e as rotas precisam consumi-lo (a fiação, não só as pontas).
  *
- * O snapshot abaixo foi medido no banco em 14/08/2026 (SQL no cabeçalho do
+ * O snapshot abaixo foi medido no banco em 22/08/2026 (SQL no cabeçalho do
  * catálogo). Tabela criada depois disso SEM entrada no catálogo reprova aqui —
  * esse vermelho é o pedido de decisão, não um falso positivo. Ao adicionar
  * tabela nova: decida mecanismo + export no catálogo E acrescente o nome ao
  * snapshot.
+ *
+ * ⚠️ O snapshot é uma FOTO: ele não pergunta nada ao banco, então enquanto
+ * ninguém o atualiza o guard fica CEGO para tudo que entrou depois — e foi o
+ * que aconteceu entre 14/08 e 22/08. Passaram despercebidas SEIS tabelas: as
+ * quatro do treino em equipe (restaurado no #859) e as duas do import de ficha
+ * por foto (#881, que guarda IMAGEM do usuário). `assessment_photos`, que
+ * estava no snapshot, já não existe no banco. Ao mexer em schema, re-rode o
+ * SQL do cabeçalho do catálogo e compare — a lista não se atualiza sozinha.
  */
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
@@ -19,15 +27,14 @@ import {
   USER_PREFIX_BUCKETS,
 } from '@/lib/account/userDataCatalog'
 
-/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — 14/08/2026 */
+/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — 22/08/2026 */
 const PROD_TABLES_SNAPSHOT = [
   'access_requests', 'active_workout_sessions', 'admin_emails', 'app_payments', 'app_plans',
-  'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessment_photos',
-  'assessments', 'audit_events', 'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
+  'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events', 'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
   'client_error_events', 'coach_inbox_states', 'daily_nutrition_logs', 'device_push_tokens', 'direct_channels',
   'direct_messages', 'error_reports', 'exercise_alias_jobs', 'exercise_aliases', 'exercise_canonical',
   'exercise_execution_submissions', 'exercise_library', 'exercise_muscle_maps', 'exercise_substitutions',
-  'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'lab_exam_files',
+  'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'invites', 'lab_exam_files',
   'lab_exams', 'lab_result_markers', 'lab_results', 'live_activity_push_tokens', 'marketplace_payments',
   'marketplace_subscriptions', 'mercadopago_webhook_events', 'muscle_weekly_summaries', 'notifications',
   'nutrition_custom_foods', 'nutrition_favorite_meals', 'nutrition_goals', 'nutrition_learned_foods',
@@ -35,18 +42,21 @@ const PROD_TABLES_SNAPSHOT = [
   'profiles', 'referrals', 'rest_day_intents', 'sets', 'sets_audit', 'social_follows', 'social_stories',
   'social_story_comments', 'social_story_likes', 'social_story_reactions', 'social_story_views',
   'soft_delete_bin', 'student_charges', 'student_diet_plans', 'student_service_plans', 'student_subscriptions',
-  'students', 'teacher_plan_subscriptions', 'teacher_plans', 'teacher_tiers', 'teachers', 'update_notifications',
+  'students', 'teacher_plan_subscriptions', 'teacher_plans', 'teacher_tiers', 'teachers',
+  'team_chat_messages', 'team_session_presence', 'team_sessions', 'update_notifications',
   'user_achievements', 'user_activity_events', 'user_activity_monthly', 'user_entitlements', 'user_gyms',
   'user_location_settings', 'user_settings', 'user_update_views', 'video_channel_whitelist',
   'vip_chat_messages', 'vip_chat_threads', 'vip_periodization_exercise_state', 'vip_periodization_programs',
   'vip_periodization_workouts', 'vip_profile', 'vip_usage_daily', 'vip_welcome_views', 'webhook_dead_letters',
-  'whatsapp_conversations', 'workout_checkins', 'workout_session_logs', 'workout_set_logs',
+  'whatsapp_conversations', 'workout_checkins', 'workout_photo_import_files', 'workout_photo_imports',
+  'workout_session_logs', 'workout_set_logs',
   'workout_sync_mappings', 'workout_sync_subscriptions', 'workouts',
 ]
 
-/** `select id from storage.buckets` — 14/08/2026 */
+/** `select id from storage.buckets` — 22/08/2026 */
 const PROD_BUCKETS_SNAPSHOT = [
   'bioimpedance-files', 'body-photos', 'chat-media', 'execution-videos', 'lab-exams', 'social-stories',
+  'workout-imports',
 ]
 
 const ROOT = path.resolve(__dirname, '../../../..')

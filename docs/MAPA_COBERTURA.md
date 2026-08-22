@@ -111,10 +111,12 @@ ignorado; corte de 24h reduzido; janela de 1 dia estreitada).
 
 ## 4. Nota de documentação
 
-O `CLAUDE.md` descreve **Treino em Dupla V2** (`contexts/team/*`,
-`normalizeParticipant`, tabelas `team_sessions`…) como feature ativa. Ela foi
-**aposentada** no commit `5bc010c7` (~4,6k linhas removidas, banco intacto) e
-`src/contexts/team/` não existe mais.
+**Atualizado em 22/08/2026.** Esta nota dizia que o Treino em Dupla V2 tinha
+sido **aposentado** e que `src/contexts/team/` não existia mais — verdade entre
+14/07 e 18/08/2026, e falsa desde então: o PR #859 restaurou código e migrations,
+e as tabelas `invites`/`team_sessions`/`team_session_presence`/
+`team_chat_messages` estão no banco (conferido por SQL). O `CLAUDE.md` descreve a
+feature como ATIVA porque ela está ativa.
 
 ---
 

@@ -502,7 +502,10 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
         const { data: assessments } = await adminDb.from('assessments').select('*').limit(2000)
         const { data: notifications } = await adminDb.from('notifications').select('*').limit(5000)
         // chat_channels + messages removed — dead system deleted in 20260419200000
-        // invites + team_sessions removed — TeamworkV2 aposentado, tabelas dropadas
+        // invites + team_sessions fora deste export ADMINISTRATIVO de propósito:
+        // o TeamworkV2 voltou no #859 (18/08/2026) e as tabelas existem, mas aqui
+        // é o dump do painel, não a exportação LGPD do titular — essa é dirigida
+        // por lib/account/userDataCatalog.ts, onde as 4 tabelas têm decisão.
 
         const { data: workouts } = await adminDb
             .from('workouts')
