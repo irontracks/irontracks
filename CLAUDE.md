@@ -1498,6 +1498,19 @@ do descanso — ele nasce com a âncora corrigida e segue contando até o descan
 (os atributos de uma activity não mudam depois de criada). Guards em
 `src/hooks/__tests__/liveActivityPauseSync.test.tsx`.
 
+**Quem fica em CIMA na tela bloqueada é o `relevanceScore` (21/08/2026).** Treino e
+descanso coexistem; com relevância igual (default 0 para todas) o iOS empilha por
+ordem de início, e o card do DESCANSO — o único que conta para trás e tem botão —
+ficava embaixo do treino. Valores em `LiveActivityRelevance`
+(`ios/App/App/RestTimerAttributes.swift`): descanso 100, treino 10. **A relevância
+mora no CONTEÚDO, não nos atributos**: precisa ir em TODA montagem de
+`ActivityContent` (são 7 no plugin) **e no push APNs** (`relevance-score`, em
+`lib/push/apnsLiveActivity.ts`) — um update sem o campo volta ao default e derruba
+o card no meio do descanso. Guard nas duas pontas:
+`lib/push/__tests__/liveActivityOrdemTelaBloqueada.test.ts` (o do Swift fatia cada
+chamada por parêntese balanceado, sobre o código sem comentários). Como é Swift, só
+vale **com build nova**; o lado do push entra por deploy web.
+
 **Arquitetura (o que exige build vs. o que não exige):** JS/hook/bridge = deploy web, vale na hora pra todos os apps instalados. Swift/widget/`pbxproj` = **só com build nova no TestFlight**. Por isso: **nunca** faça o JS chamar um método nativo que o build instalado não tem — vira `"IronTracksNative" plugin is not implemented on ios` (já gerou 6.833 eventos no Sentry).
 
 **Integridade do alvo iOS:** o widget `IronTracksWidgets` precisa existir no `pbxproj`, estar em *Embed App Extensions* e ter os 4 fontes. `scripts/add-watch-target.rb` **reescreve o pbxproj inteiro** — é vetor real de perda de target (por isso existem os backups). O guard cobre isso.
