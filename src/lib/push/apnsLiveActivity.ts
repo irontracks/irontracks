@@ -28,6 +28,20 @@ export type LiveActivityKind = 'rest' | 'workout'
 export type LiveActivityEvent = 'update' | 'end'
 
 /**
+ * Ordem das duas Live Activities quando ambas estão no ar (descanso + treino).
+ *
+ * Espelha `LiveActivityRelevance` no Swift (ios/App/App/RestTimerAttributes.swift):
+ * maior fica em CIMA na tela bloqueada e leva a Ilha Dinâmica. Precisa ir também
+ * no push, porque a relevância mora no CONTEÚDO da activity — um update remoto
+ * sem `relevance-score` volta ao default (0) e derruba o card do descanso para
+ * baixo do card do treino, que é exatamente o bug corrigido em 21/08/2026.
+ */
+export const LIVE_ACTIVITY_RELEVANCE: Record<LiveActivityKind, number> = {
+  rest: 100,
+  workout: 10,
+}
+
+/**
  * RestTimer ContentState — keep in sync with RestTimerAttributes.ContentState in Swift.
  *  endDate         — ISO string converted to seconds-since-1970 by APNs decoder
  *  targetSeconds   — original rest duration
@@ -99,6 +113,40 @@ export function normalizeContentStateDates(state: unknown): Record<string, unkno
   return out
 }
 
+/**
+ * Monta o objeto `aps` do push de Live Activity. Exportado para o guard poder
+ * exercitar a MONTAGEM (e não só procurar a string no arquivo).
+ *
+ * ⚠️ Datas DENTRO do content-state (ex.: endDate do descanso) são decodificadas
+ * pelo iOS com a estratégia PADRÃO do Swift (`.deferredToDate`) →
+ * `Date(timeIntervalSinceReferenceDate:)` = segundos desde 2001-01-01, um NÚMERO.
+ * Enviar ISO 8601 (ou segundos-1970) faz o content-state INTEIRO falhar a
+ * decodificação e o iOS DESCARTA o update silenciosamente (APNs devolve 200):
+ * o alerta chega mas a Live Activity nunca vira ("card travado"). Convertendo aqui.
+ * (Os campos aps-level `timestamp`/`stale-date`/`dismissal-date` são segundos-1970,
+ * tratados pelo próprio ActivityKit — esses NÃO passam por aqui.)
+ */
+export function buildLiveActivityAps<K extends LiveActivityKind>(
+  args: Pick<SendLiveActivityArgs<K>, 'kind' | 'event' | 'contentState' | 'dismissalDate' | 'alert'>,
+  timestamp: number,
+): Record<string, unknown> {
+  const aps: Record<string, unknown> = {
+    timestamp,
+    event: args.event,
+    'content-state': normalizeContentStateDates(args.contentState),
+    // Ordem na tela bloqueada — sem isto o update remoto zera a relevância
+    // que o Swift definiu e o card do descanso desce para baixo do treino.
+    'relevance-score': LIVE_ACTIVITY_RELEVANCE[args.kind] ?? 0,
+  }
+  if (args.event === 'end' && args.dismissalDate) {
+    aps['dismissal-date'] = Math.floor(new Date(args.dismissalDate).getTime() / 1000)
+  }
+  if (args.alert) {
+    aps.alert = { title: args.alert.title, body: args.alert.body }
+  }
+  return aps
+}
+
 async function sendOneLiveActivity<K extends LiveActivityKind>(
   args: SendLiveActivityArgs<K>,
   cfg: ApnsConfig,
@@ -107,27 +155,7 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
   return new Promise((resolve) => {
     try {
       const timestamp = Math.floor(Date.now() / 1000)
-      // ⚠️ Datas DENTRO do content-state (ex.: endDate do descanso) são decodificadas
-      // pelo iOS com a estratégia PADRÃO do Swift (`.deferredToDate`) →
-      // `Date(timeIntervalSinceReferenceDate:)` = segundos desde 2001-01-01, um NÚMERO.
-      // Enviar ISO 8601 (ou segundos-1970) faz o content-state INTEIRO falhar a
-      // decodificação e o iOS DESCARTA o update silenciosamente (APNs devolve 200):
-      // o alerta chega mas a Live Activity nunca vira ("card travado"). Convertendo aqui.
-      // (Os campos aps-level `timestamp`/`stale-date`/`dismissal-date` são segundos-1970,
-      // tratados pelo próprio ActivityKit — esses NÃO passam por aqui.)
-      const aps: Record<string, unknown> = {
-        timestamp,
-        event: args.event,
-        'content-state': normalizeContentStateDates(args.contentState),
-      }
-      if (args.event === 'end' && args.dismissalDate) {
-        aps['dismissal-date'] = Math.floor(new Date(args.dismissalDate).getTime() / 1000)
-      }
-      if (args.alert) {
-        aps.alert = { title: args.alert.title, body: args.alert.body }
-      }
-
-      const payload = JSON.stringify({ aps })
+      const payload = JSON.stringify({ aps: buildLiveActivityAps(args, timestamp) })
 
       // M2: usa env.apns.production (com .trim()) igual ao push normal (apns.ts) — leitura
       // crua de process.env.APNS_PRODUCTION causava drift sandbox/prod se houvesse espaço.
