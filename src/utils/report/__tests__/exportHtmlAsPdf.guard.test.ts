@@ -66,6 +66,8 @@ describe('guard: navigator.share nunca recebe blob: URL', () => {
       // 22/08/2026: o relatório semanal/mensal do histórico. Ele reimplementava
       // `window.open` + `print()` e o botão "Baixar PDF" era inerte no iPhone.
       'components/history/hooks/useHistoryPeriodReport.ts',
+      // 23/08/2026: o "Resumo da semana 💪" (deep-link da push semanal).
+      'components/dashboard/WeeklyMuscleSummary.tsx',
     ]
     for (const rel of callers) {
       const code = readFileSync(join(SRC, rel), 'utf8')

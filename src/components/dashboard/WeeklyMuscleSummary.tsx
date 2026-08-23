@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Loader2, TrendingUp, Brain, AlertTriangle, Target, Dumbbell } from 'lucide-react'
+import { ArrowLeft, Loader2, TrendingUp, Brain, AlertTriangle, Target, Dumbbell, Download } from 'lucide-react'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { logWarn } from '@/lib/logger'
+import { useDialog } from '@/contexts/DialogContext'
+import { buildWeeklyMuscleReportHtml } from '@/utils/report/buildWeeklyMuscleReportHtml'
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 
 type Insights = {
   summary?: string[]
@@ -35,12 +38,14 @@ const fmtRange = (weekStart?: string) => {
 export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) {
   const searchParams = useSearchParams()
   const week = String(searchParams.get('week') || '').trim()
+  const { alert } = useDialog()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [data, setData] = useState<WeeklyPayload | null>(null)
   const [found, setFound] = useState(true)
   const [reloadKey, setReloadKey] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -67,7 +72,9 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
         const meta = t?.minSets || 0
         const pct = meta > 0 ? Math.min(1, m.sets / meta) : (m.sets > 0 ? 1 : 0)
         const reached = meta > 0 && m.sets >= meta
-        return { id: m.id, label: m.label || t?.label || m.id, sets: m.sets, meta, pct, reached }
+        // `metaMax` não aparece na tela — vai só no arquivo exportado, onde a
+        // faixa recomendada é o que dá sentido ao "28 séries" fora do contexto.
+        return { id: m.id, label: m.label || t?.label || m.id, sets: m.sets, meta, metaMax: t?.maxSets || 0, pct, reached }
       })
       .sort((a, b) => b.sets - a.sets)
   }, [data])
@@ -75,6 +82,39 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
   const insights = data?.insights || null
   const workouts = Number(data?.workoutsCount || 0)
   const topLabel = muscles[0]?.label || ''
+
+  // Baixar/compartilhar são o MESMO gesto no iOS: `exportHtmlAsPdf` abre o share
+  // sheet nativo e o destino (Arquivos, WhatsApp) é escolhido lá. `window.print()`
+  // não existe no WKWebView — por isso o caminho único, e nunca à mão.
+  const handleExport = async () => {
+    if (exporting || !data) return
+    setExporting(true)
+    try {
+      const html = buildWeeklyMuscleReportHtml({
+        weekStartDate: data.weekStartDate,
+        workoutsCount: workouts,
+        muscles,
+        insights,
+        baseUrl: typeof window !== 'undefined' ? String(window.location.origin || '') : '',
+      })
+      const res = await exportHtmlAsPdf({
+        html,
+        title: 'Resumo da semana',
+        baseFileName: `IronTracks_Resumo_Semana_${data.weekStartDate || new Date().toISOString().slice(0, 10)}`,
+        alert: (msg) => { void alert(msg) },
+      })
+      // Cancelar no share sheet não é falha; erro de verdade precisa APARECER —
+      // o `catch {}` vazio do relatório de período deixou um botão inerte meses.
+      if (!res.ok && res.via === 'failed') {
+        await alert(res.error || 'Não foi possível gerar o arquivo do resumo.', 'Falha ao baixar', 'error')
+      }
+    } catch (e) {
+      logWarn('WeeklyMuscleSummary', 'export', e)
+      await alert('Não foi possível gerar o arquivo do resumo.', 'Falha ao baixar', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[1200] bg-neutral-950 flex flex-col">
@@ -88,10 +128,22 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
         >
           <ArrowLeft size={20} />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-base font-black text-white leading-tight truncate">Resumo da semana 💪</h1>
           {data?.weekStartDate && <p className="text-xs text-neutral-400 leading-tight">{fmtRange(data.weekStartDate)}</p>}
         </div>
+        {found && data && !loading && !error ? (
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            aria-label="Baixar resumo da semana"
+            aria-busy={exporting}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-yellow-500 hover:bg-neutral-800 transition-colors disabled:opacity-50 -mr-1"
+          >
+            {exporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+          </button>
+        ) : null}
       </div>
 
       {/* Body */}
