@@ -3,7 +3,12 @@
  * dependência de servidor. Fica separado de engine.ts (que tem trackMeal +
  * supabase/server) pra poder ser importado no CLIENT sem puxar next/headers pro
  * bundle. Fonte ÚNICA: web e overlay usam as mesmas funções daqui.
+ *
+ * A FÓRMULA de BMR/TDEE não mora aqui: vive em `lib/health/mifflinStJeor`,
+ * compartilhada com a avaliação física (as duas a tinham escrita, igual).
  */
+import { basalMetabolicRate, totalDailyEnergyExpenditure } from '@/lib/health/mifflinStJeor'
+
 export type Gender = 'MALE' | 'FEMALE'
 
 export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE' | 'EXTRA_ACTIVE'
@@ -38,20 +43,18 @@ export function calculateBMR(stats: UserStats): number {
   const age = Number(stats?.age)
   const gender = stats?.gender
 
+  // Erros TIPADOS por campo: a nutrição os usa para dizer ao usuário o que
+  // falta preencher, então a validação fica aqui e não no núcleo.
   if (!Number.isFinite(weight) || weight <= 0) throw new Error('nutrition_invalid_weight')
   if (!Number.isFinite(height) || height <= 0) throw new Error('nutrition_invalid_height')
   if (!Number.isFinite(age) || age <= 0) throw new Error('nutrition_invalid_age')
   if (gender !== 'MALE' && gender !== 'FEMALE') throw new Error('nutrition_invalid_gender')
 
-  // Mifflin-St Jeor (padrão atual da literatura; substitui a Harris-Benedict, que
-  // superestimava ~5%). Homem: +5; mulher: −161.
-  const bmr =
-    gender === 'MALE'
-      ? 10 * weight + 6.25 * height - 5 * age + 5
-      : 10 * weight + 6.25 * height - 5 * age - 161
-
-  if (!Number.isFinite(bmr) || bmr <= 0) throw new Error('nutrition_bmr_invalid_result')
-  return Math.round(bmr)
+  // A conta vive em `lib/health/mifflinStJeor` — era a mesma fórmula escrita
+  // aqui e em `utils/calculations/bodyComposition`.
+  const bmr = basalMetabolicRate({ weightKg: weight, heightCm: height, ageYears: age, sex: gender })
+  if (bmr == null) throw new Error('nutrition_bmr_invalid_result')
+  return bmr
 }
 
 /**
@@ -61,7 +64,9 @@ export function calculateBMR(stats: UserStats): number {
 export function calculateTDEE(stats: UserStats): number {
   const bmr = calculateBMR(stats)
   const multiplier = getActivityMultiplier(stats.activityLevel)
-  return Math.round(bmr * multiplier)
+  const tdee = totalDailyEnergyExpenditure(bmr, multiplier)
+  if (tdee == null) throw new Error('nutrition_bmr_invalid_result')
+  return tdee
 }
 
 const CALORIES_PER_GRAM = {

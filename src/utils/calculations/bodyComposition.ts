@@ -1,6 +1,7 @@
 // Funções de cálculo para composição corporal
 
 import { Assessment, CalculatedMetrics } from '@/types/assessment';
+import { basalMetabolicRate, totalDailyEnergyExpenditure } from '@/lib/health/mifflinStJeor';
 
 /**
  * Calcula a densidade corporal usando a fórmula de Pollock (7 dobras)
@@ -267,14 +268,14 @@ export const classifyBodyFat = (bodyFatPercentage: number, gender: 'M' | 'F', ag
  * @returns BMR em kcal/dia
  */
 export const calculateBMR = (weight: number, height: number, age: number, gender: 'M' | 'F'): number => {
-  if (weight <= 0 || height <= 0 || age <= 0) {
+  // A conta vive em `lib/health/mifflinStJeor` — era a mesma fórmula escrita
+  // aqui e em `lib/nutrition/goals`. Esta assinatura (posicional) permanece
+  // porque é a que o fluxo de avaliação usa; o que não se repete é o cálculo.
+  const bmr = basalMetabolicRate({ weightKg: weight, heightCm: height, ageYears: age, sex: gender });
+  if (bmr == null) {
     throw new Error('Peso, altura e idade devem ser maiores que zero');
   }
-
-  // Mifflin-St Jeor. Homem: +5; mulher: −161.
-  const bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === 'M' ? 5 : -161);
-
-  return Math.round(bmr * 100) / 100; // 2 casas decimais
+  return bmr;
 };
 
 /**
@@ -284,12 +285,11 @@ export const calculateBMR = (weight: number, height: number, age: number, gender
  * @returns TDEE em kcal/dia
  */
 export const calculateTDEE = (bmr: number, activityFactor: number): number => {
-  if (bmr <= 0 || activityFactor <= 0) {
+  const tdee = totalDailyEnergyExpenditure(bmr, activityFactor);
+  if (tdee == null) {
     throw new Error('BMR e fator de atividade devem ser maiores que zero');
   }
-
-  const tdee = bmr * activityFactor;
-  return Math.round(tdee * 100) / 100; // 2 casas decimais
+  return tdee;
 };
 
 /**
