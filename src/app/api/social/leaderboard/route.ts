@@ -3,6 +3,7 @@ import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { buildStreakDays, calcStreak } from '@/lib/social/streak'
 import { logError } from '@/lib/logger'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
@@ -52,26 +53,6 @@ const calcVolume = (notes: unknown): number => {
  * Calculate consecutive-day streak from a set of date strings (YYYY-MM-DD).
  * Starts from today and goes backwards.
  */
-const calcStreak = (days: Set<string>): number => {
-  if (!days.size) return 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let cursor = today
-  let streak = 0
-
-  // Check today and yesterday as starting points (user may not have worked out today yet)
-  const todayStr = cursor.toISOString().slice(0, 10)
-  if (!days.has(todayStr)) {
-    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000)
-    if (!days.has(cursor.toISOString().slice(0, 10))) return 0
-  }
-
-  while (days.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1
-    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000)
-  }
-  return streak
-}
 
 /**
  * GET /api/social/leaderboard — Weekly leaderboard among friends
@@ -171,7 +152,9 @@ export async function GET(req: Request) {
       const d = row?.date ? new Date(String(row.date)) : null
       if (!d || Number.isNaN(d.getTime())) continue
       if (!datesByUser.has(uid)) datesByUser.set(uid, new Set())
-      datesByUser.get(uid)!.add(d.toISOString().slice(0, 10))
+      // Dia BRT, não UTC: a Vercel roda em UTC e treino às 22h no Brasil caía
+      // no dia seguinte — 5,7% das sessões, medido antes de corrigir.
+      for (const key of buildStreakDays([d])) datesByUser.get(uid)!.add(key)
     }
 
     const streakByUser = new Map<string, number>()
