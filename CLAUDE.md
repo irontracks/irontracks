@@ -930,6 +930,26 @@ no doc. O guard NÃO acusa "mesmo valor duas vezes" de propósito: foi medido,
 produz quase só falso positivo (`.map()`, `aria-valuetext`) e guard que grita no
 lugar errado é afrouxado na primeira semana.
 
+## "Deixe em 100%" é ordem de execução, não de consulta (23/08/2026)
+
+**Quando o dono pedir 100%, ENTREGUE 100% — sem voltar para perguntar.**
+Repreensão direta dele nesta data, e merecida: na varredura das áreas de
+cálculo eu medi a cobertura, achei os buracos, fechei uma parte e **parei para
+oferecer** o resto. Ele já tinha dito o que queria; perguntar de novo só
+devolveu para ele um trabalho que era meu.
+
+A fronteira, para não confundir com a regra de perguntar antes de presumir:
+
+- **Não pergunte** quando o que falta é TRABALHO — escrever os testes que
+  faltam, cobrir os ramos, varrer o arquivo seguinte. Isso é executar o pedido.
+- **Pergunte** quando o que falta é uma DECISÃO que muda o produto e que só o
+  dono pode tomar (foi o caso do protocolo das dobras: J&P7 com as dobras
+  certas × trocar a equação × só corrigir o rótulo — três produtos diferentes).
+
+E ao reportar, dê o NÚMERO, não a impressão: "97,6% de linhas, faltam os
+caminhos com I/O" vale mais que "está bem coberto". Foi medindo que apareceram
+os dois bugs desta auditoria — o protocolo das dobras e o streak em UTC.
+
 ## Padrão de auditoria (obrigatório fechar com testes)
 **Regra fixa do dono: SEMPRE mirar 100% de cobertura.** Uma auditoria só está concluída quando TODA superfície relacionada foi varrida — inclusive as "menores" (buckets de storage, uploads de avatar/foto, onboarding/access-request, crons, etc.). Nunca deixar uma superfície "de raspão" ou "não abri a fundo": ou varre e confirma sólida, ou reporta o achado. Não encerrar dizendo "falta varrer X" — varrer X.
 
