@@ -106,11 +106,37 @@ describe('classificações exibidas', () => {
     })
 
     it('%BF classifica por sexo — a mesma gordura não significa o mesmo nos dois', () => {
-        const homem = classifyBodyFat(15, 'M', 30)
-        const mulher = classifyBodyFat(15, 'F', 30)
-        expect(homem).toBeTruthy()
-        expect(mulher).toBeTruthy()
-        expect(homem).not.toBe(mulher)
+        // 15% aos 35: "Ideal" no homem, "Muito baixo" na mulher.
+        expect(classifyBodyFat(15, 'M', 35)).toBe('Ideal')
+        expect(classifyBodyFat(15, 'F', 35)).toBe('Muito baixo')
+    })
+
+    it('as três faixas etárias têm cortes próprios — envelhecer move a régua', () => {
+        // O MESMO %BF muda de rótulo conforme a idade: 12% é "Ideal" aos 25,
+        // "Baixo" aos 35 e "Muito baixo" aos 45. Tabela de referência, não opinião.
+        expect(classifyBodyFat(12, 'M', 25)).toBe('Ideal')
+        expect(classifyBodyFat(12, 'M', 35)).toBe('Baixo')
+        expect(classifyBodyFat(12, 'M', 45)).toBe('Muito baixo')
+        expect(classifyBodyFat(20, 'F', 25)).toBe('Ideal')
+        expect(classifyBodyFat(20, 'F', 35)).toBe('Baixo')
+        expect(classifyBodyFat(20, 'F', 45)).toBe('Baixo')
+    })
+
+    it('cobre as cinco faixas nos dois sexos, nas três idades', () => {
+        const esperado = ['Muito baixo', 'Baixo', 'Ideal', 'Elevado', 'Muito elevado']
+        for (const sexo of ['M', 'F'] as const) {
+            for (const idade of [25, 35, 45]) {
+                const vistos = new Set<string>()
+                for (let bf = 3; bf <= 60; bf += 0.5) vistos.add(classifyBodyFat(bf, sexo, idade))
+                expect([...vistos].sort(), `${sexo}/${idade}`).toEqual([...esperado].sort())
+            }
+        }
+    })
+
+    it('as fronteiras são exclusivas — o valor do corte já é a faixa de cima', () => {
+        // Homem 30–39: < 15 é "Baixo", 15 exato já é "Ideal".
+        expect(classifyBodyFat(14.9, 'M', 35)).toBe('Baixo')
+        expect(classifyBodyFat(15, 'M', 35)).toBe('Ideal')
     })
 })
 

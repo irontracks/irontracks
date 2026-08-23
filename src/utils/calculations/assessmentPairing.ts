@@ -209,7 +209,11 @@ export function resolveBodyFatFromPair(
 
   const skinfold = primarySkin ?? pairSkin ?? null
   const bia = primaryBia ?? pairBia ?? null
-  const fromPair = (skinfold === pairSkin && pairSkin != null) || (bia === pairBia && pairBia != null)
+  // `fromPair` = ALGUM valor veio do par. Comparar o resultado com o valor do
+  // par (`skinfold === pairSkin`) dava true por COINCIDÊNCIA quando os dois
+  // registros tinham o mesmo número — dizia "veio do par" sobre um dado do
+  // próprio registro. A pergunta certa é se o primário estava vazio.
+  const fromPair = (primarySkin == null && pairSkin != null) || (primaryBia == null && pairBia != null)
 
   return { skinfold, bia, fromPair }
 }
