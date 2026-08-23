@@ -249,6 +249,8 @@ export function AssessmentListItem({
     hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
     thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
     calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+    pectoral_skinfold: String(getSkinfoldMm(assessment, 'pectoral') || ''),
+    midaxillary_skinfold: String(getSkinfoldMm(assessment, 'midaxillary') || ''),
     triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
     biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
     subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),

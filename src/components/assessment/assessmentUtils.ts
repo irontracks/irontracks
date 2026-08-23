@@ -7,6 +7,7 @@
  */
 
 import { parseJsonWithSchema } from '@/utils/zod';
+import { JP7_SKINFOLD_FIELDS } from '@/utils/calculations/bodyComposition';
 import { z } from 'zod';
 
 // ─── Tipo base ────────────────────────────────────────────────────────────────
@@ -118,6 +119,8 @@ export const getSkinfoldMm = (assessment: AssessmentRow, key: string): number | 
     if (nested) return nested;
 
     const keyMap: Record<string, string> = {
+        pectoral: 'pectoral_skinfold',
+        midaxillary: 'midaxillary_skinfold',
         triceps: 'triceps_skinfold',
         biceps: 'biceps_skinfold',
         subscapular: 'subscapular_skinfold',
@@ -139,16 +142,17 @@ export const getSum7Mm = (assessment: AssessmentRow): number | null => {
     const stored = toPositiveNumberOrNull(assessment?.sum7 ?? measurements?.sum7);
     if (stored) return stored;
 
-    const t = Number(assessment?.triceps_skinfold) || 0;
-    const b = Number(assessment?.biceps_skinfold) || 0;
-    const s = Number(assessment?.subscapular_skinfold) || 0;
-    const si = Number(assessment?.suprailiac_skinfold) || 0;
-    const a = Number(assessment?.abdominal_skinfold) || 0;
-    const th = Number(assessment?.thigh_skinfold) || 0;
-    const c = Number(assessment?.calf_skinfold) || 0;
-
-    const sum = t + b + s + si + a + th + c;
-    return sum > 0 ? sum : null;
+    // As 7 do protocolo J&P — a mesma lista de `JP7_SKINFOLD_FIELDS`, e pelo
+    // mesmo motivo: até 23/08/2026 esta soma também trocava peitoral e axilar
+    // média por bíceps e panturrilha. `null` quando falta alguma: somar o que
+    // houver produzia um "sum7" que não era de sete dobras.
+    let sum = 0;
+    for (const field of JP7_SKINFOLD_FIELDS) {
+        const value = Number(assessment?.[field]);
+        if (!Number.isFinite(value) || value <= 0) return null;
+        sum += value;
+    }
+    return sum;
 };
 
 // ─── Utilitários de data e JSON ───────────────────────────────────────────────

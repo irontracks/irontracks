@@ -411,6 +411,8 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
               hip_circ: String(getMeasurementCm(a, 'hip') || ''),
               thigh_circ: String(getMeasurementCm(a, 'thigh') || ''),
               calf_circ: String(getMeasurementCm(a, 'calf') || ''),
+              pectoral_skinfold: String(getSkinfoldMm(a, 'pectoral') || ''),
+              midaxillary_skinfold: String(getSkinfoldMm(a, 'midaxillary') || ''),
               triceps_skinfold: String(getSkinfoldMm(a, 'triceps') || ''),
               biceps_skinfold: String(getSkinfoldMm(a, 'biceps') || ''),
               subscapular_skinfold: String(getSkinfoldMm(a, 'subscapular') || ''),

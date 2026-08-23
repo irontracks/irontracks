@@ -26,7 +26,11 @@ export interface Assessment {
   calf_circ_left?: number;
   calf_circ_right?: number;
 
-  // 7 Dobras Cutâneas (mm)
+  // Dobras cutâneas (mm) — as 7 do protocolo Jackson & Pollock + 2 complementares.
+  // A ORDEM aqui é a do protocolo; bíceps e panturrilha ficam no fim porque NÃO
+  // entram na equação (ver `JP7_SKINFOLD_FIELDS`), são acompanhamento.
+  pectoral_skinfold?: number; // peitoral — J&P
+  midaxillary_skinfold?: number; // axilar média — J&P
   triceps_skinfold?: number; // tricipital (média dos lados)
   triceps_skinfold_left?: number;
   triceps_skinfold_right?: number;
@@ -128,7 +132,9 @@ export interface AssessmentFormData {
   calf_circ_left: string;
   calf_circ_right: string;
 
-  // 7 Dobras Cutâneas (mm)
+  // Dobras cutâneas (mm) — 7 do protocolo J&P + 2 complementares (ver Assessment)
+  pectoral_skinfold: string;
+  midaxillary_skinfold: string;
   triceps_skinfold: string;
   triceps_skinfold_left: string;
   triceps_skinfold_right: string;

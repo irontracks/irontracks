@@ -2,7 +2,7 @@ import React from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
 import {
-  calculateSumSkinfolds,
+  sumSkinfoldsJP7,
   calculateBodyDensity,
   calculateBodyFatPercentage,
   calculateBMR,
@@ -46,6 +46,8 @@ export async function generateAssessmentPDF({
   assessmentDate,
 }: AssessmentPDFGeneratorProps): Promise<Blob> {
   // All 7 Pollock skinfolds — with bilateral averaging
+  const pectoral = Number(formData.pectoral_skinfold || 0)
+  const midaxillary = Number(formData.midaxillary_skinfold || 0)
   const triceps = avgBilateral(formData, 'triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right')
   const biceps = avgBilateral(formData, 'biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right')
   const subscapular = Number(formData.subscapular_skinfold || 0)
@@ -54,15 +56,15 @@ export async function generateAssessmentPDF({
   const thigh = avgBilateral(formData, 'thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right')
   const calf = avgBilateral(formData, 'calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right')
 
-  // Correct sum of ALL 7 skinfolds
-  const sum = calculateSumSkinfolds({
+  // As 7 do protocolo J&P — bíceps e panturrilha são complementares e não entram.
+  const sum = sumSkinfoldsJP7({
+    pectoral_skinfold: pectoral || undefined,
+    midaxillary_skinfold: midaxillary || undefined,
     triceps_skinfold: triceps || undefined,
-    biceps_skinfold: biceps || undefined,
     subscapular_skinfold: subscapular || undefined,
-    suprailiac_skinfold: suprailiac || undefined,
     abdominal_skinfold: abdominal || undefined,
+    suprailiac_skinfold: suprailiac || undefined,
     thigh_skinfold: thigh || undefined,
-    calf_skinfold: calf || undefined,
   })
 
   const age = Number(formData.age) || 0
@@ -72,7 +74,7 @@ export async function generateAssessmentPDF({
 
   // %BF do método de dobras — só se tiver os dados completos.
   let skinfoldBF: number | null = null;
-  if (sum > 0 && age > 0) {
+  if (sum != null && age > 0) {
     try {
       const density = calculateBodyDensity(sum, age, gender);
       skinfoldBF = calculateBodyFatPercentage(density);

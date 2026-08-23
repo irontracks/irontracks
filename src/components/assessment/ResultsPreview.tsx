@@ -4,7 +4,7 @@ import { Download, User, Ruler, Calculator, TrendingUp, FileText, Code, Activity
 import dynamic from 'next/dynamic';
 import { AssessmentFormData } from '@/types/assessment';
 import {
-  calculateSumSkinfolds,
+  sumSkinfoldsJP7,
   calculateBodyDensity,
   calculateBodyFatPercentage,
   calculateBMR,
@@ -45,24 +45,24 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
     };
 
     const tricepsAvg = avgBilateral('triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right');
-    const bicepsAvg = avgBilateral('biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right');
     const thighSkinAvg = avgBilateral('thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right');
-    const calfSkinAvg = avgBilateral('calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right');
 
-    const sumOfSkinfolds = calculateSumSkinfolds({
+    // As 7 do protocolo J&P. Bíceps e panturrilha são complementares e ficam
+    // FORA — entravam no lugar de peitoral e axilar média até 23/08/2026.
+    const sumOfSkinfolds = sumSkinfoldsJP7({
+      pectoral_skinfold: parseFloat(formData.pectoral_skinfold || '0'),
+      midaxillary_skinfold: parseFloat(formData.midaxillary_skinfold || '0'),
       triceps_skinfold: tricepsAvg,
-      biceps_skinfold: bicepsAvg,
       subscapular_skinfold: parseFloat(formData.subscapular_skinfold || '0'),
-      suprailiac_skinfold: parseFloat(formData.suprailiac_skinfold || '0'),
       abdominal_skinfold: parseFloat(formData.abdominal_skinfold || '0'),
+      suprailiac_skinfold: parseFloat(formData.suprailiac_skinfold || '0'),
       thigh_skinfold: thighSkinAvg,
-      calf_skinfold: calfSkinAvg
-    } as unknown as Parameters<typeof calculateSumSkinfolds>[0]);
+    });
 
     // %BF do método de dobras (Siri/Pollock) — só calcula se tiver as 7
     // dobras válidas; senão fica null (usuário pode estar usando só BIA).
     let skinfoldBF: number | null = null;
-    if (sumOfSkinfolds > 0 && age > 0) {
+    if (sumOfSkinfolds != null && age > 0) {
       try {
         const bodyDensity = calculateBodyDensity(sumOfSkinfolds, age, gender);
         skinfoldBF = calculateBodyFatPercentage(bodyDensity);
@@ -349,8 +349,14 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
             })}
           </div>
           <div className="mt-3 pt-3 border-t border-neutral-700 flex items-center justify-between">
+            {/* `null` = falta alguma das 7 do protocolo. Dizer "0,0 mm" ou somar
+                o que houver seria inventar um laudo — some o número e explica. */}
             <p className="text-xs text-neutral-400">
-              Soma das dobras: <span className="font-black text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
+              {results.bodyComposition.sumOfSkinfolds != null ? (
+                <>Soma das dobras: <span className="font-black text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span></>
+              ) : (
+                <>Preencha as 7 dobras do protocolo para calcular a gordura</>
+              )}
             </p>
             <p className="text-[10px] text-neutral-400">
               Pollock 7 dobras
