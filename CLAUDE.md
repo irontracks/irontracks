@@ -1833,6 +1833,70 @@ RPC respondeu 0 para quem tem treinos — aí o problema é o parse, não a auth
 e só muda quando um treino entra ou sai do histórico, então gravar o 0
 transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
 
+## Auditoria das ÁREAS DE CÁLCULO — 23/08/2026 (PRs #893–#900)
+
+As oito áreas que fazem conta no app: **volume/força** (`report/setVolume.ts`,
+fonte única) · **carga automática** (`utils/autoload/`) · **calorias**
+(`utils/calories/`) · **nutrição** (`lib/nutrition/goals.ts`) · **avaliação
+física** (`utils/calculations/bodyComposition.ts`) · **cardio** ·
+**métricas de relatório** (`report/reportMetrics.ts`) · **gamificação**
+(`ironRank`, streak, `pacing`).
+
+Estado ao fim: **99,67% de linhas, 97,4% de ramos**. O que sobra é guarda
+defensiva inatingível pela API (ver o commit do #900 — não gaste tempo tentando
+cobrir: exigiria violar invariante interno).
+
+### Dois bugs reais, os dois achados pelo BANCO e não pela leitura de código
+
+**1. Dobras: equação de Jackson & Pollock com as entradas de OUTRO protocolo.**
+`calculateBodyDensity` usa as constantes de J&P 7 dobras e a tela anuncia
+"Pollock 7 dobras" — mas a soma trocava **peitoral** e **axilar média** por
+**bíceps** e **panturrilha**. O que fechou o diagnóstico: as colunas
+`pectoral_skinfold`/`midaxillary_skinfold` **existem no banco**, 6 das 9
+avaliações as tinham preenchidas, e **nenhum código as lia** — era o formulário
+antigo, que media certo. Os `%BF` gravados por ele (16,82 e 7,07) batem com a
+soma correta. Erro medido: **1 a 1,9 ponto percentual**.
+Hoje: `JP7_SKINFOLD_FIELDS` + `sumSkinfoldsJP7` (que devolve **`null`** quando
+falta dobra — antes `?? 0` fazia ausente virar zero e o laudo saía com gordura
+MENOR). Bíceps e panturrilha continuam sendo medidos, rotulados como
+complementares, fora da equação.
+
+**2. Streak contava dia UTC.** As duas rotas (`social/leaderboard`,
+`social/profile`) bucketavam com `toISOString().slice(0,10)`; a Vercel roda em
+UTC, então treino às 22h no Brasil caía no dia seguinte. Medido antes de
+corrigir: **36 de 633 sessões (5,7%)** em dia divergente e **4 usuários** com a
+contagem errada (um perdeu 2 dias, outro ganhou 1). Mesmo defeito que o heatmap
+de nutrição já tinha — **a classe nunca tinha sido varrida**. Fonte única em
+`lib/social/streak.ts`; `utils/cron/dateBrt.ts` já existia e ninguém usava.
+
+### A chave do treino saía VAZIA nas duas pontas (#893)
+
+`mapWorkoutRow` grava o nome do treino em **`title`** (`title: String(workout.name)`)
+— o objeto da sessão **não tem `name`**. Os dois consumidores liam
+`workout?.name ?? session?.name ?? ''`: string vazia, sempre. Efeitos: o botão
+"Descarga do treino" ficava travado em DESLIGADA (com a lista de off vazia no
+banco, só chave vazia explica) **e a priorização do histórico POR TREINO no
+motor de carga nunca rodou** — `pickUsableHistory` só prioriza `if (wanted)`.
+Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
+
+### Duplicações unificadas
+
+- **BMR/TDEE** (Mifflin-St Jeor) estava escrito em `bodyComposition.ts` e
+  `nutrition/goals.ts`, com os mesmos coeficientes. Núcleo em
+  `lib/health/mifflinStJeor.ts`; as duas APIs de domínio seguem existindo
+  (assinaturas e erros diferentes servem a chamadores diferentes).
+- Havia **cinco** implementações da soma de dobras (duas mortas). Restou uma.
+
+### O que NÃO é bug (medido, para não reabrir)
+
+- `isValidPercent` (0–100) e `isPlausibleBodyFat` (3–75) divergem **de
+  propósito**: BIA digitada como "90" precisa APARECER na tela (para o usuário
+  ver que errou) e não pode entrar na média. Unificar quebra uma das metades.
+- Guardas de divisão por zero: varridas mecanicamente, **25 divisões por
+  variável, todas protegidas**.
+- Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
+  reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
+
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 
