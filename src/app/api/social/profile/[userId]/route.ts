@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { streakFromDates } from '@/lib/social/streak'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,25 +72,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ userId: 
       .order('date', { ascending: false })
       .limit(200)
 
-    // Calculate streak
-    const daySet = new Set<string>()
+    // Streak — fonte única (`lib/social/streak`). Esta rota tinha DOIS defeitos
+    // próprios: bucketava por dia UTC (treino às 22h no Brasil caía no dia
+    // seguinte) e contava a partir do dia mais recente do HISTÓRICO, fosse ele
+    // de ontem ou de seis meses atrás — quem parou em março seguia exibindo
+    // "streak de 12 dias". Sequência é o que chega até hoje (ou ontem).
     const rows = Array.isArray(recentWorkouts) ? recentWorkouts : []
-    rows.forEach((r) => {
-      try {
-        const d = r?.date ? new Date(String(r.date)) : null
-        if (!d || Number.isNaN(d.getTime())) return
-        daySet.add(d.toISOString().slice(0, 10))
-      } catch (e) { logWarn('social:profile', 'silenced', e) }
-    })
-    let streak = 0
-    if (daySet.size) {
-      const sorted = Array.from(daySet).sort().reverse()
-      let cursor = new Date(`${sorted[0]}T00:00:00.000Z`)
-      while (daySet.has(cursor.toISOString().slice(0, 10))) {
-        streak += 1
-        cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000)
-      }
-    }
+    const streak = streakFromDates(rows.map((r) => r?.date))
 
     // Workouts this week
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
