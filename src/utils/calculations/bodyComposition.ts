@@ -1,6 +1,6 @@
 // Funções de cálculo para composição corporal
 
-import { Assessment, CalculatedMetrics } from '@/types/assessment';
+import { Assessment } from '@/types/assessment';
 import { basalMetabolicRate, totalDailyEnergyExpenditure } from '@/lib/health/mifflinStJeor';
 
 /**
@@ -158,54 +158,6 @@ export const sumSkinfoldsJP7 = (assessment: Partial<Assessment>): number | null 
   return sum
 }
 
-/**
- * Calcula todos os métricos de composição corporal
- * @param assessment - Dados da avaliação
- * @returns Objeto com todos os cálculos
- */
-export const calculateAllMetrics = (assessment: Assessment): CalculatedMetrics => {
-  try {
-    // Validar dados necessários
-    if (!assessment.weight || !assessment.height || !assessment.age || !assessment.gender) {
-      throw new Error('Dados insuficientes para cálculo');
-    }
-
-    // Soma das 7 dobras do protocolo — `null` se faltar alguma (ver
-    // `sumSkinfoldsJP7`): melhor não entregar número que entregar um errado.
-    const sumSkinfolds = sumSkinfoldsJP7(assessment);
-    if (sumSkinfolds == null) {
-      throw new Error('Dobras incompletas: o protocolo exige as 7 medidas');
-    }
-
-    // Calcular densidade corporal
-    const bodyDensity = calculateBodyDensity(sumSkinfolds, assessment.age, assessment.gender);
-
-    // Calcular % gordura
-    const bodyFatPercentage = calculateBodyFatPercentage(bodyDensity);
-
-    // Calcular massa gorda
-    const fatMass = calculateFatMass(assessment.weight, bodyFatPercentage);
-
-    // Calcular massa magra
-    const leanMass = calculateLeanMass(assessment.weight, fatMass);
-
-    // Calcular IMC
-    const bmi = calculateBMI(assessment.weight, assessment.height);
-
-    return {
-      body_fat_percentage: Math.round(bodyFatPercentage * 100) / 100, // 2 casas decimais
-      lean_mass: Math.round(leanMass * 100) / 100,
-      fat_mass: Math.round(fatMass * 100) / 100,
-      bmr: 0, // Será calculado separadamente
-      bmi: Math.round(bmi * 100) / 100,
-      sum_skinfolds: Math.round(sumSkinfolds * 10) / 10, // 1 casa decimal
-      body_density: Math.round(bodyDensity * 1000000) / 1000000 // 6 casas decimais
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Erro no cálculo da composição corporal: ${msg}`);
-  }
-};
 
 /**
  * Avalia o percentual de gordura de acordo com tabelas de referência
@@ -292,91 +244,6 @@ export const calculateTDEE = (bmr: number, activityFactor: number): number => {
   return tdee;
 };
 
-/**
- * Calcula a diferença entre duas avaliações
- * @param current - Avaliação atual
- * @param previous - Avaliação anterior
- * @returns Diferenças entre as avaliações
- */
-export const calculateAssessmentDifference = (current: Assessment, previous: Assessment) => {
-  const differences = {
-    weight: current.weight - previous.weight,
-    body_fat_percentage: (current.body_fat_percentage || 0) - (previous.body_fat_percentage || 0),
-    lean_mass: (current.lean_mass || 0) - (previous.lean_mass || 0),
-    fat_mass: (current.fat_mass || 0) - (previous.fat_mass || 0),
-    bmi: (current.bmi || 0) - (previous.bmi || 0)
-  };
-
-  return differences;
-};
-
-/**
- * Valida se os valores de entrada são razoáveis
- * @param assessment - Dados da avaliação
- * @returns true se válido, false se inválido
- */
-export const validateAssessmentValues = (assessment: Partial<Assessment>): boolean => {
-  try {
-    // Validar ranges básicos
-    if (assessment.weight && (assessment.weight < 30 || assessment.weight > 300)) return false;
-    if (assessment.height && (assessment.height < 100 || assessment.height > 250)) return false;
-    if (assessment.age && (assessment.age < 10 || assessment.age > 100)) return false;
-
-    // Validar dobras
-    const skinfolds = [
-      assessment.triceps_skinfold,
-      assessment.biceps_skinfold,
-      assessment.subscapular_skinfold,
-      assessment.suprailiac_skinfold,
-      assessment.abdominal_skinfold,
-      assessment.thigh_skinfold,
-      assessment.calf_skinfold
-    ];
-
-    for (const skinfold of skinfolds) {
-      if (skinfold && (skinfold < 3 || skinfold > 50)) return false;
-    }
-
-    // Validar circunferências
-    const circumferences = [
-      assessment.arm_circ,
-      assessment.chest_circ,
-      assessment.waist_circ,
-      assessment.hip_circ,
-      assessment.thigh_circ,
-      assessment.calf_circ
-    ];
-
-    for (const circumference of circumferences) {
-      if (circumference && (circumference < 10 || circumference > 200)) return false;
-    }
-
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Formata valores para exibição
- * @param value - Valor numérico
- * @param decimals - Número de casas decimais
- * @returns String formatada
- */
-export const formatMetric = (value: number | null | undefined, decimals: number = 1): string => {
-  if (value === null || value === undefined) return '—';
-  return value.toFixed(decimals);
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Skinfold + BIA reconciliation
-//
-// Many users record both a 7-skinfold (Siri/Pollock) reading and a
-// bioimpedance reading from a scale. Each technique has well-known biases
-// (skinfolds underestimate in lean subjects, BIA fluctuates with hydration),
-// so the most useful "single number" to surface long-term is the simple
-// arithmetic mean of the two when both are available.
-//
 // We deliberately do NOT weight one over the other (option B in the product
 // spec): the UI shows the three readings side by side and lets the user
 // reason about the discrepancy themselves.
