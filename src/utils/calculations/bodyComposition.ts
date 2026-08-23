@@ -113,23 +113,49 @@ export const classifyBMI = (bmi: number): string => {
 };
 
 /**
- * Calcula a soma das 7 dobras cutâneas
- * @param assessment - Objeto com as dobras
- * @returns Soma das dobras em mm
+ * As SETE dobras do protocolo Jackson & Pollock — as que a equação de
+ * `calculateBodyDensity` foi derivada para receber.
+ *
+ * ⚠️ Auditoria de 23/08/2026: o app somava OUTRO conjunto — trocava **peitoral**
+ * e **axilar média** por **bíceps** e **panturrilha** — enquanto usava as
+ * constantes de J&P e anunciava "Pollock 7 dobras" na tela. Equação de um
+ * protocolo com as entradas de outro não devolve o número de nenhum dos dois.
+ * Medido nos casos reais do banco: 1 a 1,9 ponto percentual de gordura.
+ *
+ * As colunas `pectoral_skinfold`/`midaxillary_skinfold` já existiam no banco e
+ * estavam preenchidas em 6 das 9 avaliações — nenhum código as lia. Era o
+ * formulário antigo, que media o protocolo certo.
  */
-export const calculateSumSkinfolds = (assessment: Partial<Assessment>): number => {
-  const skinfolds = [
-    assessment.triceps_skinfold,
-    assessment.biceps_skinfold,
-    assessment.subscapular_skinfold,
-    assessment.suprailiac_skinfold,
-    assessment.abdominal_skinfold,
-    assessment.thigh_skinfold,
-    assessment.calf_skinfold
-  ];
+export const JP7_SKINFOLD_FIELDS = [
+  'pectoral_skinfold',
+  'midaxillary_skinfold',
+  'triceps_skinfold',
+  'subscapular_skinfold',
+  'abdominal_skinfold',
+  'suprailiac_skinfold',
+  'thigh_skinfold',
+] as const satisfies ReadonlyArray<keyof Assessment>
 
-  return skinfolds.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-};
+/**
+ * Soma das 7 dobras do protocolo. **`null` quando falta alguma.**
+ *
+ * O `null` é a segunda metade da correção e vale por si: a versão anterior
+ * somava com `?? 0`, então dobra ausente entrava como zero — a soma caía, a
+ * densidade subia e o laudo saía com gordura MENOR do que a real, sem nenhum
+ * aviso. Medir seis dobras e receber um número que finge ser de sete é pior que
+ * não receber número nenhum: o app já sabe conviver com isso (quem só tem BIA
+ * segue pela BIA).
+ */
+export const sumSkinfoldsJP7 = (assessment: Partial<Assessment>): number | null => {
+  let sum = 0
+  for (const field of JP7_SKINFOLD_FIELDS) {
+    const raw = assessment[field]
+    const value = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(value) || value <= 0) return null
+    sum += value
+  }
+  return sum
+}
 
 /**
  * Calcula todos os métricos de composição corporal
@@ -143,8 +169,12 @@ export const calculateAllMetrics = (assessment: Assessment): CalculatedMetrics =
       throw new Error('Dados insuficientes para cálculo');
     }
 
-    // Calcular soma das dobras
-    const sumSkinfolds = calculateSumSkinfolds(assessment);
+    // Soma das 7 dobras do protocolo — `null` se faltar alguma (ver
+    // `sumSkinfoldsJP7`): melhor não entregar número que entregar um errado.
+    const sumSkinfolds = sumSkinfoldsJP7(assessment);
+    if (sumSkinfolds == null) {
+      throw new Error('Dobras incompletas: o protocolo exige as 7 medidas');
+    }
 
     // Calcular densidade corporal
     const bodyDensity = calculateBodyDensity(sumSkinfolds, assessment.age, assessment.gender);
@@ -336,37 +366,6 @@ export const validateAssessmentValues = (assessment: Partial<Assessment>): boole
 export const formatMetric = (value: number | null | undefined, decimals: number = 1): string => {
   if (value === null || value === undefined) return '—';
   return value.toFixed(decimals);
-};
-
-/**
- * Calcula a soma das dobras cutâneas com validação
- * @param assessment - Dados da avaliação
- * @returns Soma das dobras ou null se não houver dados suficientes
- */
-export const safeCalculateSumSkinfolds = (assessment: Partial<Assessment>): number | null => {
-  try {
-    const skinfolds = [
-      assessment.triceps_skinfold,
-      assessment.biceps_skinfold,
-      assessment.subscapular_skinfold,
-      assessment.suprailiac_skinfold,
-      assessment.abdominal_skinfold,
-      assessment.thigh_skinfold,
-      assessment.calf_skinfold
-    ];
-
-    // Verificar se tem pelo menos 4 dobras para um cálculo válido
-    const validSkinfolds = skinfolds.filter(s => s !== null && s !== undefined && s > 0) as number[];
-
-    // Pollock 7-fold formula requires ALL 7 skinfolds — partial sums produce incorrect body fat %
-    if (validSkinfolds.length < 7) {
-      return null;
-    }
-
-    return validSkinfolds.reduce((sum, value) => sum + value, 0);
-  } catch {
-    return null;
-  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

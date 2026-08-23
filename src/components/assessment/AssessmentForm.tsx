@@ -107,6 +107,8 @@ const buildDefaultFormData = (): AssessmentFormData => ({
   triceps_skinfold: '',
   triceps_skinfold_left: '',
   triceps_skinfold_right: '',
+  pectoral_skinfold: '',
+  midaxillary_skinfold: '',
   biceps_skinfold: '',
   biceps_skinfold_left: '',
   biceps_skinfold_right: '',
@@ -337,7 +339,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
 
       case 'skinfolds':
         // Validação opcional para dobras, mas verificar formato se preenchido
-        const skinfolds = ['triceps_skinfold', 'biceps_skinfold', 'subscapular_skinfold', 
+        const skinfolds = ['pectoral_skinfold', 'midaxillary_skinfold', 'triceps_skinfold', 'biceps_skinfold', 'subscapular_skinfold', 
                           'suprailiac_skinfold', 'abdominal_skinfold', 'thigh_skinfold', 'calf_skinfold'];
         skinfolds.forEach(field => {
           const value = formData[field as keyof AssessmentFormData];

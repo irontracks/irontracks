@@ -20,6 +20,8 @@ interface SkinfoldDef {
   location: string;
   placeholder: string;
   bilateral?: { left: SkinField; right: SkinField };
+  /** Medida de acompanhamento — fora da equação de J&P. */
+  complementary?: boolean;
 }
 
 export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
@@ -33,7 +35,25 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
     updateFormData({ [field]: cleanedValue });
   };
 
+  // ORDEM = protocolo Jackson & Pollock (as 7 que entram na equação), e só
+  // depois as complementares. Até 23/08/2026 o app media bíceps e panturrilha
+  // NO LUGAR de peitoral e axilar média, e mesmo assim aplicava as constantes de
+  // J&P — o laudo saía com 1 a 1,9 ponto percentual de gordura a menos.
   const skinfolds: SkinfoldDef[] = [
+    {
+      field: 'pectoral_skinfold',
+      label: 'Peitoral',
+      description: 'Dobra diagonal entre a linha axilar anterior e o mamilo — no homem, no ponto médio; na mulher, a 1/3 da axila',
+      location: 'Tórax',
+      placeholder: 'Ex: 10.0',
+    },
+    {
+      field: 'midaxillary_skinfold',
+      label: 'Axilar média',
+      description: 'Dobra vertical na linha axilar média, na altura do apêndice xifoide (base do esterno)',
+      location: 'Tronco',
+      placeholder: 'Ex: 9.0',
+    },
     {
       field: 'triceps_skinfold',
       label: 'Tricipital',
@@ -41,14 +61,6 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       location: 'Braço',
       placeholder: 'Ex: 12.5',
       bilateral: { left: 'triceps_skinfold_left', right: 'triceps_skinfold_right' },
-    },
-    {
-      field: 'biceps_skinfold',
-      label: 'Bicipital',
-      description: 'Dobra vertical na parte anterior do braço, sobre o músculo bíceps',
-      location: 'Braço',
-      placeholder: 'Ex: 8.0',
-      bilateral: { left: 'biceps_skinfold_left', right: 'biceps_skinfold_right' },
     },
     {
       field: 'subscapular_skinfold',
@@ -80,12 +92,22 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       bilateral: { left: 'thigh_skinfold_left', right: 'thigh_skinfold_right' },
     },
     {
+      field: 'biceps_skinfold',
+      label: 'Bicipital',
+      description: 'Complementar — não entra no cálculo de gordura, serve para acompanhar o braço ao longo do tempo',
+      location: 'Braço',
+      placeholder: 'Ex: 8.0',
+      bilateral: { left: 'biceps_skinfold_left', right: 'biceps_skinfold_right' },
+      complementary: true,
+    },
+    {
       field: 'calf_skinfold',
       label: 'Panturrilha',
-      description: 'Dobra vertical na panturrilha, no ponto de maior circunferência',
+      description: 'Complementar — não entra no cálculo de gordura, serve para acompanhar a perna ao longo do tempo',
       location: 'Panturrilha',
       placeholder: 'Ex: 15.5',
       bilateral: { left: 'calf_skinfold_left', right: 'calf_skinfold_right' },
+      complementary: true,
     }
   ];
 

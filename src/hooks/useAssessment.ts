@@ -27,7 +27,7 @@ import {
   calculateFatMass,
   calculateLeanMass,
   calculateBodyDensity,
-  calculateSumSkinfolds,
+  sumSkinfoldsJP7,
   combinedBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { tryAutoPair } from '@/utils/calculations/assessmentPairing';
@@ -247,6 +247,8 @@ export const useAssessment = (): UseAssessmentReturn => {
       calf_circ: toNumberOrUndefined(row.calf_circ ?? row.calf),
 
       // Dobras (com fallback para schema antigo)
+      pectoral_skinfold: toNumberOrUndefined(row.pectoral_skinfold ?? row.pectoral),
+      midaxillary_skinfold: toNumberOrUndefined(row.midaxillary_skinfold ?? row.midaxillary),
       triceps_skinfold: toNumberOrUndefined(row.triceps_skinfold ?? row.triceps),
       biceps_skinfold: toNumberOrUndefined(row.biceps_skinfold ?? row.biceps),
       subscapular_skinfold: toNumberOrUndefined(row.subscapular_skinfold ?? row.subscapular),
@@ -374,18 +376,18 @@ export const useAssessment = (): UseAssessmentReturn => {
     // Calcular métricas das dobras (Siri/Pollock). Antes lançava erro quando
     // o usuário não preenchia dobras suficientes; agora trata isso como
     // "esse método não foi usado" e delega para a BIA (ou fica vazio).
-    const sumSkinfolds = calculateSumSkinfolds({
+    const sumSkinfolds = sumSkinfoldsJP7({
+      pectoral_skinfold: parseNumberInput(data.pectoral_skinfold) ?? undefined,
+      midaxillary_skinfold: parseNumberInput(data.midaxillary_skinfold) ?? undefined,
       triceps_skinfold: triceps ?? undefined,
-      biceps_skinfold: biceps ?? undefined,
       subscapular_skinfold: subscapular ?? undefined,
-      suprailiac_skinfold: suprailiac ?? undefined,
       abdominal_skinfold: abdominal ?? undefined,
+      suprailiac_skinfold: suprailiac ?? undefined,
       thigh_skinfold: thighSkin ?? undefined,
-      calf_skinfold: calfSkin ?? undefined,
     });
 
     let bodyFatSkinfold: number | null = null;
-    if (sumSkinfolds > 0 && age > 0) {
+    if (sumSkinfolds != null && age > 0) {
       try {
         const bodyDensity = calculateBodyDensity(sumSkinfolds, age, gender);
         bodyFatSkinfold = calculateBodyFatPercentage(bodyDensity);
@@ -451,6 +453,8 @@ export const useAssessment = (): UseAssessmentReturn => {
       calf_circ_right: parseNumberInput(data.calf_circ_right) ?? undefined,
 
       // Dobras (médias bilaterais)
+      pectoral_skinfold: parseNumberInput(data.pectoral_skinfold) ?? undefined,
+      midaxillary_skinfold: parseNumberInput(data.midaxillary_skinfold) ?? undefined,
       triceps_skinfold: triceps ?? undefined,
       triceps_skinfold_left: parseNumberInput(data.triceps_skinfold_left) ?? undefined,
       triceps_skinfold_right: parseNumberInput(data.triceps_skinfold_right) ?? undefined,
