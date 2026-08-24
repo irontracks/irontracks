@@ -6,6 +6,27 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# ⚠️ O E2E logado usa UMA conta real e compartilhada (`djmkbrasil`), e a sessão
+# de treino em andamento vive no SERVIDOR (`active_workout_sessions`) — não no
+# navegador. Dois runs ao mesmo tempo brigam pela mesma linha: um deles chama
+# `descartarSessao()` na sessão que o outro acabou de abrir, e o perdedor cai
+# em "a lista de treinos precisa ter ao menos um card", sem nada a ver com o
+# diff que está sendo testado.
+#
+# Não é hipótese — foi medido em 24/08/2026, no PR #909, com precisão de
+# segundos: o E2E do run que passou ocupou 16:37:42→16:38:11 e o do run que
+# falhou 16:37:54→16:40:13. **17 segundos de sobreposição**, e a sessão ativa
+# nasceu 16:37:58, dentro deles. Eram dois commits da MESMA branch (o código e,
+# dois minutos depois, um commit só de documentação): sem esta trava, o push
+# seguinte não cancela o run anterior e os dois disputam a conta.
+#
+# `cancel-in-progress: true` é o que impede a sobreposição — o run obsoleto
+# morre quando chega um commit novo na mesma ref. Efeito colateral bem-vindo:
+# deixa de gastar minutos de runner testando um commit que já foi substituído.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-check:
     runs-on: ubuntu-latest

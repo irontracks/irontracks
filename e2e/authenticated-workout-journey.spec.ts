@@ -131,7 +131,20 @@ test.describe('Jornada do treino (UI autenticada)', () => {
     // Jornada tem mais passos que um teste de unidade: iniciar sessão (que
     // carrega o bootstrap), abrir editor, adicionar exercício, digitar tecla a
     // tecla. Os 30 s padrão do projeto estouram no caso mais longo.
-    test.describe.configure({ timeout: 90_000 })
+    //
+    // `mode: 'default'` NÃO é redundante — o config tem `fullyParallel: true`,
+    // que faz os testes DESTE arquivo rodarem concorrentes em `workers: 2`. E
+    // eles não podem: os quatro disputam a MESMA conta e a MESMA linha de
+    // `active_workout_sessions`, que é sincronizada pelo servidor. Dois casos
+    // em voo significam um chamando `descartarSessao()` na sessão que o outro
+    // acabou de abrir.
+    //
+    // 'default' e não 'serial': os dois rodam em ordem num worker só, mas o
+    // 'serial' PULA os casos seguintes quando um falha — esconderia um segundo
+    // defeito atrás do primeiro, e este spec existe justamente porque bug de
+    // jornada passa despercebido. Com 'default', cada caso é retentado por
+    // conta própria.
+    test.describe.configure({ mode: 'default', timeout: 90_000 })
 
     // VIEWPORT MOBILE — não é detalhe: o app é usado no celular, e um dos bugs
     // (a barra do descanso cobrindo o FINALIZAR) SÓ existe aqui. No desktop a
