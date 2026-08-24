@@ -458,7 +458,15 @@ export function useStoryComposer({
             }
             const img = new Image()
             img.crossOrigin = 'anonymous'
-            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url })
+            // `reject` direto no `onerror` entrega o EVENTO, não um Error: vira
+            // "Event (type=error) captured as promise rejection" no Sentry, sem
+            // stack e sem dizer o que falhou. Guard:
+            // `__tests__/promiseNuncaRejeitaComEvento.test.ts`.
+            await new Promise((resolve, reject) => {
+                img.onload = resolve
+                img.onerror = () => reject(new Error('story_background_image_failed'))
+                img.src = url
+            })
             if (!open) return
             if (mediaLoadIdRef.current !== loadId) return
             setBackgroundImage(img)

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
 import { classifyError, hashString } from '@/utils/errorClassification';
 import { getErrorMessage } from '@/utils/errorMessage';
+import { describeDomEvent, domEventUserMessage } from '@/utils/domEventError';
 
 const getAppVersion = () => {
   try {
@@ -85,7 +86,19 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
     if (inFlightRef.current) return;
 
     const { url, pathname, userAgent } = getContextSnapshot();
-    const message = getErrorMessage(error);
+
+    // Promise rejeitada com um DOM Event (`img.onerror`, `<video>`, FileReader):
+    // `getErrorMessage` cai em `String(error)` e o usuário via um modal escrito
+    // "[object Event]" — que não diz nada e treina a fechar aviso sem ler.
+    // Aconteceu em produção (24/08/2026, iPhone). Quando dá para nomear o
+    // recurso, a mensagem vira útil; quando não dá, o app não incomoda —
+    // **o Sentry continua recebendo** pelo handler global do SDK, hoje com o
+    // alvo no título (`utils/sentryDomEvent.ts`), então não há saída silenciosa.
+    const domEvent = describeDomEvent(error);
+    const domEventMessage = domEvent ? domEventUserMessage(domEvent) : '';
+    if (domEvent && !domEventMessage) return;
+
+    const message = domEventMessage || getErrorMessage(error);
 
     // Skip known Capacitor plugin errors — expected on web/simulator
     if (/plugin is not implemented/i.test(message) || /not available/i.test(message) && /capacitor/i.test(String(getErrorStack(error)))) {

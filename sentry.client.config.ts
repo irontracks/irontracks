@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs"
 import { isNoiseByName, isNoiseException } from "@/utils/sentryFilters"
 import { scrubSentryEvent } from "@/utils/sentryScrub"
+import { enrichDomEventRejection } from "@/utils/sentryDomEvent"
 
 // Detect Capacitor native WebView inline (sem import — Sentry init roda muito cedo).
 // Em mobile native, Sentry tracing duplica spans que já cobrimos via crash reports
@@ -68,6 +69,12 @@ Sentry.init({
         if (isNoiseException(val.type, val.value)) return null
       }
     }
+
+    // Promise rejeitada com um DOM Event (`img.onerror`, `<video>`, FileReader):
+    // o SDK titula "Event `Event` (type=error) captured as promise rejection",
+    // sem stack e sem dizer o que falhou. Aqui o alvo do evento vira título e
+    // agrupamento — senão o issue chega ilegível, como chegou em 24/08/2026.
+    enrichDomEventRejection(event, err)
 
     // Redige tokens/segredos (mensagens + variáveis locais) antes de enviar (LGPD).
     return scrubSentryEvent(event)
