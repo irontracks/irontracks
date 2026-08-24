@@ -290,9 +290,11 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                 if (!ctx) throw new Error('canvas_unsupported');
                 const img = new window.Image();
 
+                // Rejeitar com o próprio evento entrega ao Sentry um "Event
+                // (type=error) captured as promise rejection", ilegível.
                 await new Promise((resolve, reject) => {
                     img.onload = resolve;
-                    img.onerror = reject;
+                    img.onerror = () => reject(new Error('story_preview_image_failed'));
                     img.src = previewUrl;
                 });
 

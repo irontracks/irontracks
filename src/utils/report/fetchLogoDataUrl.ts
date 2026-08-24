@@ -18,7 +18,10 @@ export async function fetchLogoDataUrl(): Promise<string | null> {
         _cachedLogoDataUrl = result
         resolve(result)
       }
-      reader.onerror = reject
+      // O `catch` acima NÃO alcança esta rejeição (a Promise é retornada), e
+      // `reader.onerror` entrega um ProgressEvent — que no Sentry vira "Event
+      // (type=error) captured as promise rejection", sem stack.
+      reader.onerror = () => reject(new Error('logo_reader_failed'))
       reader.readAsDataURL(blob)
     })
   } catch {

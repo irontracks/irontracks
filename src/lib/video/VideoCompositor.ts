@@ -276,7 +276,13 @@ export class VideoCompositor {
                     reject(e);
                 }
             };
-            this.recorder.onerror = (e) => reject(e);
+            // O evento do MediaRecorder carrega o erro em `.error`; repassar o
+            // EVENTO cru vira "Event (type=error) captured as promise rejection"
+            // no Sentry — sem stack e sem dizer o que falhou.
+            this.recorder.onerror = (e) => {
+                const inner = (e as unknown as { error?: unknown })?.error;
+                reject(inner instanceof Error ? inner : new Error('media_recorder_failed'));
+            };
         });
 
         // Now we can set the time and wait for it to be ready
