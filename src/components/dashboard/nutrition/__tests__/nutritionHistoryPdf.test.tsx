@@ -24,13 +24,29 @@ const resposta = {
   error: null as unknown,
 }
 
+// O mock precisa distinguir a TABELA: `nutrition_day_flags` e
+// `nutrition_meal_entries` têm a mesma cadeia de chamadas
+// (select→eq→gte→lte), então um mock que ignora o nome devolve as refeições
+// como se fossem marcas de "dia incompleto" — e todos os dias somem da média.
 vi.mock('@/utils/supabase/client', () => ({
   createClient: () => ({
-    from: () => ({
+    from: (tabela: string) => ({
       select: (...args: unknown[]) => {
         selectSpy(...args)
-        return { eq: () => ({ gte: (_c: string, ini: string) => ({ lte: (_c2: string, fim: string) => { intervalos.push([ini, fim]); return Promise.resolve(resposta) } }) }) }
+        return {
+          eq: () => ({
+            gte: (_c: string, ini: string) => ({
+              lte: (_c2: string, fim: string) => {
+                if (tabela === 'nutrition_day_flags') return Promise.resolve(marcasResposta)
+                intervalos.push([ini, fim])
+                return Promise.resolve(resposta)
+              },
+            }),
+          }),
+        }
       },
+      insert: (linha: unknown) => { escritas.push(['insert', linha]); return Promise.resolve({ error: falharEscrita ? { message: 'recusado' } : null }) },
+      delete: () => ({ eq: () => ({ eq: (_c: string, date: string) => { escritas.push(['delete', date]); return Promise.resolve({ error: falharEscrita ? { message: 'recusado' } : null }) } }) }),
     }),
   }),
 }))
@@ -41,6 +57,12 @@ vi.mock('@/utils/report/exportHtmlAsPdf', () => ({
 }))
 
 let intervalos: Array<[string, string]> = []
+/** O que o hook de marcas encontra no banco. Vazio por padrão. */
+let marcasResposta: { data: unknown[]; error: unknown } = { data: [], error: null }
+/** Escritas em `nutrition_day_flags`, para provar marcar/desmarcar. */
+let escritas: Array<[string, unknown]> = []
+/** Liga a recusa do banco na próxima escrita, para provar o desfazer. */
+let falharEscrita = false
 const HOJE = '2026-08-24'
 
 const abrir = (props: Partial<React.ComponentProps<typeof NutritionHistoryModal>> = {}) =>
@@ -58,6 +80,9 @@ const abrir = (props: Partial<React.ComponentProps<typeof NutritionHistoryModal>
 
 beforeEach(() => {
   intervalos = []
+  marcasResposta = { data: [], error: null }
+  escritas = []
+  falharEscrita = false
   selectSpy.mockClear()
   exportSpy.mockClear()
 })
@@ -213,6 +238,71 @@ describe('o documento não repete o mesmo fato', () => {
     const { html } = exportSpy.mock.calls[0][0] as { html: string }
     expect(html).toContain('Últimos 30 dias')
     expect(html).toContain('26/07/2026 a 24/08/2026')
+  })
+})
+
+describe('dia marcado como registro incompleto', () => {
+  /**
+   * O caso real que originou a feature: 22/08 tem 580 kcal e UMA refeição, e
+   * entrava na média como se fosse um dia inteiro. Na base do dono eram 11 dos
+   * 68 dias, e a média ia de 2.199 para 2.493.
+   */
+  it('marcar tira o dia da média e a tela DIZ que tirou', async () => {
+    abrir()
+    await esperarLista()
+    // (3075 + 580 + 1495) / 3 = 1717
+    expect(screen.getByText('1717')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Tirar .*22 de ago.* da média/i }))
+
+    // (3075 + 1495) / 2 = 2285 — e o denominador cai para 2.
+    await waitFor(() => expect(screen.getByText('2285')).toBeInTheDocument())
+    expect(screen.getByText(/2 de 30 dias com lançamento · 1 fora da média/)).toBeInTheDocument()
+  })
+
+  it('grava a marca no banco, e desmarcar apaga', async () => {
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /Tirar .*22 de ago.* da média/i }))
+    await waitFor(() => expect(escritas).toHaveLength(1))
+    expect(escritas[0][0]).toBe('insert')
+
+    fireEvent.click(screen.getByRole('button', { name: /Voltar .*22 de ago.* para a média/i }))
+    await waitFor(() => expect(escritas).toHaveLength(2))
+    expect(escritas[1]).toEqual(['delete', '2026-08-22'])
+  })
+
+  it('o dia marcado no banco já nasce fora da média ao abrir', async () => {
+    marcasResposta = { data: [{ date: '2026-08-22' }], error: null }
+    abrir()
+    await waitFor(() => expect(screen.getByText(/2 de 30 dias com lançamento · 1 fora da média/)).toBeInTheDocument())
+    expect(screen.getByText('2285')).toBeInTheDocument()
+  })
+
+  it('o PDF mostra o dia na tabela mas fora do total, e EXPLICA', async () => {
+    // Sumir com a linha esconderia do profissional que houve lançamento; deixar
+    // sem aviso faria a soma da coluna não bater com o rodapé.
+    marcasResposta = { data: [{ date: '2026-08-22' }], error: null }
+    abrir()
+    await waitFor(() => expect(screen.getByText(/1 fora da média/)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const { html } = exportSpy.mock.calls[0][0] as { html: string }
+
+    expect(html).toContain('580')                       // a linha continua lá
+    expect(html).toContain('fora da média')             // rotulada
+    expect(html).toMatch(/não entram<\/strong> nas médias/) // e explicada
+    expect(html).toContain('4.570')                     // total = 3075 + 1495
+  })
+
+  it('falha ao gravar DESFAZ a marca — média nunca fica sobre algo não salvo', async () => {
+    abrir()
+    await esperarLista()
+    falharEscrita = true
+    fireEvent.click(screen.getByRole('button', { name: /Tirar .*22 de ago.* da média/i }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/não consegui salvar/i))
+    // Voltou para os 3 dias: a média é de novo 1717.
+    expect(screen.getByText('1717')).toBeInTheDocument()
   })
 })
 

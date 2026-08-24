@@ -37,6 +37,15 @@ export type NutritionPeriodReportInput = {
   logoDataUrl?: string | null
   /** Data de emissão (YYYY-MM-DD). Injetada pelo chamador — nada de relógio aqui dentro. */
   emitidoEm: string
+  /**
+   * Dias que o usuário marcou como registro incompleto.
+   *
+   * Continuam NA TABELA, esmaecidos e rotulados — some-los esconderia do
+   * profissional que houve lançamento naquele dia. O que eles não fazem é
+   * entrar nas médias e no total, e a nota diz isso: sem o aviso, quem somasse
+   * a coluna não bateria com o rodapé e concluiria que a conta está errada.
+   */
+  excluidos?: ReadonlySet<string> | null
 }
 
 const inteiro = (n: unknown): string => {
@@ -56,7 +65,7 @@ const rotuloDiaLongo = (date: string): string => {
 }
 
 export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): string {
-  const { periodo, dias, resumo, metaKcal, nome, logoDataUrl, emitidoEm } = input
+  const { periodo, dias, resumo, metaKcal, nome, logoDataUrl, emitidoEm, excluidos } = input
   const lista = Array.isArray(dias) ? dias : []
 
   const titulo = `Nutrição — ${rotuloPeriodo(periodo)}`
@@ -80,15 +89,18 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
   // com o total do período diria "você comeu 45.000 de 2.600".
   const difMeta = temMeta ? resumo.avgCalories - Math.round(meta) : 0
 
-  const linhas = lista.map((d) => `
-        <tr>
-          <td class="dia">${escapeHtml(rotuloDiaLongo(d.date))}</td>
+  const linhas = lista.map((d) => {
+    const fora = !!excluidos?.has(d.date)
+    return `
+        <tr${fora ? ' class="fora"' : ''}>
+          <td class="dia">${escapeHtml(rotuloDiaLongo(d.date))}${fora ? ' <span class="tag">fora da média</span>' : ''}</td>
           <td class="num forte">${inteiro(d.calories)}</td>
           <td class="num">${inteiro(d.protein)} g</td>
           <td class="num">${inteiro(d.carbs)} g</td>
           <td class="num">${inteiro(d.fat)} g</td>
           <td class="num suave">${inteiro(d.meals)}</td>
-        </tr>`).join('')
+        </tr>`
+  }).join('')
 
   const corpoTabela = lista.length
     ? linhas
@@ -130,6 +142,9 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
   td.suave{color:#6b7280}
   td.vazio{color:#6b7280;text-align:center;padding:18px}
   tfoot td{background:#fafafa;font-weight:900;border-top:1px solid #e5e7eb}
+  tr.fora td{color:#9ca3af;background:#fcfcfd}
+  tr.fora td.dia,tr.fora td.forte{font-weight:700;color:#9ca3af}
+  .tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border:1px solid #e5e7eb;border-radius:999px;padding:1px 6px;margin-left:6px;vertical-align:middle}
   .rodape{margin-top:18px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;font-weight:700}
 </style>
 </head>
@@ -177,6 +192,8 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
       ${inteiro(resumo.loggedDays)} de ${inteiro(resumo.windowDays)} dias com lançamento.
       As médias dividem pelos dias <strong>registrados</strong> — dias sem lançamento não entram
       como zero, para não rebaixar a média com refeições que apenas não foram anotadas.
+      ${resumo.excludedDays > 0 ? `<br /><strong>${inteiro(resumo.excludedDays)}</strong> dia(s) marcado(s) como registro incompleto aparecem na tabela
+      mas <strong>não entram</strong> nas médias nem no total — por isso a soma da coluna é maior que o total do período.` : ''}
     </p>
 
     <div class="section-title">Dia a dia</div>

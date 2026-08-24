@@ -144,6 +144,11 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   nutrition_custom_foods: { mechanism: 'cascade', export: own(['user_id']) },
   nutrition_favorite_meals: { mechanism: 'cascade', export: own(['user_id']) },
   daily_nutrition_logs: { mechanism: 'cascade', export: own(['user_id'], 20000) },
+  // Marcas de "registro incompleto" (24/08/2026). Cascateia pela FK para
+  // auth.users; entra no export porque é escolha declarada do usuário sobre
+  // os próprios dados — sem ela, o export explicaria mal por que a média do
+  // app difere da soma dos dias exportados.
+  nutrition_day_flags: { mechanism: 'cascade', export: own(['user_id']) },
   student_diet_plans: { mechanism: 'manual', ownerCols: ['user_id'], export: own(['user_id']) },
 
   // ── Avaliações e saúde ─────────────────────────────────────────────────────

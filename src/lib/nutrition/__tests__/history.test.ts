@@ -66,7 +66,8 @@ describe('summarizeHistory', () => {
 
   it('janela sem nenhum lançamento não inventa média nem total', () => {
     expect(summarizeHistory([], 7)).toEqual({
-      loggedDays: 0, windowDays: 7,
+      loggedDays: 0,
+      excludedDays: 0, windowDays: 7,
       avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0,
       totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
     })
