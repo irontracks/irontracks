@@ -118,6 +118,34 @@ o insight. Guard de FIAÇÃO em `periodReportExport.test.tsx` — ele anda pelo 
 e lê o HTML que chegou ao exportador, porque `buildPeriodSessionDetails` e
 `buildPeriodReportHtml` passam verdes isoladamente com o botão morto.
 
+**Dia de "registro incompleto" (`nutrition_day_flags`, 24/08/2026) — a marca é
+do USUÁRIO, o app só sugere.** Um dia em que a pessoa lançou só o café entrava
+inteiro na média. Medido na conta do dono, 68 dias: dias com 3+ refeições somam
+**2.544 kcal**, os de 1 refeição, **970** — a média exibida era 2.199 contra
+2.544 dos dias bem registrados, ~14% de erro num número que vai para o
+nutricionista. Marcar é INSERT, desmarcar é DELETE (a tabela não tem UPDATE);
+`summarizeHistory` recebe o conjunto e tira os dias da média **e do
+denominador**, devolvendo `excludedDays` para a tela DIZER que excluiu.
+
+⚠️ **Não transforme isso em automático.** Em fase de CUT um dia de 1.200 kcal
+pode ser o plano; excluí-lo sozinho apagaria dado verdadeiro e empurraria a
+média para CIMA — erro na direção oposta, e invisível.
+
+**A heurística de sugestão (`lib/nutrition/incompleteDay.ts`) exige as DUAS
+condições, e cada uma sozinha erra num caso REAL da base** (auditados antes de
+o critério virar código): `08/07` tem **1 refeição e 3.482 kcal** (ele lançou o
+dia inteiro de uma vez — o corte por contagem excluiria o maior dia da série) e
+`21/03` tem **5 refeições e 1.026 kcal** (registrou tudo e comeu pouco). A régua
+é a **mediana** do próprio usuário, nunca a média: com média, aquele dia de
+3.482 levanta o limiar e mascara os dias fracos ao redor. Abaixo de 10 dias
+registrados o app fica calado.
+
+**Ao mexer nos testes desta área:** o mock do Supabase precisa distinguir a
+TABELA. `nutrition_day_flags` tem a mesma cadeia `select→eq→gte→lte` de
+`nutrition_meal_entries`, então um mock que ignora o nome devolve as refeições
+como se fossem marcas — e todos os dias somem da média. Derrubou 8 testes na
+primeira execução.
+
 **Relatório de NUTRIÇÃO por período — o que vai para o nutricionista
 (24/08/2026).** Tela em `dashboard/nutrition/NutritionHistoryModal`, período em
 `lib/nutrition/historyPeriod.ts` (fonte única), HTML em
