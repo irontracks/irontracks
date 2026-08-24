@@ -132,7 +132,9 @@ describe('a família inteira — os 14 renderers, não só o normal', () => {
       // método e não têm peso próprio para explicar. `AdvancedSetRow` é o molde
       // da linha; a dica de anilha continua sendo responsabilidade de cada
       // renderer, que a passa como filho.
-      .filter((n) => !['AutoloadNote', 'FailureToggle', 'PlateHintLine', 'AdvancedSetRow'].includes(n))
+      // `SetMethodPicker` entrou em 24/08/2026: é o seletor de método, usado
+      // pelo card e pelo rodapé do normal — não roteia método nem tem peso.
+      .filter((n) => !['AutoloadNote', 'FailureToggle', 'PlateHintLine', 'AdvancedSetRow', 'SetMethodPicker'].includes(n))
 
     // Cardio e plank não têm carga; qualquer outro renderer precisa estar na lista.
     const semPeso = ['cardioSet', 'plankSet']

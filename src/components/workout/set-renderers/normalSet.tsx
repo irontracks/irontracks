@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, ChevronDown, MessageSquare } from 'lucide-react';
+import { Check, MessageSquare } from 'lucide-react';
+import { SetMethodPicker } from './SetMethodPicker';
 import { useWorkoutContext } from '../WorkoutContext';
 import { isUnilateralByName } from '@/utils/exerciseTracking';
 import {
@@ -189,7 +190,6 @@ const NormalSetInner = ({
   } = useWorkoutContext();
 
   const completeBusyRef = useRef(false);
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   // Set type popover (long-press on the set-number badge). The anchor rect is
   // captured at open time so the popover stays glued even if the badge
@@ -868,17 +868,18 @@ const NormalSetInner = ({
                 faixa própria: cada série ocupava três linhas (campos, falha,
                 método) para dois metadados que raramente se toca. Com 18 séries
                 por sessão, era o dobro de rolagem entre uma carga e a seguinte. */}
+            {/* O seletor virou WIDGET COMPARTILHADO em 24/08/2026
+                (`SetMethodPicker`): quando ele era JSX daqui, a série que virava
+                avançada trocava de renderer e perdia a única forma de voltar
+                para Normal. Aqui ele fica porque o rodapé já existe — nos outros
+                13 renderers quem o desenha é o `ExerciseCard`, sem custo de
+                linha extra na série normal, que é a esmagadora maioria. */}
             <div className="flex items-center gap-2 shrink-0">
               {!done && (
-                <button
-                  type="button"
-                  onClick={() => setIsPickerOpen(p => !p)}
-                  aria-expanded={isPickerOpen}
-                  className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-300 transition-colors"
-                >
-                  {String(log.per_set_method || '').trim() || 'Normal'}
-                  <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
-                </button>
+                <SetMethodPicker
+                  current={String(log.per_set_method || '').trim() || 'Normal'}
+                  onSelect={(m) => updateLog(key, { per_set_method: m, advanced_config: cfg ?? log.advanced_config ?? null })}
+                />
               )}
               {failureToggle}
             </div>
@@ -893,29 +894,6 @@ const NormalSetInner = ({
             inventory={inventoryFromSettings(settings)}
             className="px-0.5"
           />
-          {/* Lista de métodos — abre ABAIXO da linha (dentro do flex ela empurraria
-              o chip de falha ao expandir). O botão que a abre está no rodapé. */}
-          {!done && (
-            <div className="mt-1">
-              {isPickerOpen && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'].map(opt => {
-                    const current = String(log.per_set_method || '').trim() || 'Normal';
-                    return (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => { updateLog(key, { per_set_method: opt === 'Normal' ? '' : opt, advanced_config: cfg ?? log.advanced_config ?? null }); setIsPickerOpen(false); }}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${current === opt ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600 hover:text-neutral-300'}`}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </div>
         </>
       )}

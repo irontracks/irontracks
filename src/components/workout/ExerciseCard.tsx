@@ -28,6 +28,8 @@ import { setTopWeightReps } from '@/utils/report/setVolume';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
+import { SetMethodPicker } from './set-renderers/SetMethodPicker';
+import { resolveSetMethodLabel, podeTrocarMetodoRapido, precisaCongelarMetodo, metodoParaCongelar } from './helpers/resolveSetMethod';
 import { PlankSetInput } from './PlankSetInput';
 import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
@@ -361,6 +363,82 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
 
     // GVT, Pirâmide Crescente, Pirâmide Decrescente, and Normal all use NormalSet
     return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
+  };
+
+  /**
+   * Método efetivo da série — a MESMA decisão do `renderSet`, resolvida por
+   * `resolveSetMethodLabel`. Rotular por palpite seria pior que não rotular: o
+   * app diria "Normal" numa série desenhada como DROP.
+   */
+  const methodLabelOfSet = (setIdx: number): string => {
+    const plannedSet = getPlannedSet(ex, setIdx);
+    const cfg = getPlanConfig(ex, setIdx);
+    return resolveSetMethodLabel({
+      exerciseMethod: ex?.method,
+      log: getLog(`${exIdx}-${setIdx}`),
+      plannedConfig: plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null,
+      sstFromNotes: Boolean(parsedSSTConfig && setIdx === parsedSSTConfig.targetSetIdx),
+      isClusterConfig: isClusterConfig(cfg),
+      isRestPauseConfig: isRestPauseConfig(cfg),
+    });
+  };
+
+  /**
+   * Antes de remover a série `removedIdx`, grava explicitamente o método que as
+   * OUTRAS séries já mostravam — mas só naquelas em que ele é **inferido**.
+   *
+   * O método pode não existir como dado: a nota "DROP-SET na última série" faz
+   * `getPlannedSet` injetar os estágios na última. Remover a última fazia a
+   * penúltima herdar o drop, e o usuário via "apagou a série errada" — o drop
+   * continuava na tela, uma linha acima (relato do dono, 24/08/2026).
+   *
+   * Escrever a marcação explícita é o que trava a regra: `per_set_method` vence
+   * qualquer inferência.
+   */
+  const freezeInferredMethodsBeforeRemoval = (removedIdx: number) => {
+    try {
+      for (let sIdx = 0; sIdx < setsCount; sIdx += 1) {
+        if (sIdx === removedIdx) continue;
+        const key = `${exIdx}-${sIdx}`;
+        const log = getLog(key);
+        const plannedSet = getPlannedSet(ex, sIdx);
+        const cfg = getPlanConfig(ex, sIdx);
+        const input = {
+          exerciseMethod: ex?.method,
+          log,
+          plannedConfig: plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null,
+          sstFromNotes: Boolean(parsedSSTConfig && sIdx === parsedSSTConfig.targetSetIdx),
+          isClusterConfig: isClusterConfig(cfg),
+          isRestPauseConfig: isRestPauseConfig(cfg),
+        };
+        if (!precisaCongelarMetodo(input)) continue;
+        // Grava `Normal` EXPLÍCITO quando a série é normal hoje: é justamente
+        // ela que viraria drop ao passar a ser a última. String vazia não serve
+        // — cai de volta na inferência.
+        updateLog(key, { per_set_method: metodoParaCongelar(input) });
+      }
+    } catch { /* congelar é defesa; nunca pode impedir a remoção */ }
+  };
+
+  const renderMethodPicker = (setIdx: number) => {
+    const label = methodLabelOfSet(setIdx);
+    if (!podeTrocarMetodoRapido(label, isExPlank)) return null;
+    // Série normal já tem o seletor no próprio rodapé (`normalSet`), onde não
+    // custa linha. Desenhar aqui também daria uma faixa vertical extra em
+    // TODAS as séries — exatamente a densidade que a auditoria de ago/2026
+    // corrigiu (guard: `__tests__/densidadeDaSerie.test.ts`).
+    if (label === '' || label === 'Normal') return null;
+    const key = `${exIdx}-${setIdx}`;
+    const done = !!getLog(key).done;
+    return (
+      <div className="px-1 -mt-1 mb-1 flex justify-end">
+        <SetMethodPicker
+          current={label}
+          disabled={done}
+          onSelect={(m) => updateLog(key, { per_set_method: m })}
+        />
+      </div>
+    );
   };
 
   return (
@@ -780,7 +858,17 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
 
       {!collapsedNow && (
         <div className="mt-4 space-y-2">
-          {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(setIdx))}
+          {Array.from({ length: setsCount }).map((_, setIdx) => (
+            <div key={`set-${exIdx}-${setIdx}`}>
+              {renderSet(setIdx)}
+              {/* Seletor de método FORA do renderer: vale para os 14 sem tocar
+                  em nenhum. Antes ele vivia só no `normalSet`, então a série que
+                  virava avançada perdia a única forma de voltar para Normal —
+                  e no caso real o drop nem tinha sido escolhido: veio da nota
+                  "DROP-SET na última série". */}
+              {renderMethodPicker(setIdx)}
+            </div>
+          ))}
           <div className="flex gap-2">
             <button
               type="button"
@@ -823,6 +911,13 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                       aria-label={`Remover série ${sIdx + 1}`}
                       onClick={() => {
                         setRemoveSetOpen(false);
+                        // Congela o método VISÍVEL das séries que ficam antes de
+                        // remover. Sem isto, apagar a série que carrega um método
+                        // INFERIDO ("DROP-SET na última série", vindo da nota) faz
+                        // a regra escorregar para a vizinha: o dono apagou a 3
+                        // (drop) e a 2 virou drop, parecendo que o app tinha
+                        // apagado a série errada (24/08/2026).
+                        freezeInferredMethodsBeforeRemoval(sIdx);
                         void removeSetAtIndex(exIdx, sIdx);
                       }}
                       className={[
