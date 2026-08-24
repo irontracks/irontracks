@@ -1,6 +1,6 @@
 import { Client } from '@upstash/qstash'
 import { env } from '@/utils/env'
-import { logError } from '@/lib/logger'
+import { logError, logWarnRemote } from '@/lib/logger'
 
 /**
  * Agendamento (com atraso) do push de "fim de descanso" via QStash.
@@ -64,6 +64,24 @@ export async function scheduleRestEndPush(
   }
 }
 
+/**
+ * O QStash responde 404 quando a mensagem **não está mais na fila** — ou seja,
+ * já foi entregue (o descanso acabou antes de o usuário voltar) ou já havia
+ * sido cancelada. Não é falha: não existe ação possível nem nada a consertar.
+ *
+ * Tratar isso como erro custou ruído no Sentry (24/08/2026, `rest-push:
+ * {"error":"message msg_... not found"}` com stack de 7 linhas) e, pior,
+ * misturava o caso inofensivo com os que IMPORTAM — rede fora, token inválido,
+ * QStash caído —, em que o push realmente vai disparar com o usuário de volta
+ * no app.
+ */
+export function isAlreadyGoneCancel(e: unknown): boolean {
+  const status = Number((e as { status?: unknown })?.status)
+  if (status === 404) return true
+  const msg = (e instanceof Error ? e.message : String(e ?? '')).toLowerCase()
+  return msg.includes('not found')
+}
+
 /** Cancela um push agendado (usuário voltou ao app / pulou / terminou antes). */
 export async function cancelRestEndPush(messageId: string): Promise<boolean> {
   const c = client()
@@ -72,6 +90,13 @@ export async function cancelRestEndPush(messageId: string): Promise<boolean> {
     await c.messages.cancel(messageId)
     return true
   } catch (e) {
+    // Mensagem já entregue/inexistente: registra como WARNING (segue pesquisável
+    // no Sentry, e a contagem ainda mede quantos descansos terminam antes de o
+    // usuário voltar) — mas não é exception.
+    if (isAlreadyGoneCancel(e)) {
+      logWarnRemote('rest-push', 'cancelamento de push já entregue/inexistente', { messageId })
+      return false
+    }
     // L4: não engolir silenciosamente — um cancel falho faz o push de fim de descanso
     // disparar mesmo o usuário já tendo voltado. Vai pro Sentry via logError.
     logError('rest-push', e instanceof Error ? e : new Error(`Falha ao cancelar push de fim de descanso: ${String(e)}`))
