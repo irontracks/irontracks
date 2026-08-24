@@ -60,7 +60,19 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
   const lista = Array.isArray(dias) ? dias : []
 
   const titulo = `Nutrição — ${rotuloPeriodo(periodo)}`
-  const intervalo = `${formatarDataCurta(periodo.inicio)} a ${formatarDataCurta(periodo.fim)}`
+  /**
+   * A linha sob o título sempre ACRESCENTA, nunca repete.
+   *
+   * Numa janela fixa o título diz "Últimos 7 dias" e as datas são a informação
+   * que falta. Num período personalizado é o contrário: o título JÁ é o
+   * intervalo (`rotuloPeriodo` devolve as datas), e repeti-lo imprimia
+   * "01/05/2026 a 31/07/2026" duas vezes seguidas — visto ao conferir o
+   * documento renderizado, não por teste. Um fato aparece uma vez
+   * (`docs/DESIGN_HIERARCHY.md`); ali o que falta é o TAMANHO do período.
+   */
+  const subtitulo = periodo.janelaFixa != null
+    ? `${formatarDataCurta(periodo.inicio)} a ${formatarDataCurta(periodo.fim)}`
+    : `${periodo.dias} dias`
 
   const meta = Number(metaKcal)
   const temMeta = Number.isFinite(meta) && meta > 0
@@ -136,7 +148,7 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
     </div>
 
     <h1>${escapeHtml(titulo)}</h1>
-    <div class="range">${escapeHtml(intervalo)}</div>
+    <div class="range">${escapeHtml(subtitulo)}</div>
 
     <div class="cards">
       <div class="card">

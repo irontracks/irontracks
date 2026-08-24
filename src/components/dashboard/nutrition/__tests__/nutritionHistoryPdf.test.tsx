@@ -158,6 +158,43 @@ describe('período personalizado', () => {
   })
 })
 
+describe('o documento não repete o mesmo fato', () => {
+  it('no período personalizado o intervalo aparece UMA vez', async () => {
+    // Pego ao olhar o documento renderizado, não por teste: o título já é o
+    // intervalo (`rotuloPeriodo` devolve as datas) e a linha de baixo repetia
+    // "01/05/2026 a 31/07/2026" logo abaixo dele. Hoje o subtítulo acrescenta
+    // o TAMANHO do período. Ver `docs/DESIGN_HIERARCHY.md`.
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /período personalizado/i }))
+    fireEvent.change(screen.getByLabelText(/data inicial/i), { target: { value: '2026-05-01' } })
+    fireEvent.change(screen.getByLabelText(/data final/i), { target: { value: '2026-07-31' } })
+    await waitFor(() => expect(intervalos.at(-1)).toEqual(['2026-05-01', '2026-07-31']))
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const { html } = exportSpy.mock.calls[0][0] as { html: string }
+
+    // Só o CORPO: o `<title>` do documento repete o mesmo texto de propósito
+    // (é o nome da aba e do arquivo, não conteúdo visível). Contar no HTML
+    // inteiro daria 2 mesmo com a hierarquia certa — falso positivo que este
+    // teste teve na primeira escrita.
+    const corpo = html.slice(html.indexOf('<body'))
+    expect(corpo.match(/01\/05\/2026 a 31\/07\/2026/g) ?? []).toHaveLength(1)
+    expect(corpo).toContain('92 dias')
+  })
+
+  it('na janela fixa as datas ACRESCENTAM ao título, que fala em dias', async () => {
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const { html } = exportSpy.mock.calls[0][0] as { html: string }
+    expect(html).toContain('Últimos 30 dias')
+    expect(html).toContain('26/07/2026 a 24/08/2026')
+  })
+})
+
 describe('a busca não pode entrar em laço', () => {
   it('uma janela = uma consulta', async () => {
     // `periodo` é objeto derivado e entra nas dependências do efeito. Sem
