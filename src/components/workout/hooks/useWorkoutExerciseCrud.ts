@@ -192,7 +192,11 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
    * some, os vizinhos escorregam) — dado certo na chave errada, que é pior que
    * dado perdido.
    */
-  const removeSetAtIndex = async (exIdx: unknown, setIdx: unknown) => {
+  const removeSetAtIndex = async (
+    exIdx: unknown,
+    setIdx: unknown,
+    opts?: { freezeMethods?: Record<number, string> },
+  ) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
     const sIdx = Number(setIdx);
@@ -228,6 +232,28 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
 
       const prevLogs: Record<string, unknown> = (logs && typeof logs === 'object' ? logs : {}) as Record<string, unknown>;
       const nextLogs: Record<string, unknown> = {};
+      /**
+       * Método a CONGELAR por série, antes do deslize.
+       *
+       * Precisa entrar AQUI, e não num `updateLog` separado feito instantes
+       * antes da chamada: o `nextLogs` é montado a partir do `logs` do render
+       * atual, então qualquer escrita anterior seria sobrescrita por este
+       * objeto. Foi assim que a 1ª tentativa de corrigir o bug passou nos
+       * testes e falhou no aparelho.
+       *
+       * Por que congelar: o método pode ser DERIVADO — a nota "DROP-SET na
+       * última série" injeta o drop em quem for a última. Remover a última
+       * fazia a regra escorregar para a vizinha, e parecia que o app tinha
+       * apagado a série errada (relato do dono, 24/08/2026).
+       */
+      const freeze = opts?.freezeMethods && typeof opts.freezeMethods === 'object' ? opts.freezeMethods : null;
+      const withFrozenMethod = (kSet: number, value: unknown): unknown => {
+        const method = freeze ? String(freeze[kSet] ?? '').trim() : '';
+        if (!method) return value;
+        const base = value && typeof value === 'object' ? (value as UnknownRecord) : {};
+        return { ...base, per_set_method: method };
+      };
+
       for (const [k, v] of Object.entries(prevLogs)) {
         const m = /^(\d+)-(\d+)$/.exec(k);
         if (!m) { nextLogs[k] = v; continue; }
@@ -235,8 +261,21 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         const kSet = Number(m[2]);
         if (kEx !== idx) { nextLogs[k] = v; continue; }
         if (kSet === sIdx) continue;              // a série removida
-        if (kSet > sIdx) nextLogs[`${kEx}-${kSet - 1}`] = v;  // desliza pra baixo
-        else nextLogs[k] = v;
+        if (kSet > sIdx) nextLogs[`${kEx}-${kSet - 1}`] = withFrozenMethod(kSet, v);  // desliza pra baixo
+        else nextLogs[k] = withFrozenMethod(kSet, v);
+      }
+      // Série SEM log ainda (o usuário nem tocou nela) também precisa da marca —
+      // é o caso mais comum: a série vazia que viraria a última.
+      if (freeze) {
+        for (const [rawSet, method] of Object.entries(freeze)) {
+          const kSet = Number(rawSet);
+          if (!Number.isFinite(kSet) || kSet === sIdx) continue;
+          const destino = kSet > sIdx ? kSet - 1 : kSet;
+          const key = `${idx}-${destino}`;
+          if (nextLogs[key]) continue;
+          const m2 = String(method || '').trim();
+          if (m2) nextLogs[key] = { per_set_method: m2 };
+        }
       }
 
       onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });

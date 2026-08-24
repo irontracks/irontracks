@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, ChevronDown, MessageSquare, Pencil } from 'lucide-react';
+import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { FailureToggle } from './FailureToggle';
 import {
@@ -29,11 +29,9 @@ const GROUP_METHOD_INFO: Record<string, string> = {
   'Pós-exaustão': 'Composto ANTES do isolador • Execute imediatamente',
 };
 
-const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
 
 const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory, exercises, settings } = useWorkoutContext();
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
   // Este exercício é o ÚLTIMO membro do grupo (Bi-Set/Super-Set…)? Só aí o descanso
   // deve rolar. Concluir a 1ª metade do par vai DIRETO pra outra ("0s descanso entre
   // eles", como diz o GROUP_METHOD_INFO) via auto-alternância do ExerciseList. Antes,
@@ -174,14 +172,14 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             </div>
             {/* Row 2: badge método + botões de ação */}
             <div className="flex items-center gap-1.5 pl-10">
-              <button
-                type="button"
-                onClick={() => setIsPickerOpen(p => !p)}
-                className="inline-flex items-center gap-0.5 text-[10px] uppercase tracking-widest font-black text-yellow-500 hover:text-yellow-400 flex-1 truncate transition-colors"
-              >
+              {/* Rótulo do método. A TROCA saiu daqui em 24/08/2026 e virou o
+                  `SetMethodPicker` do card: esta era a 2ª cópia da mesma lista,
+                  e as duas já divergiam (o `normalSet` gravava `''` para
+                  Normal, que cai de volta na inferência; esta gravava
+                  'Normal'). Uma lista só, para os 14 renderers. */}
+              <span className="inline-flex items-center text-[10px] uppercase tracking-widest font-black text-yellow-500 flex-1 truncate">
                 {effectiveMethod}
-                <ChevronDown size={10} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
-              </button>
+              </span>
               <FailureToggle exIdx={exIdx} setIdx={setIdx} />
               <button
                 type="button"
@@ -208,20 +206,6 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 <span className="text-xs">Concluir</span>
               </button>
             </div>
-            {isPickerOpen && (
-              <div className="flex flex-wrap gap-1 pl-10 pb-1">
-                {PER_SET_METHODS.map(opt => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => { updateLog(key, { per_set_method: opt }); setIsPickerOpen(false); }}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${effectiveMethod === opt ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600 hover:text-neutral-300'}`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
           </>
         )}
       </div>

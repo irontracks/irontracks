@@ -25,13 +25,18 @@ const executavel = (src: string) =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
 
 describe('rodapé da série', () => {
-    const rodape = normalSet.slice(
-        normalSet.indexOf('<div className="mt-1 flex items-center justify-between gap-2">'),
-        normalSet.indexOf('Lista de métodos'),
-    )
+    // O `<PlateHintLine` do ramo UNILATERAL aparece antes deste rodapé no
+    // arquivo — fatiar pela primeira ocorrência devolvia string vazia, e o
+    // teste passaria a medir nada.
+    const inicioRodape = normalSet.indexOf('<div className="mt-1 flex items-center justify-between gap-2">')
+    const rodape = normalSet.slice(inicioRodape, normalSet.indexOf('<PlateHintLine', inicioRodape))
 
     it('método e falha compartilham a linha', () => {
-        expect(rodape).toContain('per_set_method')
+        // Em 24/08/2026 o seletor virou o widget `SetMethodPicker` (o JSX solto
+        // daqui sumia quando a série trocava de renderer, e não havia como
+        // voltar para Normal). A DENSIDADE não mudou: ele continua no mesmo
+        // rodapé, ao lado da falha, sem faixa própria.
+        expect(rodape).toContain('<SetMethodPicker')
         expect(rodape).toContain('{failureToggle}')
     })
 
@@ -40,10 +45,20 @@ describe('rodapé da série', () => {
             .not.toContain('{/* Per-set method picker */}')
     })
 
+    it('a série NORMAL não ganha um segundo seletor vindo do card', () => {
+        // O card desenha o picker para os outros 13 renderers; se desenhasse
+        // também na normal, seria a terceira faixa vertical de volta — com 18
+        // séries por sessão, o dobro de rolagem que esta auditoria tirou.
+        const card = readFileSync(join(SRC, 'components', 'workout', 'ExerciseCard.tsx'), 'utf8')
+        expect(card).toMatch(/label === ''\s*\|\|\s*label === 'Normal'/)
+    })
+
     it('a lista de opções abre fora do flex', () => {
-        const idxLinha = normalSet.indexOf('<div className="mt-1 flex items-center justify-between gap-2">')
-        const idxLista = normalSet.indexOf('Lista de métodos')
-        expect(idxLista, 'a lista precisa vir depois da linha, não dentro dela').toBeGreaterThan(idxLinha)
+        // Agora é responsabilidade do widget: o botão e a lista são irmãos
+        // dentro dele, e a lista vem DEPOIS (dentro do flex, ela empurraria o
+        // chip de falha ao expandir).
+        const picker = readFileSync(join(SRC, 'components', 'workout', 'set-renderers', 'SetMethodPicker.tsx'), 'utf8')
+        expect(picker.indexOf('{open && (')).toBeGreaterThan(picker.indexOf('aria-expanded={open}'))
     })
 })
 
