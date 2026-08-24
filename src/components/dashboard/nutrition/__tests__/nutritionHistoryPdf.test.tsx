@@ -128,6 +128,27 @@ describe('período personalizado', () => {
     await waitFor(() => expect(intervalos.at(-1)).toEqual(['2026-05-01', '2026-07-31']))
   })
 
+  it('ao abrir o personalizado NÃO acende alarme vermelho — campo vazio não é erro', async () => {
+    // Visto no simulador: "Escolha as duas datas." aparecia em vermelho antes
+    // de o usuário poder digitar. Vermelho neste app é erro e estouro de meta;
+    // gastá-lo numa instrução é o mesmo defeito que já tirou o vermelho
+    // decorativo de Configurações e do card de pendências com zero.
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /período personalizado/i }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    // Quem orienta é o corpo da lista, sem competir por atenção.
+    expect(screen.getByText(/escolha as duas datas para ver o período/i)).toBeInTheDocument()
+  })
+
+  it('preenchida só UMA data, ainda não é erro', async () => {
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /período personalizado/i }))
+    fireEvent.change(screen.getByLabelText(/data inicial/i), { target: { value: '2026-05-01' } })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('intervalo invertido não consulta nada e DIZ o motivo', async () => {
     abrir()
     await esperarLista()

@@ -274,9 +274,14 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
             </div>
           )}
 
-          {/* A recusa precisa DIZER o que está errado. Um intervalo invertido
-              que devolvesse lista vazia leria como "você não comeu nada". */}
-          {erroPeriodo && (
+          {/* A recusa precisa DIZER o que está errado — um intervalo invertido
+              que devolvesse lista vazia leria como "você não comeu nada".
+              Mas SÓ depois que as duas datas existem: com os campos ainda em
+              branco não há erro nenhum, e pintar "Escolha as duas datas" de
+              vermelho ao abrir gasta a cor do ALARME numa instrução. Neste app
+              vermelho é erro e estouro de meta, nada mais — e quem já diz o que
+              fazer é o corpo da lista, sem competir por atenção. */}
+          {erroPeriodo && inicioCustom && fimCustom && (
             <p className="mt-2 text-xs font-bold text-red-400" role="alert">{erroPeriodo}</p>
           )}
         </div>
