@@ -118,6 +118,30 @@ o insight. Guard de FIAÇÃO em `periodReportExport.test.tsx` — ele anda pelo 
 e lê o HTML que chegou ao exportador, porque `buildPeriodSessionDetails` e
 `buildPeriodReportHtml` passam verdes isoladamente com o botão morto.
 
+**Relatório de NUTRIÇÃO por período — o que vai para o nutricionista
+(24/08/2026).** Tela em `dashboard/nutrition/NutritionHistoryModal`, período em
+`lib/nutrition/historyPeriod.ts` (fonte única), HTML em
+`utils/report/buildNutritionPeriodHtml.ts`. Janelas de 7/15/30/90 dias **e
+intervalo escolhido pelo usuário** — o pedido concreto era "os 3 últimos meses".
+Sai por `exportHtmlAsPdf`, como todo arquivo do app.
+
+**Dia sem lançamento NÃO entra como zero**, e a cobertura ("7 de 92 dias") vai
+impressa. Preencher os vazios rebaixaria a média com refeições que a pessoa só
+não anotou — um número inventado com cara de medição, entregue a um
+profissional. É a mesma regra do `summarizeHistory`, agora também no papel.
+
+Duas armadilhas medidas ao construir, as duas fora do alcance de teste unitário:
+
+1. **`periodo` é objeto DERIVADO e entra nas dependências do efeito de busca.**
+   Sem `useMemo`, cada `setResultado` cria identidade nova, o efeito dispara de
+   novo e o modal metralha o Supabase enquanto estiver aberto. **O ESLint não
+   acusa** — a dependência está declarada corretamente. Enquanto era o número
+   `janela`, a estabilidade vinha de graça. Guard: `uma janela = uma consulta`.
+2. **Conferência visual pegou o que 6.450 testes não pegariam:** o título já era
+   o intervalo e a linha de baixo o repetia; e "Escolha as duas datas." acendia
+   em VERMELHO com os campos ainda vazios — campo em branco não é erro, e
+   vermelho aqui é erro/estouro de meta, nada mais.
+
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
 **Os INGREDIENTES da kcal têm fonte única: `utils/calories/sessionKcalInputs.ts`**
