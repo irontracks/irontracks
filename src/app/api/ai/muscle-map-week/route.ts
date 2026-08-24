@@ -30,6 +30,8 @@ import {
   normalizeAiExerciseMap,
   DEFAULT_MUSCLE_ID_SET,
 } from '@/utils/ai/muscleMapWeekHelpers'
+import { countsAsWorkout } from '@/lib/workout/countsAsWorkout'
+import { brtDayStartUtc } from '@/utils/cron/weekRangeBrt'
 import { generateWeeklyMuscleInsights } from '@/lib/ai/weeklyMuscleInsights'
 
 export const dynamic = 'force-dynamic'
@@ -197,8 +199,11 @@ export async function POST(req: Request) {
       if (cachedPayload && fresh) return NextResponse.json(cachedPayload)
     }
 
-    const startIso = new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate(), 0, 0, 0)).toISOString()
-    const endIso = new Date(Date.UTC(weekEnd.getUTCFullYear(), weekEnd.getUTCMonth(), weekEnd.getUTCDate(), 23, 59, 59)).toISOString()
+    // Fronteira BRT, não UTC: `Date.UTC(...)` fazia a semana começar às 21h de
+    // domingo no Brasil, e todo treino de domingo à noite caía na semana
+    // seguinte. Mesma classe do streak e do heatmap de nutrição.
+    const startIso = brtDayStartUtc(weekStartDate).toISOString()
+    const endIso = new Date(brtDayStartUtc(isoDate(weekEnd)).getTime() + 24 * 60 * 60 * 1000 - 1000).toISOString()
 
     const { data: workouts } = await admin
       .from('workouts')
@@ -214,6 +219,11 @@ export async function POST(req: Request) {
     const workoutRows = (Array.isArray(workouts) ? workouts : []) as Array<Record<string, unknown>>
     const safeJsonParseFn = (v: unknown) => { try { return typeof v === 'string' ? JSON.parse(v) : v } catch { return null } }
     const sessions = workoutRows.map((w) => safeJsonParseFn(w?.notes)).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
+    // O VOLUME por músculo soma todas as sessões (uma série feita numa sessão
+    // curta é volume real e deve aparecer no mapa). Já o CONTADOR mostrado ao
+    // usuário — "7 treinos" — precisa do critério mínimo, senão uma sessão de
+    // 62 s com 1 série vira "um treino". Fonte única em `countsAsWorkout`.
+    const workoutsCount = sessions.filter((s) => countsAsWorkout(s)).length
 
     const exerciseKeyToCanonical = new Map<string, string>()
     for (const s of sessions) {
@@ -464,7 +474,7 @@ export async function POST(req: Request) {
       weekStartDate,
       muscles: Object.fromEntries(sorted.map((x) => [x.id, { sets: x.sets, label: x.label }])),
       targets: Object.fromEntries(MUSCLE_GROUPS.map((m) => [m.id, { minSets: m.minSets, maxSets: m.maxSets, label: m.label }])),
-      workoutsCount: sessions.length,
+      workoutsCount,
     }
 
     let insightsFromAi = null
@@ -504,7 +514,7 @@ export async function POST(req: Request) {
       isVip,
       weekStartDate,
       weekEndDate: isoDate(weekEnd),
-      workoutsCount: sessions.length,
+      workoutsCount,
       muscles,
       topMuscles: sorted,
       unknownExercises: Array.from(new Set(unknownExercises)).slice(0, 25),
