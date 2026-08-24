@@ -395,29 +395,29 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
    * Escrever a marcação explícita é o que trava a regra: `per_set_method` vence
    * qualquer inferência.
    */
-  const freezeInferredMethodsBeforeRemoval = (removedIdx: number) => {
+  const freezeInferredMethodsBeforeRemoval = (removedIdx: number): Record<number, string> => {
+    const out: Record<number, string> = {};
     try {
       for (let sIdx = 0; sIdx < setsCount; sIdx += 1) {
         if (sIdx === removedIdx) continue;
-        const key = `${exIdx}-${sIdx}`;
-        const log = getLog(key);
         const plannedSet = getPlannedSet(ex, sIdx);
         const cfg = getPlanConfig(ex, sIdx);
         const input = {
           exerciseMethod: ex?.method,
-          log,
+          log: getLog(`${exIdx}-${sIdx}`),
           plannedConfig: plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null,
           sstFromNotes: Boolean(parsedSSTConfig && sIdx === parsedSSTConfig.targetSetIdx),
           isClusterConfig: isClusterConfig(cfg),
           isRestPauseConfig: isRestPauseConfig(cfg),
         };
         if (!precisaCongelarMetodo(input)) continue;
-        // Grava `Normal` EXPLÍCITO quando a série é normal hoje: é justamente
-        // ela que viraria drop ao passar a ser a última. String vazia não serve
-        // — cai de volta na inferência.
-        updateLog(key, { per_set_method: metodoParaCongelar(input) });
+        // `Normal` EXPLÍCITO quando a série é normal hoje: é justamente ela que
+        // viraria drop ao passar a ser a última. String vazia não serve — cai
+        // de volta na inferência.
+        out[sIdx] = metodoParaCongelar(input);
       }
     } catch { /* congelar é defesa; nunca pode impedir a remoção */ }
+    return out;
   };
 
   const renderMethodPicker = (setIdx: number) => {
@@ -917,8 +917,14 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                         // a regra escorregar para a vizinha: o dono apagou a 3
                         // (drop) e a 2 virou drop, parecendo que o app tinha
                         // apagado a série errada (24/08/2026).
-                        freezeInferredMethodsBeforeRemoval(sIdx);
-                        void removeSetAtIndex(exIdx, sIdx);
+                        // O congelamento vai JUNTO da remoção, não antes: o
+                        // `removeSetAtIndex` remonta o mapa de logs a partir do
+                        // estado do render atual e sobrescreveria qualquer
+                        // `updateLog` feito instantes antes. Provado no
+                        // aparelho — em teste as escritas pareciam separadas.
+                        void removeSetAtIndex(exIdx, sIdx, {
+                          freezeMethods: freezeInferredMethodsBeforeRemoval(sIdx),
+                        });
                       }}
                       className={[
                         'tap-44 min-w-[44px] h-9 px-3 inline-flex items-center justify-center gap-1 rounded-xl border text-sm font-bold transition-colors',

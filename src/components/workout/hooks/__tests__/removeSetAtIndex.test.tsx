@@ -117,12 +117,76 @@ describe('fiação: o card do exercício usa a remoção POR ÍNDICE', () => {
   const CARD = readFileSync(join(process.cwd(), 'src/components/workout/ExerciseCard.tsx'), 'utf8')
 
   it('a lixeira abre a escolha da série e remove pelo índice escolhido', () => {
-    expect(CARD).toMatch(/removeSetAtIndex\(exIdx,\s*sIdx\)/)
+    // O 3º argumento (`freezeMethods`) entrou em 24/08/2026: sem ele o método
+    // INFERIDO pela nota do exercício escorrega para a série vizinha.
+    expect(CARD).toMatch(/removeSetAtIndex\(exIdx,\s*sIdx,/)
+    expect(CARD).toMatch(/freezeMethods:\s*freezeInferredMethodsBeforeRemoval\(sIdx\)/)
   })
 
   it('não voltou a apagar a última série às cegas', () => {
     // `removeExtraSetFromExercise` segue existindo no controller (atalho legado),
     // mas o card não pode mais chamá-lo: era exatamente o pop cego.
     expect(CARD).not.toMatch(/removeExtraSetFromExercise\(/)
+  })
+})
+
+/**
+ * O drop que ESCORREGA — bug relatado em 24/08/2026.
+ *
+ * A nota do exercício dizia "DROP-SET **na última série**", e o drop é injetado
+ * por `getPlannedSet` em quem for a última. Remover a série 3 (o drop) fazia a
+ * série 2 virar a última e herdar o método: para o dono, o app tinha "apagado a
+ * série errada" — o drop continuava na tela, uma linha acima.
+ *
+ * O congelamento precisa acontecer NA MESMA escrita da remoção. A primeira
+ * tentativa gravou os métodos com `updateLog` logo antes de chamar isto, e o
+ * `nextLogs` — montado a partir do `logs` do render atual — sobrescreveu tudo.
+ * Passou nos testes e falhou no aparelho; por isso estes casos exercitam o
+ * parâmetro, não duas chamadas separadas.
+ */
+describe('removeSetAtIndex — congela o método das séries que ficam', () => {
+  it('marca a série que ficaria como última, mesmo sem log ainda', async () => {
+    const { result, onUpdateSession } = setup({ sets: 3 })
+    await act(async () => {
+      await result.current.removeSetAtIndex(0, 2, { freezeMethods: { 0: 'Normal', 1: 'Normal' } })
+    })
+
+    const next = nextWorkout(onUpdateSession).logs as Record<string, { per_set_method?: string }>
+    // Série sem log é o caso COMUM: o usuário não tocou nela e ela viraria drop.
+    expect(next['0-1']?.per_set_method).toBe('Normal')
+    expect(next['0-0']?.per_set_method).toBe('Normal')
+  })
+
+  it('preserva o que já havia no log ao congelar', async () => {
+    const logs = { '0-0': { weight: '50' }, '0-1': { weight: '60' }, '0-2': { weight: '70' } }
+    const { result, onUpdateSession } = setup({ sets: 3, logs })
+    await act(async () => {
+      await result.current.removeSetAtIndex(0, 2, { freezeMethods: { 1: 'Normal' } })
+    })
+
+    const next = nextWorkout(onUpdateSession).logs as Record<string, { weight?: string; per_set_method?: string }>
+    expect(next['0-1']).toEqual({ weight: '60', per_set_method: 'Normal' })
+  })
+
+  it('congela pelo índice ORIGINAL e grava no índice já deslizado', async () => {
+    const logs = { '0-0': { weight: '50' }, '0-1': { weight: '60' }, '0-2': { weight: '70' }, '0-3': { weight: '80' } }
+    const { result, onUpdateSession } = setup({ sets: 4, logs })
+    // Remove a 2ª: a 4ª (índice 3) carregava o método e vira índice 2.
+    await act(async () => {
+      await result.current.removeSetAtIndex(0, 1, { freezeMethods: { 3: 'Drop-Set' } })
+    })
+
+    const next = nextWorkout(onUpdateSession).logs as Record<string, { weight?: string; per_set_method?: string }>
+    expect(next['0-2']).toEqual({ weight: '80', per_set_method: 'Drop-Set' })
+    expect(next['0-1']?.per_set_method).toBeUndefined()
+  })
+
+  it('sem `freezeMethods` nada é marcado — a remoção simples não inventa método', async () => {
+    const logs = { '0-0': { weight: '50' }, '0-1': { weight: '60' } }
+    const { result, onUpdateSession } = setup({ sets: 2, logs })
+    await act(async () => { await result.current.removeSetAtIndex(0, 1) })
+
+    const next = nextWorkout(onUpdateSession).logs as Record<string, { per_set_method?: string }>
+    expect(next['0-0']?.per_set_method).toBeUndefined()
   })
 })
