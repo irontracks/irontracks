@@ -101,3 +101,52 @@ describe('descanso × rodapé — o contrato que destrava o FINALIZAR', () => {
     }
   })
 })
+
+/**
+ * O MESMO contrato, do lado de FORA do treino — bug de 24/08/2026.
+ *
+ * Sair do treino com o descanso rolando prendia o usuário no dashboard: a
+ * barra "Voltar pro treino" (`fixed bottom-0`, z-[1100]) ficava embaixo da
+ * barra do descanso (z-[2100]) e só reaparecia quando o descanso terminava.
+ *
+ * O guard da classe existia desde 15/08 e passou verde: varria apenas
+ * `components/workout`, e esta barra mora em `app/(app)/dashboard`. Aqui o
+ * teste mede o COMPORTAMENTO — um elemento que consome a variável de fato sobe
+ * quando o descanso aparece, e volta ao chão quando ele acaba.
+ */
+describe('descanso × barra "Voltar pro treino" (fora do treino)', () => {
+  /** Réplica do posicionamento da Session Floating Bar. */
+  const barraDeRetorno = () => {
+    const el = document.createElement('div')
+    el.style.position = 'fixed'
+    el.style.bottom = 'var(--it-rest-bar-h, 0px)'
+    document.body.appendChild(el)
+    return el
+  }
+
+  it('sem descanso, a barra fica no chão', () => {
+    const el = barraDeRetorno()
+    expect(getComputedStyle(el).bottom).toBe('var(--it-rest-bar-h, 0px)')
+    expect(lerVar()).toBe('')
+    el.remove()
+  })
+
+  it('com o descanso na tela, a barra passa a ter uma altura para subir', () => {
+    const el = barraDeRetorno()
+    const { unmount } = montarDescanso()
+    // A variável que a barra consome existe enquanto o descanso vive — é ela
+    // que tira o botão de baixo da barra do descanso.
+    expect(lerVar()).toMatch(/^\d+px$/)
+    unmount()
+    expect(lerVar()).toBe('')
+    el.remove()
+  })
+
+  it('a barra consome a MESMA variável que o descanso publica', () => {
+    // Trocar o nome de um lado só (ex.: renomear a variável) quebraria a
+    // convivência em silêncio: os dois source-guards continuariam verdes.
+    const el = barraDeRetorno()
+    expect(el.style.bottom).toContain(VAR)
+    el.remove()
+  })
+})

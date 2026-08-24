@@ -490,8 +490,29 @@ export default function DashboardModals(props: DashboardModalsProps) {
             )}
 
             {/* Session Floating Bar */}
+            {/*
+             * A barra sobe pela altura REAL da barra do descanso
+             * (`--it-rest-bar-h`, publicada pelo `RestTimerOverlay`).
+             *
+             * Sem isso, sair do treino com o descanso rolando deixava o usuário
+             * preso FORA dele: as duas barras disputam o mesmo rodapé, a do
+             * descanso tem z-[2100] contra z-[1100] daqui, e o botão "Voltar
+             * pro treino" só reaparecia quando o descanso terminava (relato do
+             * dono, 24/08/2026 — dois prints com 2 min de diferença).
+             *
+             * É a MESMA classe do FINALIZAR coberto pelo descanso (15/08). O
+             * guard daquele PR varria só `components/workout`, e esta barra
+             * mora no dashboard — guard que enumera o diretório conhecido não é
+             * guard de classe. Hoje ele varre as duas pastas.
+             *
+             * ⚠️ Não se resolve com z-index: duas barras no mesmo espaço
+             * físico, quem fica por cima esconde a outra em qualquer z.
+             */}
             {activeSession && view !== 'active' && (
-                <div className="fixed bottom-0 left-0 right-0 z-[1100]">
+                <div
+                    style={{ bottom: 'var(--it-rest-bar-h, 0px)' }}
+                    className="fixed left-0 right-0 z-[1100] transition-[bottom] duration-150"
+                >
                     <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
                         <div className="flex items-center gap-4">
                             <div className="flex-1 min-w-0">
