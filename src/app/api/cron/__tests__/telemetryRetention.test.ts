@@ -39,7 +39,15 @@ describe('ordem: agrega antes de apagar', () => {
 
     it('purga é incremental (teto por execução, sem lock longo)', () => {
         expect(rota).toMatch(/MAX_DELETE_PER_RUN = [\d_]+/)
-        expect(rota).toContain('.limit(MAX_DELETE_PER_RUN)')
+        // Este caso cobrava `.limit(MAX_DELETE_PER_RUN)` — e era justamente a
+        // construção QUEBRADA: o PostgREST devolve no máximo 1000 linhas, então
+        // o "teto de 20.000" nunca chegava ao select, e o `.in()` com a página
+        // inteira estourava a URL (medido em 24/08/2026: 300 ids ok, 500 falha).
+        // A purga ficou morta de 04/08 a 24/08 com este guard verde. O
+        // invariante REAL é "existe teto por execução e ele é respeitado" —
+        // hoje pelo laço, não por um `.limit()` que o servidor ignora.
+        expect(rota).toMatch(/while\s*\(\s*purged\s*<\s*MAX_DELETE_PER_RUN\s*\)/)
+        expect(rota).toContain('.limit(pageSize)')
     })
 })
 

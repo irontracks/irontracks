@@ -36,6 +36,12 @@ export type WeeklyMuscleReportInput = {
     recommendations?: { title?: string; actions?: string[] }[]
   } | null
   baseUrl?: string
+  /**
+   * `/icone.png` já em base64. O PDF nativo do iOS não espera a rede: com `src`
+   * remoto a marca sai como retângulo vazio no arquivo. Vem pronto do chamador
+   * (`fetchLogoDataUrl`), como o relatório de sessão já fazia.
+   */
+  logoDataUrl?: string | null
   userName?: string
   generatedAt?: Date
 }
@@ -91,7 +97,12 @@ export function buildWeeklyMuscleReportHtml(input: WeeklyMuscleReportInput) {
   const data = input && typeof input === 'object' ? input : {}
   const rawBaseUrl = String(data.baseUrl || '').trim()
   const baseUrl = /^https?:\/\//i.test(rawBaseUrl) ? rawBaseUrl : ''
-  const logoSrc = baseUrl ? `${baseUrl.replace(/\/$/, '')}/icone.png` : ''
+  const logoDataUrl = String(data.logoDataUrl || '').trim()
+  const logoSrc = logoDataUrl.startsWith('data:')
+    ? logoDataUrl
+    : baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/icone.png`
+      : ''
   const userName = String(data.userName || '').trim()
   const rangeLabel = weekRangeLabel(data.weekStartDate)
   const generatedLabel = fmtDateTime(data.generatedAt ?? new Date())

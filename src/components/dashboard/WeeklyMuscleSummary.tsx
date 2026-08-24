@@ -8,6 +8,7 @@ import { logWarn } from '@/lib/logger'
 import { useDialog } from '@/contexts/DialogContext'
 import { buildWeeklyMuscleReportHtml } from '@/utils/report/buildWeeklyMuscleReportHtml'
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
+import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl'
 
 type Insights = {
   summary?: string[]
@@ -90,11 +91,15 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
     if (exporting || !data) return
     setExporting(true)
     try {
+      // Marca em base64: o gerador de PDF do iOS não espera a rede, então com
+      // `src` remoto ela sai como retângulo vazio no arquivo.
+      const logoDataUrl = await fetchLogoDataUrl().catch((): null => null)
       const html = buildWeeklyMuscleReportHtml({
         weekStartDate: data.weekStartDate,
         workoutsCount: workouts,
         muscles,
         insights,
+        logoDataUrl,
         baseUrl: typeof window !== 'undefined' ? String(window.location.origin || '') : '',
       })
       const res = await exportHtmlAsPdf({

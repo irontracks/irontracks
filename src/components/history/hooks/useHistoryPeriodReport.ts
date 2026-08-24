@@ -10,6 +10,7 @@ import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
 import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
 import { buildPeriodSessionDetails, PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
+import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -183,12 +184,15 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
      * `exportHtmlAsPdf` em jul/2026 para as outras três telas; esta ficou de
      * fora porque o guard daquele PR listava os chamadores que já se conhecia.
      */
-    const buildCurrentHtml = (current: PeriodReport) => {
+    const buildCurrentHtml = (current: PeriodReport, logoDataUrl: string | null) => {
         const baseUrl = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';
         const userName = String(user?.displayName || user?.name || user?.email || '').trim();
         return buildPeriodReportHtml({
             type: current.type,
             stats: current.stats,
+            // Sem o base64 a marca sai como retângulo vazio no PDF do iPhone: o
+            // gerador nativo não espera a rede para resolver um `src` remoto.
+            logoDataUrl,
             // O detalhe treino a treino é o que o dono pediu no arquivo — sem ele
             // o export volta a ser só o agregado do mês.
             sessions: current.sessions ?? [],
@@ -203,7 +207,8 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
         if (!current || periodPdf.status === 'loading') return;
         setPeriodPdf((prev) => ({ ...prev, status: 'loading', error: '' }));
         try {
-            const html = buildCurrentHtml(current);
+            const logoDataUrl = await fetchLogoDataUrl().catch((): null => null);
+            const html = buildCurrentHtml(current, logoDataUrl);
             const dateLabel = new Date().toISOString().slice(0, 10);
             const kind = current.type === 'week' ? 'Semanal' : 'Mensal';
             const res = await exportHtmlAsPdf({

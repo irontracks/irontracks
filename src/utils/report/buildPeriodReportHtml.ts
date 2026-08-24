@@ -83,7 +83,17 @@ export function buildPeriodReportHtml(input: unknown) {
   const range = inferRange(stats)
   const rangeLabel = `${formatDate(range.start)} – ${formatDate(range.end)}`
   const generatedLabel = formatDateTime(generatedAt)
-  const logoSrc = baseUrl ? `${baseUrl.replace(/\/$/, '')}/icone.png` : ''
+  // O PDF nativo do iOS é renderizado a partir deste HTML e **não espera a
+  // rede**: com `src` remoto a marca sai como um retângulo vazio no arquivo
+  // (conferido no aparelho em 23/08/2026). Por isso o data URL vem pronto do
+  // chamador — mesmo motivo pelo qual o relatório de sessão já fazia assim. A
+  // URL remota fica só como último recurso (desktop, quando o fetch falhou).
+  const logoDataUrl = String(data.logoDataUrl || '').trim()
+  const logoSrc = logoDataUrl.startsWith('data:')
+    ? logoDataUrl
+    : baseUrl
+      ? `${baseUrl.replace(/\/$/, '')}/icone.png`
+      : ''
 
   const metricCards = [
     { label: 'Treinos', value: toLocaleInt(stats?.count) },
