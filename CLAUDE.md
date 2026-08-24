@@ -1417,6 +1417,35 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   re-renderizando. Parecia regressão do PR (que mexia em renderers de série) e
   não era: o clique nem chegava perto do código alterado. **Antes de investigar
   o diff, re-rode o job**; passou de primeira no rerun, sem tocar em nada.
+- **O CONCORRENTE nem sempre é humano — pode ser o outro run do seu próprio PR
+  (24/08/2026, PR #910).** O #909 falhou com "a lista de treinos precisa ter ao
+  menos um card" e o rerun passou. Não era flake sem causa: **nenhum workflow
+  do repo declarava `concurrency`**, então dois commits da MESMA branch com 2
+  minutos de diferença geravam dois runs vivos ao mesmo tempo. Medido com
+  precisão de segundos — o E2E do run que passou ocupou 16:37:42→16:38:11 e o
+  do que falhou 16:37:54→16:40:13, **17 s de sobreposição**, com a sessão ativa
+  nascendo às 16:37:58, dentro deles. Um run chamava `descartarSessao()` na
+  sessão que o outro tinha acabado de abrir.
+
+  Hoje o `ci.yml` tem `concurrency` + `cancel-in-progress: true` (o run
+  obsoleto morre) e o describe da jornada tem `mode: 'default'` — sem ele,
+  `fullyParallel: true` com `workers: 2` punha dois dos quatro casos em voo na
+  mesma conta. **`'default'` e não `'serial'`**: os dois rodam em ordem num
+  worker só, mas o `serial` PULA os casos seguintes quando um falha, e
+  esconderia um segundo defeito atrás do primeiro. Guard de classe em
+  `src/__tests__/e2eContaCompartilhada.test.ts` — spec NOVO que abra sessão de
+  treino reprova até declarar o modo.
+
+  **A correção foi provada no mundo real, não só por guard:** dois pushes na
+  mesma branch com 28 s de diferença, e o run anterior apareceu `cancelled`.
+
+  ⚠️ **Fica um risco residual conhecido:** `concurrency` agrupa por `ref`, então
+  dois PRs DIFERENTES rodando ao mesmo tempo ainda dividem a conta. Não foi
+  tratado porque exigiria extrair o E2E logado para um job próprio com grupo
+  global — e o histórico deste repo é de PRs sequenciais. Se voltar a falhar com
+  dois PRs abertos em paralelo, é essa a correção, e o diagnóstico é o mesmo:
+  compare as janelas dos steps de E2E com
+  `gh api repos/.../actions/runs/<id>/attempts/1/jobs`.
 
 ### Armadilhas de ambiente (custaram mais que o spec)
 
