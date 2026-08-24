@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { respondDbError } from '@/utils/api/dbError'
+import { weekStartDayBrt } from '@/utils/cron/weekRangeBrt'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,15 @@ export async function GET(req: Request) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(week)) {
     query = query.eq('week_start_date', week)
   } else {
-    query = query.order('week_start_date', { ascending: false }).limit(1)
+    // `lte` na semana corrente por causa da TRANSIÇÃO de 24/08/2026: a semana
+    // do app passou de segunda→domingo para domingo→sábado, então as linhas
+    // antigas guardam SEGUNDAS. Sem este filtro, a segunda órfã da semana
+    // corrente (que é maior que o domingo dela) venceria o `order desc` e o
+    // usuário veria o resumo da semana errada. Nada foi apagado — é cache.
+    query = query
+      .lte('week_start_date', weekStartDayBrt())
+      .order('week_start_date', { ascending: false })
+      .limit(1)
   }
 
   const { data, error } = await query.maybeSingle()

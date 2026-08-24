@@ -8,6 +8,7 @@
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
+import { weekStartDayBrt } from '@/utils/cron/weekRangeBrt'
 // Fonte única (re-exportada pra não quebrar quem importa daqui).
 export { extractJsonFromModelText } from '@/utils/ai/extractJson'
 
@@ -50,13 +51,16 @@ export const hasValidMapping = (mapping: unknown, allowed: Set<string>) => {
 // ────────────────────────────────────────────────────────────────────────────
 // Date helpers
 // ────────────────────────────────────────────────────────────────────────────
-export const startOfWeekUtc = (d: Date) => {
-  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-  const day = date.getUTCDay()
-  const diff = (day === 0 ? -6 : 1) - day
-  date.setUTCDate(date.getUTCDate() + diff)
-  return date
-}
+/**
+ * Domingo que abre a semana do instante dado, como Date em UTC.
+ *
+ * A semana do app é **domingo→sábado, BRT** (decisão do dono em 24/08/2026 —
+ * ver `utils/cron/weekRangeBrt.ts`). Até então isto devolvia a SEGUNDA em UTC,
+ * e o resultado era o resumo dizer 5 treinos para quem tinha feito 6 contando
+ * o domingo. O nome sobrevive porque o retorno segue sendo um Date UTC; quem
+ * decide a fronteira é `weekStartDayBrt`.
+ */
+export const startOfWeekUtc = (d: Date) => new Date(`${weekStartDayBrt(d)}T00:00:00Z`)
 
 export const isoDate = (d: Date) => {
   const y = d.getUTCFullYear()
