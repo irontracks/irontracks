@@ -277,9 +277,61 @@ por conta própria.
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
-- **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. `gemini-pro` (usado no protocolo de exames, que cruza 4 fontes) é caro; use o `fastModelId` onde couber. Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`). O gap "Sentry não recebe erro de rota server" foi CORRIGIDO em 02/08/2026 — causa: `captureException` só enfileira e a Vercel congela a instância antes do envio; `lib/logger.ts` agora agenda `Sentry.flush` via `waitUntil` (guard em `loggerServerFlush.test.ts`). Se o Sentry voltar a ficar mudo para rotas server, comece por lá.
+- **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. (Esta linha dizia que o protocolo de exames usava `gemini-pro`, modelo CARO — **errado, e conferido em 24/08/2026**: `gemini-pro` só aparece num comentário; o protocolo lê `env.gemini.modelId` como todo o resto. E `gemini-pro` está desligado desde 2025 — ver "Qual modelo Gemini o app usa", abaixo.) Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`). O gap "Sentry não recebe erro de rota server" foi CORRIGIDO em 02/08/2026 — causa: `captureException` só enfileira e a Vercel congela a instância antes do envio; `lib/logger.ts` agora agenda `Sentry.flush` via `waitUntil` (guard em `loggerServerFlush.test.ts`). Se o Sentry voltar a ficar mudo para rotas server, comece por lá.
 - **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (**10 ocorrências** hoje — confira com `grep -c`, não confie no número) antes de um release novo. Ver "iOS — release" pra saber QUANDO ela precisa subir.
 - **App Store Connect API — está TUDO no repo, não peça ao dono.** Chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8`; `ASC_KEY_ID` e **`ASC_ISSUER_ID` no `.env.local`**, lidos sozinhos por `scripts/ios-submit.mjs` (submete pro review sem painel web; `--dry-run` primeiro). Esta linha dizia "o Issuer ID não fica no disco (pegar no painel)" e **estava errada** — em 03/08/2026 o agente acreditou, parou o trabalho e foi pedir ao dono um dado que estava a um `grep` de distância, com o script de submissão pronto ao lado. Detalhes em `docs/ios-release.md`.
+
+### Qual modelo Gemini o app usa — e por que existe um REGISTRO (24/08/2026)
+
+**Padrão: `gemini-3.1-flash-lite`, e ele mora em `utils/ai/modelRegistry.ts`.
+Não digite o nome de um modelo em nenhum outro lugar** — há source-guard de
+classe que reprova.
+
+O registro nasceu de um susto: o default de `env.gemini.modelId` era
+`gemini-1.5-pro`, **desligado pelo Google em 24/09/2025**, e as ~20 rotas de
+`api/ai/` leem esse getter. Nada quebrou porque a env var
+`GOOGLE_GENERATIVE_AI_MODEL_ID` está setada na Vercel — ou seja, **a IA inteira
+dependia de uma variável de ambiente não estar faltando**, e o default existia
+justamente para esse caso. O fallback interno do wrapper apontava para
+`gemini-2.5-flash`, com desligamento anunciado para ≥ 16/10/2026: o plano B
+também tinha validade.
+
+**O saneamento roda na CHAMADA (`getGeminiModel`), não só no default** — em
+produção quem escolhe o modelo é a env var, num painel que este repo não alcança
+pela CLI. Se dependesse de alguém editar a var, a migração não chegaria ao ar.
+Modelo desligado ou em retirada é trocado pelo padrão, com `logWarnRemote`
+deduplicado por processo. **Modelo de outra MODALIDADE passa intacto de
+propósito** (`*-image`, `imagen-*`, `*-tts`, `*-native-audio`): trocar um gerador
+de imagem por um de texto devolveria prosa a quem pediu imagem — falha
+invisível, pior que o 404 que o saneamento evita.
+
+**Por que o 3.1-flash-lite** (medido, não pelo folheto): $0,25/$1,50 por 1M
+contra $0,30/$2,50 do 2.5-flash (**−40% na saída**) e Intelligence Index 34
+contra 21. Ou seja, mais barato E melhor — é raro, e é por isso que a troca não
+teve trade-off.
+
+**Duas coisas que a documentação do Google diz e a API contradiz** — as duas
+medidas contra a chave de produção em 24/08/2026:
+
+1. *"Thinking não pode ser desligado no Gemini 3"* — **a API aceita
+   `thinkingConfig: { thinkingBudget: 0 }` e o respeita** (`thoughtsTokenCount:
+   0`). O wrapper continua injetando isso em todo modelo flash, e continua
+   valendo: sem ele, o mesmo prompt de duas linhas gastava 78 tokens de
+   raciocínio. Não "conserte" isso para `thinkingLevel`.
+2. *"Troque `thinking_budget` por `thinking_level` e remova `temperature`"* —
+   **`thinkingLevel` não existe no `generationConfig` da v1beta e devolve 400**
+   (`Unknown name "thinkingLevel"`). E `temperature` segue aceito. A migração
+   foi **drop-in**: nenhum contrato de rota em `routeContracts.ts` mudou.
+
+Testado antes de virar padrão: texto, JSON estruturado (`responseMimeType` +
+`responseSchema`), entrada multimodal com imagem (OCR correto) e streaming — 200
+nos quatro. Qualidade conferida com o prompt real de estimativa de macros em 4
+refeições brasileiras: JSON válido em 4/4, números equivalentes.
+
+**Como saber o que a chave alcança hoje** (grátis, não custa chamada):
+`GET https://generativelanguage.googleapis.com/v1beta/models?key=$K` — traz
+`supportedGenerationMethods` e a lista real. Faça isso antes de supor que um
+model id existe.
 
 ### Antes de dizer "não tenho X", procure X no repo
 Vale para credencial, script, endpoint, chave — qualquer coisa. Parar e pedir ao dono
@@ -446,13 +498,43 @@ aviso de nova versão). As duas entraram no `connect-src`; guard em
 `utils/security/__tests__/cspConnectSrc.test.ts` cobra que o chamador continue
 existindo. **Ligar o enforce antes dessa janela teria derrubado o upload de fotos.**
 
-⚠️ **O enforce continua DESLIGADO, de propósito.** O header mudou em 12/08, então
-a janela existente é anterior à mudança. Antes de ligar, colete outra janela
-limpa (24 h após o deploy) com o SQL acima: se vier vazia, **`CSP_ENFORCE=true` na
-Vercel** basta —
-env var, sem deploy de código. Antes disso, olhe uma janela de relatórios limpa:
-o `script-src` de produção é mais restrito que o de dev (que tem `unsafe-inline`
-e `unsafe-eval`), então dev NÃO prova nada sobre produção.
+⚠️ **O enforce continua DESLIGADO** — mas a janela que faltava JÁ FOI LIDA
+(24/08/2026), e o que falta agora é uma decisão de UMA linha, não mais coleta.
+
+**Filtre por `documentHost`, senão a leitura engana.** A pergunta é "o que
+quebra em PRODUÇÃO", e o grosso do volume é de PREVIEW: `vercel.live` soma
+**509 eventos** (script-src-elem + frame-src) e **100% deles em
+`*.vercel.app`** — é a Vercel Toolbar, que a plataforma injeta nos deploys de
+PR. Zero em `irontracks.com.br`. Ligar o enforce não a afeta.
+
+```sql
+select metadata->>'directive' as diretiva, metadata->>'blocked' as origem,
+       count(*) as n, max(created_at) as ultimo
+from audit_events where action = 'csp_violation'
+  and metadata->>'documentHost' not like '%vercel.app'   -- ← sem isto, só se vê preview
+group by 1,2 order by 3 desc;
+```
+
+Em produção, tudo que já tinha sido tratado **parou de aparecer**, o que valida
+a allowlist: `itunes.apple.com` e `api.cloudinary.com` mudos desde 12/08,
+`res.cloudinary.com` desde 13/08, `inline` (2 eventos) desde 13/08, `www.` desde
+14/08 (o middleware redireciona).
+
+**Sobra UMA origem viva: `connect.facebook.net`** (script-src-elem, 6 eventos,
+o último em 22/08, em `irontracks.com.br`). E **não existe pixel do Meta no
+repo** — `grep` em `src/` e `public/` não devolve nada. Suspeita fundamentada,
+**não confirmada**: é o navegador embutido do Instagram/Facebook injetando o
+próprio script quando alguém abre o link do app por lá. Se for isso, bloquear é
+o comportamento CORRETO (é injeção de terceiro em que o app não toca) e nada de
+funcional se perde. Antes de virar a chave, alguém precisa dizer se algum
+material de marketing depende desse pixel.
+
+Confirmado isso, **`CSP_ENFORCE=true` na Vercel** basta — env var, sem deploy de
+código.
+
+Lembrete que continua valendo: o `script-src` de produção é mais restrito que o
+de dev (que tem `unsafe-inline` e `unsafe-eval`), então dev NÃO prova nada sobre
+produção.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
