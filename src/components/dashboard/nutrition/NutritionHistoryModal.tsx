@@ -11,7 +11,7 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, Clapperboard, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, FileDown, UtensilsCrossed } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
@@ -24,18 +24,23 @@ import {
   periodLabel,
   periodRangeText,
   summarizeHistory,
-  windowStartDate,
   type NutritionHistoryDay,
 } from '@/lib/nutrition/history'
+import {
+  JANELAS_FIXAS,
+  periodoDaJanela,
+  resolverPeriodoPersonalizado,
+  rotuloPeriodo,
+  sufixoArquivo,
+  type NutritionPeriod,
+} from '@/lib/nutrition/historyPeriod'
+import { buildNutritionPeriodHtml } from '@/utils/report/buildNutritionPeriodHtml'
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 import { periodToContent } from '@/components/stories/nutritionStory'
 
 const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStoryComposer'), { ssr: false, loading: () => null })
 
-const JANELAS = [
-  { days: 7, label: '7 dias' },
-  { days: 30, label: '30 dias' },
-  { days: 90, label: '90 dias' },
-] as const
+const JANELAS = JANELAS_FIXAS.map((days) => ({ days, label: `${days} dias` }))
 
 /** "sex., 14 de ago." — só a PRIMEIRA letra sobe. */
 function primeiraMaiuscula(s: string): string {
@@ -66,11 +71,34 @@ type Props = {
 }
 
 export default function NutritionHistoryModal({ open, userId, todayDate, goals, onPickDate, onClose }: Props) {
-  const [janela, setJanela] = useState<number>(30)
+  // `number` = uma das janelas de um toque; `'custom'` = o intervalo digitado.
+  const [modo, setModo] = useState<number | 'custom'>(30)
+  const [inicioCustom, setInicioCustom] = useState('')
+  const [fimCustom, setFimCustom] = useState('')
+
+  // O período é DERIVADO do modo — não há um segundo estado guardando datas
+  // já resolvidas que pudesse discordar dos campos na tela.
+  //
+  // ⚠️ `useMemo` NÃO é otimização aqui, é correção: `periodo` entra nas
+  // dependências do efeito de busca, e um objeto novo a cada render faria o
+  // efeito rodar sempre — `setResultado` re-renderiza, o objeto muda de
+  // identidade, o efeito dispara de novo. Fetch em laço infinito contra o
+  // Supabase. Enquanto era o número `janela`, a identidade era estável de
+  // graça e o problema não existia.
+  const { periodo, erroPeriodo } = useMemo(() => {
+    if (modo !== 'custom') {
+      return { periodo: periodoDaJanela(todayDate, modo) as NutritionPeriod | null, erroPeriodo: '' }
+    }
+    const r = resolverPeriodoPersonalizado(inicioCustom, fimCustom, todayDate)
+    return r.ok
+      ? { periodo: r.periodo as NutritionPeriod | null, erroPeriodo: '' }
+      : { periodo: null, erroPeriodo: r.erro }
+  }, [modo, inicioCustom, fimCustom, todayDate])
+
   // Um estado só, CARIMBADO com a consulta que o produziu: trocar de janela
   // invalida o resultado no próprio render, sem um `setDias(null)` dentro do
   // efeito (que dispara renda em cascata e o ESLint reprova).
-  const chave = `${String(userId || '')}|${todayDate}|${janela}`
+  const chave = `${String(userId || '')}|${periodo?.inicio ?? ''}|${periodo?.fim ?? ''}`
   const [resultado, setResultado] = useState<{ chave: string; dias: NutritionHistoryDay[]; erro: boolean } | null>(null)
   const atual = resultado && resultado.chave === chave ? resultado : null
   const dias = atual?.dias ?? null
@@ -80,7 +108,9 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
 
   useEffect(() => {
     const uid = String(userId || '').trim()
-    if (!open || !uid) return
+    // Sem período resolvido (intervalo pela metade ou inválido) não há consulta
+    // a fazer — e disparar uma com data vazia devolveria a conta inteira.
+    if (!open || !uid || !periodo) return
     let cancelado = false
 
     void (async () => {
@@ -92,8 +122,8 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
           .from('nutrition_meal_entries')
           .select('date, calories, protein, carbs, fat')
           .eq('user_id', uid)
-          .gte('date', windowStartDate(todayDate, janela))
-          .lte('date', todayDate)
+          .gte('date', periodo.inicio)
+          .lte('date', periodo.fim)
         if (cancelado) return
         // O supabase-js entrega a falha no RETORNO, não como exceção: sem este
         // ramo, erro de leitura viraria "nenhum dia registrado" — a lista diria
@@ -106,12 +136,49 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
     })()
 
     return () => { cancelado = true }
-  }, [open, userId, todayDate, janela, chave])
+  }, [open, userId, periodo, chave])
 
-  const resumo = useMemo(() => summarizeHistory(dias, janela), [dias, janela])
+  const diasJanela = periodo?.dias ?? 0
+  const resumo = useMemo(() => summarizeHistory(dias, diasJanela), [dias, diasJanela])
 
   const [storyAberto, setStoryAberto] = useState(false)
-  const rotulo = periodLabel(janela)
+  const [pdf, setPdf] = useState<{ carregando: boolean; erro: string }>({ carregando: false, erro: '' })
+  const rotulo = periodLabel(diasJanela)
+
+  /**
+   * Salva o período em PDF (pedido do dono: levar ao nutricionista).
+   *
+   * No iPhone o helper abre o share sheet do iOS, então "baixar" e
+   * "compartilhar o arquivo" são o MESMO gesto — por isso existe um botão só,
+   * e o destino (Arquivos, WhatsApp, e-mail) é escolhido lá.
+   *
+   * ⚠️ Passa por `exportHtmlAsPdf` e nada mais: `window.print()` NÃO EXISTE no
+   * WKWebView, e quem o chama direto entrega um botão inerte no aparelho, em
+   * silêncio. Foi o que aconteceu com o "Baixar PDF" do relatório de período
+   * do histórico de treino, morto por um mês.
+   */
+  const salvarPdf = useCallback(async () => {
+    if (!periodo || !dias || pdf.carregando) return
+    setPdf({ carregando: true, erro: '' })
+    try {
+      const html = buildNutritionPeriodHtml({
+        periodo,
+        dias,
+        resumo,
+        metaKcal: goals?.calories ?? null,
+        emitidoEm: todayDate,
+      })
+      const res = await exportHtmlAsPdf({
+        html,
+        title: `Nutrição — ${rotuloPeriodo(periodo)}`,
+        baseFileName: `IronTracks_Nutricao_${sufixoArquivo(periodo)}`,
+      })
+      if (res.ok || res.via === 'cancelled') { setPdf({ carregando: false, erro: '' }); return }
+      setPdf({ carregando: false, erro: res.error || 'Não consegui gerar o arquivo.' })
+    } catch (e) {
+      setPdf({ carregando: false, erro: e instanceof Error ? e.message : 'Não consegui gerar o arquivo.' })
+    }
+  }, [periodo, dias, resumo, goals, todayDate, pdf.carregando])
 
   const abrirDia = useCallback((date: string) => {
     onPickDate(date)
@@ -149,22 +216,69 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
           </button>
         </div>
 
-        <div className="flex gap-2 border-b border-neutral-800 px-4 py-3">
-          {JANELAS.map((j) => (
-            <button
-              key={j.days}
-              type="button"
-              onClick={() => setJanela(j.days)}
-              aria-pressed={janela === j.days}
-              className={`tap-44 h-9 flex-1 rounded-xl px-3 text-xs t-action uppercase tracking-wider transition ${
-                janela === j.days
-                  ? 'border border-yellow-500/25 bg-yellow-500/10 text-yellow-400'
-                  : 'border border-neutral-800/60 bg-neutral-950 text-neutral-300 hover:bg-neutral-800/80'
-              }`}
-            >
-              {j.label}
-            </button>
-          ))}
+        <div className="border-b border-neutral-800 px-4 py-3">
+          <div className="flex gap-2">
+            {JANELAS.map((j) => (
+              <button
+                key={j.days}
+                type="button"
+                onClick={() => setModo(j.days)}
+                aria-pressed={modo === j.days}
+                className={`tap-44 h-9 flex-1 rounded-xl px-2 text-xs t-action uppercase tracking-wider transition ${
+                  modo === j.days
+                    ? 'border border-yellow-500/25 bg-yellow-500/10 text-yellow-400'
+                    : 'border border-neutral-800/60 bg-neutral-950 text-neutral-300 hover:bg-neutral-800/80'
+                }`}
+              >
+                {j.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setModo('custom')}
+            aria-pressed={modo === 'custom'}
+            className={`tap-44 mt-2 h-9 w-full rounded-xl px-3 text-xs t-action uppercase tracking-wider transition ${
+              modo === 'custom'
+                ? 'border border-yellow-500/25 bg-yellow-500/10 text-yellow-400'
+                : 'border border-neutral-800/60 bg-neutral-950 text-neutral-300 hover:bg-neutral-800/80'
+            }`}
+          >
+            Período personalizado
+          </button>
+
+          {modo === 'custom' && (
+            <div className="mt-2 flex items-end gap-2">
+              <label className="min-w-0 flex-1">
+                <span className="t-meta-inherit block text-[10px] text-neutral-400">De</span>
+                <input
+                  type="date"
+                  value={inicioCustom}
+                  max={todayDate}
+                  aria-label="Data inicial do período"
+                  onChange={(e) => setInicioCustom(e.target.value)}
+                  className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
+                />
+              </label>
+              <label className="min-w-0 flex-1">
+                <span className="t-meta-inherit block text-[10px] text-neutral-400">Até</span>
+                <input
+                  type="date"
+                  value={fimCustom}
+                  max={todayDate}
+                  aria-label="Data final do período"
+                  onChange={(e) => setFimCustom(e.target.value)}
+                  className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
+                />
+              </label>
+            </div>
+          )}
+
+          {/* A recusa precisa DIZER o que está errado. Um intervalo invertido
+              que devolvesse lista vazia leria como "você não comeu nada". */}
+          {erroPeriodo && (
+            <p className="mt-2 text-xs font-bold text-red-400" role="alert">{erroPeriodo}</p>
+          )}
         </div>
 
         {/* Resumo. A média é dos dias REGISTRADOS e a cobertura vem junto —
@@ -187,7 +301,11 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {dias === null ? (
+          {!periodo ? (
+            <p className="px-1 py-8 text-center text-sm text-neutral-400">
+              Escolha as duas datas para ver o período.
+            </p>
+          ) : dias === null ? (
             <p className="px-1 py-6 text-center text-sm text-neutral-400">Carregando…</p>
           ) : erro ? (
             <p className="px-1 py-6 text-center text-sm text-neutral-400">
@@ -234,24 +352,37 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
           )}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-neutral-800 px-4 py-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-neutral-400">
+        <div className="border-t border-neutral-800 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-neutral-400">
             <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="truncate">
               {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
             </span>
           </div>
-          {/* Sem dia registrado não há o que postar — e um story de "0 kcal em
-              média" seria uma afirmação falsa sobre a semana da pessoa. */}
-          <button
-            type="button"
-            onClick={() => setStoryAberto(true)}
-            disabled={resumo.loggedDays === 0}
-            className="tap-44 inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-yellow-500/25 bg-yellow-500/10 px-3 text-xs t-action uppercase tracking-wider text-yellow-400 disabled:opacity-40"
-          >
-            <Clapperboard className="h-4 w-4" aria-hidden="true" />
-            Compartilhar {rotulo.toLowerCase()}
-          </button>
+          {pdf.erro && <p className="mt-2 text-xs font-bold text-red-400" role="alert">{pdf.erro}</p>}
+          <div className="mt-2 flex items-center gap-2">
+            {/* Sem dia registrado não há o que postar nem o que exportar — e um
+                relatório de "0 kcal em média" seria uma afirmação falsa sobre o
+                período da pessoa, ainda por cima entregue ao nutricionista. */}
+            <button
+              type="button"
+              onClick={() => { void salvarPdf() }}
+              disabled={resumo.loggedDays === 0 || pdf.carregando}
+              className="tap-44 inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-yellow-500/25 bg-yellow-500/10 px-3 text-xs t-action uppercase tracking-wider text-yellow-400 disabled:opacity-40"
+            >
+              <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{pdf.carregando ? 'Gerando…' : 'Salvar PDF'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStoryAberto(true)}
+              disabled={resumo.loggedDays === 0}
+              aria-label={`Compartilhar ${rotulo.toLowerCase()} como story`}
+              className="tap-44 inline-flex h-9 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800/60 bg-neutral-950 text-neutral-300 disabled:opacity-40"
+            >
+              <Clapperboard className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {storyAberto && (
@@ -260,7 +391,10 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
             mode="period"
             content={periodToContent(resumo, goals, {
               periodLabel: rotulo,
-              rangeText: periodRangeText(todayDate, janela),
+              // O intervalo sai do PERÍODO, não de `todayDate`: num período
+              // personalizado que termina em julho, contar para trás a partir
+              // de hoje escreveria no story um intervalo que não é o exibido.
+              rangeText: periodRangeText(periodo?.fim ?? todayDate, diasJanela),
             })}
             onClose={() => setStoryAberto(false)}
           />
