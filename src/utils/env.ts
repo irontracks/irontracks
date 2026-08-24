@@ -7,6 +7,8 @@
 // - requireEnv só lança erro quando o valor é realmente acessado
 // - Isso previne crashes durante build, SSR e cold start
 
+import { DEFAULT_GEMINI_TEXT_MODEL } from '@/utils/ai/modelRegistry'
+
 const isDev = process.env.NODE_ENV === 'development'
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -45,17 +47,17 @@ export const env = {
   // ── Google Gemini ─────────────────────────────────────────
   gemini: {
     get apiKey() { return requireEnv('GOOGLE_GENERATIVE_AI_API_KEY') },
-    get modelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_MODEL_ID', 'gemini-1.5-pro') },
+    // ⚠️ NÃO escreva o nome de um modelo à mão aqui. O padrão mora em
+    // `utils/ai/modelRegistry.ts` — este default já foi `gemini-1.5-pro`, um
+    // modelo que o Google desligou em 24/09/2025, e ninguém percebeu por meses
+    // porque a env var de produção mascarava o buraco.
+    get modelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_MODEL_ID', DEFAULT_GEMINI_TEXT_MODEL) },
     // Fast model for heavy/long generations (meal plans, workout routines).
-    // Default matches production's modelId (gemini-2.5-flash) so behaviour is
-    // predictable — the REAL fix for the 30s timeout is the maxOutputTokens
-    // cap set per-route in those heavy handlers, not a model change. Kept as
-    // a separate getter so heavy routes can be bumped to an even-faster
-    // variant in the future without touching the lighter routes.
-    //
-    // Do NOT default to gemini-1.5-flash — that model 404s on the current
-    // API key / project. Only 2.x flash is reachable here.
-    get fastModelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_FAST_MODEL_ID', optionalEnv('GOOGLE_GENERATIVE_AI_MODEL_ID', 'gemini-2.5-flash')) },
+    // Mesmo default do modelId, mantido como getter separado para que as rotas
+    // pesadas possam ir para uma variante mais rápida no futuro sem tocar nas
+    // leves. O REAL conserto do timeout de 30s é o teto de `maxOutputTokens`
+    // por rota, não a troca de modelo.
+    get fastModelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_FAST_MODEL_ID', optionalEnv('GOOGLE_GENERATIVE_AI_MODEL_ID', DEFAULT_GEMINI_TEXT_MODEL)) },
   },
 
   // ── RevenueCat ────────────────────────────────────────────

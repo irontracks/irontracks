@@ -1,9 +1,10 @@
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { DEFAULT_GEMINI_TEXT_MODEL } from '@/utils/ai/modelRegistry'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { env } from '@/utils/env'
 
-const VIDEO_AI_MODEL_ID = env.gemini.modelId || 'gemini-2.5-flash'
+const VIDEO_AI_MODEL_ID = env.gemini.modelId || DEFAULT_GEMINI_TEXT_MODEL
 
 const extractJson = (raw: string) => {
   const text = String(raw || '').trim()
