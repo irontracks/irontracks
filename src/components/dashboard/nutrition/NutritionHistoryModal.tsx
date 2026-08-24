@@ -11,7 +11,7 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, Clapperboard, FileDown, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, EyeOff, FileDown, UtensilsCrossed } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
@@ -34,6 +34,8 @@ import {
   sufixoArquivo,
   type NutritionPeriod,
 } from '@/lib/nutrition/historyPeriod'
+import { diasSugeridos } from '@/lib/nutrition/incompleteDay'
+import { useNutritionDayFlags } from '@/hooks/useNutritionDayFlags'
 import { buildNutritionPeriodHtml } from '@/utils/report/buildNutritionPeriodHtml'
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 import { periodToContent } from '@/components/stories/nutritionStory'
@@ -139,7 +141,15 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
   }, [open, userId, periodo, chave])
 
   const diasJanela = periodo?.dias ?? 0
-  const resumo = useMemo(() => summarizeHistory(dias, diasJanela), [dias, diasJanela])
+  const { marcados, erro: erroMarcas, alternar } = useNutritionDayFlags(userId, periodo?.inicio ?? null, periodo?.fim ?? null)
+
+  // A MESMA função calcula a média com e sem os dias marcados — duas contas
+  // para o mesmo número é como nasce divergência entre a tela e o exportado.
+  const resumo = useMemo(() => summarizeHistory(dias, diasJanela, marcados), [dias, diasJanela, marcados])
+
+  // Candidatos que o app aponta. Sugerir é tudo o que ele faz: quem decide o
+  // que conta como registro completo é o dono do dado.
+  const sugeridos = useMemo(() => new Set(diasSugeridos(dias, marcados)), [dias, marcados])
 
   const [storyAberto, setStoryAberto] = useState(false)
   const [pdf, setPdf] = useState<{ carregando: boolean; erro: string }>({ carregando: false, erro: '' })
@@ -167,6 +177,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
         resumo,
         metaKcal: goals?.calories ?? null,
         emitidoEm: todayDate,
+        excluidos: marcados,
       })
       const res = await exportHtmlAsPdf({
         html,
@@ -178,7 +189,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
     } catch (e) {
       setPdf({ carregando: false, erro: e instanceof Error ? e.message : 'Não consegui gerar o arquivo.' })
     }
-  }, [periodo, dias, resumo, goals, todayDate, pdf.carregando])
+  }, [periodo, dias, resumo, goals, todayDate, marcados, pdf.carregando])
 
   const abrirDia = useCallback((date: string) => {
     onPickDate(date)
@@ -324,26 +335,36 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
             </div>
           ) : (
             <ul className="space-y-2">
-              {dias.map((d) => (
-                <li key={d.date}>
+              {dias.map((d) => {
+                const foraDaMedia = marcados.has(d.date)
+                const sugerido = sugeridos.has(d.date)
+                return (
+                <li key={d.date} className="flex items-stretch gap-2">
                   <button
                     type="button"
                     onClick={() => abrirDia(d.date)}
                     // A linha inteira é UM controle: sem o rótulo, o leitor de
                     // tela anuncia seis fragmentos soltos (data, P, C, G,
                     // refeições, número) e nenhum deles diz o que o toque faz.
-                    aria-label={`Abrir ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeição${d.meals === 1 ? '' : 'ões'}`}
-                    className="flex w-full items-center gap-3 rounded-xl border border-neutral-800/60 bg-neutral-950 px-3 py-3 text-left transition active:scale-[0.99] hover:bg-neutral-800/50"
+                    aria-label={`Abrir ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeição${d.meals === 1 ? '' : 'ões'}${foraDaMedia ? ', fora da média' : ''}`}
+                    className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-neutral-800/60 bg-neutral-950 px-3 py-3 text-left transition active:scale-[0.99] hover:bg-neutral-800/50 ${foraDaMedia ? 'opacity-45' : ''}`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-neutral-100">
                         {rotuloData(d.date, todayDate)}
                       </div>
-                      <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-neutral-400">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-400">
                         <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(d.protein)}g</span>
                         <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(d.carbs)}g</span>
                         <span style={{ color: MACRO_COLORS.fat }}>G {Math.round(d.fat)}g</span>
                         <span>· {d.meals} refeiç{d.meals === 1 ? 'ão' : 'ões'}</span>
+                        {foraDaMedia && <span className="text-[10px] font-bold text-neutral-400">· fora da média</span>}
+                        {/* Só um convite, em cinza: o dia AINDA conta, e pintar
+                            a sugestão de dourado ou vermelho afirmaria algo que
+                            o app não sabe. Quem decide é o dono do dado. */}
+                        {!foraDaMedia && sugerido && (
+                          <span className="text-[10px] font-bold text-neutral-400">· parece incompleto</span>
+                        )}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
@@ -351,8 +372,30 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                       <div className="text-[11px] text-neutral-400">kcal</div>
                     </div>
                   </button>
+                  {/* Controle SEPARADO do "abrir o dia": são duas ações
+                      diferentes, e o leitor de tela precisa poder alcançar as
+                      duas. Ícone e nome dizem o efeito na MÉDIA, não "marcar" —
+                      é o efeito que o usuário está procurando. */}
+                  <button
+                    type="button"
+                    onClick={() => { void alternar(d.date, !foraDaMedia) }}
+                    aria-pressed={foraDaMedia}
+                    aria-label={foraDaMedia
+                      ? `Voltar ${rotuloData(d.date, todayDate)} para a média`
+                      : `Tirar ${rotuloData(d.date, todayDate)} da média (registro incompleto)`}
+                    className={`tap-44 flex w-11 shrink-0 items-center justify-center rounded-xl border transition ${
+                      foraDaMedia
+                        ? 'border-neutral-700 bg-neutral-800 text-neutral-200'
+                        : sugerido
+                          ? 'border-neutral-700/80 bg-neutral-900 text-neutral-300'
+                          : 'border-neutral-800/60 bg-neutral-950 text-neutral-400'
+                    }`}
+                  >
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  </button>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
         </div>
@@ -362,9 +405,15 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
             <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="truncate">
               {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
+              {/* A tela precisa DIZER que excluiu. Uma média que muda sem
+                  explicação é pior que a média contaminada: o usuário deixa de
+                  confiar nos dois números. */}
+              {resumo.excludedDays > 0 && ` · ${resumo.excludedDays} fora da média`}
             </span>
           </div>
-          {pdf.erro && <p className="mt-2 text-xs font-bold text-red-400" role="alert">{pdf.erro}</p>}
+          {(pdf.erro || erroMarcas) && (
+            <p className="mt-2 text-xs font-bold text-red-400" role="alert">{pdf.erro || erroMarcas}</p>
+          )}
           <div className="mt-2 flex items-center gap-2">
             {/* Sem dia registrado não há o que postar nem o que exportar — e um
                 relatório de "0 kcal em média" seria uma afirmação falsa sobre o

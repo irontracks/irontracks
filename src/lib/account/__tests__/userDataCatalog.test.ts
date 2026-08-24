@@ -27,7 +27,7 @@ import {
   USER_PREFIX_BUCKETS,
 } from '@/lib/account/userDataCatalog'
 
-/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — 22/08/2026 */
+/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — 24/08/2026 */
 const PROD_TABLES_SNAPSHOT = [
   'access_requests', 'active_workout_sessions', 'admin_emails', 'app_payments', 'app_plans',
   'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events', 'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
@@ -37,7 +37,7 @@ const PROD_TABLES_SNAPSHOT = [
   'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'invites', 'lab_exam_files',
   'lab_exams', 'lab_result_markers', 'lab_results', 'live_activity_push_tokens', 'marketplace_payments',
   'marketplace_subscriptions', 'mercadopago_webhook_events', 'muscle_weekly_summaries', 'notifications',
-  'nutrition_custom_foods', 'nutrition_favorite_meals', 'nutrition_goals', 'nutrition_learned_foods',
+  'nutrition_custom_foods', 'nutrition_day_flags', 'nutrition_favorite_meals', 'nutrition_goals', 'nutrition_learned_foods',
   'nutrition_meal_entries', 'onboarding_events', 'password_recovery_codes', 'phone_verifications', 'photos',
   'profiles', 'referrals', 'rest_day_intents', 'sets', 'sets_audit', 'social_follows', 'social_stories',
   'social_story_comments', 'social_story_likes', 'social_story_reactions', 'social_story_views',

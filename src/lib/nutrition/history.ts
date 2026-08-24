@@ -70,8 +70,18 @@ export function aggregateEntriesByDay(rows: NutritionHistoryEntryRow[] | null | 
 }
 
 export type NutritionHistorySummary = {
-  /** Dias COM lançamento na janela. */
+  /** Dias COM lançamento na janela que ENTRAM na conta (já sem os marcados). */
   loggedDays: number
+  /**
+   * Dias que o usuário marcou como registro incompleto e que por isso saíram
+   * das médias E do denominador.
+   *
+   * Sai junto com o resto porque a tela precisa DIZER que excluiu: uma média
+   * que muda sem explicação é pior que a média contaminada — o usuário perde a
+   * confiança nos dois números. Medido na base do dono (24/08/2026): 11 dos 68
+   * dias eram registro parcial, e a média ia de 2.199 para 2.493.
+   */
+  excludedDays: number
   /** Tamanho da janela em dias — o denominador honesto da cobertura. */
   windowDays: number
   /** Médias sobre os dias REGISTRADOS (ver abaixo). 0 quando não há nenhum. */
@@ -106,12 +116,28 @@ export type NutritionHistorySummary = {
  * 2400 — um número inventado com cara de medição, que é exatamente o defeito
  * do `workout_calories: 300` que já saiu do heatmap.
  */
-export function summarizeHistory(days: NutritionHistoryDay[] | null | undefined, windowDays: number): NutritionHistorySummary {
-  const lista = Array.isArray(days) ? days : []
+export function summarizeHistory(
+  days: NutritionHistoryDay[] | null | undefined,
+  windowDays: number,
+  /**
+   * Dias marcados como registro incompleto (`nutrition_day_flags`). Saem da
+   * média E do denominador — um dia em que a pessoa lançou só o café não é um
+   * dia de 580 kcal, é um dia sem dado.
+   *
+   * Parâmetro opcional de propósito: o story e outros chamadores continuam
+   * funcionando sem saber que isto existe, e quem passa o conjunto recebe o
+   * número limpo pela MESMA função. Duas contas para a mesma média é como
+   * nasce divergência entre a tela e o que foi exportado.
+   */
+  excluded?: ReadonlySet<string> | null,
+): NutritionHistorySummary {
+  const todos = Array.isArray(days) ? days : []
+  const lista = excluded?.size ? todos.filter((d) => !excluded.has(d.date)) : todos
+  const excludedDays = todos.length - lista.length
   const loggedDays = lista.length
   if (!loggedDays) {
     return {
-      loggedDays: 0, windowDays,
+      loggedDays: 0, excludedDays, windowDays,
       avgCalories: 0, avgProtein: 0, avgCarbs: 0, avgFat: 0,
       totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0,
     }
@@ -129,6 +155,7 @@ export function summarizeHistory(days: NutritionHistoryDay[] | null | undefined,
 
   return {
     loggedDays,
+    excludedDays,
     windowDays,
     avgCalories: media(totalCalories),
     avgProtein: media(totalProtein),

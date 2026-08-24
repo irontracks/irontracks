@@ -13,12 +13,21 @@ import NutritionHistoryModal from '@/components/dashboard/nutrition/NutritionHis
 
 const resposta = { data: [] as unknown[], error: null as unknown }
 
+// Distinguir a TABELA é obrigatório: `nutrition_day_flags` tem a mesma cadeia
+// select→eq→gte→lte, e um mock que ignora o nome devolveria as refeições como
+// se fossem marcas de "dia incompleto" — sumindo com todos os dias da média.
 vi.mock('@/utils/supabase/client', () => ({
     createClient: () => ({
-        from: () => ({
+        from: (tabela: string) => ({
             select: () => ({
-                eq: () => ({ gte: () => ({ lte: () => Promise.resolve(resposta) }) }),
+                eq: () => ({
+                    gte: () => ({
+                        lte: () => Promise.resolve(tabela === 'nutrition_day_flags' ? { data: [], error: null } : resposta),
+                    }),
+                }),
             }),
+            insert: () => Promise.resolve({ error: null }),
+            delete: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
         }),
     }),
 }))
