@@ -1897,6 +1897,47 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## A semana do app começa no DOMINGO (24/08/2026) — e "treino" tem piso
+
+Duas queixas no mesmo dia sobre o push "Resumo da semana 📊", com causas
+DIFERENTES. Fui ao banco antes de mexer, e só uma era bug.
+
+**1. Semana domingo→sábado, em BRT.** Decisão do dono: a Fran treinou domingo a
+sexta (6 treinos) e o resumo disse 5, porque o app fechava segunda→domingo
+(ISO) e o domingo dela caía na semana anterior. **A agenda já começava no
+domingo** — o resto do app é que estava fora de linha. Fonte única em
+`utils/cron/weekRangeBrt.ts`; consumidores: `weekly-recap`, `muscle-map-week`
+(+ cron de insights), `weekly-summary` e `leaderboard`. O defeito não era um
+cálculo errado — eram **três** cálculos escritos à mão, e nenhum teste cobria a
+fronteira. Guard de classe: `__tests__/semanaComecaNoDomingo.test.ts`.
+
+**Ficam FORA, de propósito** (allowlist do guard, com motivo): o reset de cota
+VIP (`utils/vip/weekReset.ts`, segunda 03:00 BRT — é regra de cobrança, mexer
+ali muda quando o crédito volta) e a grade do `WorkoutCalendarModal` (alinha
+colunas, não define intervalo).
+
+⚠️ **Transição:** `muscle_weekly_summaries.week_start_date` tem SEGUNDAS antes
+de 24/08 e DOMINGOS depois. Nada foi apagado (é cache recalculável), e a rota
+que lê "a mais recente" filtra `lte(semana corrente)` — senão a segunda órfã
+vence o `order desc` e mostra a semana errada.
+
+**2. Sessão de 1 série não é treino** (`lib/workout/countsAsWorkout.ts`). O
+dono recebeu "7 treinos" tendo feito 5: as duas linhas a mais eram uma sessão
+de **62 s com 1 série** (duplicata do treino da manhã) e outra de **11 min com
+1 série**. O cron somava LINHAS de `workouts`, sem olhar dentro e sem exigir
+`completed_at`. O corte foi **medido antes de escolhido** — 120 dias de
+produção: 0 séries = 7 sessões (≤2 min), 1 série = 5 sessões (máx 11 min),
+**2 séries = ZERO**, 3 séries = 2 sessões. Não existe sessão legítima com 1 ou
+2 séries. Piso: **2 séries concluídas**, ou 1 série com **≥15 min** (essa
+porta existe pelo CARDIO, em que a corrida inteira é um único log).
+
+**O volume por músculo continua somando tudo** — uma série feita é volume real.
+Quem ganhou critério é o CONTADOR mostrado ao usuário.
+
+Bug extra achado no caminho: o ranking fazia `monday.setDate(getDate() -
+getDay() + 1)`, que **no domingo aponta para amanhã** — o ranking da semana
+ficava zerado o domingo inteiro.
+
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 
