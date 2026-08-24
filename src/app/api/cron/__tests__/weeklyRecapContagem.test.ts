@@ -81,10 +81,13 @@ describe('weekly-recap — a contagem que vai no push', () => {
     expect(notifs).toHaveLength(0)
   })
 
-  it('a janela consultada é BRT e exclui a segunda seguinte', async () => {
+  it('a janela é domingo→sábado em BRT, não segunda→domingo em UTC', async () => {
     await GET(req())
-    expect(query.gte).toBe('2026-08-17T03:00:00.000Z')
-    expect(query.lt).toBe('2026-08-24T03:00:00.000Z')
+    // Domingo 16/08 00:00 BRT (inclusivo) → domingo 23/08 00:00 BRT (exclusivo).
+    // Era `'2026-08-17'` a `'2026-08-24'` em UTC: perdia o domingo e ainda
+    // começava às 21h do domingo anterior.
+    expect(query.gte).toBe('2026-08-16T03:00:00.000Z')
+    expect(query.lt).toBe('2026-08-23T03:00:00.000Z')
   })
 
   it('só sessão CONCLUÍDA entra — rascunho não é treino', async () => {

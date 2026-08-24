@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
+import { currentWeekRangeBrt } from '@/utils/cron/weekRangeBrt'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { buildStreakDays, calcStreak } from '@/lib/social/streak'
@@ -97,10 +98,12 @@ export async function GET(req: Request) {
     const allIds = [...new Set([userId, ...friendIds])]
 
     // ── Parallel fetch: profiles + week workouts + streak dates ───────
-    const monday = new Date()
-    monday.setDate(monday.getDate() - monday.getDay() + 1)
-    monday.setHours(0, 0, 0, 0)
-    const weekStart = monday.toISOString()
+    // Semana do app: domingo→sábado, BRT (fonte única em `weekRangeBrt`).
+    // Duas correções aqui: a fronteira era SEGUNDA e usava o relógio local do
+    // servidor — que na Vercel é UTC, então a semana virava às 21h de domingo.
+    // Pior: com `- getDay() + 1`, no DOMINGO o início caía em amanhã e o
+    // ranking da semana aparecia zerado para todo mundo o dia inteiro.
+    const weekStart = currentWeekRangeBrt().startIso
 
     const streakWindowStart = new Date()
     streakWindowStart.setDate(streakWindowStart.getDate() - 90)
