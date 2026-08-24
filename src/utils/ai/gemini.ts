@@ -1,5 +1,6 @@
 import { GoogleGenAI, type GenerateContentParameters } from '@google/genai'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logWarnRemote } from '@/lib/logger'
+import { DEFAULT_GEMINI_TEXT_MODEL, resolveGeminiModel } from './modelRegistry'
 
 /**
  * Wrapper único sobre o SDK oficial @google/genai (substituiu o deprecado
@@ -15,8 +16,13 @@ import { logWarn } from '@/lib/logger'
  *    falha ou demora mais que {@link PRIMARY_TIMEOUT_MS}.
  */
 
-/** Modelo de fallback — estável e rápido. */
-const FALLBACK_MODEL = 'gemini-2.5-flash'
+/**
+ * Modelo de fallback — estável e rápido. Vem do registro para não virar um
+ * segundo lugar onde um modelo morto pode se esconder: em 24/08/2026 este
+ * arquivo apontava para `gemini-2.5-flash`, que tem desligamento anunciado
+ * para ≥ 16/10/2026, ou seja, o "plano B" tinha data de validade.
+ */
+const FALLBACK_MODEL = DEFAULT_GEMINI_TEXT_MODEL
 
 /** Se o primário não responder neste tempo, usamos o fallback. */
 const PRIMARY_TIMEOUT_MS = 12_000
@@ -50,10 +56,16 @@ export interface GeminiModelShim {
 }
 
 /**
- * `gemini-2.5-flash` (e flash-lite) habilita "thinking" por padrão; os tokens
- * de raciocínio consomem o budget de saída ANTES da resposta visível,
- * truncando JSON estruturado (finishReason MAX_TOKENS). `thinkingBudget: 0`
- * desliga. O 2.5 Pro NÃO permite desligar — por isso só aplicamos em flash.
+ * Os modelos flash habilitam "thinking" por padrão; os tokens de raciocínio
+ * consomem o budget de saída ANTES da resposta visível, truncando JSON
+ * estruturado (finishReason MAX_TOKENS). `thinkingBudget: 0` desliga. Os
+ * modelos `pro` NÃO permitem desligar — por isso só aplicamos em flash.
+ *
+ * Medido em 24/08/2026 contra a API, já no `gemini-3.1-flash-lite`: com o
+ * budget zerado a resposta vem com `thoughtsTokenCount: 0`; sem ele, o
+ * `gemini-2.5-flash` gastava 78 tokens de raciocínio no MESMO prompt de duas
+ * linhas. A doc do Gemini 3 diz que "thinking não pode ser desligado" — na
+ * prática a API aceita o budget 0 e o respeita, então isto continua valendo.
  */
 function buildConfig(model: string, generationConfig: GeminiGenerationConfig): Record<string, unknown> {
   const cfg: Record<string, unknown> = { ...generationConfig }
@@ -64,14 +76,40 @@ function buildConfig(model: string, generationConfig: GeminiGenerationConfig): R
 }
 
 /**
+ * Modelos já avisados neste processo. Sem isso, uma env desatualizada geraria
+ * um evento de Sentry por REQUEST — o aviso viraria ruído e seria silenciado,
+ * que é o oposto do que ele existe para fazer.
+ */
+const warnedModels = new Set<string>()
+
+/**
  * Cria um "modelo" Gemini (shim) com thinking desligado por padrão e fallback
  * automático para um modelo estável.
+ *
+ * O `model` pedido passa pelo registro ANTES de qualquer chamada: modelo já
+ * desligado pelo Google (ou com desligamento anunciado) é substituído pelo
+ * padrão do app. É aqui, e não no default da env, porque o valor que chega em
+ * produção vem de uma env var — e env var desatualizada é exatamente o caso
+ * que o saneamento precisa cobrir.
  */
 export function getGeminiModel(
   apiKey: string,
-  model: string,
+  requestedModel: string,
   generationConfig: GeminiGenerationConfig = {},
 ): GeminiModelShim {
+  const resolution = resolveGeminiModel(requestedModel)
+  const model = resolution.modelId
+  if (resolution.replacedReason && resolution.replacedReason !== 'empty' && !warnedModels.has(resolution.requested)) {
+    warnedModels.add(resolution.requested)
+    try {
+      logWarnRemote(
+        'ai:gemini',
+        `Modelo "${resolution.requested}" está ${resolution.replacedReason === 'retired' ? 'desligado' : 'em retirada'}; usando "${model}"`,
+        { requested: resolution.requested, used: model, reason: resolution.replacedReason },
+      )
+    } catch { /* aviso nunca pode derrubar a chamada de IA */ }
+  }
+
   const ai = new GoogleGenAI({ apiKey })
 
   const callOnce = async (m: string, contents: GeminiContents): Promise<GeminiResult> => {
