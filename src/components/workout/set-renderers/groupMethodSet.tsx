@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, ChevronDown, MessageSquare, Pencil } from 'lucide-react';
+import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { FailureToggle } from './FailureToggle';
 import {
