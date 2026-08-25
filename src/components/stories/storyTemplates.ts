@@ -1,4 +1,19 @@
 /**
+ * ⚠️ A MARCA É UMA PALAVRA SÓ: IRONTRACKS.
+ *
+ * Até 25/08/2026 cada template trazia um `brandDivider` — ' · ', ' / ',
+ * ' 🇧🇷 ' — e a marca saía "IRON · TRACKS", "IRON / TRACKS". Pior: os layouts
+ * `live`, `group` e `workout` desenhavam por outro caminho, SEM divisor, então
+ * trocar de layout trocava a grafia do nome. Duas escritas do mesmo nome, no
+ * mesmo produto, na peça que vai para a rede social.
+ *
+ * Cor, fonte, peso e itálico variam por template — é para isso que o template
+ * existe. A GRAFIA do nome, não: é a única coisa que precisa sair idêntica de
+ * toda peça. O campo foi REMOVIDO, não zerado, para ninguém repor sem pensar.
+ * Guard: `src/components/__tests__/marcaUmaPalavraSo.test.ts`.
+ */
+
+/**
  * storyTemplates.ts
  *
  * Registry de ESTILOS (templates) do Story do Instagram. Cada template é só
@@ -12,7 +27,6 @@
 export interface StoryTemplateColors {
   brandPrimary: string // "IRON"
   brandAccent: string // "TRACKS"
-  brandDot: string // separador " · " (layouts standard)
   title: string
   subtitle: string
   value: string // valor do card
@@ -65,7 +79,6 @@ export interface StoryTemplate {
   /** Título em CAIXA ALTA (true) ou como digitado (false). */
   titleUppercase: boolean
   /** Separador entre IRON e TRACKS nos layouts standard (ex.: ' · ', ' — ', ''). */
-  brandDivider: string
 }
 
 // Fontes JÁ instaladas no iOS/macOS (renderizam no canvas sem carregar nada).
@@ -92,7 +105,6 @@ const CLASSIC_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#facc15',
-    brandDot: 'rgba(250,204,21,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(255,255,255,0.85)',
     value: '#ffffff',
@@ -127,7 +139,6 @@ const CLASSIC_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 28, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' · ',
 }
 
 // ── 2. Noir (serifada, editorial, sem linha de acento) ───────────────────────
@@ -138,7 +149,6 @@ const NOIR_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#e5e5e5',
-    brandDot: 'rgba(255,255,255,0.45)',
     title: '#ffffff',
     subtitle: 'rgba(255,255,255,0.80)',
     value: '#ffffff',
@@ -173,7 +183,6 @@ const NOIR_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 20, accentHeight: 2, showAccentLine: false },
   titleUppercase: false,
-  brandDivider: '',
 }
 
 // ── 3. Sunset (quente, coral/laranja) ────────────────────────────────────────
@@ -184,7 +193,6 @@ const SUNSET_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#fb7185',
-    brandDot: 'rgba(251,146,60,0.6)',
     title: '#fff7ed',
     subtitle: 'rgba(255,237,213,0.88)',
     value: '#ffffff',
@@ -219,7 +227,6 @@ const SUNSET_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 28, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' · ',
 }
 
 // ── 4. Ocean (ciano/azul) ────────────────────────────────────────────────────
@@ -230,7 +237,6 @@ const OCEAN_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#38bdf8',
-    brandDot: 'rgba(56,189,248,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(224,242,254,0.88)',
     value: '#ffffff',
@@ -265,7 +271,6 @@ const OCEAN_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 24, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' / ',
 }
 
 // ── 5. Lime (alto contraste, verde-limão, bold) ──────────────────────────────
@@ -276,7 +281,6 @@ const LIME_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#a3e635',
-    brandDot: 'rgba(163,230,53,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(236,252,203,0.85)',
     value: '#a3e635',
@@ -311,7 +315,6 @@ const LIME_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 16, accentHeight: 4, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: '',
 }
 
 // ── 6. Brasil (verde/amarelo/azul — clima de Copa, bandeirinha 🇧🇷 no divisor) ─
@@ -322,7 +325,6 @@ const BRASIL_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#ffdf00',
-    brandDot: 'rgba(255,223,0,0.55)',
     title: '#00d95f', // verde bandeira (vivo p/ legibilidade no fundo escuro)
     subtitle: 'rgba(220,252,231,0.88)',
     value: '#ffdf00',
@@ -357,7 +359,6 @@ const BRASIL_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 28, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' 🇧🇷 ',
 }
 
 export const STORY_TEMPLATES: StoryTemplate[] = [

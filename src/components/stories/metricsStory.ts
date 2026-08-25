@@ -174,14 +174,8 @@ export const drawMetricsStory = ({
   ctx.fillStyle = C.brandPrimary
   ctx.fillText('IRON', left, brandY)
   const ironW = ctx.measureText('IRON').width
-  const divider = template.brandDivider
-  ctx.fillStyle = C.brandDot
-  ctx.font = f(F.brandWeight, Math.round(brandSize * 0.55), F.brandStyle)
-  const dotW = divider ? ctx.measureText(divider).width : 0
-  if (divider) ctx.fillText(divider, left + ironW, brandY + brandSize * 0.22)
-  ctx.font = f(F.brandWeight, brandSize, F.brandStyle)
   ctx.fillStyle = C.brandAccent
-  ctx.fillText('TRACKS', left + ironW + dotW, brandY)
+  ctx.fillText('TRACKS', left + ironW, brandY)
   ctx.restore()
 
   // ── Título ─────────────────────────────────────────────────────────────────

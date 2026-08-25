@@ -68,14 +68,31 @@ export const SAFE_TOP = 168;
 export const SAFE_BOTTOM = 200;
 export const SAFE_SIDE = 56;
 
+/**
+ * Os layouts oferecidos ao usuário.
+ *
+ * Eram sete até 25/08/2026. Saíram **Topo**, **LIVE** e **Grupo** (decisão do
+ * dono) quando o HORÁRIO passou a ser independente do layout, como a marca:
+ *
+ *  - `live` existia para arrastar as peças. Com marca, legenda e horário já
+ *    arrastáveis em qualquer layout, ele deixou de ser um layout e virou uma
+ *    duplicata dos outros com as posições soltas.
+ *  - `group` usava a mesma engine do `live` — a mesma duplicata, com outro nome.
+ *  - `top-row` era o único que o dono não usava, e competia com o `bottom-row`
+ *    sem oferecer decisão diferente.
+ *
+ * Quatro opções, cada uma com um propósito distinto: onde os cards ficam
+ * (embaixo, à direita, à esquerda) ou a tabela de exercícios.
+ *
+ * ⚠️ Quem tiver um layout antigo em memória cai no fallback de
+ * `renderStoryFrame` (`STORY_LAYOUTS.some(...) ? layout : 'bottom-row'`) — por
+ * isso remover daqui é seguro, e por isso esse fallback não pode sumir.
+ */
 export const STORY_LAYOUTS: LayoutOption[] = [
     { id: 'bottom-row', label: 'Normal' },
     { id: 'right-stack', label: 'Direita' },
     { id: 'left-stack', label: 'Esquerda' },
-    { id: 'top-row', label: 'Topo' },
     { id: 'workout', label: 'Treino' },
-    { id: 'live', label: 'LIVE' },
-    { id: 'group', label: 'Grupo' },
 ];
 
 // Safe-area-aware defaults for LIVE layout
@@ -403,6 +420,7 @@ export const drawStory = ({
     workoutTransform,
     brandOffset,
     brandScale,
+    timeOffset,
     customText,
     customTextOffset,
 }: {
@@ -420,6 +438,11 @@ export const drawStory = ({
     workoutTransform?: { scale: number; offsetX: number; offsetY: number };
     /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
     brandOffset?: { x: number; y: number };
+    /**
+     * Deslocamento próprio do HORÁRIO, mesmo contrato do `brandOffset`.
+     * Independente do layout e imune ao zoom/pan do bloco.
+     */
+    timeOffset?: { x: number; y: number };
     /** Escala própria da marca (pinça sobre o logo). */
     brandScale?: number;
     /** Legenda livre do usuário, na tipografia do template. */
@@ -475,6 +498,7 @@ export const drawStory = ({
     const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
     // Offset SÓ da marca (aplicado dentro do transform geral, nos blocos de brand).
     const bOff = clampBrandOffset(brandOffset);
+    const tOff = clampBrandOffset(timeOffset);
     if (wtApplied) {
         ctx.save();
         ctx.translate(wt.offsetX, wt.offsetY);
@@ -766,6 +790,10 @@ export const drawStory = ({
         ctx.textAlign = 'left';
         ctx.letterSpacing = '0px';
         if (wtApplied) ctx.restore();
+        // O horário vem DEPOIS do restore: ele é independente do zoom/pan do
+        // bloco, como a marca. Antes deste ponto, este caminho retornava sem
+        // desenhar horário nenhum — o layout "Treino" saía sem ele.
+        drawTimePill(ctx, { C, f, right, safeBottomY, offset: tOff });
         return;
     }
 
@@ -790,17 +818,14 @@ export const drawStory = ({
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
+    // IRONTRACKS: uma palavra. Duas cores, zero separador — ver a nota no topo
+    // de `storyTemplates.ts`. Este caminho já foi o único que inseria ' · ',
+    // enquanto live/group/workout desenhavam junto: a mesma marca, escrita de
+    // dois jeitos conforme o layout.
     ctx.fillText('IRON', left, brandY);
     const ironW = ctx.measureText('IRON').width;
-    // separator (varia por template — pode ser '', ' · ', ' — ', ' / ')
-    const divider = template.brandDivider;
-    ctx.fillStyle = C.brandDot;
-    ctx.font = f(F.brandWeight, Math.round(brandFontSize * 0.55), F.brandStyle);
-    const dotW = divider ? ctx.measureText(divider).width : 0;
-    if (divider) ctx.fillText(divider, left + ironW, brandY + brandFontSize * 0.22);
-    ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
     ctx.fillStyle = C.brandAccent;
-    ctx.fillText('TRACKS', left + ironW + dotW, brandY);
+    ctx.fillText('TRACKS', left + ironW, brandY);
     ctx.restore();
 
     // ── Workout title — wrapping text ─────────────────────────────────────────
@@ -921,43 +946,8 @@ export const drawStory = ({
     // ── Draw cards ────────────────────────────────────────────────────────────
     cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
 
-    // ── Timestamp badge — bottom-right, inside safe-bottom zone ──────────────
-    (() => {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        if (!timeStr) return;
-
-        ctx.save();
-        const fontSize = 32;
-        ctx.font = f('900', fontSize);
-        const timeW = ctx.measureText(timeStr).width;
-
-        const padX = 18;
-        const padY = 10;
-        const pillW = timeW + padX * 2;
-        const pillH = fontSize + padY * 2;
-        // Place in bottom-right, centered vertically inside SAFE_BOTTOM zone
-        const pillX = right - pillW;
-        const pillY = safeBottomY + (SAFE_BOTTOM - pillH) / 2;
-
-        // Glass background
-        drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 14);
-        ctx.fillStyle = C.timeFill;
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = C.timeBorder;
-        ctx.stroke();
-
-        // Time text
-        ctx.font = f('900', fontSize);
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = C.timeText;
-        ctx.shadowColor = 'rgba(0,0,0,0.7)';
-        ctx.shadowBlur = 6;
-        ctx.fillText(timeStr, pillX + padX, pillY + padY);
-
-        ctx.restore();
-    })();
+    // O horário é INDEPENDENTE do layout, como a marca — ver `drawTimePill`.
+    drawTimePill(ctx, { C, f, right, safeBottomY, offset: tOff });
 
     if (wtApplied) ctx.restore();
 
@@ -966,6 +956,69 @@ export const drawStory = ({
     // bloco), como a marca — ver customText.ts.
     drawCustomTextLayer(ctx, template, String(customText ?? ''), customTextOffset);
 };
+
+/**
+ * A pílula do HORÁRIO — desenhada em TODOS os layouts, com posição própria.
+ *
+ * Até 25/08/2026 ela morava no fim do caminho padrão de `renderStoryFrame`, e
+ * os layouts que retornavam antes (`workout`, e os extintos `live`/`group`)
+ * simplesmente não tinham horário. Ou seja: um elemento da peça aparecia ou
+ * sumia conforme uma escolha que nada tem a ver com ele. Relato do dono, que
+ * pediu o horário "independente do layout, igual o IRONTRACKS".
+ *
+ * O `offset` é o mesmo contrato da marca (`brandOffset`): deslocamento em
+ * pixels de canvas a partir da âncora, arrastado pelo usuário e imune ao
+ * zoom/pan do bloco — por isso o desenho acontece FORA de qualquer transform
+ * do bloco, com `save`/`restore` próprios.
+ */
+export function drawTimePill(
+    ctx: CanvasRenderingContext2D,
+    opts: {
+        C: { timeFill: string; timeBorder: string; timeText: string }
+        f: (weight: string, size: number, style?: 'italic' | 'normal') => string
+        right: number
+        safeBottomY: number
+        offset?: Offset | null
+    },
+): void {
+    const { C, f, right, safeBottomY } = opts
+    const now = new Date()
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    if (!timeStr) return
+
+    ctx.save()
+    const fontSize = 32
+    ctx.font = f('900', fontSize)
+    const timeW = ctx.measureText(timeStr).width
+
+    const padX = 18
+    const padY = 10
+    const pillW = timeW + padX * 2
+    const pillH = fontSize + padY * 2
+
+    // Âncora: canto inferior direito, centrada na faixa segura de baixo. O
+    // offset do usuário parte daqui, então "sem arrastar" continua sendo
+    // exatamente onde a pílula sempre esteve.
+    const off = clampBrandOffset(opts.offset)
+    const pillX = right - pillW + off.x
+    const pillY = safeBottomY + (SAFE_BOTTOM - pillH) / 2 + off.y
+
+    drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 14)
+    ctx.fillStyle = C.timeFill
+    ctx.fill()
+    ctx.lineWidth = 1.5
+    ctx.strokeStyle = C.timeBorder
+    ctx.stroke()
+
+    ctx.font = f('900', fontSize)
+    ctx.textBaseline = 'top'
+    ctx.fillStyle = C.timeText
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'
+    ctx.shadowBlur = 6
+    ctx.fillText(timeStr, pillX + padX, pillY + padY)
+
+    ctx.restore()
+}
 
 // ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────
 export const WORKOUT_MIN_SCALE = 0.4
@@ -1032,8 +1085,9 @@ export const BRAND_FONT_SIZE = 54
  *
  * Existe porque a alça de arrasto usava 380×66 chumbado, e a caixa tracejada
  * aparecia deslocada do logo (print do dono, 03/08/2026). A largura do
- * "IRONTRACKS" depende da fonte do template e do separador (`brandDivider`, que
- * varia entre '', ' · ', ' — ', ' / '), então nenhum número fixo acerta em todos.
+ * "IRONTRACKS" depende da fonte do template — que varia peso, família e itálico
+ * —, então nenhum número fixo acerta em todos. (O separador `brandDivider` saiu
+ * em 25/08/2026: a marca é uma palavra só.)
  *
  * A mesma caixa também decide, no overlay de gesto, se a pinça é da MARCA ou do
  * bloco — daí ela precisar ser fiel, e não aproximada.
@@ -1045,7 +1099,7 @@ export const BRAND_FONT_SIZE = 54
 const BRAND_BOX_PAD = 8
 
 export const measureBrandBox = (
-    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string },
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' } },
     scale = 1,
 ): { w: number; h: number; dx: number; dy: number } => {
     const s = Number.isFinite(scale) && scale > 0 ? scale : 1
@@ -1070,14 +1124,7 @@ export const measureBrandBox = (
         const iron = ctx.measureText('IRON')
         const tracks = ctx.measureText('TRACKS')
 
-        const divider = template.brandDivider ?? ''
-        let dividerW = 0
-        if (divider) {
-            ctx.font = storyFont(F.family, F.brandWeight, Math.round(BRAND_FONT_SIZE * 0.55), style)
-            dividerW = ctx.measureText(divider).width
-        }
-
-        const inkW = iron.width + dividerW + tracks.width
+        const inkW = iron.width + tracks.width
         if (!Number.isFinite(inkW) || inkW <= 0) return fallback
 
         /**
@@ -1255,7 +1302,7 @@ export const isPointOverBrand = (
     clientX: number,
     clientY: number,
     rect: DOMRect | null | undefined,
-    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string } | null | undefined,
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' } } | null | undefined,
     brandOffset: Offset | null | undefined,
     brandScale?: number | null,
 ): boolean => {
@@ -1280,6 +1327,75 @@ export const isPointOverBrand = (
  * Onde a alça da marca cai no preview (fração 0..1 do lado). NÃO depende do
  * zoom/pan geral — a marca não é afetada por eles.
  */
+
+// ── Horário: medida e alça (espelha o contrato da MARCA) ─────────────────────
+
+/**
+ * Tamanho e âncora da pílula do horário, em px de canvas.
+ *
+ * Diferente da marca, a pílula NÃO muda com o template: fonte, corpo e padding
+ * são fixos em `drawTimePill`. O que varia é a largura do texto — "09:01" e
+ * "23:47" não medem igual —, então a caixa é MEDIDA, não chutada. A alça e o
+ * hit-test do gesto usam este mesmo retângulo: divergir faz o usuário mirar
+ * num lugar e acertar outro (lição da alça da marca, 03/08/2026).
+ */
+export function measureTimePillBox(): { w: number; h: number; x: number; y: number } {
+    const fontSize = 32
+    const padX = 18
+    const padY = 10
+    const h = fontSize + padY * 2
+    const fallbackW = 150
+
+    let textW = 0
+    try {
+        if (typeof document !== 'undefined') {
+            const ctx = document.createElement('canvas').getContext('2d')
+            if (ctx) {
+                ctx.font = `900 ${fontSize}px Inter, system-ui, sans-serif`
+                const now = new Date()
+                textW = ctx.measureText(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).width
+            }
+        }
+    } catch {
+        // jsdom não implementa measureText de verdade — cai no fallback, que é
+        // suficiente para o teste e nunca é usado no aparelho.
+    }
+
+    const w = (Number.isFinite(textW) && textW > 0 ? textW : fallbackW - padX * 2) + padX * 2
+    return {
+        w,
+        h,
+        // Âncora: canto inferior direito, dentro da faixa segura de baixo — a
+        // mesma conta de `drawTimePill`, para alça e desenho não discordarem.
+        x: CANVAS_W - SAFE_SIDE - w,
+        y: CANVAS_H - SAFE_BOTTOM + (SAFE_BOTTOM - h) / 2,
+    }
+}
+
+/** Posição da alça do horário em % do canvas, já com o offset do usuário. */
+export const timeHandlePct = (timeOffset: Offset | null | undefined): Offset => {
+    const t = clampBrandOffset(timeOffset)
+    const box = measureTimePillBox()
+    return { x: (box.x + t.x) / CANVAS_W, y: (box.y + t.y) / CANVAS_H }
+}
+
+/** O ponto (px de tela) caiu sobre a pílula do horário? */
+export const isPointOverTime = (
+    px: number,
+    py: number,
+    rect: DOMRect | null,
+    timeOffset: Offset | null | undefined,
+): boolean => {
+    if (!rect || rect.width <= 0) return false
+    const t = clampBrandOffset(timeOffset)
+    const box = measureTimePillBox()
+    const fx = rect.width / CANVAS_W
+    const fy = rect.height / CANVAS_H
+    const x0 = rect.left + (box.x + t.x) * fx
+    const y0 = rect.top + (box.y + t.y) * fy
+    return px >= x0 && px <= x0 + box.w * fx && py >= y0 && py <= y0 + box.h * fy
+}
+
 export const brandHandlePct = (brandOffset: Offset | null | undefined): Offset => {
     const b = clampBrandOffset(brandOffset)
     return {

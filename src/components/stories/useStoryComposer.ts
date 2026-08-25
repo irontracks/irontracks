@@ -68,8 +68,17 @@ export type StoryRenderer = (args: {
     template: StoryTemplate
     /** Zoom/reposição do card (pinça + arrasto) — mesmo do layout 'workout'. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number }
-    /** Posição própria da marca (IRON·TRACKS) — independente do transform geral. */
+    /** Posição própria da marca (IRONTRACKS) — independente do transform geral. */
     brandOffset?: Offset
+    /**
+     * Posição própria do HORÁRIO — mesmo contrato da marca.
+     *
+     * Opcional: os renderers de nutrição, cardio e métricas ainda desenham a
+     * pílula na âncora fixa, e ignorar o campo é o comportamento correto para
+     * eles. Quem o consome é o story de TREINO, que era onde o horário
+     * aparecia ou sumia conforme o layout.
+     */
+    timeOffset?: Offset
     /** Escala própria da marca (pinça sobre o logo). */
     brandScale?: number
     /** Legenda livre do usuário, na tipografia do template. */
@@ -163,6 +172,19 @@ export function useStoryComposer({
      * segundo dedo caía fora dela, no overlay de gesto — que via dois toques e
      * escalava o bloco inteiro. Agora o gesto que NASCE sobre a marca é dela.
      */
+    /**
+     * Deslocamento próprio do HORÁRIO — mesmo contrato do `brandOffset`.
+     * Pedido do dono (25/08/2026): o horário passa a ser independente do
+     * layout, como a marca, em vez de existir só em alguns layouts e sempre
+     * no mesmo canto.
+     */
+    const [timeOffset, setTimeOffset] = useState<Offset>(NO_OFFSET)
+    const timeOffsetRef = useRef(timeOffset)
+    useEffect(() => { timeOffsetRef.current = timeOffset }, [timeOffset])
+    const timeDragRef = useRef<{ pointerId: number | null; startX: number; startY: number; start: Offset }>({
+        pointerId: null, startX: 0, startY: 0, start: NO_OFFSET,
+    })
+
     const [brandScale, setBrandScale] = useState(1)
     const brandScaleRef = useRef(brandScale)
     useEffect(() => { brandScaleRef.current = brandScale }, [brandScale])
@@ -383,7 +405,7 @@ export function useStoryComposer({
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET); setTimeOffset(NO_OFFSET)
         brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
         workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
@@ -583,7 +605,7 @@ export function useStoryComposer({
             setDraggingKey(null)
             // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
             setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-            setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
+            setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET); setTimeOffset(NO_OFFSET)
             workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
@@ -604,7 +626,7 @@ export function useStoryComposer({
     }, [])
     const resetWorkoutTransform = useCallback(() => {
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
-        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET)
+        setBrandOffset(NO_OFFSET); setBrandScale(1); setAlignGuides({ x: false, y: false }); setCustomTextOffset(NO_OFFSET); setTimeOffset(NO_OFFSET)
         workoutGestureRef.current.mode = 'none'
     }, [])
 
@@ -702,6 +724,39 @@ export function useStoryComposer({
     const onWorkoutWheel = useCallback((deltaY: number) => {
         nudgeWorkoutScale(deltaY < 0 ? 0.05 : -0.05)
     }, [nudgeWorkoutScale])
+
+    // ── Arrasto do HORÁRIO (mesmo desenho do da marca) ─────────────────────────
+    // Sem snap ao centro de propósito: a pílula vive na faixa segura de baixo,
+    // e "centro do canvas" não é um alvo que faça sentido para ela — ao
+    // contrário da marca, que é o elemento de topo da composição.
+    const onTimePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            if (typeof e?.pointerId !== 'number') return
+            e.preventDefault?.(); e.stopPropagation?.()
+            timeDragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, start: timeOffsetRef.current }
+            e.currentTarget?.setPointerCapture?.(e.pointerId)
+        } catch { }
+    }, [])
+
+    const onTimePointerMove = useCallback((e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => {
+        try {
+            const { pointerId, startX, startY, start } = timeDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const factor = canvasFactor(rect)
+            setTimeOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor))
+        } catch { }
+    }, [])
+
+    const onTimePointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            const { pointerId } = timeDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.releasePointerCapture?.(pointerId)
+            timeDragRef.current = { pointerId: null, startX: 0, startY: 0, start: timeOffsetRef.current }
+        } catch { }
+    }, [])
 
     // ── Arrasto da MARCA (handle próprio, independente do bloco) ───────────────
     // Handle separado (pointer, com capture) em vez de reusar o overlay de gesto:
@@ -825,10 +880,14 @@ export function useStoryComposer({
         const bs = brandScaleRef.current
         const ct = customTextRef.current
         const cto = customTextOffsetRef.current
+        // Pelo REF, como todo o resto: em 03/08/2026 o `brandScale` foi
+        // esquecido aqui e a escala aparecia na prévia mas SUMIA no arquivo
+        // salvo. Campo novo no desenho entra nesta lista também.
+        const to = timeOffsetRef.current
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto, timeOffset: to })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto, timeOffset: to })
         }
     }
 
@@ -1099,6 +1158,7 @@ export function useStoryComposer({
         onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
         // marca (IRON·TRACKS) independente
         brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+        timeOffset, onTimePointerDown, onTimePointerMove, onTimePointerUp,
         customText, setCustomText, customTextOffset, customTextBox, customTextOverflowing,
         onCustomTextPointerDown, onCustomTextPointerMove, onCustomTextPointerUp,
         // handlers

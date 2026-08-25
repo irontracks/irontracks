@@ -7,6 +7,7 @@ import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
+import { TimeDragHandle } from '@/components/stories/TimeDragHandle'
 import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
 import { CustomTextDragHandle } from '@/components/stories/CustomTextDragHandle'
 import { CustomTextPanel } from '@/components/stories/CustomTextPanel'
@@ -63,6 +64,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
     brandOffset, brandScale, alignGuides, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
+    timeOffset, onTimePointerDown, onTimePointerMove, onTimePointerUp,
     customText, setCustomText, customTextOffset, customTextBox, customTextOverflowing,
     onCustomTextPointerDown, onCustomTextPointerMove, onCustomTextPointerUp,
     loadMedia, onSelectLayout,
@@ -89,11 +91,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset, brandScale, customText, customTextOffset })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset, brandScale, customText, customTextOffset, timeOffset })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset, brandScale, customText, customTextOffset, timeOffset])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -246,17 +248,28 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       </div>
                     )}
 
-                    {layout !== 'live' && layout !== 'group' && (
-                      <BrandDragHandle
-                        brandOffset={brandOffset}
-                        brandScale={brandScale}
-                        template={template}
-                        previewRef={previewRef}
-                        onPointerDown={onBrandPointerDown}
-                        onPointerMove={onBrandPointerMove}
-                        onPointerUp={onBrandPointerUp}
-                      />
-                    )}
+                    {/* A guarda `layout !== 'live' && !== 'group'` saiu com os
+                        próprios layouts (25/08/2026): a marca é arrastável em
+                        todos os quatro que restaram. */}
+                    <BrandDragHandle
+                      brandOffset={brandOffset}
+                      brandScale={brandScale}
+                      template={template}
+                      previewRef={previewRef}
+                      onPointerDown={onBrandPointerDown}
+                      onPointerMove={onBrandPointerMove}
+                      onPointerUp={onBrandPointerUp}
+                    />
+
+                    {/* Alça do HORÁRIO — pedido do dono: independente do layout,
+                        igual à marca. */}
+                    <TimeDragHandle
+                      timeOffset={timeOffset}
+                      previewRef={previewRef}
+                      onPointerDown={onTimePointerDown}
+                      onPointerMove={onTimePointerMove}
+                      onPointerUp={onTimePointerUp}
+                    />
 
                     <CustomTextDragHandle
                       box={customTextBox}
