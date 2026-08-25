@@ -219,7 +219,26 @@ de 596 linhas.
 
 **`MyDietPlan` — o posicionamento automático não pode vencer o usuário.** "Abre no dia de HOJE" roda no efeito que observa `days`, e os botões de dia já estão na tela nesse instante: quem tocasse num dia antes de o efeito rodar era devolvido para hoje em silêncio, e o swap ia para o índice errado. `positionedRef.current = true` é marcado no efeito **e no clique**. Guard varre os sete dias da semana.
 
-**"Já treinou hoje?" tem fonte única: `lib/workout/trainedToday.ts`** — usada pelo `QuickStartCard` (o atalho "Treinar agora" some depois da sessão concluída) e pelo `RestDayPromptCard`. Dia BRT, `is_template = false`, e **nunca** selecionar `workouts.notes` para responder um booleano.
+**"Já treinou hoje?" tem fonte única: `lib/workout/trainedToday.ts`**
+
+**O card de treino piscava a cada abertura (24/08/2026).** Relato: "toda vez que
+entro no app, o card TREINO DE HOJE aparece por cerca de 1 segundo e some". Não
+era render — o cache do positivo vivia só em MEMÓRIA e morria com o app, então
+toda abertura recomeçava sem saber e ia à rede; nesse intervalo o consumidor
+trata "não sei" como "ainda não treinou". **Essa leitura do desconhecido está
+CERTA e não deve ser invertida**: esconder a ação primária durante a consulta
+deixaria a primeira dobra vazia para quem de fato não treinou, e o card entraria
+depois empurrando a tela — o mesmo flash, ao contrário.
+
+Hoje o positivo é persistido em `localStorage` com o DIA na chave (vira sozinho
+na meia-noite BRT), e a consulta segue rodando em segundo plano para DESFAZER a
+marca se o servidor discordar — o caso real é apagar do histórico a sessão de
+hoje, que sem isso esconderia o botão de iniciar até a virada do dia. Só o
+positivo é gravado: "não treinou" envelhece em minutos.
+
+Os guards medem **quantas idas à rede acontecem antes de a resposta existir**,
+não o booleano — o valor final sempre esteve correto, o defeito era o tempo até
+chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo `QuickStartCard` (o atalho "Treinar agora" some depois da sessão concluída) e pelo `RestDayPromptCard`. Dia BRT, `is_template = false`, e **nunca** selecionar `workouts.notes` para responder um booleano.
 
 **`userSnapshot` (`lib/user/snapshot.ts`) — o LEITOR único dos dados do usuário. Comece por ele antes de escrever qualquer `from('user_settings')`.** Devolve os fatos já resolvidos (antropometria declarada, objetivo, fase da dieta, stats de TDEE, meta do dia + de onde ela veio) por setor: `profile`, `nutrition`. Nasceu porque as mesmas 5 chaves de perfil eram extraídas em DOIS lugares independentes (`extractProfileStats` e o `profileSection` do `userContext`) e a fiação "meta salva > TDEE do perfil" existia em TRÊS (página, overlay, contexto de IA) — o tipo de duplicação que não quebra nada hoje e diverge em silêncio no dia em que o perfil ganhar um campo.
 
