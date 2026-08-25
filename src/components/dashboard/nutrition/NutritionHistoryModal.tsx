@@ -11,14 +11,16 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, Clapperboard, EyeOff, FileDown, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Clapperboard, EyeOff, FileDown, FileText, Flame, UtensilsCrossed } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
-import { MACRO_COLORS } from '@/lib/nutrition/macroColors'
+import { MACRO_COLORS, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { HistorySummaryShell, SummaryAction } from '@/components/history/HistorySummaryShell'
+import { HistoryWeekDivider, weekDividerLabel, weekStartOfDay } from '@/components/history/HistoryWeekDivider'
 import {
   aggregateEntriesByDay,
   periodLabel,
@@ -42,7 +44,14 @@ import { periodToContent } from '@/components/stories/nutritionStory'
 
 const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStoryComposer'), { ssr: false, loading: () => null })
 
-const JANELAS = JANELAS_FIXAS.map((days) => ({ days, label: `${days} dias` }))
+/**
+ * As pílulas de janela, no molde do histórico de treino: rótulo CURTO na tela
+ * (quatro cabem em 375pt) e o nome inteiro para o leitor de tela.
+ */
+const OPCOES_JANELA = [
+  ...JANELAS_FIXAS.map((days) => ({ key: String(days), label: `${days}d`, ariaLabel: `${days} dias` })),
+  { key: 'custom', label: 'Período', ariaLabel: 'Período personalizado' },
+]
 
 /** "sex., 14 de ago." — só a PRIMEIRA letra sobe. */
 function primeiraMaiuscula(s: string): string {
@@ -227,96 +236,126 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
           </button>
         </div>
 
-        <div className="border-b border-neutral-800 px-4 py-3">
-          <div className="flex gap-2">
-            {JANELAS.map((j) => (
-              <button
-                key={j.days}
-                type="button"
-                onClick={() => setModo(j.days)}
-                aria-pressed={modo === j.days}
-                className={`tap-44 h-9 flex-1 rounded-xl px-2 text-xs t-action uppercase tracking-wider transition ${
-                  modo === j.days
-                    ? 'border border-yellow-500/25 bg-yellow-500/10 text-yellow-400'
-                    : 'border border-neutral-800/60 bg-neutral-950 text-neutral-300 hover:bg-neutral-800/80'
-                }`}
-              >
-                {j.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setModo('custom')}
-            aria-pressed={modo === 'custom'}
-            className={`tap-44 mt-2 h-9 w-full rounded-xl px-3 text-xs t-action uppercase tracking-wider transition ${
-              modo === 'custom'
-                ? 'border border-yellow-500/25 bg-yellow-500/10 text-yellow-400'
-                : 'border border-neutral-800/60 bg-neutral-950 text-neutral-300 hover:bg-neutral-800/80'
-            }`}
+        {/* O card de resumo ROLA com a lista, como no histórico de treino: numa
+            folha de 88vh, prender resumo + filtros no topo custava metade da
+            área útil para o que a tela existe para mostrar. */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <HistorySummaryShell
+            eyebrow="Resumo"
+            title={periodo ? rotuloPeriodo(periodo) : 'Período personalizado'}
+            /* A cobertura sai do rodapé e vem qualificar o título: "1.900
+               kcal/dia" de quem lançou 8 dias em 30 não é a média do mês, e o
+               número só significa alguma coisa ao lado do denominador. */
+            subtitle={
+              <>
+                {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
+                {resumo.excludedDays > 0 && ` · ${resumo.excludedDays} fora da média`}
+              </>
+            }
+            ranges={{
+              options: OPCOES_JANELA,
+              value: modo === 'custom' ? 'custom' : String(modo),
+              onChange: (k) => setModo(k === 'custom' ? 'custom' : Number(k)),
+            }}
+            metrics={[
+              {
+                key: 'kcal',
+                label: 'Média/dia',
+                featured: true,
+                icon: <Flame size={28} className="text-yellow-500" />,
+                value: <>{resumo.avgCalories}<span className="ml-1 text-xs font-bold text-neutral-400">kcal</span></>,
+              },
+              {
+                key: 'protein',
+                label: 'Proteína',
+                icon: <PontoMacro macro="protein" />,
+                valueColor: MACRO_COLORS.protein,
+                value: <>{resumo.avgProtein}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
+              },
+              {
+                key: 'carbs',
+                label: 'Carbo',
+                icon: <PontoMacro macro="carbs" />,
+                valueColor: MACRO_COLORS.carbs,
+                value: <>{resumo.avgCarbs}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
+              },
+              {
+                key: 'fat',
+                label: 'Gordura',
+                icon: <PontoMacro macro="fat" />,
+                valueColor: MACRO_COLORS.fat,
+                value: <>{resumo.avgFat}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
+              },
+            ]}
+            actions={{
+              label: 'Relatórios',
+              icon: <FileText size={14} className="shrink-0 text-neutral-400" aria-hidden="true" />,
+              children: (
+                <>
+                  {/* Sem dia registrado não há o que exportar nem o que postar —
+                      um relatório de "0 kcal em média" seria afirmação falsa
+                      sobre o período, ainda por cima entregue ao nutricionista. */}
+                  <SummaryAction
+                    variant="gold"
+                    onClick={() => { void salvarPdf() }}
+                    disabled={resumo.loggedDays === 0 || pdf.carregando}
+                  >
+                    <FileDown size={12} aria-hidden="true" />
+                    {pdf.carregando ? 'Gerando…' : 'Salvar PDF'}
+                  </SummaryAction>
+                  <SummaryAction
+                    onClick={() => setStoryAberto(true)}
+                    disabled={resumo.loggedDays === 0}
+                    aria-label={`Compartilhar ${rotulo.toLowerCase()} como story`}
+                    className="w-9 px-0"
+                  >
+                    <Clapperboard size={14} aria-hidden="true" />
+                  </SummaryAction>
+                </>
+              ),
+            }}
           >
-            Período personalizado
-          </button>
+            {modo === 'custom' && (
+              <div className="mt-3 flex items-end gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className="t-meta-inherit block text-[10px] text-neutral-400">De</span>
+                  <input
+                    type="date"
+                    value={inicioCustom}
+                    max={todayDate}
+                    aria-label="Data inicial do período"
+                    onChange={(e) => setInicioCustom(e.target.value)}
+                    className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
+                  />
+                </label>
+                <label className="min-w-0 flex-1">
+                  <span className="t-meta-inherit block text-[10px] text-neutral-400">Até</span>
+                  <input
+                    type="date"
+                    value={fimCustom}
+                    max={todayDate}
+                    aria-label="Data final do período"
+                    onChange={(e) => setFimCustom(e.target.value)}
+                    className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
+                  />
+                </label>
+              </div>
+            )}
 
-          {modo === 'custom' && (
-            <div className="mt-2 flex items-end gap-2">
-              <label className="min-w-0 flex-1">
-                <span className="t-meta-inherit block text-[10px] text-neutral-400">De</span>
-                <input
-                  type="date"
-                  value={inicioCustom}
-                  max={todayDate}
-                  aria-label="Data inicial do período"
-                  onChange={(e) => setInicioCustom(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
-                />
-              </label>
-              <label className="min-w-0 flex-1">
-                <span className="t-meta-inherit block text-[10px] text-neutral-400">Até</span>
-                <input
-                  type="date"
-                  value={fimCustom}
-                  max={todayDate}
-                  aria-label="Data final do período"
-                  onChange={(e) => setFimCustom(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-neutral-800 bg-neutral-950 px-2 text-sm text-neutral-100"
-                />
-              </label>
-            </div>
+            {/* A recusa precisa DIZER o que está errado — um intervalo invertido
+                que devolvesse lista vazia leria como "você não comeu nada".
+                Mas SÓ depois que as duas datas existem: com os campos em branco
+                não há erro nenhum, e pintar "Escolha as duas datas" de vermelho
+                ao abrir gasta a cor do ALARME numa instrução. */}
+            {erroPeriodo && inicioCustom && fimCustom && (
+              <p className="mt-2 text-xs font-bold text-red-400" role="alert">{erroPeriodo}</p>
+            )}
+          </HistorySummaryShell>
+
+          {(pdf.erro || erroMarcas) && (
+            <p className="text-xs font-bold text-red-400" role="alert">{pdf.erro || erroMarcas}</p>
           )}
 
-          {/* A recusa precisa DIZER o que está errado — um intervalo invertido
-              que devolvesse lista vazia leria como "você não comeu nada".
-              Mas SÓ depois que as duas datas existem: com os campos ainda em
-              branco não há erro nenhum, e pintar "Escolha as duas datas" de
-              vermelho ao abrir gasta a cor do ALARME numa instrução. Neste app
-              vermelho é erro e estouro de meta, nada mais — e quem já diz o que
-              fazer é o corpo da lista, sem competir por atenção. */}
-          {erroPeriodo && inicioCustom && fimCustom && (
-            <p className="mt-2 text-xs font-bold text-red-400" role="alert">{erroPeriodo}</p>
-          )}
-        </div>
-
-        {/* Resumo. A média é dos dias REGISTRADOS e a cobertura vem junto —
-            sem ela, "1.900 kcal/dia" de quem lançou 8 dias em 30 lê como se
-            fosse a média do mês. */}
-        <div className="flex items-center gap-4 border-b border-neutral-800 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="t-meta text-[10px]">Média por dia registrado</div>
-            <div className="text-2xl font-black tabular-nums text-white">
-              {resumo.avgCalories}
-              <span className="ml-1 text-xs font-bold text-neutral-400">kcal</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-bold tabular-nums" style={{ color: MACRO_COLORS.protein }}>
-              {resumo.avgProtein} g
-            </div>
-            <div className="text-[11px] text-neutral-400">proteína</div>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {!periodo ? (
             <p className="px-1 py-8 text-center text-sm text-neutral-400">
               Escolha as duas datas para ver o período.
@@ -328,115 +367,108 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               Não consegui carregar o histórico agora. Tente de novo em instantes.
             </p>
           ) : dias.length === 0 ? (
-            <div className="px-1 py-8 text-center">
+            <div
+              className="rounded-2xl px-6 py-8 text-center"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
               <UtensilsCrossed className="mx-auto mb-2 h-6 w-6 text-neutral-600" aria-hidden="true" />
-              <p className="text-sm text-neutral-300">Nenhum dia registrado nesta janela.</p>
+              <p className="text-sm font-black text-white">Nenhum dia registrado nesta janela.</p>
               <p className="mt-1 text-xs text-neutral-400">Lance uma refeição e ela aparece aqui.</p>
             </div>
           ) : (
-            <ul className="space-y-2">
-              {dias.map((d) => {
+            <ul className="space-y-3 pb-2">
+              {dias.map((d, i) => {
                 const foraDaMedia = marcados.has(d.date)
                 const sugerido = sugeridos.has(d.date)
+                const semana = weekStartOfDay(d.date)
+                const semanaAnterior = i > 0 ? weekStartOfDay(dias[i - 1].date) : '__NENHUMA__'
+                const abreSemana = !!semana && semana !== semanaAnterior
                 return (
-                <li key={d.date} className="flex items-stretch gap-2">
-                  <button
-                    type="button"
-                    onClick={() => abrirDia(d.date)}
-                    // A linha inteira é UM controle: sem o rótulo, o leitor de
-                    // tela anuncia seis fragmentos soltos (data, P, C, G,
-                    // refeições, número) e nenhum deles diz o que o toque faz.
-                    aria-label={`Abrir ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeição${d.meals === 1 ? '' : 'ões'}${foraDaMedia ? ', fora da média' : ''}`}
-                    className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-neutral-800/60 bg-neutral-950 px-3 py-3 text-left transition active:scale-[0.99] hover:bg-neutral-800/50 ${foraDaMedia ? 'opacity-45' : ''}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold text-neutral-100">
-                        {rotuloData(d.date, todayDate)}
+                <li key={d.date}>
+                  {abreSemana && semana && <HistoryWeekDivider label={weekDividerLabel(semana)} />}
+                  <div className="flex items-stretch gap-2">
+                    <button
+                      type="button"
+                      onClick={() => abrirDia(d.date)}
+                      // A linha inteira é UM controle: sem o rótulo, o leitor de
+                      // tela anuncia seis fragmentos soltos (data, P, C, G,
+                      // refeições, número) e nenhum deles diz o que o toque faz.
+                      aria-label={`Abrir ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeição${d.meals === 1 ? '' : 'ões'}${foraDaMedia ? ', fora da média' : ''}`}
+                      className="group relative min-w-0 flex-1 overflow-hidden rounded-2xl text-left transition-all duration-300 hover:shadow-lg hover:shadow-black/30 active:scale-[0.99]"
+                    >
+                      {/* Barra de accent — o mesmo código de estado do card de
+                          sessão. O dia fora da média fica CINZA aqui, não
+                          apagado por opacidade: 45% de opacity levava o texto
+                          para baixo do contraste mínimo, e um dado que a pessoa
+                          marcou continua sendo dado dela. */}
+                      <div className={`absolute bottom-0 left-0 top-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${foraDaMedia ? 'bg-neutral-700' : 'bg-yellow-500/30 group-hover:bg-yellow-500/60'}`} />
+                      <div
+                        className="flex items-center gap-3 rounded-2xl p-4 pl-5"
+                        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <CalendarDays size={13} className={`shrink-0 ${foraDaMedia ? 'text-neutral-600' : 'text-yellow-500/60'}`} aria-hidden="true" />
+                            <h3 className={`truncate font-black tracking-tight ${foraDaMedia ? 'text-neutral-300' : 'text-white'}`}>
+                              {rotuloData(d.date, todayDate)}
+                            </h3>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <BadgeMacro macro="protein" letra="P" gramas={d.protein} mudo={foraDaMedia} />
+                            <BadgeMacro macro="carbs" letra="C" gramas={d.carbs} mudo={foraDaMedia} />
+                            <BadgeMacro macro="fat" letra="G" gramas={d.fat} mudo={foraDaMedia} />
+                            <span className="inline-flex items-center gap-1 rounded-full border border-neutral-700/50 bg-neutral-800/80 px-2 py-0.5 text-[10px] font-bold text-neutral-300">
+                              <UtensilsCrossed size={10} className="text-yellow-500/60" aria-hidden="true" />
+                              {d.meals} refeiç{d.meals === 1 ? 'ão' : 'ões'}
+                            </span>
+                            {foraDaMedia && (
+                              <span className="inline-flex items-center rounded-full border border-neutral-700/50 bg-neutral-800/80 px-2 py-0.5 text-[10px] font-bold text-neutral-300">
+                                fora da média
+                              </span>
+                            )}
+                            {/* Só um convite, em cinza: o dia AINDA conta, e
+                                pintar a sugestão de dourado ou vermelho
+                                afirmaria algo que o app não sabe. */}
+                            {!foraDaMedia && sugerido && (
+                              <span className="inline-flex items-center rounded-full border border-neutral-800 bg-neutral-900 px-2 py-0.5 text-[10px] font-bold text-neutral-400">
+                                parece incompleto
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className={`text-lg font-black tabular-nums ${foraDaMedia ? 'text-neutral-300' : 'text-white'}`}>{Math.round(d.calories)}</div>
+                          <div className="text-[11px] text-neutral-400">kcal</div>
+                        </div>
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-neutral-400">
-                        <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(d.protein)}g</span>
-                        <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(d.carbs)}g</span>
-                        <span style={{ color: MACRO_COLORS.fat }}>G {Math.round(d.fat)}g</span>
-                        <span>· {d.meals} refeiç{d.meals === 1 ? 'ão' : 'ões'}</span>
-                        {foraDaMedia && <span className="text-[10px] font-bold text-neutral-400">· fora da média</span>}
-                        {/* Só um convite, em cinza: o dia AINDA conta, e pintar
-                            a sugestão de dourado ou vermelho afirmaria algo que
-                            o app não sabe. Quem decide é o dono do dado. */}
-                        {!foraDaMedia && sugerido && (
-                          <span className="text-[10px] font-bold text-neutral-400">· parece incompleto</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-lg font-black tabular-nums text-white">{Math.round(d.calories)}</div>
-                      <div className="text-[11px] text-neutral-400">kcal</div>
-                    </div>
-                  </button>
-                  {/* Controle SEPARADO do "abrir o dia": são duas ações
-                      diferentes, e o leitor de tela precisa poder alcançar as
-                      duas. Ícone e nome dizem o efeito na MÉDIA, não "marcar" —
-                      é o efeito que o usuário está procurando. */}
-                  <button
-                    type="button"
-                    onClick={() => { void alternar(d.date, !foraDaMedia) }}
-                    aria-pressed={foraDaMedia}
-                    aria-label={foraDaMedia
-                      ? `Voltar ${rotuloData(d.date, todayDate)} para a média`
-                      : `Tirar ${rotuloData(d.date, todayDate)} da média (registro incompleto)`}
-                    className={`tap-44 flex w-11 shrink-0 items-center justify-center rounded-xl border transition ${
-                      foraDaMedia
-                        ? 'border-neutral-700 bg-neutral-800 text-neutral-200'
-                        : sugerido
-                          ? 'border-neutral-700/80 bg-neutral-900 text-neutral-300'
-                          : 'border-neutral-800/60 bg-neutral-950 text-neutral-400'
-                    }`}
-                  >
-                    <EyeOff className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                    </button>
+                    {/* Controle SEPARADO do "abrir o dia": são duas ações
+                        diferentes, e o leitor de tela precisa alcançar as duas.
+                        Ícone e nome dizem o efeito na MÉDIA, não "marcar" — é o
+                        efeito que o usuário está procurando. */}
+                    <button
+                      type="button"
+                      onClick={() => { void alternar(d.date, !foraDaMedia) }}
+                      aria-pressed={foraDaMedia}
+                      aria-label={foraDaMedia
+                        ? `Voltar ${rotuloData(d.date, todayDate)} para a média`
+                        : `Tirar ${rotuloData(d.date, todayDate)} da média (registro incompleto)`}
+                      className={`tap-44 flex w-11 shrink-0 items-center justify-center rounded-2xl border transition active:scale-95 ${
+                        foraDaMedia
+                          ? 'border-neutral-700 bg-neutral-800 text-neutral-200'
+                          : sugerido
+                            ? 'border-neutral-700/80 bg-neutral-900 text-neutral-300'
+                            : 'border-neutral-800/60 bg-neutral-950 text-neutral-400'
+                      }`}
+                    >
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
                 )
               })}
             </ul>
           )}
-        </div>
-
-        <div className="border-t border-neutral-800 px-4 py-3">
-          <div className="flex items-center gap-2 text-xs text-neutral-400">
-            <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {resumo.loggedDays} de {resumo.windowDays} dias com lançamento
-              {/* A tela precisa DIZER que excluiu. Uma média que muda sem
-                  explicação é pior que a média contaminada: o usuário deixa de
-                  confiar nos dois números. */}
-              {resumo.excludedDays > 0 && ` · ${resumo.excludedDays} fora da média`}
-            </span>
-          </div>
-          {(pdf.erro || erroMarcas) && (
-            <p className="mt-2 text-xs font-bold text-red-400" role="alert">{pdf.erro || erroMarcas}</p>
-          )}
-          <div className="mt-2 flex items-center gap-2">
-            {/* Sem dia registrado não há o que postar nem o que exportar — e um
-                relatório de "0 kcal em média" seria uma afirmação falsa sobre o
-                período da pessoa, ainda por cima entregue ao nutricionista. */}
-            <button
-              type="button"
-              onClick={() => { void salvarPdf() }}
-              disabled={resumo.loggedDays === 0 || pdf.carregando}
-              className="tap-44 inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-yellow-500/25 bg-yellow-500/10 px-3 text-xs t-action uppercase tracking-wider text-yellow-400 disabled:opacity-40"
-            >
-              <FileDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{pdf.carregando ? 'Gerando…' : 'Salvar PDF'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStoryAberto(true)}
-              disabled={resumo.loggedDays === 0}
-              aria-label={`Compartilhar ${rotulo.toLowerCase()} como story`}
-              className="tap-44 inline-flex h-9 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-800/60 bg-neutral-950 text-neutral-300 disabled:opacity-40"
-            >
-              <Clapperboard className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
         </div>
 
         {storyAberto && (
@@ -456,5 +488,35 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
       </div>
     </div>
   </FullscreenPortal>
+  )
+}
+
+/** O ponto de cor do macro no bloco de métrica — o papel do ícone lucide do card de treino. */
+function PontoMacro({ macro }: { macro: 'protein' | 'carbs' | 'fat' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={{ backgroundColor: MACRO_COLORS[macro] }}
+    />
+  )
+}
+
+/**
+ * Badge de macro na linha do dia, no molde dos badges do card de sessão.
+ *
+ * `mudo` é o dia que o usuário tirou da média: os macros recuam para a
+ * superfície neutra. Visto no aparelho — em cor cheia, o dia excluído
+ * competia de igual para igual com os que contam, e a lista deixava de ter
+ * primeiro plano. O dado continua legível: some a ÊNFASE, não o número.
+ */
+function BadgeMacro({ macro, letra, gramas, mudo }: { macro: 'protein' | 'carbs' | 'fat'; letra: string; gramas: number; mudo?: boolean }) {
+  const tema = mudo
+    ? { surface: 'bg-neutral-800/80 border-neutral-700/50', label: 'text-neutral-300' }
+    : MACRO_SURFACES[macro]
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums ${tema.surface} ${tema.label}`}>
+      {letra} {Math.round(gramas)}g
+    </span>
   )
 }

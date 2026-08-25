@@ -4,6 +4,7 @@ import { formatMinutesLabel } from '@/utils/report/formatters';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HistorySummaryCard } from '@/components/history/HistorySummaryCard';
 import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/HistoryEmptyStates';
+import { HistoryWeekDivider, weekDividerLabel, weekStartOfMs } from '@/components/history/HistoryWeekDivider';
 import {
     CalendarDays, ChevronLeft, ChevronRight, Clock, MoreHorizontal,
     Dumbbell, Edit3, History, MapPin, Plus, Trash2, TrendingUp,
@@ -121,15 +122,13 @@ const HistoryList: React.FC<HistoryListProps> = ({
         } catch { return 'Data desconhecida'; }
     };
 
+    // A semana do app e domingo->sabado, BRT (`utils/cron/weekRangeBrt`). Este
+    // calculo era feito aqui a mao, a partir da SEGUNDA e no fuso do aparelho:
+    // o treino de domingo caia sob o cabecalho da semana anterior, enquanto o
+    // push "Resumo da semana" ja o contava na semana corrente.
     const getWeekStart = (dateVal: unknown): string | null => {
         try {
-            const t = toDateMs(dateVal);
-            if (!t || !Number.isFinite(t)) return null;
-            const d = new Date(t);
-            const dayOfWeek = d.getDay();
-            const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-            const monday = new Date(d.setDate(diff));
-            return monday.toISOString().slice(0, 10);
+            return weekStartOfMs(toDateMs(dateVal));
         } catch { return null; }
     };
 
@@ -205,9 +204,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                 const prevSession = row.index > 0 ? visibleHistory[row.index - 1] : null;
                                 const prevWeek = prevSession ? getWeekStart(prevSession?.date ?? prevSession?.dateMs) : '__NONE__';
                                 const showWeekHeader = currentWeek && currentWeek !== prevWeek;
-                                const weekHeaderLabel = showWeekHeader
-                                    ? `Semana de ${new Date(currentWeek + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
-                                    : '';
+                                const weekHeaderLabel = showWeekHeader ? weekDividerLabel(currentWeek) : '';
 
                                 const isCardio = session.kind === 'cardio';
                                 const accentColor = isCardio ? 'green' : 'yellow';
@@ -218,13 +215,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${row.start - rowVirtualizer.options.scrollMargin}px)`, paddingBottom: '12px' }}
                                     >
                                         {showWeekHeader && (
-                                            <div className="flex items-center gap-2 mb-3 pt-1">
-                                                <div className={`h-px flex-1 bg-gradient-to-r from-transparent via-${accentColor}-500/20 to-transparent`} />
-                                                <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-${accentColor}-500/70 bg-${accentColor}-500/5 border border-${accentColor}-500/15 px-3 py-1 rounded-full`}>
-                                                    <CalendarDays size={10} /> {weekHeaderLabel}
-                                                </span>
-                                                <div className={`h-px flex-1 bg-gradient-to-r from-transparent via-${accentColor}-500/20 to-transparent`} />
-                                            </div>
+                                            <HistoryWeekDivider label={weekHeaderLabel} accent={isCardio ? 'green' : 'yellow'} />
                                         )}
 
                                         <div
