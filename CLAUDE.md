@@ -1494,6 +1494,16 @@ Só a consulta ao `active_workout_sessions` (com `state->'logs'`) fechou o caso:
 o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
 
 **O que fica:**
+- **Isso é AUTOMÁTICO desde 25/08/2026** (pedido do dono): `npm run sim:close`
+  (`scripts/sim-close-workout.mjs`) encerra o app em todo simulador ligado e
+  apaga a sessão ativa da conta de TESTE. Ele roda sozinho como hook `Stop`
+  — ou seja, ao fim de cada resposta —, configurado em `.claude/settings.json`.
+  ⚠️ **O `.claude/` está no `.gitignore`**, então o hook é local desta máquina:
+  em outro clone existe o script mas não o gatilho. O `user_id` é literal e a
+  conta oficial (`djmkapple`) é conferida e recusada; nada mais no banco é
+  tocado (medido: apagou 1 linha da conta de teste e preservou as 4 de
+  usuários reais). Só mexe no banco quando há simulador LIGADO — sem isso, um
+  DELETE às cegas alcançaria o iPhone de quem estivesse logado na conta de teste.
 - Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
   app aberto continua escrevendo. E confira a tabela:
   ```sql

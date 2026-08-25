@@ -36,6 +36,7 @@
     "cap:open:android": "npx cap open android",
     "sim:local": "node scripts/sim-server.mjs local",
     "sim:prod": "node scripts/sim-server.mjs prod",
+    "sim:close": "node scripts/sim-close-workout.mjs",
     "sim:status": "node scripts/sim-server.mjs status",
     "ios:release": "bash scripts/ios-release.sh",
     "ios:submit": "node scripts/ios-submit.mjs",
