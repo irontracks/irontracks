@@ -13,9 +13,18 @@ type BackButtonProps = {
    * Defaults to false when onClick is provided (treat as "controlled"), otherwise true.
    */
   withNavigation?: boolean;
+  /**
+   * Só a seta, sem a palavra "Voltar".
+   *
+   * Para barras onde a largura é disputada — o header do treino ativo tem seis
+   * controles e o nome do treino na mesma faixa, e a palavra custava ~45pt que
+   * faltavam ao título (que truncava). Seta sozinha é convenção de iOS, e o
+   * `aria-label` continua dizendo "Voltar" para quem usa leitor de tela.
+   */
+  iconOnly?: boolean;
 };
 
-export function BackButton({ onClick, className, label = "Voltar", withNavigation }: BackButtonProps) {
+export function BackButton({ onClick, className, label = "Voltar", withNavigation, iconOnly = false }: BackButtonProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -57,7 +66,7 @@ export function BackButton({ onClick, className, label = "Voltar", withNavigatio
       aria-label="Voltar"
     >
       <ArrowLeft size={20} />
-      <span className="font-semibold text-sm md:text-base">{label}</span>
+      {!iconOnly && <span className="font-semibold text-sm md:text-base">{label}</span>}
     </button>
   );
 }
