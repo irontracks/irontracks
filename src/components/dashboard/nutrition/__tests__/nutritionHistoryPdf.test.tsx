@@ -38,10 +38,15 @@ vi.mock('@/utils/supabase/client', () => ({
             gte: (_c: string, ini: string) => ({
               lte: (_c2: string, fim: string) => {
                 if (tabela === 'nutrition_day_flags') return Promise.resolve(marcasResposta)
+                // O DETALHE por refeição sai da mesma tabela dos agregados —
+                // só o select distingue os dois. Ignorar isso faria a lista de
+                // dias receber refeições (e vice-versa) sem erro nenhum.
+                if (String(args[0] ?? '').includes('food_name')) return Promise.resolve(refeicoesResposta)
                 intervalos.push([ini, fim])
                 return Promise.resolve(resposta)
               },
             }),
+            eq: () => Promise.resolve(refeicoesResposta),
           }),
         }
       },
@@ -57,6 +62,8 @@ vi.mock('@/utils/report/exportHtmlAsPdf', () => ({
 }))
 
 let intervalos: Array<[string, string]> = []
+/** As refeições que o PDF detalha. */
+let refeicoesResposta: { data: unknown[]; error: unknown } = { data: [], error: null }
 /** O que o hook de marcas encontra no banco. Vazio por padrão. */
 let marcasResposta: { data: unknown[]; error: unknown } = { data: [], error: null }
 /** Escritas em `nutrition_day_flags`, para provar marcar/desmarcar. */
@@ -80,6 +87,13 @@ const abrir = (props: Partial<React.ComponentProps<typeof NutritionHistoryModal>
 
 beforeEach(() => {
   intervalos = []
+  refeicoesResposta = {
+    data: [
+      { id: 'm1', date: '2026-08-22', created_at: '2026-08-22T12:15:00Z', food_name: 'Almoço', calories: 580, protein: 28, carbs: 70, fat: 20, items: [{ label: '150g arroz', grams: 150 }] },
+      { id: 'm2', date: '2026-08-21', created_at: '2026-08-21T23:40:00Z', food_name: 'Ceia', calories: 300, protein: 30, carbs: 10, fat: 8, items: [] },
+    ],
+    error: null,
+  }
   marcasResposta = { data: [], error: null }
   escritas = []
   falharEscrita = false
@@ -317,5 +331,57 @@ describe('a busca não pode entrar em laço', () => {
     await esperarLista()
     await new Promise((r) => setTimeout(r, 60))
     expect(intervalos.length).toBe(1)
+  })
+})
+
+/**
+ * O detalhe por refeição no relatório (pedido do dono, 25/08/2026).
+ *
+ * Antes o nutricionista lia "5 refeições" e não via QUAIS — a contagem de um
+ * dado que ele precisa por inteiro. Estes casos medem a FIAÇÃO: o modal busca,
+ * agrupa e entrega ao gerador. `buildNutritionPeriodHtml` passa verde sozinho
+ * com o botão entregando `null`.
+ */
+describe('refeições no relatório', () => {
+  const htmlExportado = () => String((exportSpy.mock.calls.at(-1)?.[0] as { html?: string } | undefined)?.html ?? '')
+
+  it('o PDF lista as refeições de cada dia, com hora em BRT', async () => {
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const html = htmlExportado()
+    expect(html).toContain('Refeições, dia a dia')
+    expect(html).toContain('Almoço')
+    expect(html).toContain('150g arroz')
+    // 23:40Z do dia 21 é 20:40 em São Paulo — e o dia continua sendo o 21.
+    expect(html).toContain('20:40')
+  })
+
+  it('janela longa sai sem o detalhe e DIZ o motivo, no papel e na tela', async () => {
+    abrir()
+    await esperarLista()
+    fireEvent.click(screen.getByRole('button', { name: /^90 dias$/i }))
+    await waitFor(() => expect(screen.getByText(/sem o detalhe por refeição acima de 31 dias/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/3 de 90 dias com lançamento/)).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const html = htmlExportado()
+    expect(html).toContain('Refeições, dia a dia')
+    expect(html, 'omitir em silêncio faria o profissional ler ausência de refeição como ausência de registro')
+      .toMatch(/até 31 dias/)
+    expect(html).not.toContain('Almoço')
+  })
+
+  it('falha ao ler o detalhe não vira "não comeu nada"', async () => {
+    abrir()
+    await esperarLista()
+    refeicoesResposta = { data: [], error: { message: 'boom' } }
+    fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
+    await waitFor(() => expect(exportSpy).toHaveBeenCalled())
+    const html = htmlExportado()
+    expect(html).toMatch(/Não consegui carregar o detalhe por refeição/i)
+    // Os totais diários continuam íntegros — só o detalhe faltou.
+    expect(html).toContain('3.075')
   })
 })

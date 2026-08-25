@@ -11,7 +11,7 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, Clapperboard, EyeOff, FileDown, FileText, Flame, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ChevronDown, Clapperboard, ExternalLink, EyeOff, FileDown, FileText, Flame, UtensilsCrossed } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
@@ -38,6 +38,8 @@ import {
 } from '@/lib/nutrition/historyPeriod'
 import { diasSugeridos } from '@/lib/nutrition/incompleteDay'
 import { useNutritionDayFlags } from '@/hooks/useNutritionDayFlags'
+import { useNutritionDayMeals, COLUNAS_REFEICAO } from '@/hooks/useNutritionDayMeals'
+import { groupMealsByDay, MAX_DIAS_DETALHE_REFEICOES, normalizeMealRows, resumoItens, type NutritionMeal, type NutritionMealRow } from '@/lib/nutrition/dayMeals'
 import { buildNutritionPeriodHtml } from '@/utils/report/buildNutritionPeriodHtml'
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 import { periodToContent } from '@/components/stories/nutritionStory'
@@ -160,6 +162,12 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
   // que conta como registro completo é o dono do dado.
   const sugeridos = useMemo(() => new Set(diasSugeridos(dias, marcados)), [dias, marcados])
 
+  // Abrir o card mostra as refeições DAQUELE dia, sem sair do histórico
+  // (pedido do dono, 25/08/2026). Antes o toque fechava o modal e trocava a
+  // data da aba — que abre no topo, com os lançamentos no fim da página: o
+  // gesto de "abrir o dia" nunca chegava a mostrar o dia.
+  const { alternar: alternarDia, estadoDe, estaAberto } = useNutritionDayMeals(userId)
+
   const [storyAberto, setStoryAberto] = useState(false)
   const [pdf, setPdf] = useState<{ carregando: boolean; erro: string }>({ carregando: false, erro: '' })
   const rotulo = periodLabel(diasJanela)
@@ -180,6 +188,34 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
     if (!periodo || !dias || pdf.carregando) return
     setPdf({ carregando: true, erro: '' })
     try {
+      /**
+       * O detalhe de refeições do PERÍODO inteiro — o que o nutricionista quer
+       * ler, e o que o relatório não tinha. Coletado só na hora de exportar:
+       * puxar isso junto da lista multiplicaria por 5 um payload que o usuário
+       * quase sempre só quer resumido.
+       *
+       * Acima de `MAX_DIAS_DETALHE_REFEICOES` o detalhe fica de fora e o
+       * relatório DIZ por quê. Omitir em silêncio faria o profissional ler
+       * ausência de refeição como ausência de registro.
+       */
+      let refeicoesPorDia: ReadonlyMap<string, NutritionMeal[]> | null = null
+      let detalheOmitido: string | null = null
+      if (periodo.dias > MAX_DIAS_DETALHE_REFEICOES) {
+        detalheOmitido = `Detalhe por refeição disponível em períodos de até ${MAX_DIAS_DETALHE_REFEICOES} dias — este tem ${periodo.dias}. Os totais diários acima cobrem o período inteiro.`
+      } else {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('nutrition_meal_entries')
+          .select(COLUNAS_REFEICAO)
+          .eq('user_id', String(userId || ''))
+          .gte('date', periodo.inicio)
+          .lte('date', periodo.fim)
+        // Falha de leitura não pode virar "não comeu nada": o relatório sai
+        // sem a seção e com o motivo escrito.
+        if (error) detalheOmitido = 'Não consegui carregar o detalhe por refeição desta vez. Os totais diários acima estão completos.'
+        else refeicoesPorDia = groupMealsByDay(normalizeMealRows((data ?? []) as NutritionMealRow[]))
+      }
+
       const html = buildNutritionPeriodHtml({
         periodo,
         dias,
@@ -187,6 +223,8 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
         metaKcal: goals?.calories ?? null,
         emitidoEm: todayDate,
         excluidos: marcados,
+        refeicoesPorDia,
+        detalheOmitido,
       })
       const res = await exportHtmlAsPdf({
         html,
@@ -198,7 +236,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
     } catch (e) {
       setPdf({ carregando: false, erro: e instanceof Error ? e.message : 'Não consegui gerar o arquivo.' })
     }
-  }, [periodo, dias, resumo, goals, todayDate, marcados, pdf.carregando])
+  }, [periodo, dias, resumo, goals, todayDate, marcados, pdf.carregando, userId])
 
   const abrirDia = useCallback((date: string) => {
     onPickDate(date)
@@ -352,6 +390,16 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
             )}
           </HistorySummaryShell>
 
+          {/* O corte do detalhe é dito ANTES de exportar: descobrir no PDF que
+              faltam as refeições custa um arquivo inteiro. Em linha PRÓPRIA —
+              dentro da linha de ações ele espremia o "Salvar PDF" em duas
+              linhas (visto no aparelho). */}
+          {periodo && periodo.dias > MAX_DIAS_DETALHE_REFEICOES && (
+            <p className="-mt-2 px-1 text-[11px] text-neutral-400">
+              O PDF sai sem o detalhe por refeição acima de {MAX_DIAS_DETALHE_REFEICOES} dias — os totais diários vão completos.
+            </p>
+          )}
+
           {(pdf.erro || erroMarcas) && (
             <p className="text-xs font-bold text-red-400" role="alert">{pdf.erro || erroMarcas}</p>
           )}
@@ -380,6 +428,8 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               {dias.map((d, i) => {
                 const foraDaMedia = marcados.has(d.date)
                 const sugerido = sugeridos.has(d.date)
+                const aberto = estaAberto(d.date)
+                const detalhe = estadoDe(d.date)
                 const semana = weekStartOfDay(d.date)
                 const semanaAnterior = i > 0 ? weekStartOfDay(dias[i - 1].date) : '__NENHUMA__'
                 const abreSemana = !!semana && semana !== semanaAnterior
@@ -389,11 +439,13 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                   <div className="flex items-stretch gap-2">
                     <button
                       type="button"
-                      onClick={() => abrirDia(d.date)}
+                      onClick={() => alternarDia(d.date)}
                       // A linha inteira é UM controle: sem o rótulo, o leitor de
                       // tela anuncia seis fragmentos soltos (data, P, C, G,
                       // refeições, número) e nenhum deles diz o que o toque faz.
-                      aria-label={`Abrir ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeição${d.meals === 1 ? '' : 'ões'}${foraDaMedia ? ', fora da média' : ''}`}
+                      aria-label={`${aberto ? 'Fechar' : 'Ver'} as refeições de ${rotuloData(d.date, todayDate)} — ${Math.round(d.calories)} kcal, ${d.meals} refeiç${d.meals === 1 ? 'ão' : 'ões'}${foraDaMedia ? ', fora da média' : ''}`}
+                      aria-expanded={aberto}
+                      aria-controls={`refeicoes-${d.date}`}
                       className="group relative min-w-0 flex-1 overflow-hidden rounded-2xl text-left transition-all duration-300 hover:shadow-lg hover:shadow-black/30 active:scale-[0.99]"
                     >
                       {/* Barra de accent — o mesmo código de estado do card de
@@ -436,9 +488,18 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                             )}
                           </div>
                         </div>
-                        <div className="shrink-0 text-right">
-                          <div className={`text-lg font-black tabular-nums ${foraDaMedia ? 'text-neutral-300' : 'text-white'}`}>{Math.round(d.calories)}</div>
-                          <div className="text-[11px] text-neutral-400">kcal</div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <div className="text-right">
+                            <div className={`text-lg font-black tabular-nums ${foraDaMedia ? 'text-neutral-300' : 'text-white'}`}>{Math.round(d.calories)}</div>
+                            <div className="text-[11px] text-neutral-400">kcal</div>
+                          </div>
+                          {/* A seta é a promessa de que há mais embaixo. Sem
+                              ela o card parece um destino, e o toque surpreende. */}
+                          <ChevronDown
+                            size={16}
+                            aria-hidden="true"
+                            className={`shrink-0 text-neutral-400 transition-transform duration-300 ${aberto ? 'rotate-180' : ''}`}
+                          />
                         </div>
                       </div>
                     </button>
@@ -464,6 +525,34 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                       <EyeOff className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
+                  {aberto && (
+                    <div id={`refeicoes-${d.date}`} className="mt-2 mr-[52px] rounded-2xl border border-neutral-800/60 bg-neutral-950/60 p-3">
+                      {detalhe.status === 'carregando' ? (
+                        <p className="py-2 text-center text-xs text-neutral-400">Carregando as refeições…</p>
+                      ) : detalhe.status === 'erro' ? (
+                        <p className="py-2 text-center text-xs font-bold text-red-400" role="alert">{detalhe.mensagem}</p>
+                      ) : detalhe.status === 'ok' && detalhe.refeicoes.length === 0 ? (
+                        /* O card só existe porque houve lançamento — zero aqui é
+                           divergência (refeição apagada em outro aparelho), não
+                           "dia vazio". Dizer isso evita caça a fantasma. */
+                        <p className="py-2 text-center text-xs text-neutral-400">
+                          Não encontrei as refeições deste dia. Ele pode ter sido editado em outro aparelho.
+                        </p>
+                      ) : detalhe.status === 'ok' ? (
+                        <ul className="space-y-2">
+                          {detalhe.refeicoes.map((m) => <LinhaRefeicao key={m.id} refeicao={m} />)}
+                        </ul>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => abrirDia(d.date)}
+                        className="tap-44 mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-700/50 bg-neutral-800/80 px-3 text-[11px] t-action uppercase tracking-wider text-neutral-300 transition active:scale-95"
+                      >
+                        <ExternalLink size={12} aria-hidden="true" />
+                        Abrir o dia para editar
+                      </button>
+                    </div>
+                  )}
                 </li>
                 )
               })}
@@ -519,4 +608,48 @@ function BadgeMacro({ macro, letra, gramas, mudo }: { macro: 'protein' | 'carbs'
       {letra} {Math.round(gramas)}g
     </span>
   )
+}
+
+/**
+ * Uma refeição dentro do card do dia.
+ *
+ * Hierarquia: a HORA e o NOME identificam ("07:34 · Café da manhã"), as kcal
+ * são o número, e os macros ficam abaixo em corpo menor. Os alimentos entram
+ * numa linha só (`resumoItens`) — a lista completa é papel do PDF; aqui, seis
+ * linhas por refeição transformariam o card num segundo histórico.
+ */
+function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
+  // "5 ovos cozidos" no título E "5 ovos cozidos" embaixo: quando a refeição
+  // tem um item só, o parser costuma repetir o nome inteiro. Um fato aparece
+  // uma vez (docs/DESIGN_HIERARCHY.md) — visto no aparelho, 25/08/2026.
+  const bruto = resumoItens(refeicao)
+  const itens = mesmoTexto(bruto, refeicao.nome) ? '' : bruto
+  return (
+    <li className="flex items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          {refeicao.hora && <span className="shrink-0 text-[11px] font-bold tabular-nums text-yellow-500/70">{refeicao.hora}</span>}
+          <span className="truncate text-sm font-bold text-neutral-100">{refeicao.nome}</span>
+        </div>
+        {itens && <p className="mt-0.5 truncate text-[11px] text-neutral-400">{itens}</p>}
+        <p className="mt-0.5 text-[11px] tabular-nums text-neutral-400">
+          <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(refeicao.protein)}g</span>
+          {' · '}
+          <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(refeicao.carbs)}g</span>
+          {' · '}
+          <span style={{ color: MACRO_COLORS.fat }}>G {Math.round(refeicao.fat)}g</span>
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-sm font-black tabular-nums text-white">{Math.round(refeicao.calories)}</div>
+        <div className="text-[10px] text-neutral-400">kcal</div>
+      </div>
+    </li>
+  )
+}
+
+/** Mesmo texto a menos de caixa, acento e espaço — para não repetir o rótulo. */
+function mesmoTexto(a: string, b: string): boolean {
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return !!a && norm(a) === norm(b)
 }

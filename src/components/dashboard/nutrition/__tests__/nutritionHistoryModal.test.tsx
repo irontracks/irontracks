@@ -12,20 +12,32 @@ import NutritionHistoryModal from '@/components/dashboard/nutrition/NutritionHis
  */
 
 const resposta = { data: [] as unknown[], error: null as unknown }
+/** As REFEIÇÕES (o detalhe do card aberto e do PDF), não os agregados do dia. */
+const refeicoes = { data: [] as unknown[], error: null as unknown }
 
-// Distinguir a TABELA é obrigatório: `nutrition_day_flags` tem a mesma cadeia
-// select→eq→gte→lte, e um mock que ignora o nome devolveria as refeições como
-// se fossem marcas de "dia incompleto" — sumindo com todos os dias da média.
+// Duas coisas precisam ser distinguidas, e ignorar qualquer uma inverte o teste:
+//
+// 1. a TABELA — `nutrition_day_flags` tem a mesma cadeia select→eq→gte→lte, e um
+//    mock que ignora o nome devolve as refeições como se fossem marcas de "dia
+//    incompleto", sumindo com todos os dias da média;
+// 2. as COLUNAS — o detalhe por refeição sai da MESMA tabela dos agregados
+//    (`nutrition_meal_entries`), e só o select diz qual das duas é.
 vi.mock('@/utils/supabase/client', () => ({
     createClient: () => ({
         from: (tabela: string) => ({
-            select: () => ({
-                eq: () => ({
-                    gte: () => ({
-                        lte: () => Promise.resolve(tabela === 'nutrition_day_flags' ? { data: [], error: null } : resposta),
+            select: (colunas?: string) => {
+                const alvo = () => {
+                    if (tabela === 'nutrition_day_flags') return { data: [], error: null }
+                    return String(colunas ?? '').includes('food_name') ? refeicoes : resposta
+                }
+                return {
+                    eq: () => ({
+                        gte: () => ({ lte: () => Promise.resolve(alvo()) }),
+                        // `.eq(user).eq(date)` — a busca das refeições de UM dia.
+                        eq: () => Promise.resolve(alvo()),
                     }),
-                }),
-            }),
+                }
+            },
             insert: () => Promise.resolve({ error: null }),
             delete: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
         }),
@@ -53,6 +65,11 @@ beforeEach(() => {
         { date: '2026-08-14', calories: 2000, protein: 150, carbs: 200, fat: 60 },
     ]
     resposta.error = null
+    refeicoes.data = [
+        { id: 'm1', date: '2026-08-14', created_at: '2026-08-14T13:20:00Z', food_name: 'Café da manhã', calories: 700, protein: 50, carbs: 70, fat: 20, items: [{ label: '100g aveia', grams: 100 }] },
+        { id: 'm2', date: '2026-08-14', created_at: '2026-08-14T21:05:00Z', food_name: 'Janta', calories: 1300, protein: 100, carbs: 130, fat: 40, items: [] },
+    ]
+    refeicoes.error = null
 })
 
 describe('lista de dias', () => {
@@ -63,14 +80,79 @@ describe('lista de dias', () => {
         expect(screen.getByText(/2 refeições/)).toBeInTheDocument()
     })
 
-    it('tocar num dia abre aquele dia e fecha a janela', async () => {
+    /**
+     * Pedido do dono (25/08/2026): tocar no card mostra as refeições DAQUELE
+     * dia. Antes o toque fechava o modal e trocava a data da aba — que abre no
+     * topo, com os lançamentos no fim da página, então o gesto de "abrir o
+     * dia" nunca chegava a mostrar o dia.
+     */
+    it('tocar num dia mostra as refeições daquele dia, sem sair do histórico', async () => {
         const onPickDate = vi.fn()
         const onClose = vi.fn()
         abrir({ onPickDate, onClose })
-        const linha = await screen.findByRole('button', { name: /2000/ })
-        fireEvent.click(linha)
+        const card = await screen.findByRole('button', { name: /Ver as refeições de Sex/i })
+        expect(card).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(card)
+        expect(await screen.findByText('Café da manhã')).toBeInTheDocument()
+        expect(screen.getByText('Janta')).toBeInTheDocument()
+        expect(card).toHaveAttribute('aria-expanded', 'true')
+        expect(onPickDate, 'abrir o card não é navegar — o usuário fica no histórico').not.toHaveBeenCalled()
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
+    /**
+     * "5 ovos cozidos" no título e "5 ovos cozidos" embaixo — foi o que o
+     * aparelho mostrou. Quando a refeição tem um item só, o parser repete o
+     * nome inteiro, e o card gastava duas linhas para dizer a mesma coisa.
+     */
+    it('o item não se repete quando é o próprio nome da refeição', async () => {
+        refeicoes.data = [
+            { id: 'm1', date: '2026-08-14', created_at: '2026-08-14T13:20:00Z', food_name: '5 ovos cozidos', calories: 388, protein: 33, carbs: 3, fat: 28, items: [{ label: '5 ovos cozidos', grams: 250 }] },
+            { id: 'm2', date: '2026-08-14', created_at: '2026-08-14T21:05:00Z', food_name: 'Janta', calories: 900, protein: 60, carbs: 90, fat: 30, items: [{ label: '150g arroz', grams: 150 }] },
+        ]
+        abrir()
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        expect(await screen.findAllByText('5 ovos cozidos')).toHaveLength(1)
+        // O item que ACRESCENTA informação continua aparecendo.
+        expect(screen.getByText('150g arroz')).toBeInTheDocument()
+    })
+
+    /** A hora é BRT: `created_at` é UTC e 21:05Z é 18:05 em São Paulo. */
+    it('a hora da refeição sai no fuso do Brasil', async () => {
+        abrir()
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        expect(await screen.findByText('10:20')).toBeInTheDocument()
+        expect(screen.getByText('18:05')).toBeInTheDocument()
+    })
+
+    it('a navegação continua existindo, dentro do card aberto', async () => {
+        const onPickDate = vi.fn()
+        const onClose = vi.fn()
+        abrir({ onPickDate, onClose })
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        fireEvent.click(await screen.findByRole('button', { name: /abrir o dia para editar/i }))
         expect(onPickDate).toHaveBeenCalledWith('2026-08-14')
         expect(onClose).toHaveBeenCalled()
+    })
+
+    /**
+     * O card só existe porque houve lançamento. Zero refeições aqui é
+     * divergência (refeição apagada em outro aparelho) — dizer "nenhuma
+     * refeição" sem mais nada mandaria o usuário caçar um fantasma.
+     */
+    it('lista vazia no detalhe é tratada como divergência, não como dia vazio', async () => {
+        refeicoes.data = []
+        abrir()
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        expect(await screen.findByText(/editado em outro aparelho/i)).toBeInTheDocument()
+    })
+
+    it('falha de leitura não vira "não comeu nada"', async () => {
+        refeicoes.error = { message: 'boom' }
+        refeicoes.data = []
+        abrir()
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        expect(await screen.findByText(/não consegui carregar as refeições/i)).toBeInTheDocument()
     })
 
     it('a média é a dos dias registrados, e a cobertura fica visível', async () => {
@@ -195,7 +277,7 @@ describe('mesmo molde do histórico de treino', () => {
      */
     it('dia fora da média não é apagado por opacidade', async () => {
         abrir()
-        const linha = await screen.findByRole('button', { name: /Abrir Hoje/i })
+        const linha = await screen.findByRole('button', { name: /refeições de Hoje/i })
         expect(linha.className).not.toMatch(/opacity-/)
     })
 })
