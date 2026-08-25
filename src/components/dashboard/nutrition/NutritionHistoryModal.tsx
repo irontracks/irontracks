@@ -19,7 +19,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { MACRO_COLORS, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
-import { HistorySummaryShell } from '@/components/history/HistorySummaryShell'
+import { HistorySummaryShell, SummaryAction } from '@/components/history/HistorySummaryShell'
 import { HistoryWeekDivider, weekDividerLabel, weekStartOfDay } from '@/components/history/HistoryWeekDivider'
 import {
   aggregateEntriesByDay,
@@ -263,28 +263,28 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                 label: 'Média/dia',
                 featured: true,
                 icon: <Flame size={28} className="text-yellow-500" />,
-                value: <>{resumo.avgCalories}<span className="ml-1 text-xs font-black text-neutral-400">kcal</span></>,
+                value: <>{resumo.avgCalories}<span className="ml-1 text-xs font-bold text-neutral-400">kcal</span></>,
               },
               {
                 key: 'protein',
                 label: 'Proteína',
                 icon: <PontoMacro macro="protein" />,
                 valueColor: MACRO_COLORS.protein,
-                value: <>{resumo.avgProtein}<span className="ml-0.5 text-xs font-black opacity-70">g</span></>,
+                value: <>{resumo.avgProtein}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
               },
               {
                 key: 'carbs',
                 label: 'Carbo',
                 icon: <PontoMacro macro="carbs" />,
                 valueColor: MACRO_COLORS.carbs,
-                value: <>{resumo.avgCarbs}<span className="ml-0.5 text-xs font-black opacity-70">g</span></>,
+                value: <>{resumo.avgCarbs}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
               },
               {
                 key: 'fat',
                 label: 'Gordura',
                 icon: <PontoMacro macro="fat" />,
                 valueColor: MACRO_COLORS.fat,
-                value: <>{resumo.avgFat}<span className="ml-0.5 text-xs font-black opacity-70">g</span></>,
+                value: <>{resumo.avgFat}<span className="ml-0.5 text-xs font-bold opacity-70">g</span></>,
               },
             ]}
             actions={{
@@ -295,24 +295,22 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                   {/* Sem dia registrado não há o que exportar nem o que postar —
                       um relatório de "0 kcal em média" seria afirmação falsa
                       sobre o período, ainda por cima entregue ao nutricionista. */}
-                  <button
-                    type="button"
+                  <SummaryAction
+                    variant="gold"
                     onClick={() => { void salvarPdf() }}
                     disabled={resumo.loggedDays === 0 || pdf.carregando}
-                    className="tap-44 inline-flex h-8 items-center gap-1.5 rounded-lg border border-yellow-500/20 bg-yellow-500/10 px-3 text-[11px] font-black uppercase tracking-wider text-yellow-500 transition-all duration-300 hover:bg-yellow-500/20 active:scale-95 disabled:opacity-40"
                   >
                     <FileDown size={12} aria-hidden="true" />
                     {pdf.carregando ? 'Gerando…' : 'Salvar PDF'}
-                  </button>
-                  <button
-                    type="button"
+                  </SummaryAction>
+                  <SummaryAction
                     onClick={() => setStoryAberto(true)}
                     disabled={resumo.loggedDays === 0}
                     aria-label={`Compartilhar ${rotulo.toLowerCase()} como story`}
-                    className="tap-44 inline-flex h-8 w-9 items-center justify-center rounded-lg border border-neutral-700/50 bg-neutral-800/80 text-neutral-300 transition-all duration-300 hover:bg-neutral-800 active:scale-95 disabled:opacity-40"
+                    className="w-9 px-0"
                   >
                     <Clapperboard size={14} aria-hidden="true" />
-                  </button>
+                  </SummaryAction>
                 </>
               ),
             }}
@@ -373,7 +371,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               className="rounded-2xl px-6 py-8 text-center"
               style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <UtensilsCrossed className="mx-auto mb-2 h-6 w-6 text-neutral-500" aria-hidden="true" />
+              <UtensilsCrossed className="mx-auto mb-2 h-6 w-6 text-neutral-600" aria-hidden="true" />
               <p className="text-sm font-black text-white">Nenhum dia registrado nesta janela.</p>
               <p className="mt-1 text-xs text-neutral-400">Lance uma refeição e ela aparece aqui.</p>
             </div>
@@ -410,15 +408,15 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <CalendarDays size={13} className={`shrink-0 ${foraDaMedia ? 'text-neutral-500' : 'text-yellow-500/60'}`} aria-hidden="true" />
+                            <CalendarDays size={13} className={`shrink-0 ${foraDaMedia ? 'text-neutral-600' : 'text-yellow-500/60'}`} aria-hidden="true" />
                             <h3 className={`truncate font-black tracking-tight ${foraDaMedia ? 'text-neutral-300' : 'text-white'}`}>
                               {rotuloData(d.date, todayDate)}
                             </h3>
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <BadgeMacro macro="protein" letra="P" gramas={d.protein} />
-                            <BadgeMacro macro="carbs" letra="C" gramas={d.carbs} />
-                            <BadgeMacro macro="fat" letra="G" gramas={d.fat} />
+                            <BadgeMacro macro="protein" letra="P" gramas={d.protein} mudo={foraDaMedia} />
+                            <BadgeMacro macro="carbs" letra="C" gramas={d.carbs} mudo={foraDaMedia} />
+                            <BadgeMacro macro="fat" letra="G" gramas={d.fat} mudo={foraDaMedia} />
                             <span className="inline-flex items-center gap-1 rounded-full border border-neutral-700/50 bg-neutral-800/80 px-2 py-0.5 text-[10px] font-bold text-neutral-300">
                               <UtensilsCrossed size={10} className="text-yellow-500/60" aria-hidden="true" />
                               {d.meals} refeiç{d.meals === 1 ? 'ão' : 'ões'}
@@ -504,9 +502,18 @@ function PontoMacro({ macro }: { macro: 'protein' | 'carbs' | 'fat' }) {
   )
 }
 
-/** Badge de macro na linha do dia, no molde dos badges do card de sessão. */
-function BadgeMacro({ macro, letra, gramas }: { macro: 'protein' | 'carbs' | 'fat'; letra: string; gramas: number }) {
-  const tema = MACRO_SURFACES[macro]
+/**
+ * Badge de macro na linha do dia, no molde dos badges do card de sessão.
+ *
+ * `mudo` é o dia que o usuário tirou da média: os macros recuam para a
+ * superfície neutra. Visto no aparelho — em cor cheia, o dia excluído
+ * competia de igual para igual com os que contam, e a lista deixava de ter
+ * primeiro plano. O dado continua legível: some a ÊNFASE, não o número.
+ */
+function BadgeMacro({ macro, letra, gramas, mudo }: { macro: 'protein' | 'carbs' | 'fat'; letra: string; gramas: number; mudo?: boolean }) {
+  const tema = mudo
+    ? { surface: 'bg-neutral-800/80 border-neutral-700/50', label: 'text-neutral-300' }
+    : MACRO_SURFACES[macro]
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums ${tema.surface} ${tema.label}`}>
       {letra} {Math.round(gramas)}g

@@ -133,3 +133,31 @@ export function HistorySummaryShell({ eyebrow, title, subtitle, ranges, metrics,
         </div>
     )
 }
+
+/**
+ * O botão da linha de ações do resumo — exportar, abrir relatório.
+ *
+ * Existe para os dois históricos terem o MESMO botão, e não dois botões
+ * parecidos: era o último pedaço do card que cada tela escrevia à mão.
+ * Peso 700 (`t-action`), não 900: a 11px o peso 900 empata com o número do
+ * card, e a régua do app (`hierarquiaTipografica`) manda o texto de controle
+ * ficar abaixo do dado que ele acompanha.
+ */
+export function SummaryAction({
+    variant = 'neutral',
+    children,
+    ...props
+}: { variant?: 'gold' | 'neutral' } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+    const tema = variant === 'gold'
+        ? 'border-yellow-500/20 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20'
+        : 'border-neutral-700/50 bg-neutral-800/80 text-neutral-300 hover:bg-neutral-800'
+    return (
+        <button
+            type="button"
+            {...props}
+            className={`tap-44 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-3 text-[11px] t-action uppercase tracking-wider transition-all duration-300 active:scale-95 disabled:opacity-40 ${tema} ${props.className ?? ''}`}
+        >
+            {children}
+        </button>
+    )
+}

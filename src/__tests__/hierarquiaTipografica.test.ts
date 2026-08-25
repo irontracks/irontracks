@@ -46,7 +46,7 @@ const SRC = join(__dirname, '..')
 // 677 → 617 em 24/08/2026: o seletor de método por série virou um widget só
 // (`SetMethodPicker`) em vez de duas listas de botões `font-black` copiadas no
 // `normalSet` e no `groupMethodSet`. Ratchet só desce — o ganho fica travado.
-const TETO_PESO_900_EM_TEXTO_MIUDO = 617
+const TETO_PESO_900_EM_TEXTO_MIUDO = 615
 
 function arquivosTsx(dir: string, out: string[] = []): string[] {
     for (const entrada of readdirSync(dir)) {

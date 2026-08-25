@@ -1,7 +1,7 @@
 'use client'
 
 import { Flame, Clock, TrendingUp, Dumbbell, FileText } from 'lucide-react'
-import { HistorySummaryShell } from '@/components/history/HistorySummaryShell'
+import { HistorySummaryShell, SummaryAction } from '@/components/history/HistorySummaryShell'
 
 export type HistorySummary = {
     count: number
@@ -77,20 +77,8 @@ export function HistorySummaryCard({
                 icon: <FileText size={14} className="text-neutral-400 flex-shrink-0" />,
                 children: (
                     <>
-                        <button
-                            type="button"
-                            onClick={() => onOpenReport('week')}
-                            className="tap-44 h-8 px-3 rounded-lg bg-yellow-500/10 text-yellow-500 text-[11px] font-black uppercase tracking-wider hover:bg-yellow-500/20 transition-all duration-300 active:scale-95 border border-yellow-500/20"
-                        >
-                            Semanal
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onOpenReport('month')}
-                            className="tap-44 h-8 px-3 rounded-lg bg-neutral-800/80 text-neutral-300 text-[11px] font-black uppercase tracking-wider hover:bg-neutral-800 transition-all duration-300 active:scale-95 border border-neutral-700/50"
-                        >
-                            Mensal
-                        </button>
+                        <SummaryAction variant="gold" onClick={() => onOpenReport('week')}>Semanal</SummaryAction>
+                        <SummaryAction onClick={() => onOpenReport('month')}>Mensal</SummaryAction>
                     </>
                 ),
             } : undefined}
