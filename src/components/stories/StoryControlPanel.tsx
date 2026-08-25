@@ -4,6 +4,7 @@ import React from 'react'
 import { Layout, Move, RotateCcw, Crown, Download, Loader2, CheckCircle2, AlertCircle, Palette } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
+import { LayoutThumb } from './LayoutThumb'
 import { STORY_LAYOUTS, LivePositions } from '../storyComposerUtils'
 import type { StoryTemplate } from './storyTemplates'
 
@@ -81,27 +82,39 @@ export function StoryControlPanel({
                     <Palette size={14} />
                     ESCOLHA O ESTILO
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                    {templates.map((t) => (
+                {/* grid-cols-3: são SEIS estilos, e em 5 colunas o último ficava
+                    órfão numa segunda linha — a grade lutando contra o próprio
+                    conteúdo. Três colunas dão duas linhas exatas e largura para o
+                    nome caber ("CLÁSSICO" truncava em "CLÁSSI…", justamente no
+                    item selecionado). */}
+                <div className="grid grid-cols-3 gap-2">
+                    {templates.map((t) => {
+                        const ativo = templateId === t.id
+                        return (
                         <button
                             key={t.id} type="button"
                             onClick={() => onSelectTemplate(t.id)}
                             disabled={busy}
-                            aria-pressed={templateId === t.id}
+                            aria-pressed={ativo}
                             title={t.name}
-                            className={['flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-all active:scale-[0.97]',
-                                templateId === t.id ? 'border-white bg-white/10 shadow-lg scale-[1.03]' : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700 hover:bg-neutral-800',
+                            className={['group flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all active:scale-[0.97]',
+                                ativo
+                                    ? 'border-yellow-500/60 bg-yellow-500/10'
+                                    : 'border-white/[0.06] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.05]',
                             ].join(' ')}
                         >
                             <span
-                                className="block h-7 w-7 rounded-full ring-1 ring-white/20"
+                                className={['block h-9 w-9 rounded-full transition-shadow',
+                                    ativo ? 'ring-2 ring-yellow-500/70' : 'ring-1 ring-white/15',
+                                ].join(' ')}
                                 style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0%, ${t.swatch[1]} 100%)` }}
                             />
-                            <span className={['text-[9px] font-bold uppercase tracking-wide truncate w-full text-center',
-                                templateId === t.id ? 'text-white' : 'text-neutral-400',
+                            <span className={['w-full truncate text-center text-[10px] uppercase tracking-wide transition-colors',
+                                ativo ? 'font-black text-yellow-400' : 'font-semibold text-neutral-400',
                             ].join(' ')}>{t.name}</span>
                         </button>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
 
@@ -111,20 +124,33 @@ export function StoryControlPanel({
                     <Layout size={14} />
                     ESCOLHA O LAYOUT
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                    {STORY_LAYOUTS.map((l) => (
+                {/* MINIATURA, não palavra. "Topo", "Esquerda", "Normal" descrevem
+                    posição e obrigam o usuário a imaginar o resultado — em quatro
+                    colunas com wireframe ele VÊ onde o conteúdo cai, e os sete
+                    layouts cabem em duas linhas em vez de cinco. O `col-span-2`
+                    do LIVE saiu: era ele que abria dois buracos na grade. */}
+                <div className="grid grid-cols-4 gap-2">
+                    {STORY_LAYOUTS.map((l) => {
+                        const ativo = layout === l.id
+                        return (
                         <button
                             key={l.id} type="button"
                             onClick={() => onSelectLayout(l.id)}
-                            className={['h-12 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all active:scale-[0.98]',
-                                layout === l.id ? 'bg-white text-black border-white shadow-lg scale-[1.02]' : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700',
-                                l.id === 'live' ? 'col-span-2' : ''
+                            aria-pressed={ativo}
+                            className={['flex flex-col items-center gap-1.5 rounded-2xl border p-2 transition-all active:scale-[0.97] disabled:opacity-40',
+                                ativo
+                                    ? 'border-yellow-500/60 bg-yellow-500/10 text-yellow-400'
+                                    : 'border-white/[0.06] bg-white/[0.03] text-neutral-400 hover:border-white/[0.12] hover:bg-white/[0.05]',
                             ].join(' ')}
                             disabled={busy}
                         >
-                            {l.label}
+                            <LayoutThumb id={l.id} className="h-14 w-auto" />
+                            <span className={['text-[10px] uppercase tracking-wide',
+                                ativo ? 'font-black' : 'font-semibold',
+                            ].join(' ')}>{l.label}</span>
                         </button>
-                    ))}
+                        )
+                    })}
                 </div>
                 {layout === 'live' && (
                     <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 mt-2">
