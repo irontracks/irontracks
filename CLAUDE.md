@@ -2219,6 +2219,62 @@ grelhada (136 kcal)`.
 ⚠️ **Refeição já gravada não muda.** O detalhe não existe no dado antigo, e
 reprocessar com IA seria inventar sobre o passado.
 
+### O parser DESCONFIA quando sobra comida na linha (25/08/2026, PR #926)
+
+A frase acima ("o resolvedor local… quando ele não reconhece, cai na IA") estava
+certa e incompleta: o problema é o resolvedor **achar que reconheceu**.
+
+No chat da nutrição, `"140g de atum sólido ao natural mais 70g de proteína de
+soja com 400ml de leite desnatado"` devolvia **162 kcal — o mesmo valor de comer
+só o atum**. O match é pela CABEÇA do nome (`matchesAtHead`) e ignora o resto, o
+que está certo para modo de preparo ("frango GRELHADO") e para prato composto
+("esfirra de frango COM requeijão", que é UM item). O que ele não via era uma
+**segunda porção escondida na mesma linha** — e, como não sobrava
+`unknownLine`, a cascata do `resolveFood` (que só chama a IA quando sobra algo
+não reconhecido) considerava sucesso e respondia com confiança. Falha silenciosa
+com cara de acerto, oferecendo "Lançar no diário" com 1/3 das calorias.
+
+Duas mudanças, e a segunda é a que pega a CLASSE:
+
+1. **" mais " virou separador de item.** ⚠️ **" com " NÃO é, e não pode ser** —
+   ele liga o prato ao ingrediente, e separar reintroduz exatamente o bug que o
+   `matchesAtHead` existe para matar (39 kcal de requeijão no lugar de 224 da
+   esfirra).
+2. **Sobra com quantidade derruba o match** (`SOBRA_COM_QUANTIDADE`): casou a
+   cabeça mas restou número + unidade **seguido de mais texto**? A linha vira
+   `unknownLine` e a cascata segue. O parser não adivinha nada — admite que não
+   é o dono daquela linha.
+
+**O "seguido de mais texto" foi medido, não escolhido.** A primeira versão da
+regra derrubou `1 fatia de pão integral 50g` (74 kcal → desconhecido): ali o
+"50g" QUALIFICA a fatia, não abre comida nova. Comparação antes/depois em 12
+frases: a única diferença é o caso do bug.
+
+Verificado ponta a ponta contra Supabase e Gemini reais: a cascata desiste e a
+IA devolve **535 kcal · P73,5** (140g atum 155 · 70g soja 235 · 400g leite 145).
+
+**O aviso de peso é para o CHUTE, não para o dado.** O prompt do chat mandava,
+em toda resposta, "cite o PESO ASSUMIDO… se parecer irreal, peça o peso certo".
+A regra existe por um motivo real — o parser cai em 50g quando o alimento não
+declara peso por unidade, e "uma pizza grande" virava 133 kcal —, mas disparava
+também quando a pessoa tinha ESCRITO o peso: *"Comendo 140g de atum (que o app
+assumiu como 140g)…"*. Hoje `ParsedMealItem.assumedWeight` marca só o que o app
+converteu, e sem ele o prompt **proíbe** dizer que o app assumiu. Junto: proibido
+dizer "exatamente" sobre valor de tabela — "use exatamente estes números" é
+instrução de fidelidade e vazava como precisão de medição.
+
+**Duas armadilhas de verificação desta tarefa:**
+
+1. **Guard tautológico que a mutação pegou:** o `label` do item é a LINHA CRUA,
+   então procurar `/ovos/` no texto do rótulo passava verde mesmo com o
+   separador removido (um item só, rotulado com a frase inteira). O que prova
+   separação é a CONTAGEM de itens.
+2. **`gh pr merge --delete-branch` devolve para a `main` LOCAL, que fica atrás
+   do merge.** Rodar um script de verificação logo depois executa o código
+   ANTIGO — e o resultado parece regressão. Custou um "❌ o bug continua" que
+   era falso. Confira `git log --oneline -1` antes de acreditar no que o script
+   disse.
+
 ### "Abrir o dia para editar" — o botão que prometia e entregava metade
 
 Trocar a data não bastava: a aba abre no TOPO e a lista de LANÇAMENTOS (única
