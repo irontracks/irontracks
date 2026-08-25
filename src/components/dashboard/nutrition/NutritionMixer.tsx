@@ -793,6 +793,23 @@ export default function NutritionMixer({
   const handleFavoriteSelect = useCallback((mealText: string) => { setInput(mealText); try { inputRef.current?.focus() } catch {} }, [])
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
 
+  /**
+   * Abre o editor de um lançamento (expande o card e semeia o rascunho).
+   *
+   * Saiu do JSX para poder ser chamada de fora do toque do usuário — é o que
+   * o "Abrir o dia para editar" do histórico precisa fazer sozinho.
+   */
+  const abrirEditorDaEntry = useCallback((entry: MealEntry) => {
+    setExpandedEntryId(entry.id)
+    setEditingEntryId(entry.id)
+    const existing = Array.isArray(entry.items) ? entry.items : []
+    // Refeições antigas sem detalhamento: semeia 1 item com os macros atuais.
+    const seeded: MealItemView[] = existing.length > 0
+      ? existing.map(it => ({ label: String(it.label || ''), grams: safeNumber(it.grams), calories: safeNumber(it.calories), protein: safeNumber(it.protein), carbs: safeNumber(it.carbs), fat: safeNumber(it.fat) }))
+      : [{ label: entry.food_name || 'Refeição', grams: 0, calories: safeNumber(entry.calories), protein: safeNumber(entry.protein), carbs: safeNumber(entry.carbs), fat: safeNumber(entry.fat) }]
+    setEditDraft({ food_name: entry.food_name, items: seeded })
+  }, [])
+
   const entriesAnchorRef = useRef<HTMLDivElement | null>(null)
   // Contador, não booleano: pedir o MESMO dia duas vezes precisa rolar as duas.
   const [levarAosLancamentos, setLevarAosLancamentos] = useState(0)
@@ -809,10 +826,35 @@ export default function NutritionMixer({
    * navegando pelos dias e olhando o resumo do topo; arrastar a tela a cada
    * seta seria sequestrar o gesto dele.
    */
-  const handlePickFromHistory = useCallback((d: string) => {
+  /**
+   * Pedido de edição que só pode ser atendido DEPOIS que os lançamentos do dia
+   * chegarem do servidor: no instante do toque a lista ainda é a do dia
+   * anterior (`handleDateChange` a esvazia). `id` = a refeição tocada no
+   * histórico; `null` = veio do botão do dia.
+   */
+  const [editarAoCarregar, setEditarAoCarregar] = useState<{ id: string | null; ticket: number } | null>(null)
+
+  const handlePickFromHistory = useCallback((d: string, mealId?: string) => {
     handleDateChange(d)
     setLevarAosLancamentos((n) => n + 1)
+    setEditarAoCarregar((prev) => ({ id: mealId || null, ticket: (prev?.ticket ?? 0) + 1 }))
   }, [handleDateChange])
+
+  useEffect(() => {
+    if (!editarAoCarregar) return
+    const lista = Array.isArray(entries) ? entries : []
+    if (lista.length === 0) return
+    // Com id, a refeição tocada. Sem id (botão do dia), a PRIMEIRA da lista —
+    // que é a mais recente (`order created_at desc`), a que costuma precisar
+    // de ajuste. Escolher a mais antiga seria arbitrário do mesmo jeito e
+    // ainda erraria mais.
+    const alvo = editarAoCarregar.id
+      ? lista.find((e) => e.id === editarAoCarregar.id)
+      : lista[0]
+    // Refeição apagada em outro aparelho: some o pedido, não trava a tela.
+    if (alvo) abrirEditorDaEntry(alvo)
+    setEditarAoCarregar(null)
+  }, [editarAoCarregar, entries, abrirEditorDaEntry])
 
   useEffect(() => {
     if (!levarAosLancamentos) return
@@ -1505,15 +1547,7 @@ export default function NutritionMixer({
                 editDraft={editDraft || { food_name: '', items: [] }}
                 editBusy={editBusy}
                 onAddFood={resolveFoodForEditor}
-                onStartEdit={(entry) => {
-                  setEditingEntryId(entry.id)
-                  const existing = Array.isArray(entry.items) ? entry.items : []
-                  // Refeições antigas sem detalhamento: semeia 1 item com os macros atuais.
-                  const seeded: MealItemView[] = existing.length > 0
-                    ? existing.map(it => ({ label: String(it.label || ''), grams: safeNumber(it.grams), calories: safeNumber(it.calories), protein: safeNumber(it.protein), carbs: safeNumber(it.carbs), fat: safeNumber(it.fat) }))
-                    : [{ label: entry.food_name || 'Refeição', grams: 0, calories: safeNumber(entry.calories), protein: safeNumber(entry.protein), carbs: safeNumber(entry.carbs), fat: safeNumber(entry.fat) }]
-                  setEditDraft({ food_name: entry.food_name, items: seeded })
-                }}
+                onStartEdit={abrirEditorDaEntry}
                 onCancelEdit={() => { setEditingEntryId(null); setEditDraft(null) }}
                 onSaveEdit={async () => {
                   if (!editingEntryId || !editDraft) return
