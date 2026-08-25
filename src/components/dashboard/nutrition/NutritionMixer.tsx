@@ -792,6 +792,42 @@ export default function NutritionMixer({
 
   const handleFavoriteSelect = useCallback((mealText: string) => { setInput(mealText); try { inputRef.current?.focus() } catch {} }, [])
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
+
+  const entriesAnchorRef = useRef<HTMLDivElement | null>(null)
+  // Contador, não booleano: pedir o MESMO dia duas vezes precisa rolar as duas.
+  const [levarAosLancamentos, setLevarAosLancamentos] = useState(0)
+
+  /**
+   * "Abrir o dia para editar", vindo do histórico.
+   *
+   * Trocar a data não bastava: a aba abre no topo (hero de calorias, macros,
+   * scanner…) e a lista de lançamentos — a única superfície onde se edita ou
+   * apaga uma refeição — fica lá embaixo. Escolhendo HOJE, que é o caso comum,
+   * a tela não mudava nada e o botão parecia quebrado.
+   *
+   * As setas do `DateNavigator` continuam SEM rolar: ali o usuário está
+   * navegando pelos dias e olhando o resumo do topo; arrastar a tela a cada
+   * seta seria sequestrar o gesto dele.
+   */
+  const handlePickFromHistory = useCallback((d: string) => {
+    handleDateChange(d)
+    setLevarAosLancamentos((n) => n + 1)
+  }, [handleDateChange])
+
+  useEffect(() => {
+    if (!levarAosLancamentos) return
+    // O modal fecha no MESMO gesto: sem esperar o quadro seguinte, a rolagem
+    // acontece com a folha ainda por cima e não se vê nada acontecer.
+    const id = requestAnimationFrame(() => {
+      try {
+        entriesAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } catch {
+        // WebView antiga sem `behavior: smooth` no contrato do objeto.
+        entriesAnchorRef.current?.scrollIntoView(true)
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [levarAosLancamentos])
   // `openHistoryOnMount`: o menu do avatar abre a aba JÁ no histórico — é de lá
   // que o dono foi procurar (é onde mora o histórico de treinos).
   //
@@ -859,7 +895,7 @@ export default function NutritionMixer({
         userId={userId}
         todayDate={todayDate}
         goals={safeGoals}
-        onPickDate={handleDateChange}
+        onPickDate={handlePickFromHistory}
         onClose={() => setHistoryOpen(false)}
       />
 
@@ -1414,6 +1450,11 @@ export default function NutritionMixer({
       )}
 
       {/* ══ ENTRIES LIST ═════════════════════════════════════════════════ */}
+      {/* Âncora do "Abrir o dia para editar" (histórico). Sem ela o botão
+          trocava a data e deixava o usuário no TOPO da aba — os lançamentos
+          ficam no fim da página, e para quem já estava no dia de hoje nada
+          mudava na tela: "clico e ele só abre a aba de nutrição". */}
+      <div ref={entriesAnchorRef} className="scroll-mt-4">
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">
@@ -1528,6 +1569,7 @@ export default function NutritionMixer({
           )}
         </div>
       </Card>
+      </div>
 
       {/* ── Barcode Scanner overlay ───────────────────────────────────── */}
       {showBarcodeScanner && (
