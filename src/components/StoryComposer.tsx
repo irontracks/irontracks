@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect } from 'react'
-import { ArrowLeft, Upload, Scissors } from 'lucide-react'
+import { ArrowLeft, Frame, RotateCcw, Scissors, Upload } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
@@ -285,54 +285,82 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
 
                   </div>
 
-                  {/* Controles de zoom — precisos via +/−. Em todos os layouts. */}
+                  {/* UMA linha para os seis controles (pedido do dono).
+                      Somados como estavam — 48+48+70+120+112 + gaps — davam
+                      438px numa faixa de 340: não cabia. Em vez de espremer
+                      seis botões ilegíveis, o que sobrou foi agrupado pelo que
+                      cada um FAZ:
+
+                      · zoom e reset são a mesma família (manipular o bloco) e
+                        viraram um stepper único, sem gaps internos — quatro
+                        controles com o custo de largura de um;
+                      · trocar mídia e guia são de naturezas diferentes, e ficam
+                        do outro lado de um divisor, como ícones de 44pt.
+
+                      O rótulo "GUIA ON/OFF" saiu: o estado já era comunicado
+                      pela COR (dourado aceso = ligado), então a palavra repetia
+                      o que o olho lê primeiro. `aria-label` mantém o estado
+                      para quem usa leitor de tela. */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
-                      <button
-                        type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
-                        aria-label="Diminuir zoom"
-                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
-                      >−</button>
-                      <div className="flex-1 h-11 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-center text-xs font-black tabular-nums text-yellow-500">
-                        {Math.round(workoutTransform.scale * 100)}%
+                      {/* Stepper: peças coladas dentro de uma casca só. */}
+                      <div className="flex h-11 flex-1 items-center overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+                        <button
+                          type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
+                          aria-label="Diminuir zoom"
+                          className="h-full w-10 text-xl font-black text-white transition-colors hover:bg-neutral-800 disabled:opacity-50 active:scale-95"
+                        >−</button>
+                        <div className="flex h-full min-w-[52px] flex-1 items-center justify-center border-x border-neutral-800 text-xs font-black tabular-nums text-yellow-500">
+                          {Math.round(workoutTransform.scale * 100)}%
+                        </div>
+                        <button
+                          type="button" onClick={() => nudgeWorkoutScale(0.05)} disabled={busy}
+                          aria-label="Aumentar zoom"
+                          className="h-full w-10 text-xl font-black text-white transition-colors hover:bg-neutral-800 disabled:opacity-50 active:scale-95"
+                        >+</button>
+                        <button
+                          type="button" onClick={resetWorkoutTransform} disabled={busy}
+                          aria-label="Redefinir zoom e posição"
+                          title="Redefinir zoom e posição"
+                          className="flex h-full w-10 items-center justify-center border-l border-neutral-800 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white disabled:opacity-50 active:scale-95"
+                        >
+                          <RotateCcw size={15} />
+                        </button>
                       </div>
-                      <button
-                        type="button" onClick={() => nudgeWorkoutScale(0.05)} disabled={busy}
-                        aria-label="Aumentar zoom"
-                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
-                      >+</button>
-                      <button
-                        type="button" onClick={resetWorkoutTransform} disabled={busy}
-                        className="h-11 px-4 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white disabled:opacity-50 transition-colors active:scale-95"
-                      >Reset</button>
-                  </div>
 
-                  {/* Media Controls */}
-                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
-                    <label className={['flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
-                      <Upload size={16} className="text-yellow-500" />
-                      {isVideo ? 'TROCAR' : 'TROCAR FOTO'}
-                      <input
-                        ref={inputRef} type="file" aria-label="Trocar mídia" accept="image/*,video/*" className="sr-only"
-                        onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
-                      />
-                    </label>
+                      {/* Divisor: separa manipular o BLOCO de trocar a FONTE. */}
+                      <span className="h-6 w-px shrink-0 bg-white/10" aria-hidden="true" />
 
-                    {isVideo && (
-                      <button type="button" onClick={() => setShowTrimmer(v => !v)}
-                        className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${showTrimmer ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
-                        disabled={busy}
-                        aria-label="Cortar vídeo"
+                      <label
+                        aria-label={isVideo ? 'Trocar vídeo' : 'Trocar foto'}
+                        title={isVideo ? 'Trocar vídeo' : 'Trocar foto'}
+                        className={['tap-44 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-yellow-500 transition-all hover:border-neutral-700 hover:bg-neutral-800 active:scale-[0.98]', busy ? 'pointer-events-none opacity-50' : ''].join(' ')}
                       >
-                        <Scissors size={18} />
-                      </button>
-                    )}
+                        <Upload size={17} />
+                        <input
+                          ref={inputRef} type="file" aria-label="Trocar mídia" accept="image/*,video/*" className="sr-only"
+                          onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
+                        />
+                      </label>
 
-                    <button type="button" onClick={() => setShowSafeGuide(v => !v)}
-                      className={`w-28 h-12 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${showSafeGuide ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
-                      disabled={busy}
-                    >
-                      GUIA {showSafeGuide ? 'ON' : 'OFF'}
-                    </button>
+                      {isVideo && (
+                        <button type="button" onClick={() => setShowTrimmer(v => !v)}
+                          className={`tap-44 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors active:scale-[0.98] ${showTrimmer ? 'border-yellow-500 bg-yellow-500 text-black' : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white'}`}
+                          disabled={busy}
+                          aria-label="Cortar vídeo"
+                        >
+                          <Scissors size={17} />
+                        </button>
+                      )}
+
+                      <button type="button" onClick={() => setShowSafeGuide(v => !v)}
+                        aria-pressed={showSafeGuide}
+                        aria-label={showSafeGuide ? 'Ocultar guias de área segura' : 'Mostrar guias de área segura'}
+                        title={showSafeGuide ? 'Ocultar guias' : 'Mostrar guias'}
+                        className={`tap-44 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors active:scale-[0.98] ${showSafeGuide ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-500' : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-white'}`}
+                        disabled={busy}
+                      >
+                        <Frame size={17} />
+                      </button>
                   </div>
                 </div>
 
