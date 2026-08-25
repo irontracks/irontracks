@@ -24,6 +24,7 @@
 import { escapeHtml } from '@/utils/escapeHtml'
 import type { NutritionHistoryDay, NutritionHistorySummary } from '@/lib/nutrition/history'
 import { formatarDataCurta, rotuloPeriodo, type NutritionPeriod } from '@/lib/nutrition/historyPeriod'
+import { resumoItens, type NutritionMeal } from '@/lib/nutrition/dayMeals'
 
 export type NutritionPeriodReportInput = {
   periodo: NutritionPeriod
@@ -46,6 +47,18 @@ export type NutritionPeriodReportInput = {
    * a coluna não bateria com o rodapé e concluiria que a conta está errada.
    */
   excluidos?: ReadonlySet<string> | null
+  /**
+   * As refeições de cada dia — o que o nutricionista de fato quer ler.
+   *
+   * Até 25/08/2026 o relatório dizia "5 refeições" e não dizia QUAIS: o
+   * profissional recebia a contagem de um dado que ele precisa ver por
+   * inteiro. `null` = detalhe não coletado; o motivo entra em
+   * `detalheOmitido` e é IMPRESSO — relatório que omite em silêncio faz o
+   * leitor concluir que a pessoa não registrou nada.
+   */
+  refeicoesPorDia?: ReadonlyMap<string, NutritionMeal[]> | null
+  /** Por que o detalhe não veio (janela longa demais, falha de leitura). */
+  detalheOmitido?: string | null
 }
 
 const inteiro = (n: unknown): string => {
@@ -65,7 +78,7 @@ const rotuloDiaLongo = (date: string): string => {
 }
 
 export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): string {
-  const { periodo, dias, resumo, metaKcal, nome, logoDataUrl, emitidoEm, excluidos } = input
+  const { periodo, dias, resumo, metaKcal, nome, logoDataUrl, emitidoEm, excluidos, refeicoesPorDia, detalheOmitido } = input
   const lista = Array.isArray(dias) ? dias : []
 
   const titulo = `Nutrição — ${rotuloPeriodo(periodo)}`
@@ -102,6 +115,54 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
         </tr>`
   }).join('')
 
+  /**
+   * "Refeições, dia a dia" — uma sub-tabela por dia, na ordem em que foram
+   * lançadas. Segue a MESMA regra da tabela de cima: dia sem lançamento não
+   * aparece (não é zero), e dia fora da média aparece rotulado, porque
+   * escondê-lo esconderia do profissional que houve registro ali.
+   */
+  const secaoRefeicoes = (() => {
+    if (detalheOmitido) {
+      return `<div class="section-title" style="margin-top:22px">Refeições, dia a dia</div>
+    <p class="nota">${escapeHtml(detalheOmitido)}</p>`
+    }
+    if (!refeicoesPorDia || refeicoesPorDia.size === 0) return ''
+    const blocos = lista.map((d) => {
+      const refeicoes = refeicoesPorDia.get(d.date) ?? []
+      if (!refeicoes.length) return ''
+      const fora = !!excluidos?.has(d.date)
+      const linhasRef = refeicoes.map((m) => {
+        const itens = resumoItens(m, 12)
+        return `
+        <tr>
+          <td class="hora">${escapeHtml(m.hora || '—')}</td>
+          <td class="dia">${escapeHtml(m.nome)}${itens ? `<div class="itens">${escapeHtml(itens)}</div>` : ''}</td>
+          <td class="num forte">${inteiro(m.calories)}</td>
+          <td class="num">${inteiro(m.protein)} g</td>
+          <td class="num">${inteiro(m.carbs)} g</td>
+          <td class="num">${inteiro(m.fat)} g</td>
+        </tr>`
+      }).join('')
+      return `
+    <div class="bloco-dia">
+      <div class="dia-titulo">${escapeHtml(rotuloDiaLongo(d.date))}${fora ? ' <span class="tag">fora da média</span>' : ''}</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:56px">Hora</th><th>Refeição</th>
+            <th style="text-align:right">kcal</th><th style="text-align:right">Proteína</th>
+            <th style="text-align:right">Carbo</th><th style="text-align:right">Gordura</th>
+          </tr>
+        </thead>
+        <tbody>${linhasRef}
+        </tbody>
+      </table>
+    </div>`
+    }).join('')
+    if (!blocos.trim()) return ''
+    return `<div class="section-title" style="margin-top:22px">Refeições, dia a dia</div>${blocos}`
+  })()
+
   const corpoTabela = lista.length
     ? linhas
     : `<tr><td class="vazio" colspan="6">Nenhum dia com lançamento neste período.</td></tr>`
@@ -132,6 +193,10 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
   .card-sub{font-size:11px;color:#6b7280;font-weight:700;margin-top:2px}
   .nota{font-size:11px;color:#6b7280;font-weight:600;margin:10px 0 18px}
   .section-title{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;font-weight:900;margin:0 0 8px}
+  .bloco-dia{margin-bottom:14px;break-inside:avoid;page-break-inside:avoid}
+  .dia-titulo{font-size:12px;font-weight:900;color:#111827;margin:0 0 6px}
+  .hora{font-size:11px;font-weight:800;color:#6b7280;white-space:nowrap}
+  .itens{font-size:10px;color:#6b7280;font-weight:600;margin-top:2px}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eef2f7;border-radius:12px;overflow:hidden}
   th,td{padding:7px 10px;text-align:left;font-size:12px;border-bottom:1px solid #f1f5f9}
   th{color:#6b7280;text-transform:uppercase;font-weight:900;font-size:10px;letter-spacing:.16em;background:#fafafa}
@@ -218,6 +283,8 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
         </tr>
       </tfoot>` : ''}
     </table>
+
+    ${secaoRefeicoes}
 
     <div class="rodape">Gerado pelo IronTracks · irontracks.com.br</div>
   </div>
