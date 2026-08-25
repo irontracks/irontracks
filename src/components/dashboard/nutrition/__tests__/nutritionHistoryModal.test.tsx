@@ -151,6 +151,55 @@ describe('story do período', () => {
     })
 })
 
+/**
+ * O MESMO MOLDE do histórico de treino (25/08/2026, pedido do dono).
+ *
+ * As duas telas respondem a mesma pergunta — "como foi o meu período?" — e
+ * chegavam a ela por caminhos visuais diferentes. Aqui ficam os casos que
+ * provam a paridade pela TELA; a que impede uma terceira cópia de nascer está
+ * em `components/history/__tests__/historicoMesmoMolde.test.ts`.
+ */
+describe('mesmo molde do histórico de treino', () => {
+    it('o resumo traz a média de CADA macro, não só a proteína', async () => {
+        abrir()
+        // Média de 2 dias: (900+1500+2000)/2 = 2200 kcal · P 165 · C 225 · G 65.
+        expect(await screen.findByText('2200')).toBeInTheDocument()
+        for (const [rotulo, media] of [['Proteína', '165'], ['Carbo', '225'], ['Gordura', '65']]) {
+            const bloco = screen.getByText(rotulo).closest('.rounded-xl')
+            expect(bloco?.textContent, `o bloco ${rotulo} precisa mostrar a média`).toContain(media)
+        }
+    })
+
+    /**
+     * A semana do app é domingo→sábado, BRT — e a fixture foi escolhida para
+     * distinguir: 16/08 é DOMINGO e 14/08 é sexta. Com o cálculo antigo (a
+     * partir da segunda, como o histórico de treino fazia) os dois cairiam na
+     * mesma semana e existiria UM cabeçalho só.
+     */
+    it('os dias vêm agrupados por semana, e o domingo ABRE a semana', async () => {
+        abrir()
+        expect(await screen.findByText('Semana de 16/08')).toBeInTheDocument()
+        expect(screen.getByText('Semana de 09/08')).toBeInTheDocument()
+    })
+
+    it('a pílula abrevia na tela e anuncia por extenso', async () => {
+        abrir()
+        const pilula = await screen.findByRole('button', { name: /^7 dias$/i })
+        expect(pilula.textContent, 'quatro janelas + período precisam caber em 375pt').toBe('7d')
+    })
+
+    /**
+     * O dia fora da média some por HIERARQUIA (accent cinza + badge), nunca por
+     * opacidade: `opacity-45` levava o texto para 45% do contraste e o dado
+     * continua sendo dado da pessoa.
+     */
+    it('dia fora da média não é apagado por opacidade', async () => {
+        abrir()
+        const linha = await screen.findByRole('button', { name: /Abrir Hoje/i })
+        expect(linha.className).not.toMatch(/opacity-/)
+    })
+})
+
 describe('fiação na aba de nutrição', () => {
     const read = (f: string) => readFileSync(join(__dirname, '..', f), 'utf8')
 
