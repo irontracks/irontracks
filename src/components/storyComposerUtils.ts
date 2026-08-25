@@ -790,17 +790,14 @@ export const drawStory = ({
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
+    // IRONTRACKS: uma palavra. Duas cores, zero separador — ver a nota no topo
+    // de `storyTemplates.ts`. Este caminho já foi o único que inseria ' · ',
+    // enquanto live/group/workout desenhavam junto: a mesma marca, escrita de
+    // dois jeitos conforme o layout.
     ctx.fillText('IRON', left, brandY);
     const ironW = ctx.measureText('IRON').width;
-    // separator (varia por template — pode ser '', ' · ', ' — ', ' / ')
-    const divider = template.brandDivider;
-    ctx.fillStyle = C.brandDot;
-    ctx.font = f(F.brandWeight, Math.round(brandFontSize * 0.55), F.brandStyle);
-    const dotW = divider ? ctx.measureText(divider).width : 0;
-    if (divider) ctx.fillText(divider, left + ironW, brandY + brandFontSize * 0.22);
-    ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
     ctx.fillStyle = C.brandAccent;
-    ctx.fillText('TRACKS', left + ironW + dotW, brandY);
+    ctx.fillText('TRACKS', left + ironW, brandY);
     ctx.restore();
 
     // ── Workout title — wrapping text ─────────────────────────────────────────
@@ -1032,8 +1029,9 @@ export const BRAND_FONT_SIZE = 54
  *
  * Existe porque a alça de arrasto usava 380×66 chumbado, e a caixa tracejada
  * aparecia deslocada do logo (print do dono, 03/08/2026). A largura do
- * "IRONTRACKS" depende da fonte do template e do separador (`brandDivider`, que
- * varia entre '', ' · ', ' — ', ' / '), então nenhum número fixo acerta em todos.
+ * "IRONTRACKS" depende da fonte do template — que varia peso, família e itálico
+ * —, então nenhum número fixo acerta em todos. (O separador `brandDivider` saiu
+ * em 25/08/2026: a marca é uma palavra só.)
  *
  * A mesma caixa também decide, no overlay de gesto, se a pinça é da MARCA ou do
  * bloco — daí ela precisar ser fiel, e não aproximada.
@@ -1045,7 +1043,7 @@ export const BRAND_FONT_SIZE = 54
 const BRAND_BOX_PAD = 8
 
 export const measureBrandBox = (
-    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string },
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' } },
     scale = 1,
 ): { w: number; h: number; dx: number; dy: number } => {
     const s = Number.isFinite(scale) && scale > 0 ? scale : 1
@@ -1070,14 +1068,7 @@ export const measureBrandBox = (
         const iron = ctx.measureText('IRON')
         const tracks = ctx.measureText('TRACKS')
 
-        const divider = template.brandDivider ?? ''
-        let dividerW = 0
-        if (divider) {
-            ctx.font = storyFont(F.family, F.brandWeight, Math.round(BRAND_FONT_SIZE * 0.55), style)
-            dividerW = ctx.measureText(divider).width
-        }
-
-        const inkW = iron.width + dividerW + tracks.width
+        const inkW = iron.width + tracks.width
         if (!Number.isFinite(inkW) || inkW <= 0) return fallback
 
         /**
@@ -1255,7 +1246,7 @@ export const isPointOverBrand = (
     clientX: number,
     clientY: number,
     rect: DOMRect | null | undefined,
-    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' }; brandDivider?: string } | null | undefined,
+    template: { fonts: { family: string; brandWeight: string; brandStyle?: 'italic' | 'normal' } } | null | undefined,
     brandOffset: Offset | null | undefined,
     brandScale?: number | null,
 ): boolean => {

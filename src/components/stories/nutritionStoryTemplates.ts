@@ -21,7 +21,6 @@ const FRESH_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#4ade80',
-    brandDot: 'rgba(74,222,128,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(220,252,231,0.88)',
     value: '#ffffff',
@@ -56,7 +55,6 @@ const FRESH_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 24, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' · ',
 }
 
 // ── 2. Protein (vermelho, pesado/condensado) ─────────────────────────────────
@@ -67,7 +65,6 @@ const PROTEIN_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#f87171',
-    brandDot: 'rgba(248,113,113,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(254,226,226,0.88)',
     value: '#ffffff',
@@ -102,7 +99,6 @@ const PROTEIN_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 14, accentHeight: 4, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: '',
 }
 
 // ── 3. Berry (roxo, geométrico) ──────────────────────────────────────────────
@@ -113,7 +109,6 @@ const BERRY_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#c084fc',
-    brandDot: 'rgba(192,132,252,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(243,232,255,0.88)',
     value: '#ffffff',
@@ -148,7 +143,6 @@ const BERRY_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 24, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' / ',
 }
 
 // ── 4. Citrus (laranja, sistema) ─────────────────────────────────────────────
@@ -159,7 +153,6 @@ const CITRUS_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#fbbf24',
-    brandDot: 'rgba(251,146,60,0.55)',
     title: '#ffffff',
     subtitle: 'rgba(255,237,213,0.88)',
     value: '#ffffff',
@@ -194,7 +187,6 @@ const CITRUS_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 24, accentHeight: 3, showAccentLine: true },
   titleUppercase: true,
-  brandDivider: ' · ',
 }
 
 // ── 5. Mono (serifada, clean) ────────────────────────────────────────────────
@@ -205,7 +197,6 @@ const MONO_TEMPLATE: StoryTemplate = {
   colors: {
     brandPrimary: '#ffffff',
     brandAccent: '#e5e5e5',
-    brandDot: 'rgba(255,255,255,0.45)',
     title: '#ffffff',
     subtitle: 'rgba(255,255,255,0.80)',
     value: '#ffffff',
@@ -240,7 +231,6 @@ const MONO_TEMPLATE: StoryTemplate = {
   },
   card: { radius: 18, accentHeight: 2, showAccentLine: false },
   titleUppercase: false,
-  brandDivider: '',
 }
 
 export const NUTRITION_STORY_TEMPLATES: StoryTemplate[] = [
