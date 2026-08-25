@@ -219,10 +219,17 @@ describe('story do período', () => {
         expect(botao).toBeDisabled()
     })
 
+    /**
+     * ⚠️ `findByRole` + assert imediato NÃO serve aqui: o botão existe desde o
+     * primeiro render, DESABILITADO (`loggedDays === 0` enquanto a consulta não
+     * volta). O teste media um estado transitório e passava por sorte — quebrou
+     * no CI, que é mais lento, com o código correto. O que se espera é a
+     * TRANSIÇÃO, então quem espera é o `waitFor`.
+     */
     it('com dias registrados, o botão libera', async () => {
         abrir()
         const botao = await screen.findByRole('button', { name: /compartilhar/i })
-        expect(botao).not.toBeDisabled()
+        await waitFor(() => expect(botao).not.toBeDisabled())
     })
 
     it('o composer recebe o resumo JÁ calculado, sem refazer a média', () => {
