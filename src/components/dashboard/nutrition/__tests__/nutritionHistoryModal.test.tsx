@@ -299,11 +299,36 @@ describe('fiação na aba de nutrição', () => {
             .toMatch(/<NutritionHistoryModal/)
     })
 
-    it('tocar num dia da lista muda o dia da aba', () => {
+    /**
+     * "Abrir o dia para editar" precisa CHEGAR na lista de lançamentos — a
+     * única superfície onde se edita ou apaga uma refeição. Trocar a data
+     * sozinho deixa o usuário no topo da aba, e escolhendo HOJE (o caso comum)
+     * a tela não muda nada: "clico e ele só abre a aba de nutrição"
+     * (relatado no iPhone, 25/08/2026).
+     */
+    it('tocar num dia da lista muda o dia da aba E leva aos lançamentos', () => {
         const mixer = read('NutritionMixer.tsx')
         const bloco = mixer.slice(mixer.indexOf('<NutritionHistoryModal'), mixer.indexOf('<NutritionHistoryModal') + 300)
         expect(bloco, 'a lista existe para navegar — sem isto ela é só leitura')
-            .toMatch(/onPickDate=\{handleDateChange\}/)
+            .toMatch(/onPickDate=\{handlePickFromHistory\}/)
+        // O handler faz as DUAS coisas; só trocar a data é o bug de origem.
+        const handler = mixer.slice(mixer.indexOf('const handlePickFromHistory'), mixer.indexOf('const handlePickFromHistory') + 260)
+        expect(handler).toMatch(/handleDateChange\(d\)/)
+        expect(handler).toMatch(/setLevarAosLancamentos/)
+        expect(mixer, 'sem a âncora não há para onde rolar').toMatch(/ref=\{entriesAnchorRef\}/)
+        expect(mixer).toMatch(/entriesAnchorRef\.current\?\.scrollIntoView/)
+    })
+
+    /**
+     * As SETAS do navegador de data continuam sem rolar: ali o usuário está
+     * passeando pelos dias e olhando o resumo do topo — arrastar a tela a cada
+     * toque seria sequestrar o gesto dele.
+     */
+    it('as setas de dia NÃO arrastam a tela', () => {
+        const mixer = read('NutritionMixer.tsx')
+        const nav = mixer.slice(mixer.indexOf('<DateNavigator'), mixer.indexOf('<DateNavigator') + 220)
+        expect(nav).toMatch(/onDateChange=\{handleDateChange\}/)
+        expect(nav).not.toMatch(/handlePickFromHistory/)
     })
 
     it('a meta chega ao story do período', () => {
