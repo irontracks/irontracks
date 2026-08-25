@@ -41,6 +41,11 @@ const RULES = [
   '- Não invente alimento, meta nem histórico.',
   '- Não dê conselho médico nem fale de doença/remédio.',
   '- Português do Brasil, tom direto de treino. No máximo 3 frases.',
+  // "use exatamente estes números" é instrução de FIDELIDADE, e vazava para a
+  // resposta como precisão de medição: "você vai adicionar exatamente 36g de
+  // proteína". Tabela de alimento é estimativa — dizer "exatamente" promete o
+  // que o dado não tem.
+  '- Nunca diga "exatamente"/"precisamente" sobre os valores: são estimativas de tabela.',
 ]
 
 function historyBlock(history: ChatTurn[]): string {
@@ -162,6 +167,7 @@ export function buildReplyPrompt(
   items: ReplyItem[] = [],
 ): string {
   const p = projection
+  const assumidos = (items ?? []).filter((i) => i?.assumedWeight)
   // Rótulos inequívocos de propósito: com "dia fecha em 133", o modelo escreveu
   // "você ainda ficaria com 133 kcal" — leu o TOTAL como se fosse a SOBRA. Os
   // números estavam certos; o rótulo é que dava margem. Dizer o que cada número É
@@ -192,8 +198,8 @@ export function buildReplyPrompt(
     '',
     `O usuário perguntou: ${question}`,
     `Alimento simulado: ${foodText}`,
-    items.length
-      ? `PESO ASSUMIDO PELO APP: ${items.map((i) => `${i.label} = ${Math.round(Number(i.grams) || 0)}g`).join(' · ')}`
+    assumidos.length
+      ? `PESO ASSUMIDO PELO APP (o usuário NÃO informou): ${assumidos.map((i) => `${i.label} = ${Math.round(Number(i.grams) || 0)}g`).join(' · ')}`
       : '',
     '',
     'RESULTADO JÁ CALCULADO PELO APP (use exatamente estes números):',
@@ -206,10 +212,16 @@ export function buildReplyPrompt(
     'estourar, aponte qual e sugira um ajuste usando comida que ele já come (a lista',
     'do contexto). Não repita todos os macros um a um — vá no que importa.',
     '',
-    'OBRIGATÓRIO: cite o PESO ASSUMIDO junto do alimento (ex.: "uma pizza grande (50g)")',
-    'e, se esse peso parecer irreal pro que ele descreveu, avise e peça o peso certo.',
-    'O app chuta 50g quando não sabe quanto pesa uma unidade — pra "pizza" isso está',
-    'errado, e só o usuário pode corrigir.',
+    // O aviso é para o CHUTE, não para o dado. Mandar citar "o peso assumido"
+    // sempre fazia a resposta dizer "(que o app assumiu como 140g)" para um peso
+    // que a própria pessoa tinha acabado de digitar — ruído que mina a confiança
+    // no número (visto no iPhone, 25/08/2026).
+    assumidos.length
+      ? 'OBRIGATÓRIO: cite o PESO ASSUMIDO junto do alimento (ex.: "uma pizza grande (50g)")\n' +
+        'e, se esse peso parecer irreal pro que ele descreveu, avise e peça o peso certo.\n' +
+        'O app chuta 50g quando não sabe quanto pesa uma unidade — pra "pizza" isso está\n' +
+        'errado, e só o usuário pode corrigir.'
+      : 'O peso veio do próprio usuário — NÃO diga que o app "assumiu" nem peça para ele conferir o peso.',
     '',
     ...RULES,
   ]

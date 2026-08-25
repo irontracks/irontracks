@@ -179,6 +179,20 @@ export type ParsedMealItem = {
    * sem ele.
    */
   preparation?: string
+  /**
+   * O peso foi CHUTADO pelo app, não informado pelo usuário.
+   *
+   * `true` quando a quantidade veio em unidade ("1 pizza", "2 fatias") e o app
+   * converteu para gramas — inclusive pelo último recurso de 50g, que é o que
+   * já produziu "uma pizza grande = 50g = 133 kcal". `false` quando o usuário
+   * escreveu o peso ("140g de atum").
+   *
+   * Quem usa isso é o prompt do chat: pedir para a IA "citar o peso assumido"
+   * em TODA resposta fazia ela escrever "(que o app assumiu como 140g)" para um
+   * peso que a própria pessoa tinha acabado de digitar — ruído que mina a
+   * confiança no número. O aviso existe para o CHUTE, não para o dado.
+   */
+  assumedWeight?: boolean
 }
 
 /** Full breakdown of a meal: totals, per-item detail and unrecognized lines. */
@@ -193,6 +207,22 @@ export type MealAnalysis = {
  * the per-item breakdown and the list of lines we couldn't match. Used by the
  * live "simulação" preview so the user sees partial macros while typing.
  */
+/**
+ * Uma quantidade sobrando depois do alimento que casou: "…mais 70g de soja",
+ * "…com 400ml de leite", "…e 2 ovos".
+ *
+ * Exige número + unidade + ALGO DEPOIS. As duas condições foram medidas:
+ *
+ *  - sem a unidade, nome de produto com dígito ("whey 100%", "coca zero 350")
+ *    viraria desconhecido e gastaria uma chamada paga à toa;
+ *  - sem o "algo depois", `1 fatia de pão integral 50g` regredia — ali o 50g
+ *    QUALIFICA a fatia, não abre uma segunda comida. (Medido: 74 kcal antes,
+ *    desconhecido depois. Era falso positivo meu.)
+ *
+ * "com 30g de whey" casa; "…pão integral 50g" não.
+ */
+const SOBRA_COM_QUANTIDADE = /\b\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|l|colher(?:es)?|conchas?|fatias?|unidades?|un|scoops?|doses?|copos?|latas?|pedacos?)\b\s+\S/i
+
 export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>): MealAnalysis {
   const rawText = typeof text === 'string' ? text : ''
   const empty: MealAnalysis = {
@@ -212,6 +242,15 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // " e " between items is also a separator ("banana e iogurte"). No food in
     // the database contains a standalone " e ", so this is safe.
     .flatMap((l) => String(l || '').split(/\s+e\s+/gi))
+    // " mais " idem ("140g de atum mais 70g de soja") — ninguém escreve um
+    // alimento com "mais" no meio do nome.
+    //
+    // ⚠️ " com " fica de FORA de propósito: ele costuma ligar o PRATO ao seu
+    // ingrediente ("esfirra de frango com requeijão", "sanduíche com bacon"), e
+    // separar reintroduziria o bug que o `matchesAtHead` existe para matar — o
+    // ingrediente ganhando do prato e devolvendo 39 kcal no lugar de 224. Quem
+    // cuida do "com" é a desconfiança de sobra, abaixo.
+    .flatMap((l) => String(l || '').split(/\s+mais\s+/gi))
     .map((l) => String(l || '').trim())
     .filter(Boolean)
   let mealName = 'Refeição'
@@ -355,6 +394,33 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       continue
     }
 
+    /**
+     * A cabeça casou — mas sobrou COMIDA COM QUANTIDADE no resto da linha?
+     *
+     * O match é pela cabeça e ignora o resto, o que está certo para modo de
+     * preparo ("frango GRELHADO") e para prato composto ("esfirra de frango COM
+     * requeijão", que é um item só). O que ele não via era uma SEGUNDA porção
+     * escondida ali dentro:
+     *
+     *   "140g de atum sólido ao natural mais 70g de proteína de soja
+     *    com 400ml de leite desnatado"  →  casava 'atum', 140g, 162 kcal
+     *
+     * — o mesmo valor de comer só o atum, e sem sobrar `unknownLine` para a
+     * cascata desconfiar. Ou seja: falha SILENCIOSA com cara de sucesso, e o
+     * usuário recebia o botão "Lançar no diário" com ~1/3 das calorias reais
+     * (relatado no iPhone, 25/08/2026). Um número plausível e errado é pior que
+     * não reconhecer — ninguém confere o que parece certo.
+     *
+     * Aqui a linha vira `unknownLine` e a cascata segue para TACO/OFF/IA, que
+     * leem a frase inteira. Nada é inventado: o parser só admite que não é o
+     * dono desta linha.
+     */
+    const restoDaLinha = foodName.replace(new RegExp(`^${dbKeyMatched}`), '')
+    if (SOBRA_COM_QUANTIDADE.test(restoDaLinha)) {
+      unknownLines.push(rawLine)
+      continue
+    }
+
     let grams = 0
     if (unitUsed === 'g') {
       grams = qtd
@@ -419,6 +485,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       carbs: Math.max(0, sc),
       fat: Math.max(0, sf),
       ...(prep && prepApplies ? { preparation: prep.label } : {}),
+      ...(wasApprox ? { assumedWeight: true } : {}),
     })
   }
 

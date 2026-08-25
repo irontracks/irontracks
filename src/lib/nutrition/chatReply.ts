@@ -16,6 +16,8 @@ import type { MealProjection } from './chatProjection'
 export interface ReplyItem {
   label: string
   grams: number
+  /** O peso foi CHUTADO pelo app (unidade → gramas), não informado pelo usuário. */
+  assumedWeight?: boolean
 }
 
 const MACRO_LABEL = {

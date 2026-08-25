@@ -310,6 +310,9 @@ async function simulate(
     ? resolved.items.map((it) => ({
         label: String(it.label ?? '').slice(0, 120),
         grams: Number(it.grams) || 0,
+        // Sem repassar isto, o prompt trata todo peso como chute e a resposta
+        // diz "o app assumiu 140g" para um peso que o usuário digitou.
+        ...(it.assumedWeight ? { assumedWeight: true } : {}),
         calories: Number(it.calories) || 0,
         protein: Number(it.protein) || 0,
         carbs: Number(it.carbs) || 0,
