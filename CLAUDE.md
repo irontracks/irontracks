@@ -268,6 +268,30 @@ chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo
 
 ## ⚠️ Editor de Story — três elementos, três espaços, e uma armadilha de canvas
 
+**A MARCA É UMA PALAVRA: IRONTRACKS (25/08/2026).** Cada template trazia um
+`brandDivider` (' · ', ' / ', ' 🇧🇷 ') e a marca saía "IRON · TRACKS". Pior: os
+layouts `live`, `group` e `workout` desenhavam por OUTRO caminho, sem divisor —
+**trocar de layout trocava a grafia do nome**. Cor, fonte, peso e itálico variam
+por template; a grafia, nunca. O campo foi REMOVIDO (não zerado) junto com o
+`brandDot`. Guard de classe em `__tests__/marcaUmaPalavraSo.test.ts`, que mira
+na FORMA da chamada (`fillText('TRACKS', x + ironW, …)`), não no nome do campo —
+separador reposto com outro nome também reprova.
+
+**O HORÁRIO é independente do layout desde 25/08/2026, e arrastável.** Ele
+estava inline no fim de UM caminho de render, então `workout`/`live`/`group`
+retornavam antes e simplesmente não tinham horário. Hoje é `drawTimePill` +
+`timeOffset`, com o mesmo contrato da marca (`TimeDragHandle`, imune ao zoom/pan
+do bloco). **Os layouts caíram de 7 para 4** no mesmo pedido do dono: LIVE virou
+duplicata dos outros com posições soltas, `group` usava a mesma engine e
+`top-row` competia com `bottom-row`. Layout antigo em memória cai no fallback de
+`renderStoryFrame` — por isso esse fallback não pode sumir.
+
+⚠️ **Campo novo no desenho tem que entrar TAMBÉM no `renderComposite`**, que lê
+tudo por ref. O `brandScale` já foi esquecido lá (03/08/2026) e a escala
+aparecia na prévia e SUMIA no arquivo salvo. Hoje `exportLeTudoPorRef.test.ts`
+COMPARA as duas chamadas em vez de listar campos — o próximo esquecido reprova
+sozinho.
+
 `StoryComposer`/`NutritionStoryComposer`/`CardioStoryComposer` compartilham `useStoryComposer` + os mesmos sub-componentes. **Mexeu num, confira os três** — o padrão aqui é componente único (`BrandDragHandle`, `AlignmentGuides`, `CustomTextDragHandle`, `CustomTextPanel`) justamente para não replicar 3× e divergir.
 
 Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a **legenda** do usuário (`customText.ts`) e o **bloco** (título + cards, movido por `workoutTransform`).
