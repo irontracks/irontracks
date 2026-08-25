@@ -203,6 +203,7 @@ export default function NutritionMixer({
   currentPhase,
   phaseIsExplicit,
   openHistoryOnMount,
+  onHistoryOpened,
 }: {
   dateKey: string
   initialTotals: Totals
@@ -214,6 +215,8 @@ export default function NutritionMixer({
   restDayReduction?: number
   /** Abre a aba já com o histórico de refeições na tela (entrada pelo menu). */
   openHistoryOnMount?: boolean
+  /** Avisa o pai que o pedido foi atendido, para ele poder pedir de novo. */
+  onHistoryOpened?: () => void
   /** Perfil (peso/altura/idade/sexo/frequência) p/ o seletor recalcular a meta. Null = incompleto. */
   profileStats?: UserStats | null
   /** Fase em vigor: a escolhida, ou a derivada do objetivo de treino. */
@@ -791,7 +794,21 @@ export default function NutritionMixer({
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
   // `openHistoryOnMount`: o menu do avatar abre a aba JÁ no histórico — é de lá
   // que o dono foi procurar (é onde mora o histórico de treinos).
+  //
+  // ⚠️ O valor inicial do `useState` só vale na PRIMEIRA montagem, e com a aba
+  // de nutrição JÁ ABERTA este componente não remonta: o item do menu virava
+  // um botão morto (relatado no iPhone em 25/08/2026 — "clico e não aparece
+  // nada"). Parecia z-index, e não era; o modal nunca chegava a ser pedido.
+  // Por isso o efeito abaixo, que reage à PROP em vez de só ao nascimento.
   const [historyOpen, setHistoryOpen] = useState(Boolean(openHistoryOnMount))
+  useEffect(() => {
+    if (!openHistoryOnMount) return
+    setHistoryOpen(true)
+    // O pedido é CONSUMIDO aqui. Sem isso a flag ficaria presa em `true` e o
+    // segundo clique no item do menu não mudaria nada — o efeito só reage à
+    // troca de valor, e o botão voltaria a ser morto a partir da segunda vez.
+    onHistoryOpened?.()
+  }, [openHistoryOnMount, onHistoryOpened])
 
   const handleBarcodeResult = useCallback(async (ean: string) => {
     setShowBarcodeScanner(false)

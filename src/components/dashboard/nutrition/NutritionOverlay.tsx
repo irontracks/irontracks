@@ -32,9 +32,11 @@ interface NutritionOverlayProps {
   canViewMacros?: boolean
   /** Entrou pelo item "Histórico de refeições" do menu: já abre nele. */
   openHistoryOnMount?: boolean
+  /** Avisa que o pedido de abrir o histórico já foi atendido. */
+  onHistoryOpened?: () => void
 }
 
-export default function NutritionOverlay({ onClose: _onClose, canViewMacros, openHistoryOnMount }: NutritionOverlayProps) {
+export default function NutritionOverlay({ onClose: _onClose, canViewMacros, openHistoryOnMount, onHistoryOpened }: NutritionOverlayProps) {
   const supabase = useMemo(() => createClient(), [])
   const [data, setData] = useState<{
     dateKey: string
@@ -234,6 +236,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros, ope
             currentPhase={data.currentPhase}
             phaseIsExplicit={data.phaseIsExplicit}
             openHistoryOnMount={openHistoryOnMount}
+            onHistoryOpened={onHistoryOpened}
           />
         ) : (
           <div className="space-y-4">

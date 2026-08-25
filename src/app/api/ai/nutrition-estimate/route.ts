@@ -10,7 +10,8 @@ import { sanitizeFoodName } from '@/lib/nutrition/security'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
-import { buildEstimatePrompt, parseEstimateOutput } from '@/lib/nutrition/aiEstimate'
+import { buildEstimatePrompt, itemsParaGravar, parseEstimateOutput } from '@/lib/nutrition/aiEstimate'
+import { nutritionEstimateGenerationConfig } from '@/utils/ai/routeContracts'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,10 @@ export async function POST(req: Request) {
     const prompt = buildEstimatePrompt(text)
     if (!prompt) return NextResponse.json({ ok: false, error: 'input_too_short' }, { status: 400 })
 
-    const model = getGeminiModel(apiKey, MODEL)
+    // Contrato NA CHAMADA, não só no texto do prompt: pedir JSON por prosa
+    // derruba o parse, e cada retry é uma chamada PAGA (auditoria de
+    // 02/08/2026). Mesmo padrão das outras rotas — o config vai no modelo.
+    const model = getGeminiModel(apiKey, MODEL, nutritionEstimateGenerationConfig())
     const geminiResult = await safeGemini('nutrition-estimate', () =>
       model.generateContent([{ text: prompt }]),
     )
@@ -88,7 +92,7 @@ export async function POST(req: Request) {
       protein,
       carbs,
       fat,
-    }, dateKey, [{ label: itemLabel, grams: 0, calories, protein, carbs, fat }], clientId)
+    }, dateKey, itemsParaGravar(out, itemLabel), clientId)
 
     // Auto-learn: save the AI-estimated food so the local parser
     // recognizes it next time without needing the AI again.

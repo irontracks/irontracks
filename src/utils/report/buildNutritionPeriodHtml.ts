@@ -24,7 +24,7 @@
 import { escapeHtml } from '@/utils/escapeHtml'
 import type { NutritionHistoryDay, NutritionHistorySummary } from '@/lib/nutrition/history'
 import { formatarDataCurta, rotuloPeriodo, type NutritionPeriod } from '@/lib/nutrition/historyPeriod'
-import { resumoItens, type NutritionMeal } from '@/lib/nutrition/dayMeals'
+import { resumoItens, rotuloItem, type NutritionMeal } from '@/lib/nutrition/dayMeals'
 
 export type NutritionPeriodReportInput = {
   periodo: NutritionPeriod
@@ -132,16 +132,31 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
       if (!refeicoes.length) return ''
       const fora = !!excluidos?.has(d.date)
       const linhasRef = refeicoes.map((m) => {
-        const itens = resumoItens(m, 12)
+        // Prato separado vira uma LINHA POR ALIMENTO, com quantidade e macros
+        // — é o que o nutricionista precisa conferir. Com um item só, a linha
+        // extra repetiria a refeição, e aí basta o resumo.
+        const detalhado = m.itens.length > 1
+        const resumo = detalhado ? '' : resumoItens(m, 12)
+        const filhos = detalhado
+          ? m.itens.map((it) => `
+        <tr class="item">
+          <td></td>
+          <td class="dia">${escapeHtml(rotuloItem(it))}</td>
+          <td class="num">${inteiro(it.calories)}</td>
+          <td class="num">${inteiro(it.protein)} g</td>
+          <td class="num">${inteiro(it.carbs)} g</td>
+          <td class="num">${inteiro(it.fat)} g</td>
+        </tr>`).join('')
+          : ''
         return `
         <tr>
           <td class="hora">${escapeHtml(m.hora || '—')}</td>
-          <td class="dia">${escapeHtml(m.nome)}${itens ? `<div class="itens">${escapeHtml(itens)}</div>` : ''}</td>
+          <td class="dia"><strong>${escapeHtml(m.nome)}</strong>${resumo ? `<div class="itens">${escapeHtml(resumo)}</div>` : ''}</td>
           <td class="num forte">${inteiro(m.calories)}</td>
           <td class="num">${inteiro(m.protein)} g</td>
           <td class="num">${inteiro(m.carbs)} g</td>
           <td class="num">${inteiro(m.fat)} g</td>
-        </tr>`
+        </tr>${filhos}`
       }).join('')
       return `
     <div class="bloco-dia">
@@ -197,6 +212,8 @@ export function buildNutritionPeriodHtml(input: NutritionPeriodReportInput): str
   .dia-titulo{font-size:12px;font-weight:900;color:#111827;margin:0 0 6px}
   .hora{font-size:11px;font-weight:800;color:#6b7280;white-space:nowrap}
   .itens{font-size:10px;color:#6b7280;font-weight:600;margin-top:2px}
+  tr.item td{color:#6b7280;font-size:11px}
+  tr.item .dia{padding-left:18px}
   table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #eef2f7;border-radius:12px;overflow:hidden}
   th,td{padding:7px 10px;text-align:left;font-size:12px;border-bottom:1px solid #f1f5f9}
   th{color:#6b7280;text-transform:uppercase;font-weight:900;font-size:10px;letter-spacing:.16em;background:#fafafa}

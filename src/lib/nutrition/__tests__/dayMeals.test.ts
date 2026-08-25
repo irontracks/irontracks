@@ -14,6 +14,7 @@ import {
   horaBrt,
   normalizeMealRows,
   resumoItens,
+  rotuloItem,
   type NutritionMealRow,
 } from '@/lib/nutrition/dayMeals'
 
@@ -105,16 +106,50 @@ describe('normalizeMealRows', () => {
     expect(m.protein).toBe(0)
   })
 
-  it('lê os alimentos do jsonb e ignora entrada sem rótulo', () => {
+  it('lê os alimentos do jsonb, com os macros de cada um, e ignora entrada sem rótulo', () => {
     const [m] = normalizeMealRows([linha({
-      items: [{ label: '150g arroz', grams: 150 }, { label: '', grams: 10 }, 'lixo'],
+      items: [
+        { label: 'arroz branco', grams: 250, calories: 320, protein: 6, carbs: 70, fat: 1 },
+        { label: '', grams: 10 },
+        'lixo',
+      ],
     })])
-    expect(m.itens).toEqual([{ label: '150g arroz', grams: 150 }])
+    expect(m.itens).toEqual([
+      { label: 'arroz branco', grams: 250, calories: 320, protein: 6, carbs: 70, fat: 1 },
+    ])
   })
 
   it('entrada nula não explode', () => {
     expect(normalizeMealRows(null)).toEqual([])
     expect(normalizeMealRows(undefined)).toEqual([])
+  })
+})
+
+describe('rotuloItem', () => {
+  const item = (over: Partial<{ label: string; grams: number }>) => ({
+    label: 'arroz branco', grams: 250, calories: 0, protein: 0, carbs: 0, fat: 0, ...over,
+  })
+
+  it('põe a quantidade na frente do alimento', () => {
+    expect(rotuloItem(item({}))).toBe('250g arroz branco')
+  })
+
+  /**
+   * O resolvedor local grava o rótulo COM a quantidade ("150g arroz"). Prefixar
+   * de novo produziria "150g 150g arroz" — e os dois formatos convivem no
+   * banco, porque só os lançamentos novos passam pela IA.
+   */
+  it('não repete a quantidade quando o rótulo já a traz', () => {
+    expect(rotuloItem(item({ label: '150g arroz', grams: 150 }))).toBe('150g arroz')
+    expect(rotuloItem(item({ label: '2 ovos', grams: 100 }))).toBe('2 ovos')
+  })
+
+  it('sem gramas conhecidas, sai só o nome — inventar 100g seria afirmar uma medição', () => {
+    expect(rotuloItem(item({ grams: 0 }))).toBe('arroz branco')
+  })
+
+  it('rótulo vazio não vira linha', () => {
+    expect(rotuloItem(item({ label: '   ' }))).toBe('')
   })
 })
 
