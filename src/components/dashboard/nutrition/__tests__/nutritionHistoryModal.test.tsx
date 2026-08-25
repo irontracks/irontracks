@@ -131,7 +131,23 @@ describe('lista de dias', () => {
         abrir({ onPickDate, onClose })
         fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
         fireEvent.click(await screen.findByRole('button', { name: /abrir o dia para editar/i }))
-        expect(onPickDate).toHaveBeenCalledWith('2026-08-14')
+        // Sem refeição escolhida: quem decide qual editar é a aba (a mais recente).
+        expect(onPickDate).toHaveBeenCalledWith('2026-08-14', undefined)
+        expect(onClose).toHaveBeenCalled()
+    })
+
+    /**
+     * Tocar na REFEIÇÃO leva direto ao editor DELA. Abrir o dia e caçar a linha
+     * de novo é justamente o passo que o histórico existe para poupar — e com
+     * 5 refeições o botão do dia teria que adivinhar qual.
+     */
+    it('tocar numa refeição manda editar AQUELA', async () => {
+        const onPickDate = vi.fn()
+        const onClose = vi.fn()
+        abrir({ onPickDate, onClose })
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        fireEvent.click(await screen.findByRole('button', { name: /Editar Janta/i }))
+        expect(onPickDate).toHaveBeenCalledWith('2026-08-14', 'm2')
         expect(onClose).toHaveBeenCalled()
     })
 
@@ -317,6 +333,35 @@ describe('fiação na aba de nutrição', () => {
         expect(handler).toMatch(/setLevarAosLancamentos/)
         expect(mixer, 'sem a âncora não há para onde rolar').toMatch(/ref=\{entriesAnchorRef\}/)
         expect(mixer).toMatch(/entriesAnchorRef\.current\?\.scrollIntoView/)
+    })
+
+    /**
+     * "Abrir o dia para editar" precisa chegar NO EDITOR, não na lista
+     * colapsada (pedido do dono, 25/08/2026, apontando este botão). O editor
+     * só pode abrir DEPOIS que os lançamentos do dia chegam do servidor — no
+     * instante do toque a lista ainda é a do dia anterior.
+     */
+    it('o pedido de edição espera os lançamentos do dia carregarem', () => {
+        const mixer = read('NutritionMixer.tsx')
+        const handler = mixer.slice(mixer.indexOf('const handlePickFromHistory'), mixer.indexOf('const handlePickFromHistory') + 320)
+        expect(handler, 'a refeição tocada viaja junto').toMatch(/mealId\?: string/)
+        expect(handler).toMatch(/setEditarAoCarregar/)
+        // O efeito é quem atende, quando `entries` chega.
+        const efeito = mixer.slice(mixer.indexOf('if (!editarAoCarregar) return'), mixer.indexOf('if (!editarAoCarregar) return') + 700)
+        expect(efeito, 'sem lançamento não há o que editar — e o pedido não pode disparar no vazio')
+            .toMatch(/lista\.length === 0/)
+        expect(efeito, 'com id, a refeição tocada; sem id, a mais recente').toMatch(/lista\.find\(/)
+        expect(efeito).toMatch(/:\s*lista\[0\]/)
+        expect(efeito).toMatch(/abrirEditorDaEntry\(alvo\)/)
+    })
+
+    it('abrir o editor expande o card E semeia o rascunho', () => {
+        const mixer = read('NutritionMixer.tsx')
+        const fn = mixer.slice(mixer.indexOf('const abrirEditorDaEntry'), mixer.indexOf('const abrirEditorDaEntry') + 1300)
+        // Sem expandir, o editor abriria dentro de um card fechado.
+        expect(fn).toMatch(/setExpandedEntryId\(entry\.id\)/)
+        expect(fn).toMatch(/setEditingEntryId\(entry\.id\)/)
+        expect(fn, 'sem rascunho o editor abre vazio e salvar apagaria a refeição').toMatch(/setEditDraft\(/)
     })
 
     /**

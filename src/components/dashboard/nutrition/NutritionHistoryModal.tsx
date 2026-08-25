@@ -11,7 +11,7 @@
  * atalho de navegação, não uma segunda tela de dados.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, ChevronDown, Clapperboard, ExternalLink, EyeOff, FileDown, FileText, Flame, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ChevronDown, Clapperboard, ExternalLink, EyeOff, FileDown, FileText, Flame, Pencil, UtensilsCrossed } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/utils/supabase/client'
@@ -79,7 +79,8 @@ type Props = {
   todayDate: string
   /** Meta ATUAL, para o story do período. O banco não guarda meta datada. */
   goals?: { calories?: number } | null
-  onPickDate: (date: string) => void
+  /** `mealId` = a refeição tocada; ausente = o dia inteiro (botão do rodapé). */
+  onPickDate: (date: string, mealId?: string) => void
   onClose: () => void
 }
 
@@ -238,8 +239,8 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
     }
   }, [periodo, dias, resumo, goals, todayDate, marcados, pdf.carregando, userId])
 
-  const abrirDia = useCallback((date: string) => {
-    onPickDate(date)
+  const abrirDia = useCallback((date: string, mealId?: string) => {
+    onPickDate(date, mealId)
     onClose()
   }, [onPickDate, onClose])
 
@@ -540,7 +541,14 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
                         </p>
                       ) : detalhe.status === 'ok' ? (
                         <ul className="space-y-2">
-                          {detalhe.refeicoes.map((m) => <LinhaRefeicao key={m.id} refeicao={m} />)}
+                          {detalhe.refeicoes.map((m) => (
+                            <LinhaRefeicao
+                              key={m.id}
+                              refeicao={m}
+                              onEditar={() => abrirDia(d.date, m.id)}
+                              rotuloDia={rotuloData(d.date, todayDate)}
+                            />
+                          ))}
                         </ul>
                       ) : null}
                       <button
@@ -618,7 +626,7 @@ function BadgeMacro({ macro, letra, gramas, mudo }: { macro: 'protein' | 'carbs'
  * numa linha só (`resumoItens`) — a lista completa é papel do PDF; aqui, seis
  * linhas por refeição transformariam o card num segundo histórico.
  */
-function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
+function LinhaRefeicao({ refeicao, onEditar, rotuloDia }: { refeicao: NutritionMeal; onEditar: () => void; rotuloDia: string }) {
   // "5 ovos cozidos" no título E "5 ovos cozidos" embaixo: quando a refeição
   // tem um item só, o parser costuma repetir o nome inteiro. Um fato aparece
   // uma vez (docs/DESIGN_HIERARCHY.md) — visto no aparelho, 25/08/2026.
@@ -630,7 +638,15 @@ function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
   // repetiria a refeição, e aí vale o resumo de antes.
   const detalhado = refeicao.itens.length > 1
   return (
-    <li className="flex items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2">
+    <li>
+    <button
+      type="button"
+      onClick={onEditar}
+      // A refeição é o alvo de quem quer CORRIGIR algo — abrir o dia e caçar a
+      // linha de novo é o passo que o histórico existe para poupar.
+      aria-label={`Editar ${refeicao.nome} de ${rotuloDia} — ${Math.round(refeicao.calories)} kcal`}
+      className="flex w-full items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2 text-left transition active:scale-[0.99] hover:bg-white/[0.04]"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           {refeicao.hora && <span className="shrink-0 text-[11px] font-bold tabular-nums text-yellow-500/70">{refeicao.hora}</span>}
@@ -665,10 +681,14 @@ function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
           <span style={{ color: MACRO_COLORS.fat }}>G {Math.round(refeicao.fat)}g</span>
         </p>
       </div>
-      <div className="shrink-0 text-right">
-        <div className="text-sm font-black tabular-nums text-white">{Math.round(refeicao.calories)}</div>
-        <div className="text-[10px] text-neutral-400">kcal</div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <div className="text-right">
+          <div className="text-sm font-black tabular-nums text-white">{Math.round(refeicao.calories)}</div>
+          <div className="text-[10px] text-neutral-400">kcal</div>
+        </div>
+        <Pencil size={12} className="shrink-0 text-neutral-500" aria-hidden="true" />
       </div>
+    </button>
     </li>
   )
 }
