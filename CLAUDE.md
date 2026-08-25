@@ -2272,8 +2272,17 @@ instrução de fidelidade e vazava como precisão de medição.
 2. **`gh pr merge --delete-branch` devolve para a `main` LOCAL, que fica atrás
    do merge.** Rodar um script de verificação logo depois executa o código
    ANTIGO — e o resultado parece regressão. Custou um "❌ o bug continua" que
-   era falso. Confira `git log --oneline -1` antes de acreditar no que o script
-   disse.
+   era falso.
+
+   **Resolvido por construção: use `npm run pr:merge <n>`**
+   (`scripts/pr-merge.mjs`). Ele recusa mergear com `quality-check` fora de
+   "pass" (a regra que já foi violada em 10/08/2026, quando um `for … sleep;
+   done; gh pr merge` mergeou no vermelho) e, depois do merge, alinha a `main`
+   local com a origin. O `reset --hard` só acontece com a árvore limpa E o
+   conteúdo idêntico ao da origin — depois de um squash os hashes diferem, mas
+   a ÁRVORE é a mesma; havendo conteúdo local ausente na origin, ele para e
+   devolve a decisão para o humano. A regra mora em `decidirSync`, função pura,
+   travada em `src/__tests__/prMergeSync.test.ts`.
 
 ### "Abrir o dia para editar" — o botão que prometia e entregava metade
 
