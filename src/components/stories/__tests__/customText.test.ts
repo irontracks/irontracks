@@ -192,7 +192,21 @@ describe('fiação da legenda', () => {
       const src = readFileSync(f, 'utf8')
       expect(src, f).toMatch(/<CustomTextPanel/)
       expect(src, f).toMatch(/<CustomTextDragHandle/)
-      expect(src, f).toMatch(/customText, customTextOffset \}\)/)
+      // Presença, não POSIÇÃO. A versão anterior casava
+      // `customText, customTextOffset })` — exigindo que a legenda fosse o
+      // ÚLTIMO argumento da chamada. Acrescentar qualquer campo novo ao draw
+      // (foi o `timeOffset`, em 25/08/2026) reprovava um guard que não tem
+      // nada a ver com ordem de argumento. O que importa é a legenda CHEGAR
+      // ao renderer.
+      // TODAS as chamadas, não a primeira: cada composer tem um wrapper com
+      // spread (`{ ...args, content }`) antes da chamada completa, e casar a
+      // primeira media o wrapper. Cada nome também é diferente — drawStory,
+      // drawNutritionStory, drawCardioStory —, então nada de nome fixo.
+      const chamadas = [...src.matchAll(/draw\w*Story\(\{[\s\S]{0,600}/g)].map((m) => m[0])
+      expect(chamadas.length, `${f}: nenhuma chamada draw*Story encontrada`).toBeGreaterThan(0)
+      const chamada = chamadas.join('\n')
+      expect(chamada, `${f}: customText precisa chegar ao renderer`).toMatch(/\bcustomText\b/)
+      expect(chamada, `${f}: customTextOffset precisa chegar ao renderer`).toMatch(/\bcustomTextOffset\b/)
     }
   })
 })
