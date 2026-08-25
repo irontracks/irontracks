@@ -153,6 +153,11 @@ primeira execução.
 intervalo escolhido pelo usuário** — o pedido concreto era "os 3 últimos meses".
 Sai por `exportHtmlAsPdf`, como todo arquivo do app.
 
+**Desde 25/08/2026 ele também lista as REFEIÇÕES, dia a dia** (nome, hora BRT,
+alimentos, kcal e macros) — antes o profissional lia "5 refeições" e não via
+quais. Teto de 31 dias, e acima disso o relatório diz que omitiu. Ver a seção
+"Histórico de REFEIÇÕES".
+
 **Dia sem lançamento NÃO entra como zero**, e a cobertura ("7 de 92 dias") vai
 impressa. Preencher os vazios rebaixaria a média com refeições que a pessoa só
 não anotou — um número inventado com cara de medição, entregue a um
@@ -250,7 +255,7 @@ chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo
 
 **Plano alimentar salvo + troca de alimento (ago/2026).** A dieta gerada era efêmera; agora salva em `student_diet_plans` — a MESMA tabela do plano prescrito pelo professor, separadas por `created_by`: `= user_id` é plano próprio (editável), `≠` é do coach (read-only). A rota `prescribed-plan` filtra por `.neq('created_by', userId)`; sem isso a dieta que o usuário gerou aparece como recomendação do coach, num card que trava a edição. Leitura SEMPRE por `planDays()` (`lib/nutrition/dietPlanShape`), que normaliza plano de um dia (`meals`) e de semana (`days`) numa lista só — e recomputa os totais dos itens, nunca lê total gravado.
 
-**O motor de troca de alimento não usa IA — e o repertório "aprendido" É LIXO.** `nutrition_learned_foods` guarda o que o usuário DIGITOU no lançamento, e ele digita refeição inteira: dos 42 "alimentos" da conta do dono, **1** servia de substituto (37 compostos, 14 com densidade fisicamente impossível — 1070/1285/1650 kcal/100 g, que é o TOTAL da refeição gravado no campo `per_100g` —, 17 com a quantidade no nome). **A fonte certa é `nutrition_meal_entries.items`**, que o parser já quebrou em alimentos individuais com gramas e macros absolutos (`{"label": "150g arroz", "grams": 150, …}`) — daí sai nome limpo e macros/100 g derivados de gramas reais (`lib/nutrition/mealItemFoods`). Todo candidato passa por `foodItemSanity` (sem composto, sem densidade impossível, sem quantidade no nome).
+**O motor de troca de alimento não usa IA — e o repertório "aprendido" É LIXO.** `nutrition_learned_foods` guarda o que o usuário DIGITOU no lançamento, e ele digita refeição inteira: dos 42 "alimentos" da conta do dono, **1** servia de substituto (37 compostos, 14 com densidade fisicamente impossível — 1070/1285/1650 kcal/100 g, que é o TOTAL da refeição gravado no campo `per_100g` —, 17 com a quantidade no nome). **A fonte certa é `nutrition_meal_entries.items`**, que o parser já quebrou em alimentos individuais com gramas e macros absolutos (`{"label": "150g arroz", "grams": 150, …}`) — e **desde 25/08/2026 a estimativa por IA também separa** (antes ela somava tudo num item só; ver "Histórico de REFEIÇÕES") — daí sai nome limpo e macros/100 g derivados de gramas reais (`lib/nutrition/mealItemFoods`). Todo candidato passa por `foodItemSanity` (sem composto, sem densidade impossível, sem quantidade no nome).
 
 **Classificar alimento por macro dominante SOZINHO produz sugestão absurda.** Auditoria de 132 trocas reais (04/08/2026) pegou: bife virando ovo (gordura dominava), leite desnatado virando substituto de mamão e feijão (caía em fruta/verdura), maionese virando bolo, arroz virando "orange chicken". As cinco regras que consertaram, todas em `foodSwap`: (1) proteína ≥ 10 g/100 g e ≥ 25% das kcal manda, mesmo com gordura maior; (2) `produce` exige proteína < 35% das kcal — o corte fica ENTRE leite desnatado (39%) e alface/brócolis (26–29%), e apertar demais joga alface em `carb`; (3) `mixed` NÃO troca (sem saber o papel, é chute); (4) dentro de `fat`, candidato com > 25% das kcal em carbo sai (separa requeijão de brigadeiro); (5) porção que encosta no clamp (10 g/1000 g) é recusada. Além disso, a adequação à refeição vem do HISTÓRICO (`mealContext`: em que refeições ele já comeu aquele alimento), não de lista fixa — e alimento sem histórico não é bloqueado, só não ganha preferência. **Ao mexer aqui, audite contra dados reais e LEIA as sugestões: os filtros mecânicos diziam "0 problemas" enquanto o motor sugeria trocas que ninguém faria.**
 
@@ -1723,6 +1728,15 @@ Continua valendo: `.app` já instalado serve para qualquer mudança **web/JS** �
 código NATIVO (Swift/plugin) exige build nova. E, depois do merge, apontar para
 produção segue sendo a conferência final.
 
+⚠️ **O teclado do simulador corrige para o INGLÊS.** Medido em 25/08/2026:
+"peixe grelhado com batata doce" virou "Price grew Haro com Batista doce" e
+"cozido" virou "cozies". Some-se a isto que o campo de nome de refeição
+capitaliza cada palavra. **Digitar texto livre em português no simulador não
+prova nada** — para conferir a TELA, injete o dado na conta de teste por SQL;
+para conferir o MODELO de IA, chame a API direto. (Campos de identificador do
+app já desligam a autocorreção — ver `utils/ui/textFieldProps.ts`; o que sobra
+são os de texto livre, onde ela ajuda no aparelho real.)
+
 **Acesso ao device é concedido pelo dono**, uma vez por aparelho, no link
 "Let Claude use it" do painel. Se `attach`/`launch` responder que falta permissão,
 peça — não fique tentando em loop.
@@ -2113,6 +2127,134 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## Histórico de REFEIÇÕES — o irmão do de treinos (25/08/2026, PRs #919, #921–#924)
+
+Cinco entregas no mesmo dia, puxadas por relatos do dono no iPhone. (O #920, da
+mesma data, é outro assunto: o hook que fecha o treino ativo do simulador.)
+
+O que vale guardar é o método. **Os SINTOMAS relatados estavam todos certos** —
+"não aparece nada", "aparece numa linha só", "só abre a aba de nutrição". O que
+não se sustentou foi uma HIPÓTESE de causa ("abre por baixo da aba de
+nutrição"), e em dois casos quem decidiu o diagnóstico foi o BANCO, não a
+leitura do código: o dado gravado dizia o que a tela não podia inventar.
+
+### O molde tem dono — não copie o card do treino
+
+`components/history/HistorySummaryShell.tsx` (chassi do card de resumo: véu
+dourado, eyebrow, pílulas de janela, grade 2×4, linha de ações), `SummaryAction`
+(o botão dessa linha) e `HistoryWeekDivider` ("Semana de dd/mm"). Treino e
+nutrição consomem os três. Copiar o JSX era a saída barata e é a mesma deriva
+que já produziu 86 tons de cinza e três cálculos de semana aqui.
+
+Guard de CLASSE em `components/history/__tests__/historicoMesmoMolde.test.ts`:
+quem redesenhar o chassi ou o divisor reprova, e **cada card só pode ter UM
+`featured: true`** (`docs/DESIGN_HIERARCHY.md`).
+
+⚠️ **O agrupamento semanal do histórico de TREINO contava a partir da SEGUNDA**
+— contra a regra domingo→sábado de 24/08. O guard `semanaComecaNoDomingo` não
+pegava porque o cálculo passava por uma variável intermediária (`dayOfWeek`) em
+vez de chamar `getDay()` na mesma expressão: **guard de forma erra quando a
+forma muda.** Corrigido nos dois; a fronteira agora sai de `weekRangeBrt`.
+
+### O card do dia abre as refeições daquele dia
+
+`lib/nutrition/dayMeals.ts` (puro) + `hooks/useNutritionDayMeals.ts` (busca sob
+demanda, cache por dia). Duas regras que já quebraram este app em outras telas:
+
+* **O dia é a coluna `date`, NUNCA derivado de `created_at`.** Uma refeição das
+  23h30 em São Paulo tem carimbo no dia seguinte em UTC.
+* **A hora sai de `created_at` com `timeZone` explícito.** Sem isso, o relatório
+  impresso num servidor em UTC diz que o café da manhã foi às 11h.
+
+⚠️ **O guard da hora precisa das DUAS metades.** O caso comportamental só
+reprova onde o runner não está em BRT (o CI, em UTC): na máquina do dono ele
+passa verde com o `timeZone` removido — medido. E **forçar `process.env.TZ` no
+topo do arquivo de teste NÃO resolve**: o worker do Vitest já subiu e o Node
+cacheia o fuso na primeira formatação (testado, sem efeito). Quem fecha o buraco
+localmente é o source-guard que exige o `timeZone` na chamada.
+
+**No PDF do período**, o detalhe por refeição tem teto de
+`MAX_DIAS_DETALHE_REFEICOES` (31 dias) — acima disso ele sai e o relatório
+**diz por quê**, no papel e na tela antes de exportar. Descobrir no arquivo que
+faltam as refeições custa um PDF inteiro.
+
+### "Clico no menu e não aparece nada" — não era z-index
+
+`historyOpen` nascia de `useState(Boolean(openHistoryOnMount))`, e valor inicial
+só vale na PRIMEIRA montagem. Com a aba de nutrição **já aberta** o
+`NutritionMixer` não remonta: o item "Histórico de refeições" do menu do avatar
+era um botão morto. O modal nunca chegava a ser pedido — a suspeita de "abre por
+baixo do overlay" era razoável e falsa.
+
+Hoje um efeito reage à prop **e o pedido é consumido** (`onHistoryOpened`): sem
+isso a flag ficaria presa em `true` e o segundo clique morreria igual. Guard em
+`__tests__/menuAbreHistorico.test.ts` — que **nasceu faltando**: a primeira
+mutação passou verde e revelou que nenhum teste cobria o caso.
+
+### A IA de lançamento passou a SEPARAR os alimentos
+
+O lançamento por texto tenta primeiro o resolvedor local (`resolveFood`), que já
+grava item a item com gramas; quando ele não reconhece a frase, cai em
+`/api/ai/nutrition-estimate` — e o prompt mandava, **literalmente, "Some tudo e
+retorne um único objeto"**. Resultado no histórico: "arroz branco cozido com
+filé de tilápia grelhada" numa linha só, `grams: 0`. Medido na conta do dono
+antes de mexer: **75 refeições com um item só contra 131 com dois ou mais**, e
+as de um item são justamente as que passaram pela IA.
+
+Hoje o prompt separa, estima a porção quando o usuário não diz, e o contrato vai
+na chamada (`nutritionEstimateGenerationConfig`, padrão do repo). Medido contra
+a API real: `180g Arroz branco cozido (234 kcal)` + `140g Filé de tilápia
+grelhada (136 kcal)`.
+
+**Duas fronteiras que não podem cair:**
+
+1. **`itemsParaGravar` tem fallback.** Sem itens válidos (ou com um item só, que
+   apenas repete a refeição e desalinha o total), grava o item único de sempre.
+   Perder o lançamento porque o detalhe falhou é trocar incômodo por perda de
+   dado. `items` fica FORA do `required` do responseSchema pelo mesmo motivo.
+2. **Não desmontar preparo único.** A primeira medição devolveu "1 esfirra de
+   frango com requeijão" como massa + frango + requeijão — o app desmontando o
+   que o usuário lançou como UM item. A regra está no prompt e tem guard.
+
+⚠️ **Refeição já gravada não muda.** O detalhe não existe no dado antigo, e
+reprocessar com IA seria inventar sobre o passado.
+
+### "Abrir o dia para editar" — o botão que prometia e entregava metade
+
+Trocar a data não bastava: a aba abre no TOPO e a lista de LANÇAMENTOS (única
+superfície onde se edita ou apaga uma refeição) fica no fim da página. Com o dia
+de HOJE, que é o caso comum, a tela não mudava nada.
+
+Hoje o botão troca a data, **rola até a âncora** (`entriesAnchorRef`) e **abre o
+editor**. As setas do `DateNavigator` continuam sem rolar, de propósito — ali o
+usuário passeia pelos dias olhando o resumo do topo, e arrastar a tela a cada
+toque sequestraria o gesto dele. Há guard para os dois lados.
+
+**O editor não pode abrir no instante do toque:** `handleDateChange` esvazia a
+lista, e ali os lançamentos ainda são os do dia anterior. O pedido fica pendente
+(`editarAoCarregar`) e é atendido quando `entries` chega — e some sozinho se a
+refeição não estiver mais lá, em vez de travar a tela. `abrirEditorDaEntry`
+expande o card **e** semeia o rascunho: sem expandir, o editor abriria dentro de
+um card fechado; sem rascunho, abriria vazio e salvar apagaria a refeição.
+
+Tocar numa REFEIÇÃO do card do histórico edita AQUELA (o id viaja no
+`onPickDate`); o botão do dia, sem id, abre a **mais recente**.
+
+### Três armadilhas de verificação que custaram tempo nesta sessão
+
+1. **O teclado do simulador está com dicionário em INGLÊS.** "peixe grelhado com
+   batata doce" virou "Price grew Haro com Batista doce"; "cozido" virou
+   "cozies". Digitar português no simulador não prova nada sobre texto livre —
+   para conferir TELA, injete o dado na conta de teste por SQL; para conferir
+   MODELO, chame a API direto.
+2. **Teste que mede estado transitório passa por sorte.** `findByRole` + assert
+   imediato num botão que nasce desabilitado quebrou no CI (mais lento) com o
+   código CORRETO. O que se espera é a TRANSIÇÃO: quem espera é `waitFor`.
+3. **Componente grande demais para montar pede source-guard.** `NutritionMixer`
+   exige Supabase, imports dinâmicos e ~20 props — um teste de render ali mede o
+   harness, não o app. O comportamento se prova no aparelho e o guard trava a
+   CAUSA (a forma do código) voltar. Diga isso no arquivo de teste.
+
 ## A semana do app começa no DOMINGO (24/08/2026) — e "treino" tem piso
 
 Duas queixas no mesmo dia sobre o push "Resumo da semana 📊", com causas
@@ -2126,6 +2268,13 @@ domingo** — o resto do app é que estava fora de linha. Fonte única em
 (+ cron de insights), `weekly-summary` e `leaderboard`. O defeito não era um
 cálculo errado — eram **três** cálculos escritos à mão, e nenhum teste cobria a
 fronteira. Guard de classe: `__tests__/semanaComecaNoDomingo.test.ts`.
+
+⚠️ **Esse guard tem um ponto cego conhecido, e ele já deixou passar um caso.**
+Ele casa com `getDay()` na mesma expressão; o histórico de treino calculava a
+segunda-feira passando por uma variável intermediária (`dayOfWeek`) e escapou
+até 25/08/2026 — o agrupamento "Semana de dd/mm" da lista ficou meses fora da
+regra. Quem for mexer em fronteira de semana: use `weekRangeBrt`, e não confie
+no guard como prova de que não há mais ninguém calculando à mão.
 
 **Ficam FORA, de propósito** (allowlist do guard, com motivo): o reset de cota
 VIP (`utils/vip/weekReset.ts`, segunda 03:00 BRT — é regra de cobrança, mexer
