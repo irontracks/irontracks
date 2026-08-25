@@ -77,9 +77,17 @@ describe('sobra com quantidade → a linha vai para a cascata', () => {
     expect(Math.round(r.meal.calories)).toBe(74)
   })
 
+  /**
+   * ⚠️ Este caso já nasceu TAUTOLÓGICO e a mutação pegou: o `label` do item é a
+   * linha crua, então procurar /ovos/ no texto passava verde mesmo com o
+   * separador removido (um item só, rotulado com a frase inteira). O que prova
+   * a separação é a CONTAGEM de itens.
+   */
   it('"mais" separa itens; a base não tem alimento com "mais" no nome', () => {
     const r = analyzeMeal('200g de frango grelhado mais 2 ovos cozidos')
-    expect(r.items.map((i) => i.label).join(' | ')).toMatch(/frango/i)
-    expect(r.items.map((i) => i.label).join(' | ')).toMatch(/ovos/i)
+    expect(r.items).toHaveLength(2)
+    expect(r.unknownLines).toHaveLength(0)
+    // Frango (330) + 2 ovos (155): sem o separador, ficaria só o frango.
+    expect(Math.round(r.meal.calories)).toBe(485)
   })
 })

@@ -179,6 +179,20 @@ export type ParsedMealItem = {
    * sem ele.
    */
   preparation?: string
+  /**
+   * O peso foi CHUTADO pelo app, não informado pelo usuário.
+   *
+   * `true` quando a quantidade veio em unidade ("1 pizza", "2 fatias") e o app
+   * converteu para gramas — inclusive pelo último recurso de 50g, que é o que
+   * já produziu "uma pizza grande = 50g = 133 kcal". `false` quando o usuário
+   * escreveu o peso ("140g de atum").
+   *
+   * Quem usa isso é o prompt do chat: pedir para a IA "citar o peso assumido"
+   * em TODA resposta fazia ela escrever "(que o app assumiu como 140g)" para um
+   * peso que a própria pessoa tinha acabado de digitar — ruído que mina a
+   * confiança no número. O aviso existe para o CHUTE, não para o dado.
+   */
+  assumedWeight?: boolean
 }
 
 /** Full breakdown of a meal: totals, per-item detail and unrecognized lines. */
@@ -471,6 +485,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       carbs: Math.max(0, sc),
       fat: Math.max(0, sf),
       ...(prep && prepApplies ? { preparation: prep.label } : {}),
+      ...(wasApprox ? { assumedWeight: true } : {}),
     })
   }
 
