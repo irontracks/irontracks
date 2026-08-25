@@ -686,7 +686,7 @@ function LinhaRefeicao({ refeicao, onEditar, rotuloDia }: { refeicao: NutritionM
           <div className="text-sm font-black tabular-nums text-white">{Math.round(refeicao.calories)}</div>
           <div className="text-[10px] text-neutral-400">kcal</div>
         </div>
-        <Pencil size={12} className="shrink-0 text-neutral-500" aria-hidden="true" />
+        <Pencil size={12} className="shrink-0 text-neutral-400" aria-hidden="true" />
       </div>
     </button>
     </li>
