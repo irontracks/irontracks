@@ -157,6 +157,48 @@ export const NUTRITION_LABEL_RESPONSE_SCHEMA = {
     propertyOrdering: ['productName', 'servingSizeG', 'kcalPer100g', 'proteinPer100g', 'carbsPer100g', 'fatPer100g', 'fiberPer100g', 'confidence'],
 } as const
 
+// nutrition-estimate — espelha `OutputSchema` do `aiEstimate.ts`. Os `items`
+// entraram em 25/08/2026: o prompt mandava "some tudo e retorne um único
+// objeto", e a refeição chegava ao histórico como uma linha só ("arroz branco
+// cozido com filé de tilápia grelhada", 0 g). Ficam FORA do `required` de
+// propósito — o chamador tem fallback para o item único, e exigir a lista faria
+// o modelo inventar detalhe quando a entrada for realmente um alimento só.
+export const NUTRITION_ESTIMATE_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        foodName: STR,
+        calories: NUM,
+        protein: NUM,
+        carbs: NUM,
+        fat: NUM,
+        items: {
+            type: 'ARRAY',
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    label: STR,
+                    grams: NUM,
+                    calories: NUM,
+                    protein: NUM,
+                    carbs: NUM,
+                    fat: NUM,
+                },
+                required: ['label', 'calories', 'protein', 'carbs', 'fat'],
+                propertyOrdering: ['label', 'grams', 'calories', 'protein', 'carbs', 'fat'],
+            },
+        },
+    },
+    required: ['foodName', 'calories', 'protein', 'carbs', 'fat'],
+    propertyOrdering: ['foodName', 'calories', 'protein', 'carbs', 'fat', 'items'],
+} as const
+
+export const nutritionEstimateGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: NUTRITION_ESTIMATE_RESPONSE_SCHEMA,
+    maxOutputTokens: 2048,
+    temperature: 0.2,
+} as const)
+
 export const nutritionLabelGenerationConfig = () => ({
     responseMimeType: 'application/json',
     responseSchema: NUTRITION_LABEL_RESPONSE_SCHEMA,

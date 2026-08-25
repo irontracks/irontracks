@@ -39,7 +39,7 @@ import {
 import { diasSugeridos } from '@/lib/nutrition/incompleteDay'
 import { useNutritionDayFlags } from '@/hooks/useNutritionDayFlags'
 import { useNutritionDayMeals, COLUNAS_REFEICAO } from '@/hooks/useNutritionDayMeals'
-import { groupMealsByDay, MAX_DIAS_DETALHE_REFEICOES, normalizeMealRows, resumoItens, type NutritionMeal, type NutritionMealRow } from '@/lib/nutrition/dayMeals'
+import { groupMealsByDay, MAX_DIAS_DETALHE_REFEICOES, normalizeMealRows, resumoItens, rotuloItem, type NutritionMeal, type NutritionMealRow } from '@/lib/nutrition/dayMeals'
 import { buildNutritionPeriodHtml } from '@/utils/report/buildNutritionPeriodHtml'
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf'
 import { periodToContent } from '@/components/stories/nutritionStory'
@@ -623,7 +623,12 @@ function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
   // tem um item só, o parser costuma repetir o nome inteiro. Um fato aparece
   // uma vez (docs/DESIGN_HIERARCHY.md) — visto no aparelho, 25/08/2026.
   const bruto = resumoItens(refeicao)
-  const itens = mesmoTexto(bruto, refeicao.nome) ? '' : bruto
+  const resumo = mesmoTexto(bruto, refeicao.nome) ? '' : bruto
+  // Com o prato separado, cada alimento ganha a PRÓPRIA linha, com quantidade
+  // e macros — pedido do dono: "250g arroz branco / 250g de filé de tilápia
+  // grelhada e suas kcal de macros". Com um item só, a linha extra apenas
+  // repetiria a refeição, e aí vale o resumo de antes.
+  const detalhado = refeicao.itens.length > 1
   return (
     <li className="flex items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2">
       <div className="min-w-0 flex-1">
@@ -631,8 +636,28 @@ function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
           {refeicao.hora && <span className="shrink-0 text-[11px] font-bold tabular-nums text-yellow-500/70">{refeicao.hora}</span>}
           <span className="truncate text-sm font-bold text-neutral-100">{refeicao.nome}</span>
         </div>
-        {itens && <p className="mt-0.5 truncate text-[11px] text-neutral-400">{itens}</p>}
-        <p className="mt-0.5 text-[11px] tabular-nums text-neutral-400">
+        {detalhado ? (
+          <ul className="mt-1 space-y-1">
+            {refeicao.itens.map((it, i) => (
+              <li key={`${it.label}-${i}`} className="flex items-baseline gap-2 text-[11px]">
+                <span className="min-w-0 flex-1 truncate text-neutral-300">{rotuloItem(it)}</span>
+                <span className="shrink-0 tabular-nums text-neutral-400">
+                  {Math.round(it.calories)} kcal
+                </span>
+                <span className="shrink-0 tabular-nums text-neutral-400">
+                  <span style={{ color: MACRO_COLORS.protein }}>{Math.round(it.protein)}</span>
+                  {'/'}
+                  <span style={{ color: MACRO_COLORS.carbs }}>{Math.round(it.carbs)}</span>
+                  {'/'}
+                  <span style={{ color: MACRO_COLORS.fat }}>{Math.round(it.fat)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : resumo ? (
+          <p className="mt-0.5 truncate text-[11px] text-neutral-400">{resumo}</p>
+        ) : null}
+        <p className="mt-1 text-[11px] tabular-nums text-neutral-400">
           <span style={{ color: MACRO_COLORS.protein }}>P {Math.round(refeicao.protein)}g</span>
           {' · '}
           <span style={{ color: MACRO_COLORS.carbs }}>C {Math.round(refeicao.carbs)}g</span>

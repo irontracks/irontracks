@@ -1357,6 +1357,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onClose={() => { setNutritionOpen(false); setNutritionHistoryOnOpen(false) }}
                                     canViewMacros={!!(vipStatus?.limits as Record<string, unknown> | undefined)?.nutrition_macros}
                                     openHistoryOnMount={nutritionHistoryOnOpen}
+                                    onHistoryOpened={() => setNutritionHistoryOnOpen(false)}
                                 />
                             ) : null}
 

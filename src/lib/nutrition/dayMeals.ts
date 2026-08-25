@@ -32,10 +32,20 @@ export type NutritionMealRow = {
   items?: unknown
 }
 
-/** Um alimento dentro da refeição ("150g arroz"), como o parser já gravou. */
+/**
+ * Um alimento dentro da refeição, como o parser gravou.
+ *
+ * O `label` pode vir com a quantidade colada ("150g arroz", do resolvedor
+ * local) ou limpo ("arroz branco cozido", da IA desde 25/08/2026). Quem exibe
+ * usa `rotuloItem`, que junta `grams` e `label` sem repetir a quantidade.
+ */
 export type NutritionMealItem = {
   label: string
   grams: number
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
 }
 
 export type NutritionMeal = {
@@ -91,8 +101,32 @@ function parseItens(raw: unknown): NutritionMealItem[] {
   if (!Array.isArray(raw)) return []
   return raw
     .filter((it): it is Record<string, unknown> => !!it && typeof it === 'object')
-    .map((it) => ({ label: String(it.label ?? '').trim(), grams: num(it.grams) }))
+    .map((it) => ({
+      label: String(it.label ?? '').trim(),
+      grams: num(it.grams),
+      calories: num(it.calories),
+      protein: num(it.protein),
+      carbs: num(it.carbs),
+      fat: num(it.fat),
+    }))
     .filter((it) => it.label)
+}
+
+/** Já começa com quantidade? "150g arroz", "2 ovos", "1 esfirra…". */
+const COMECA_COM_QUANTIDADE = /^\s*\d/
+
+/**
+ * "250g arroz branco" — a quantidade na frente do alimento.
+ *
+ * Não repete o que já está no rótulo: o resolvedor local grava "150g arroz",
+ * e prefixar de novo produziria "150g 150g arroz". Sem gramas conhecidas, sai
+ * só o nome — inventar "100g" seria afirmar uma medição que ninguém fez.
+ */
+export function rotuloItem(item: NutritionMealItem): string {
+  const nome = item.label.trim()
+  if (!nome) return ''
+  if (item.grams <= 0 || COMECA_COM_QUANTIDADE.test(nome)) return nome
+  return `${Math.round(item.grams)}g ${nome}`
 }
 
 /**
