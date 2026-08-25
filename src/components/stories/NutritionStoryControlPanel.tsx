@@ -75,27 +75,39 @@ export function NutritionStoryControlPanel({
           <Palette size={14} />
           ESCOLHA O ESTILO
         </div>
-        <div className="grid grid-cols-5 gap-2">
-          {templates.map((t) => (
+        {/* Mesma gramática do StoryControlPanel: seleção em DOURADO, não em
+            branco sólido. Branco puro é o maior contraste possível (21:1) e
+            estava sendo gasto num controle secundário, roubando o olho do
+            preview — que é o que o usuário veio ver. Três colunas dão nome
+            inteiro e linhas cheias. */}
+        <div className="grid grid-cols-3 gap-2">
+          {templates.map((t) => {
+            const ativo = templateId === t.id
+            return (
             <button
               key={t.id} type="button"
               onClick={() => onSelectTemplate(t.id)}
               disabled={busy}
-              aria-pressed={templateId === t.id}
+              aria-pressed={ativo}
               title={t.name}
-              className={['flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-all active:scale-[0.97]',
-                templateId === t.id ? 'border-white bg-white/10 shadow-lg scale-[1.03]' : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700 hover:bg-neutral-800',
+              className={['flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all active:scale-[0.97]',
+                ativo
+                  ? 'border-yellow-500/60 bg-yellow-500/10'
+                  : 'border-white/[0.06] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.05]',
               ].join(' ')}
             >
               <span
-                className="block h-7 w-7 rounded-full ring-1 ring-white/20"
+                className={['block h-9 w-9 rounded-full transition-shadow',
+                  ativo ? 'ring-2 ring-yellow-500/70' : 'ring-1 ring-white/15',
+                ].join(' ')}
                 style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0%, ${t.swatch[1]} 100%)` }}
               />
-              <span className={['text-[9px] font-bold uppercase tracking-wide truncate w-full text-center',
-                templateId === t.id ? 'text-white' : 'text-neutral-400',
+              <span className={['w-full truncate text-center text-[10px] uppercase tracking-wide transition-colors',
+                ativo ? 'font-black text-yellow-400' : 'font-semibold text-neutral-400',
               ].join(' ')}>{t.name}</span>
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
 
