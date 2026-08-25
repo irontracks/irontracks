@@ -81,13 +81,32 @@ export function StoryControlPanel({
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80 mb-2">
                     <Palette size={14} />
                     ESCOLHA O ESTILO
+                    {/* O nome do escolhido vive aqui: uma vez, como ESTADO da
+                        seção — não repetido sob cada bolinha como legenda. */}
+                    {templates.find((t) => t.id === templateId)?.name && (
+                        <span className="text-neutral-400">
+                            · <span className="text-neutral-200">{templates.find((t) => t.id === templateId)?.name}</span>
+                        </span>
+                    )}
                 </div>
                 {/* grid-cols-3: são SEIS estilos, e em 5 colunas o último ficava
                     órfão numa segunda linha — a grade lutando contra o próprio
                     conteúdo. Três colunas dão duas linhas exatas e largura para o
                     nome caber ("CLÁSSICO" truncava em "CLÁSSI…", justamente no
                     item selecionado). */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* UMA linha (pedido do dono). Seis cards COM rótulo em 440pt
+                    dariam ~62pt por célula, e "CLÁSSICO" em 10px não cabe em 62 —
+                    voltaria a truncar, que é o defeito que acabamos de corrigir.
+                    Então o rótulo saiu de baixo de cada um: a BOLINHA já é a
+                    informação (é uma escolha de cor), e o nome "OCEAN" não diz
+                    nada sobre a cor que o olho não tenha visto antes de ler.
+
+                    Com o rótulo fora, o swatch CRESCE de 36 para 48px — fica
+                    maior do que era em duas linhas. E o nome do estilo escolhido
+                    aparece uma vez, ao lado do título da seção, onde é lido como
+                    estado e não como legenda de cada peça. Mesma gramática do
+                    Lightroom e do VSCO para presets. */}
+                <div className="grid grid-cols-6 gap-2">
                     {templates.map((t) => {
                         const ativo = templateId === t.id
                         return (
@@ -96,22 +115,22 @@ export function StoryControlPanel({
                             onClick={() => onSelectTemplate(t.id)}
                             disabled={busy}
                             aria-pressed={ativo}
+                            // Sem rótulo na tela, o nome tem que estar AQUI —
+                            // senão o leitor de tela anuncia seis botões iguais.
+                            aria-label={`Estilo ${t.name}`}
                             title={t.name}
-                            className={['group flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all active:scale-[0.97]',
+                            className={['tap-44 flex aspect-square items-center justify-center rounded-2xl border transition-all active:scale-[0.94]',
                                 ativo
                                     ? 'border-yellow-500/60 bg-yellow-500/10'
                                     : 'border-white/[0.06] bg-white/[0.03] hover:border-white/[0.12] hover:bg-white/[0.05]',
                             ].join(' ')}
                         >
                             <span
-                                className={['block h-9 w-9 rounded-full transition-shadow',
+                                className={['block h-full w-full max-h-12 max-w-12 rounded-full transition-shadow',
                                     ativo ? 'ring-2 ring-yellow-500/70' : 'ring-1 ring-white/15',
                                 ].join(' ')}
                                 style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0%, ${t.swatch[1]} 100%)` }}
                             />
-                            <span className={['w-full truncate text-center text-[10px] uppercase tracking-wide transition-colors',
-                                ativo ? 'font-black text-yellow-400' : 'font-semibold text-neutral-400',
-                            ].join(' ')}>{t.name}</span>
                         </button>
                         )
                     })}
