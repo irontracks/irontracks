@@ -100,6 +100,23 @@ describe('lista de dias', () => {
         expect(onClose).not.toHaveBeenCalled()
     })
 
+    /**
+     * "5 ovos cozidos" no título e "5 ovos cozidos" embaixo — foi o que o
+     * aparelho mostrou. Quando a refeição tem um item só, o parser repete o
+     * nome inteiro, e o card gastava duas linhas para dizer a mesma coisa.
+     */
+    it('o item não se repete quando é o próprio nome da refeição', async () => {
+        refeicoes.data = [
+            { id: 'm1', date: '2026-08-14', created_at: '2026-08-14T13:20:00Z', food_name: '5 ovos cozidos', calories: 388, protein: 33, carbs: 3, fat: 28, items: [{ label: '5 ovos cozidos', grams: 250 }] },
+            { id: 'm2', date: '2026-08-14', created_at: '2026-08-14T21:05:00Z', food_name: 'Janta', calories: 900, protein: 60, carbs: 90, fat: 30, items: [{ label: '150g arroz', grams: 150 }] },
+        ]
+        abrir()
+        fireEvent.click(await screen.findByRole('button', { name: /Ver as refeições de Sex/i }))
+        expect(await screen.findAllByText('5 ovos cozidos')).toHaveLength(1)
+        // O item que ACRESCENTA informação continua aparecendo.
+        expect(screen.getByText('150g arroz')).toBeInTheDocument()
+    })
+
     /** A hora é BRT: `created_at` é UTC e 21:05Z é 18:05 em São Paulo. */
     it('a hora da refeição sai no fuso do Brasil', async () => {
         abrir()

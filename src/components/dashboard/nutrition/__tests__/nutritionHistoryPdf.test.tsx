@@ -362,7 +362,7 @@ describe('refeições no relatório', () => {
     abrir()
     await esperarLista()
     fireEvent.click(screen.getByRole('button', { name: /^90 dias$/i }))
-    await waitFor(() => expect(screen.getByText(/PDF sem detalhe por refeição/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/sem o detalhe por refeição acima de 31 dias/i)).toBeInTheDocument())
     await waitFor(() => expect(screen.getByText(/3 de 90 dias com lançamento/)).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: /salvar pdf/i }))
     await waitFor(() => expect(exportSpy).toHaveBeenCalled())

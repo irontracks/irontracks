@@ -330,13 +330,6 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               icon: <FileText size={14} className="shrink-0 text-neutral-400" aria-hidden="true" />,
               children: (
                 <>
-                  {/* O corte do detalhe é dito ANTES de exportar: descobrir no
-                      PDF que faltam as refeições custa um arquivo inteiro. */}
-                  {periodo && periodo.dias > MAX_DIAS_DETALHE_REFEICOES && (
-                    <span className="mr-auto text-[10px] leading-tight text-neutral-400">
-                      PDF sem detalhe por refeição<br />acima de {MAX_DIAS_DETALHE_REFEICOES} dias
-                    </span>
-                  )}
                   {/* Sem dia registrado não há o que exportar nem o que postar —
                       um relatório de "0 kcal em média" seria afirmação falsa
                       sobre o período, ainda por cima entregue ao nutricionista. */}
@@ -396,6 +389,16 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               <p className="mt-2 text-xs font-bold text-red-400" role="alert">{erroPeriodo}</p>
             )}
           </HistorySummaryShell>
+
+          {/* O corte do detalhe é dito ANTES de exportar: descobrir no PDF que
+              faltam as refeições custa um arquivo inteiro. Em linha PRÓPRIA —
+              dentro da linha de ações ele espremia o "Salvar PDF" em duas
+              linhas (visto no aparelho). */}
+          {periodo && periodo.dias > MAX_DIAS_DETALHE_REFEICOES && (
+            <p className="-mt-2 px-1 text-[11px] text-neutral-400">
+              O PDF sai sem o detalhe por refeição acima de {MAX_DIAS_DETALHE_REFEICOES} dias — os totais diários vão completos.
+            </p>
+          )}
 
           {(pdf.erro || erroMarcas) && (
             <p className="text-xs font-bold text-red-400" role="alert">{pdf.erro || erroMarcas}</p>
@@ -616,7 +619,11 @@ function BadgeMacro({ macro, letra, gramas, mudo }: { macro: 'protein' | 'carbs'
  * linhas por refeição transformariam o card num segundo histórico.
  */
 function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
-  const itens = resumoItens(refeicao)
+  // "5 ovos cozidos" no título E "5 ovos cozidos" embaixo: quando a refeição
+  // tem um item só, o parser costuma repetir o nome inteiro. Um fato aparece
+  // uma vez (docs/DESIGN_HIERARCHY.md) — visto no aparelho, 25/08/2026.
+  const bruto = resumoItens(refeicao)
+  const itens = mesmoTexto(bruto, refeicao.nome) ? '' : bruto
   return (
     <li className="flex items-start gap-3 rounded-xl bg-white/[0.02] px-3 py-2">
       <div className="min-w-0 flex-1">
@@ -639,4 +646,10 @@ function LinhaRefeicao({ refeicao }: { refeicao: NutritionMeal }) {
       </div>
     </li>
   )
+}
+
+/** Mesmo texto a menos de caixa, acento e espaço — para não repetir o rótulo. */
+function mesmoTexto(a: string, b: string): boolean {
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return !!a && norm(a) === norm(b)
 }

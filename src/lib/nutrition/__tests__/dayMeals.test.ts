@@ -6,17 +6,9 @@
  * seguinte, streak errado em 36 de 633 sessões) e a hora sair sem `timeZone`
  * (o café da manhã impresso às 11h num servidor em UTC).
  */
-/**
- * ⚠️ Fuso do RUNNER forçado para longe do Brasil.
- *
- * Sem isto, remover o `timeZone` do formatador passa VERDE no Mac do dono (que
- * já está em BRT) e só quebra no CI, que roda em UTC — o guard reprovaria a
- * pessoa errada, no momento errado. Medido: com TZ de Nova York, 21:05Z sai
- * 17:05 sem o `timeZone` e 18:05 com ele.
- */
-process.env.TZ = 'America/New_York'
-
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   groupMealsByDay,
   horaBrt,
@@ -26,10 +18,34 @@ import {
 } from '@/lib/nutrition/dayMeals'
 
 describe('hora da refeição', () => {
+  /**
+   * ⚠️ Este caso só REPROVA onde o runner não está em BRT — no CI, que roda em
+   * UTC. Na máquina do dono (São Paulo) ele passa verde mesmo sem o `timeZone`,
+   * porque o padrão do processo já é o fuso certo. Medido ao provar por
+   * mutação: remover `timeZone: FUSO` deixou os 14 casos verdes localmente.
+   *
+   * Forçar `process.env.TZ` no topo do arquivo NÃO resolve: o worker do Vitest
+   * já subiu e o Node cacheia o fuso na primeira formatação (testado, sem
+   * efeito). Quem fecha o buraco localmente é o source-guard abaixo — os dois
+   * juntos cobrem as duas máquinas.
+   */
   it('sai em BRT, não no fuso de quem lê', () => {
     // 21:05Z é 18:05 em São Paulo (UTC−3).
     expect(horaBrt('2026-08-14T21:05:00Z')).toBe('18:05')
     expect(horaBrt('2026-08-14T13:20:00Z')).toBe('10:20')
+  })
+
+  it('o formatador DECLARA o fuso — hora sem `timeZone` é a hora de quem lê', () => {
+    const fonte = readFileSync(join(process.cwd(), 'src/lib/nutrition/dayMeals.ts'), 'utf8')
+    // Fatia o corpo de `horaBrt` pela CHAMADA, não pelo nome solto: com o nome,
+    // a linha de export e as menções em comentário arrastariam o arquivo todo.
+    const i = fonte.indexOf('export function horaBrt')
+    expect(i, 'a função mudou de nome — atualize o guard, não o apague').toBeGreaterThan(-1)
+    const corpo = fonte.slice(i, fonte.indexOf('\nfunction parseItens', i))
+    const semComentario = corpo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
+    expect(semComentario).toMatch(/Intl\.DateTimeFormat\(/)
+    expect(semComentario, 'sem timeZone o relatório impresso num servidor em UTC diz que o café foi às 11h')
+      .toMatch(/timeZone:\s*FUSO/)
   })
 
   it('carimbo ruim vira string vazia, nunca "Invalid Date"', () => {
