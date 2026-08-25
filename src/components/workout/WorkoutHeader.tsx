@@ -101,7 +101,10 @@ export default function WorkoutHeader() {
         />
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <BackButton onClick={exitOnBack} className="!py-0.5" />
+            {/* Só a seta: a palavra "Voltar" custava ~45pt numa faixa onde seis
+                controles disputam espaço com o nome do treino — que truncava. O
+                `aria-label` do componente continua dizendo "Voltar". */}
+            <BackButton onClick={exitOnBack} className="!py-0.5" iconOnly />
 
             {/* Estes botões JÁ SUMIRAM uma vez, e não por remoção: até 22/08/2026
                 o bloco ficava `opacity-0 pointer-events-none` "durante a execução
@@ -197,35 +200,15 @@ export default function WorkoutHeader() {
               <div className="font-black text-white truncate tracking-tight">{stripDayPrefix(workout?.title) || 'Treino'}</div>
               <HeartRateMonitor />
             </div>
-            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-0.5">
-              {/* Progress Ring SVG */}
-              {totalSets > 0 && (() => {
-                const size = 32;
-                const stroke = 3.5;
-                const radius = (size - stroke) / 2;
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference - (progressPct / 100) * circumference;
-                const ringColor = progressPct >= 90 ? '#10b981' : progressPct >= 50 ? '#f59e0b' : '#d97706';
-                return (
-                  <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-                    <svg width={size} height={size} className="rotate-[-90deg]">
-                      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
-                      <circle
-                        cx={size / 2} cy={size / 2} r={radius} fill="none"
-                        stroke={ringColor}
-                        strokeWidth={stroke}
-                        strokeLinecap="round"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={offset}
-                        style={{
-                          transition: 'stroke-dashoffset 0.5s ease-out, stroke 0.3s',
-                          filter: progressPct >= 80 ? `drop-shadow(0 0 4px ${ringColor}80)` : 'none',
-                        }}
-                      />
-                    </svg>
-                  </div>
-                );
-              })()}
+            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1.5">
+              {/* O anel de progresso SAIU daqui em 25/08/2026, e não por gosto:
+                  `progressPct` era desenhado TRÊS vezes no mesmo header — este
+                  anel de 32pt, o "0/16" do chip a 8pt de distância, e a barra de
+                  3px na base. O anel era a representação mais cara em largura e a
+                  menos legível (em 0% é um "O" cinza vazio), e caía exatamente sob
+                  a primeira letra do título, produzindo a leitura de "item em cima
+                  de item". Sobraram as duas que informam: o número exato e a barra
+                  contínua. */}
               <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.07] px-2.5 py-1">
                 {totalSets > 0 && (
                   <>
