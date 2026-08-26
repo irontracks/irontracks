@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { execFileSync } from 'child_process'
 import { join } from 'path'
 import { BACK_OVERLAYS, FRONT_OVERLAYS } from '@/lib/muscleMap/overlays'
 
@@ -56,6 +57,95 @@ describe('overlays do mapa muscular', () => {
             opacos,
             `PNG sem canal alfa em public/muscle-overlays/: ${opacos.join(', ')}. ` +
             'O recorte do músculo é o alfa; sem ele o overlay pinta a silhueta inteira.',
+        ).toEqual([])
+    })
+
+    /**
+     * O caso acima varre `public/`, e por isso NÃO viu que `next.config.ts`
+     * continuou listando o caminho da variante feminina no `images.localPatterns`
+     * depois de a pasta ser apagada (achado da revisão de 26/08/2026). Config
+     * que allowlista um caminho proibido não quebra nada — Next não serve
+     * arquivo inexistente —, mas afirma no repo o contrário do que a decisão
+     * diz, e é assim que a próxima pessoa reintroduz a pasta achando que era
+     * suportada.
+     *
+     * Os comentários saem ANTES de casar (este arquivo e o `overlays.ts` citam
+     * o caminho proibido justamente para explicar por que ele é proibido), mas
+     * as STRINGS ficam: o alvo mora dentro de uma — `{ pathname: '/...' }`.
+     *
+     * ⚠️ Por isso o scanner anda caractere a caractere, e não por regex. A
+     * primeira versão usava `/\/\*[\s\S]*?\*\//g` e era um GUARD FALSO: em
+     * `next.config.ts` toda entrada termina em `/**` dentro de aspas, e esse
+     * `/` + `*` abre um comentário que o regex não sabe que está numa string.
+     * Só não explodia porque, por acaso, não havia nenhum `*` + `/` depois
+     * daquele ponto do arquivo. Medido: repor a linha órfã E acrescentar um
+     * JSDoc banal acima de `remotePatterns` fazia o strip comer as 25 linhas do
+     * array inteiro — 4 de 4 casos VERDES com a linha proibida literalmente no
+     * arquivo. O guard morria no único arquivo que existe para policiar.
+     */
+    it('nenhum código ou config aponta para overlay por gênero', () => {
+        /**
+         * Remove comentário de linha e de bloco APENAS em contexto de código —
+         * o que está dentro de string, template ou regex literal é preservado.
+         */
+        const semComentarios = (src: string): string => {
+            let out = ''
+            let i = 0
+            let ctx: 'codigo' | "'" | '"' | '`' | '/' = 'codigo'
+            while (i < src.length) {
+                const c = src[i]
+                const prox = src[i + 1]
+                if (ctx === 'codigo') {
+                    if (c === '/' && prox === '/') {
+                        while (i < src.length && src[i] !== '\n') i++
+                        continue
+                    }
+                    if (c === '/' && prox === '*') {
+                        i += 2
+                        while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++
+                        i += 2
+                        continue
+                    }
+                    if (c === "'" || c === '"' || c === '`') ctx = c
+                    else if (c === '/' && /[=(,:[!&|?{};+\-*%^~<>]\s*$/.test(out)) ctx = '/'
+                    out += c
+                    i++
+                    continue
+                }
+                // dentro de string/template/regex: só o fechamento correspondente sai
+                if (c === '\\') { out += c + (src[i + 1] ?? ''); i += 2; continue }
+                if (c === ctx || (ctx === '/' && c === '\n')) ctx = 'codigo'
+                out += c
+                i++
+            }
+            return out
+        }
+
+        // O hífen É o padrão: a pasta canônica é `muscle-overlays/`, então
+        // `muscle-overlays-` só aparece numa variante. Sem exigir letra depois —
+        // com `[a-z]` o guard deixava passar caminho montado por concatenação
+        // (`\`/muscle-overlays-${genero}\``), medido por mutação.
+        //
+        // Montado por partes de propósito: escrito inteiro, o padrão casaria com
+        // este próprio arquivo e o guard se acusaria sozinho.
+        const PROIBIDO = new RegExp('muscle' + '-overlays-', 'i')
+
+        const rastreados = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
+            .split('\0')
+            .filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|json)$/.test(f))
+            .filter((f) => !/(^|\/)package-lock\.json$/.test(f))
+
+        const culpados = rastreados.filter((f) => {
+            const abs = join(process.cwd(), f)
+            if (!existsSync(abs)) return false // rastreado mas apagado do disco
+            const src = readFileSync(abs, 'utf8')
+            return PROIBIDO.test(f.endsWith('.json') ? src : semComentarios(src))
+        })
+
+        expect(
+            culpados,
+            `caminho de overlay por gênero em: ${culpados.join(', ')}. ` +
+            'Existe UMA pasta de overlays; o gênero troca a base e a máscara do corpo.',
         ).toEqual([])
     })
 

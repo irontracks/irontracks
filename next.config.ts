@@ -50,7 +50,6 @@ const nextConfig: NextConfig = {
       { pathname: '/icons/**' },
       { pathname: '/badge-**' },
       { pathname: '/muscle-overlays/**' },
-      { pathname: '/muscle-overlays-female/**' },
       { pathname: '/body-types/**' },
       { pathname: '/onboarding-**' },
       { pathname: '/body-**' },
