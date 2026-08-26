@@ -664,7 +664,7 @@ resultado esperado varia com o calendário, o guard **varre a semana inteira** �
 senão ele passa sozinho no dia certo. Mesmo raciocínio vale para fuso e virada
 de mês.
 
-## Guard falso — os cinco jeitos de errar que já aconteceram aqui
+## Guard falso — os sete jeitos de errar que já aconteceram aqui
 
 Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padrões que passaram verdes COM o bug presente:
 
@@ -673,6 +673,21 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 3. **Cobrindo as pontas e não a fiação** — algoritmo e coletor corretos isoladamente, e ninguém ligando os dois. Foi assim que remover `knownWeights` da chamada no hook deixou 198 testes verdes.
 4. **Proibindo o consumo CORRETO** — source-guard mirando o NOME do campo (`bodyWeightKg`…) em vez da FONTE: `p.bodyWeightKg` vindo do leitor único é exatamente o certo, e o guard reprovava. Mire em quem LÊ a tabela, não em quem usa o dado (ago/2026, `userSnapshot`).
 5. **O teste que não existe** — declarar "provado por mutação" sem conferir que o caso foi mesmo inserido no arquivo. Um `replace` de script que não casa deixa o teste fora, e a mutação passa verde porque **nada** o exercita. Rode `vitest -t "<nome do caso>"` e confirme `1 passed`, não `0 passed | N skipped`.
+6. **Cego por migração** — ao trocar classe literal por token (`text-violet-300/80` → `MACHINE_ACCENT.text`), `plateHint` e `valorVsSugestao` seguiram procurando a string que deixou de existir: verdes e cegos. Não nasceu de teste mal escrito, e sim de uma migração que o deixou passando por inércia. **Ao trocar classe por token, varra os testes que citam a classe antiga** e mire na FONTE (12/08/2026).
+7. **Casando com a REFERÊNCIA, não com a seção referida** — `toContain('Fase 3½')` passou verde com a fase inteira renomeada, porque outro parágrafo do mesmo arquivo dizia "a Fase 3½ decidiu". Em documento, mire no TÍTULO (`^### Fase 3½`); e quando o padrão aparece mais de uma vez, **assere dentro do BLOCO** daquela seção, não no arquivo todo — senão apagar a regra de um lugar passa despercebido porque ela existe em outro. Medido por mutação em 25/08/2026, nos guards do próprio `/documentar`.
+
+## Antes do /clear: `/documentar`
+
+O que sobrevive ao `/clear` é o que estiver no `CLAUDE.md` — a conversa some
+inteira. O protocolo de destilar a sessão (o que merece nota, o que é changelog,
+como caçar a nota que a tarefa tornou FALSA, e o orçamento deste arquivo) está em
+**`docs/skill-documentar.md`**, versionado. O comando `/documentar` só aponta
+para ele.
+
+Duas regras de lá que valem mesmo sem rodar o comando: **armadilha que dá para
+eliminar deve ser eliminada, não documentada** — nota que descreve um perigo
+evitável vira folclore; e **regra de comportamento do agente vai para o
+`~/.claude/CLAUDE.md` global**, não para este arquivo, que é sobre ESTE repo.
 
 ## Checklist obrigatório antes de declarar qualquer tarefa concluída
 1. **TypeScript:** `npx tsc --noEmit` — zero erros, sem exceção.
@@ -1083,14 +1098,6 @@ mede 3.75:1** — pior, e só porque a regex olhava outra coisa. Eram 54 ocorrê
 em 12 arquivos, todas texto real. Medido sobre `#0a0a0a`: `/40` = 3.75:1 ·
 `/45` = 4.39:1 · `/50` = 5.15:1. **O piso é `/55`.** `hover:` fica de fora (estado
 transitório, e no celular nem existe).
-
-## Guard cego por migração — o 6º jeito de errar (12/08/2026)
-
-Ao migrar classe literal para token (`text-violet-300/80` → `MACHINE_ACCENT.text`),
-**dois guards ficaram verdes e cegos**: `plateHint` e `valorVsSugestao` procuravam
-a string que deixou de existir. Não nasceu de teste mal escrito — nasceu de uma
-migração que deixou o teste passando por inércia. **Ao trocar classe por token,
-varra os testes que citam a classe antiga** e faça o guard apontar para a FONTE.
 
 ## Regra da hierarquia — um fato, um lugar (ago/2026)
 **Antes de mexer em qualquer card que MOSTRE DADOS, leia `docs/DESIGN_HIERARCHY.md`.**
