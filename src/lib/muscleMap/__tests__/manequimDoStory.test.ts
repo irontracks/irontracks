@@ -83,10 +83,21 @@ describe('geometria das duas vistas', () => {
         expect(geo.back.dx + geo.back.dw).toBeLessThanOrEqual(CANVAS_W)
     })
 
-    it('o corpo fica na METADE DE CIMA — embaixo mora o bloco de métricas', () => {
-        // O gradiente do template escurece a partir de ~35% da altura; corpo
-        // que desce demais é engolido por ele e pelos cards.
-        expect(geo.dy + geo.dh).toBeLessThan(CANVAS_H * 0.62)
+    it('nasce abaixo da MARCA e termina acima do bloco de métricas', () => {
+        // Medido no aparelho em 26/08/2026: com o corpo começando a 5% da
+        // altura, a marca IRONTRACKS caía sobre o peitoral aceso — o elemento
+        // que o manequim existe para mostrar. Os dois limites são de tela,
+        // não de gosto.
+        expect(geo.dy).toBeGreaterThanOrEqual(CANVAS_H * 0.16)
+        expect(geo.dy + geo.dh).toBeLessThanOrEqual(CANVAS_H * 0.64)
+    })
+
+    it('em canvas estreito quem manda é a LARGURA — dois corpos nunca se cruzam', () => {
+        // A altura disponível pede uma largura que um canvas mais estreito não
+        // tem; sem o teto, as duas vistas se sobreporiam.
+        const estreito = mannequinLayout(400, 1920)
+        expect(estreito.front.dx + estreito.front.dw).toBeLessThanOrEqual(estreito.back.dx)
+        expect(estreito.back.dx + estreito.back.dw).toBeLessThanOrEqual(400)
     })
 
     it('não distorce o corpo: a caixa mantém a proporção do recorte', () => {

@@ -123,15 +123,28 @@ export const drawMannequinView = (
     ctx.drawImage(off, S.x, S.y, S.w, S.h, dx, dy, dw, dh)
 }
 
-/** Geometria das duas vistas dentro do canvas do story. */
+/**
+ * Geometria das duas vistas dentro do canvas do story.
+ *
+ * A faixa vertical foi medida NO APARELHO, não escolhida: na primeira versão o
+ * corpo começava a 5% da altura e o peitoral aceso — justamente o que o
+ * manequim tem de melhor para mostrar — ficava atrás da marca IRONTRACKS.
+ * Hoje ele nasce ABAIXO da marca e termina ACIMA do título do bloco. A largura
+ * é consequência da altura disponível, nunca o contrário: o corpo não pode
+ * esticar.
+ */
+export const MANNEQUIN_BAND = { top: 0.18, bottom: 0.63 } as const
+
 export const mannequinLayout = (canvasW: number, canvasH: number) => {
-    const side = Math.round(canvasW * 0.022)
     const gap = Math.round(canvasW * 0.022)
-    const dw = Math.floor((canvasW - side * 2 - gap) / 2)
+    const dy = Math.round(canvasH * MANNEQUIN_BAND.top)
+    const alturaDisponivel = Math.round(canvasH * (MANNEQUIN_BAND.bottom - MANNEQUIN_BAND.top))
+    const larguraPorAltura = Math.floor((alturaDisponivel * MANNEQUIN_SRC.w) / MANNEQUIN_SRC.h)
+    // Se a altura pedir mais largura do que o canvas tem, quem manda é a largura.
+    const larguraMaxima = Math.floor((canvasW - gap) / 2)
+    const dw = Math.min(larguraPorAltura, larguraMaxima)
     const dh = Math.round((dw * MANNEQUIN_SRC.h) / MANNEQUIN_SRC.w)
-    // Metade de cima: o gradiente do template escurece a partir de ~35% da
-    // altura e o bloco de métricas mora embaixo.
-    const dy = Math.round(canvasH * 0.05)
+    const side = Math.round((canvasW - dw * 2 - gap) / 2)
     return { dy, dh, front: { dx: side, dw }, back: { dx: side + dw + gap, dw } }
 }
 
