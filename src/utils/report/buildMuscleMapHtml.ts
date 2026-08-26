@@ -19,48 +19,19 @@
  * hundreds of bezier curves. The PNG-overlay approach lets us reuse the
  * artwork that already exists.
  */
-
-const FRONT_OVERLAYS: { muscleId: string; file: string }[] = [
-    { muscleId: 'chest', file: 'front-chest.png' },
-    { muscleId: 'delts_front', file: 'front-delts.png' },
-    { muscleId: 'delts_side', file: 'front-delts.png' },
-    { muscleId: 'biceps', file: 'front-biceps.png' },
-    { muscleId: 'forearms', file: 'front-forearms.png' },
-    { muscleId: 'abs', file: 'front-abs.png' },
-    { muscleId: 'quads', file: 'front-quads.png' },
-    { muscleId: 'calves', file: 'front-calves.png' },
-]
-
-const BACK_OVERLAYS: { muscleId: string; file: string }[] = [
-    { muscleId: 'upper_back', file: 'back-upper_back.png' },
-    { muscleId: 'lats', file: 'back-lats.png' },
-    { muscleId: 'delts_rear', file: 'back-delts_rear.png' },
-    { muscleId: 'triceps', file: 'back-triceps.png' },
-    { muscleId: 'spinal_erectors', file: 'back-spinal_erectors.png' },
-    { muscleId: 'glutes', file: 'back-glutes.png' },
-    { muscleId: 'hamstrings', file: 'back-hamstrings.png' },
-    { muscleId: 'calves', file: 'back-calves.png' },
-]
-
-const ratioToOpacity = (ratio: number) => {
-    if (!Number.isFinite(ratio) || ratio <= 0) return 0
-    return Math.min(1, Math.max(0.15, ratio * 0.85))
-}
+import {
+    FRONT_OVERLAYS,
+    BACK_OVERLAYS,
+    dedupOverlays,
+    ratioToOpacity,
+} from '@/lib/muscleMap/overlays'
 
 type MuscleEntry = { ratio?: number; sets?: number; view?: string }
 
 const dedupForView = (
     overlays: typeof FRONT_OVERLAYS,
     muscles: Record<string, MuscleEntry>,
-) => {
-    const seen = new Map<string, number>()
-    for (const o of overlays) {
-        const ratio = Number(muscles?.[o.muscleId]?.ratio || 0)
-        const prev = seen.get(o.file) ?? 0
-        if (ratio > prev) seen.set(o.file, ratio)
-    }
-    return Array.from(seen.entries()).map(([file, maxRatio]) => ({ file, maxRatio }))
-}
+) => dedupOverlays(overlays, (id) => Number(muscles?.[id]?.ratio || 0))
 
 interface BuildOptions {
     /** Origin URL for the asset paths (e.g. https://irontracks.com.br). Used

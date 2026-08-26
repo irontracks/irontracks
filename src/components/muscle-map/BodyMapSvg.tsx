@@ -2,6 +2,13 @@
 
 import React, { memo, useMemo } from 'react'
 import { MUSCLE_BY_ID, type MuscleId } from '@/utils/muscleMapConfig'
+import {
+  FRONT_OVERLAYS,
+  BACK_OVERLAYS,
+  OVERLAY_FOLDER,
+  dedupOverlays,
+  ratioToOpacity,
+} from '@/lib/muscleMap/overlays'
 
 /**
  * Hitbox SVG acessível — substitui <rect onClick> "inacessível" por
@@ -53,54 +60,9 @@ type Props = {
   gender?: 'male' | 'female' | 'not_informed'
 }
 
-// Maps each MuscleId to its overlay image filename (without path prefix)
-const FRONT_OVERLAYS: { muscleId: MuscleId; file: string }[] = [
-  { muscleId: 'chest', file: 'front-chest.png' },
-  { muscleId: 'delts_front', file: 'front-delts.png' },
-  { muscleId: 'delts_side', file: 'front-delts.png' },
-  { muscleId: 'biceps', file: 'front-biceps.png' },
-  { muscleId: 'forearms', file: 'front-forearms.png' },
-  { muscleId: 'abs', file: 'front-abs.png' },
-  { muscleId: 'quads', file: 'front-quads.png' },
-  { muscleId: 'calves', file: 'front-calves.png' },
-]
-
-const BACK_OVERLAYS: { muscleId: MuscleId; file: string }[] = [
-  { muscleId: 'upper_back', file: 'back-upper_back.png' },
-  { muscleId: 'lats', file: 'back-lats.png' },
-  { muscleId: 'delts_rear', file: 'back-delts_rear.png' },
-  { muscleId: 'triceps', file: 'back-triceps.png' },
-  { muscleId: 'spinal_erectors', file: 'back-spinal_erectors.png' },
-  { muscleId: 'glutes', file: 'back-glutes.png' },
-  { muscleId: 'hamstrings', file: 'back-hamstrings.png' },
-  { muscleId: 'calves', file: 'back-calves.png' },
-]
-
-const OVERLAY_FOLDER = '/muscle-overlays'
-
-// Deduplicate overlays (delts_front and delts_side share the same image)
-const dedup = (overlays: typeof FRONT_OVERLAYS, muscles: Record<string, MuscleState>) => {
-  const seen = new Map<string, { file: string; muscleIds: MuscleId[]; maxRatio: number }>()
-  for (const o of overlays) {
-    const ratio = Number(muscles[o.muscleId]?.ratio || 0)
-    const existing = seen.get(o.file)
-    if (existing) {
-      existing.muscleIds.push(o.muscleId)
-      existing.maxRatio = Math.max(existing.maxRatio, ratio)
-    } else {
-      seen.set(o.file, { file: o.file, muscleIds: [o.muscleId], maxRatio: ratio })
-    }
-  }
-  return Array.from(seen.values())
-}
-
-/** Compute opacity from ratio (0-1+). Returns 0 for untrained, up to ~0.95 for high volume */
-const ratioToOpacity = (ratio: number, isSelected: boolean) => {
-  if (ratio <= 0) return 0
-  // Clamp ratio to a nice visible range
-  const base = Math.min(1, Math.max(0.15, ratio * 0.85))
-  return isSelected ? Math.min(1, base + 0.2) : base
-}
+// Listas de overlay, dedup e curva de opacidade vivem em `lib/muscleMap/overlays`
+// — o manequim do Story desenha o MESMO corpo em canvas e precisa da mesma
+// tabela. Duas cópias divergiriam em silêncio.
 
 const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected, gender }: Props) {
   const isFemale = gender === 'female'
@@ -114,7 +76,10 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
     ? (isFemale ? '/body-front-female-mask.png' : '/body-front-mask.png')
     : (isFemale ? '/body-back-female-mask.png' : '/body-back-mask.png')
 
-  const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
+  const layers = useMemo(
+    () => dedupOverlays(overlays, (id) => Number(muscles[id]?.ratio || 0)),
+    [overlays, muscles],
+  )
 
   return (
     <div

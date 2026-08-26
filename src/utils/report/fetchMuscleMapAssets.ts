@@ -1,3 +1,5 @@
+import { FRONT_OVERLAYS, BACK_OVERLAYS, OVERLAY_FOLDER } from '@/lib/muscleMap/overlays'
+
 /**
  * Pre-fetches every PNG the PDF muscle-map needs and returns them as base64
  * data URLs so `buildMuscleMapHtml` can embed them inline.
@@ -9,28 +11,6 @@
  * Only fetches overlays for muscles with ratio > 0 to keep the payload small
  * (~50–200 KB total instead of ~1 MB).
  */
-
-const FRONT_OVERLAY_BY_MUSCLE: Record<string, string> = {
-    chest: 'front-chest.png',
-    delts_front: 'front-delts.png',
-    delts_side: 'front-delts.png',
-    biceps: 'front-biceps.png',
-    forearms: 'front-forearms.png',
-    abs: 'front-abs.png',
-    quads: 'front-quads.png',
-    calves: 'front-calves.png',
-}
-
-const BACK_OVERLAY_BY_MUSCLE: Record<string, string> = {
-    upper_back: 'back-upper_back.png',
-    lats: 'back-lats.png',
-    delts_rear: 'back-delts_rear.png',
-    triceps: 'back-triceps.png',
-    spinal_erectors: 'back-spinal_erectors.png',
-    glutes: 'back-glutes.png',
-    hamstrings: 'back-hamstrings.png',
-    calves: 'back-calves.png',
-}
 
 export interface MuscleMapAssets {
     baseFront: string | null
@@ -81,12 +61,11 @@ export async function fetchMuscleMapAssets(
         ? (muscleData.muscles as Record<string, MuscleEntry>)
         : {}
 
+    // Tabela músculo→PNG vem de `lib/muscleMap/overlays` — a mesma que a tela
+    // do mapa e o manequim do Story usam.
     const overlayFilesNeeded = new Set<string>()
-    Object.entries(FRONT_OVERLAY_BY_MUSCLE).forEach(([id, file]) => {
-        if (Number(muscles[id]?.ratio || 0) > 0) overlayFilesNeeded.add(file)
-    })
-    Object.entries(BACK_OVERLAY_BY_MUSCLE).forEach(([id, file]) => {
-        if (Number(muscles[id]?.ratio || 0) > 0) overlayFilesNeeded.add(file)
+    ;[...FRONT_OVERLAYS, ...BACK_OVERLAYS].forEach(({ muscleId, file }) => {
+        if (Number(muscles[muscleId]?.ratio || 0) > 0) overlayFilesNeeded.add(file)
     })
 
     const [baseFront, baseBack, maskFront, maskBack] = await Promise.all([
@@ -98,7 +77,7 @@ export async function fetchMuscleMapAssets(
 
     const overlayEntries = await Promise.all(
         Array.from(overlayFilesNeeded).map(async (file) => {
-            const url = await fetchAsDataUrl(`/muscle-overlays/${file}`)
+            const url = await fetchAsDataUrl(`${OVERLAY_FOLDER}/${file}`)
             return [file, url] as const
         }),
     )
