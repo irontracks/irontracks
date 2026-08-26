@@ -220,6 +220,51 @@ de 596 linhas.
 **Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
 **Os 18,7° entre proteína e gordura — RESOLVIDO em 12/08/2026, e não trocando cor.** Proteína (`#fbbf24`, 43°) e gordura (`#f97316`, 25°) seguem abaixo dos 40° que a paleta exige de si mesma, e vão continuar: não há faixa de matiz livre (vermelho é ERRO, verde é sucesso, azul é carboidrato, violeta virou a cor da máquina). Mas a distância de matiz nunca foi o problema — **dois matizes próximos convivem enquanto não se TOCAM**. Os dois pontos onde encostavam: (1) no card de lançamento os segmentos são condicionais (`pct > 0`), então refeição sem carboidrato cola âmbar em laranja — o azul que "salvava" era acaso; (2) no `MacroBar` o vermelho de estouro era desenhado encostado no macro, e contra a gordura são **25°** — o alerta sussurrava justamente onde precisa gritar. `MACRO_SEGMENT_GAP_PX` (2px do fundo entre blocos) resolve os dois sem gastar matiz. Guards em `__tests__/macroBar.test.tsx`.
 
+**Mapa muscular: o gênero troca a BASE e a MÁSCARA, NUNCA os overlays (26/08/2026).**
+Três superfícies desenham o corpo — a tela (`components/muscle-map/BodyMapSvg.tsx`),
+o PDF (`utils/report/buildMuscleMapHtml.ts` + `fetchMuscleMapAssets.ts`) e o
+manequim do Story (`lib/muscleMap/mannequinCanvas.ts`) —, as três com a MESMA
+composição e a MESMA tabela (`lib/muscleMap/overlays.ts`): foto do manequim,
+camada de overlays por músculo, e uma máscara da silhueta por cima para nada
+vazar do corpo. **Quem recorta QUAL músculo acende é o canal ALFA do PNG do
+overlay**; a máscara só impede vazamento para fora, ela não distingue peito de
+coxa.
+
+Existiu uma `public/muscle-overlays-female/`. Ela **nunca chegou a ser usada em
+produção**: nasceu no commit `5b39b1043` (13/03/2026) e foi tirada do render 19
+minutos depois pelo `eb55b1b03`, que trocou as bases femininas por versões
+alinhadas ao enquadramento do manequim masculino e passou a reusar
+`/muscle-overlays/` para os dois gêneros. Isso está CERTO e é fácil de conferir:
+o `front-chest.png` de lá é um torso com seios — a arte já é anatomicamente
+feminina. **Conferido na tela em 26/08/2026**, com o gerador real e o gênero
+feminino: peito, ombro, bíceps, abdômen, quadríceps, dorsal, tríceps, lombar,
+glúteo e posteriores acendem alinhados ao corpo feminino, sem artefato que o
+masculino não tenha.
+
+**A pasta órfã ficou 5 meses no repo e enganou quem passou depois** (esta nota
+existe por causa disso). Medida antes de ser apagada, ela era inaproveitável por
+três motivos independentes, e nenhum deles se resolve no código: (1) **100%
+opaca** — sem alfa, cada overlay pintaria a silhueta inteira; (2) **outro
+manequim**, em enquadramento próprio por arquivo (largura do corpo de 233 a 596
+px contra 287 da base) — o melhor registro por escala + translação dá **IoU
+0,35–0,66**, contra 0,89 das duas bases entre si, então nem alinhar por
+transformação resolve; (3) faltava `front-forearms.png` (14 de 15). Reexportar
+com alfa e aceitar as duas formas de PNG foram os dois caminhos avaliados e
+**descartados pela medição** — o que faltaria é renderizar a arte do MESMO
+manequim feminino que gerou `body-front-female.png`, o que é trabalho de arte 3D
+e depende de asset-source que não está no repo. Recuperável em
+`git show 3bf9ba378:public/muscle-overlays-female/<arquivo>`.
+
+Guard em `src/__tests__/muscleOverlayAlphaRecortado.test.ts` (provado por
+mutação, três casos): PNG sem alfa na pasta reprova, overlay citado no código sem
+PNG reprova, e pasta paralela `muscle-overlays-*` reprova.
+
+⚠️ **Bug ABERTO, dos dois gêneros, não corrigido aqui:** `front-forearms.png`
+está fora de escala e, depois da máscara, acende as **MÃOS** em vez dos
+antebraços — visível na conferência visual de 26/08. É 16% de pixels opacos
+contra 1–3% dos outros 14, o que denuncia o arquivo sem precisar olhar a tela.
+Corrigir é reexportar a arte, não mexer em código.
+
 **Heatmap Treino × Nutrição:** o bucketing por dia vive em `lib/nutrition/correlationDays.ts` (função pura, dia sempre BRT). Antes a rota fazia `toISOString().slice(0,10)` — dia UTC —, então **todo treino depois das 21h BRT acendia o quadrado do dia seguinte** e o próprio "hoje" da grade virava amanhã. A rota não devolve mais `workout_calories`: era o literal `300` por sessão exibido como se fosse medição.
 
 **`MyDietPlan` — o posicionamento automático não pode vencer o usuário.** "Abre no dia de HOJE" roda no efeito que observa `days`, e os botões de dia já estão na tela nesse instante: quem tocasse num dia antes de o efeito rodar era devolvido para hoje em silêncio, e o swap ia para o índice errado. `positionedRef.current = true` é marcado no efeito **e no clique**. Guard varre os sete dias da semana.

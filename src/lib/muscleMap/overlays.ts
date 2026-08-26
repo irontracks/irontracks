@@ -35,6 +35,20 @@ export const BACK_OVERLAYS: OverlayEntry[] = [
     { muscleId: 'calves', file: 'back-calves.png' },
 ]
 
+/**
+ * Pasta ÚNICA de overlays, para os dois gêneros. O que muda com o gênero é a
+ * BASE e a MÁSCARA do corpo (`baseSrcFor`/`maskSrcFor` no manequim, e os pares
+ * equivalentes na tela e no PDF) — nunca o overlay.
+ *
+ * Existiu uma `/muscle-overlays-female` (13/03/2026); ela foi tirada do render
+ * no mesmo dia (commit eb55b1b03) por dois motivos que continuam valendo: estes
+ * PNGs já desenham anatomia feminina (o `front-chest.png` é um torso com seios)
+ * e as bases femininas foram refeitas alinhadas ao mesmo enquadramento do
+ * manequim masculino. A pasta órfã foi apagada em 26/08/2026 — medida antes:
+ * arte de OUTRO manequim, 100% opaca (sem o alfa que recorta o músculo) e cada
+ * arquivo num enquadramento próprio, sem alinhamento possível por escala e
+ * translação. Guard: `src/__tests__/muscleOverlayAlphaRecortado.test.ts`.
+ */
 export const OVERLAY_FOLDER = '/muscle-overlays'
 
 export type DedupedOverlay = { file: string; muscleIds: MuscleId[]; maxRatio: number }
