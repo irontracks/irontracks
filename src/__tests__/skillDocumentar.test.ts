@@ -57,6 +57,22 @@ describe('protocolo do /documentar', () => {
     expect(bloco).toMatch(/tornou redundante e apague/)
   })
 
+  /**
+   * A Fase 5 é ONDE se decide o destino da nota — e ela não estava protegida.
+   * Descoberto por mutação: apagar `docs/<assunto>.md` de lá passava verde,
+   * porque o guard do orçamento só olhava a Fase 5½. "Onde o guard NÃO olha?"
+   * é a pergunta certa ao escrever guard.
+   */
+  it('a Fase 5 lista os quatro destinos possíveis', () => {
+    const i = doc.indexOf('### Fase 5 —')
+    expect(i, 'a fase que escolhe o destino sumiu').toBeGreaterThan(-1)
+    const bloco = doc.slice(i, doc.indexOf('### Fase 5½', i))
+    expect(bloco, 'seção existente').toMatch(/funda ali/)
+    expect(bloco, 'comentário no código').toMatch(/comentário no arquivo/)
+    expect(bloco, 'conteúdo extenso').toMatch(/docs\/<assunto>\.md/)
+    expect(bloco, 'regra de comportamento vai para o global').toMatch(/~\/\.claude\/CLAUDE\.md/)
+  })
+
   it('separa regra de comportamento (global) de conhecimento do repo (projeto)', () => {
     expect(doc).toMatch(/~\/\.claude\/CLAUDE\.md/)
   })
