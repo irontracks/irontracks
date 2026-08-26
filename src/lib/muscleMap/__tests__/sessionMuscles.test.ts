@@ -60,12 +60,26 @@ describe('buildSessionMuscles', () => {
             .toBeGreaterThan(Number(buildSessionMuscles(base).chest?.setsEq))
     })
 
-    it('cardio não acende perna', () => {
+    it('exercício marcado como CARDIO não acende músculo', () => {
+        // O nome importa para o teste ter efeito: "Esteira" e "Corrida" não
+        // são reconhecidos pela heurística e ficariam de fora de qualquer
+        // jeito — um caso assim passa verde com o filtro removido (medido).
+        // Quem o filtro de fato protege é o exercício de nome RECONHECÍVEL
+        // classificado como cardio, cuja série não é volume de musculação.
         const so = {
-            exercises: [{ name: 'Esteira', type: 'cardio', reps: 30 }],
+            exercises: [{ name: 'Agachamento livre', type: 'cardio', reps: 30 }],
             logs: { '0-0': { done: true, reps: 1 } },
         }
         expect(buildSessionMuscles(so)).toEqual({})
+    })
+
+    it('o MESMO exercício sem a marca de cardio acende a perna', () => {
+        // Contraprova: sem isto, o caso acima passaria com a heurística muda.
+        const so = {
+            exercises: [{ name: 'Agachamento livre' }],
+            logs: { '0-0': { done: true, weight: 100, reps: 5 } },
+        }
+        expect(Object.keys(buildSessionMuscles(so))).toContain('quads')
     })
 
     it('exercício que a heurística não conhece não quebra nem pinta', () => {
