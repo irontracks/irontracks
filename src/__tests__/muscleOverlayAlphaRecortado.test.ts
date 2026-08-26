@@ -130,16 +130,24 @@ describe('overlays do mapa muscular', () => {
         // este próprio arquivo e o guard se acusaria sozinho.
         const PROIBIDO = new RegExp('muscle' + '-overlays-', 'i')
 
+        // Todo formato que pode carregar um caminho de asset: código, config e
+        // estilo. Sem filtro nenhum o guard passaria a ler os PNGs de `public/`.
+        const VARRIDOS = /\.(ts|tsx|js|jsx|mjs|cjs|json|css|ya?ml)$/
+        const CODIGO_JS = /\.(ts|tsx|js|jsx|mjs|cjs)$/
+
         const rastreados = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
             .split('\0')
-            .filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|json)$/.test(f))
+            .filter((f) => VARRIDOS.test(f))
             .filter((f) => !/(^|\/)package-lock\.json$/.test(f))
 
         const culpados = rastreados.filter((f) => {
             const abs = join(process.cwd(), f)
             if (!existsSync(abs)) return false // rastreado mas apagado do disco
             const src = readFileSync(abs, 'utf8')
-            return PROIBIDO.test(f.endsWith('.json') ? src : semComentarios(src))
+            // O scanner entende comentário de JS. JSON não tem comentário, e em
+            // CSS/YAML aplicá-lo leria errado (`#` do YAML, aspas com outra
+            // semântica) — nesses o texto cru serve, e não há doc a proteger.
+            return PROIBIDO.test(CODIGO_JS.test(f) ? semComentarios(src) : src)
         })
 
         expect(
