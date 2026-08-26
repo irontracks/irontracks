@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect } from 'react'
-import { ArrowLeft, Frame, RotateCcw, Scissors, Upload } from 'lucide-react'
+import { ArrowLeft, Frame, PersonStanding, RotateCcw, Scissors, Upload } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
@@ -12,6 +12,9 @@ import { AlignmentGuides } from '@/components/stories/AlignmentGuides'
 import { CustomTextDragHandle } from '@/components/stories/CustomTextDragHandle'
 import { CustomTextPanel } from '@/components/stories/CustomTextPanel'
 import { getTemplateById } from '@/components/stories/storyTemplates'
+import { buildSessionMuscles } from '@/lib/muscleMap/sessionMuscles'
+import { buildMannequinBlob } from '@/lib/muscleMap/mannequinCanvas'
+import { logWarnRemote } from '@/lib/logger'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { createClient } from '@/utils/supabase/client'
@@ -79,6 +82,40 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     initialTemplateId: settings.storyTemplate,
     onTemplatePersist: (id) => { updateSetting('storyTemplate', id); void save({ storyTemplate: id }) },
   })
+
+  /* ── Manequim: o corpo no lugar da foto ─────────────────────────────────
+   * Para quem não quer se expor, mas quer mostrar o treino. Entra pela MESMA
+   * porta da foto (`loadMedia`), então nenhum renderer precisa saber que a
+   * "foto" é gerada — e zoom, pan, layouts, export e publicação valem de graça.
+   * Vazio = a sessão não tem série concluída que a heurística reconheça; o
+   * botão desabilita em vez de entregar um manequim apagado. */
+  const sessionMuscles = React.useMemo(() => (open ? buildSessionMuscles(session) : {}), [open, session])
+  const hasMuscles = React.useMemo(() => Object.keys(sessionMuscles).length > 0, [sessionMuscles])
+  const [mannequinBusy, setMannequinBusy] = useState(false)
+
+  const useMannequin = React.useCallback(async () => {
+    if (!hasMuscles || mannequinBusy) return
+    setMannequinBusy(true)
+    try {
+      const blob = await buildMannequinBlob({
+        muscles: sessionMuscles,
+        gender: settings.biologicalSex === 'female' ? 'female' : 'male',
+        background: template.overlay.fallbackBg,
+        canvasW: CANVAS_W,
+        canvasH: CANVAS_H,
+      })
+      await loadMedia(new File([blob], 'irontracks-manequim.png', { type: 'image/png' }))
+    } catch (e) {
+      // Falha aqui é asset que não carregou; o composer segue usável com o
+      // fundo do template. Silenciar seria mais uma saída muda em caminho
+      // visual — e é assim que a Live Activity morreu 12 vezes.
+      logWarnRemote('story.mannequin.failed', 'não foi possível montar o manequim', {
+        message: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setMannequinBusy(false)
+    }
+  }, [hasMuscles, mannequinBusy, sessionMuscles, settings.biologicalSex, template, loadMedia])
 
   // metrics.kcal already reflects caloriesOverride (applied inside the hook so the canvas is correct)
   const metrics = rawMetrics
@@ -341,6 +378,19 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                           onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
                         />
                       </label>
+
+                      {/* Manequim: publica o corpo com os músculos da sessão acesos,
+                          para quem não quer postar a própria foto. */}
+                      <button
+                        type="button"
+                        onClick={useMannequin}
+                        disabled={busy || mannequinBusy || !hasMuscles}
+                        aria-label={hasMuscles ? 'Usar manequim com os músculos do treino' : 'Manequim indisponível: nenhuma série reconhecida neste treino'}
+                        title={hasMuscles ? 'Usar manequim' : 'Nenhuma série reconhecida neste treino'}
+                        className={['tap-44 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-neutral-800 bg-neutral-900 text-yellow-500 transition-all hover:border-neutral-700 hover:bg-neutral-800 active:scale-[0.98]', (busy || mannequinBusy || !hasMuscles) ? 'pointer-events-none opacity-50' : ''].join(' ')}
+                      >
+                        <PersonStanding size={17} />
+                      </button>
 
                       {isVideo && (
                         <button type="button" onClick={() => setShowTrimmer(v => !v)}
