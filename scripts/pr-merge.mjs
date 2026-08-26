@@ -41,11 +41,44 @@ export function decidirSync({ arvoreSuja, conteudoIgual }) {
   return { acao: 'sincronizar', motivo: '' }
 }
 
-function statusDoCheck(pr) {
-  const linhas = sh('gh', ['pr', 'checks', String(pr)], { stdio: ['ignore', 'pipe', 'pipe'] }).split('\n')
+/**
+ * Falha de ferramenta não pode sair como stack trace do Node.
+ *
+ * Medido: `pr:merge 999999` cuspia 20 linhas de `execFileSync` e escondia a
+ * única informação útil ("Could not resolve to a PullRequest"). Quem lê isso no
+ * fim de uma tarefa não sabe se o problema é o PR, a rede ou o script.
+ */
+function ghOuMorra(args, oQueTentava) {
+  try {
+    return sh('gh', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    const detalhe = String(e?.stderr || e?.stdout || e?.message || '').trim().split('\n')[0]
+    process.stderr.write(`ABORTADO: ${oQueTentava}.\n  ${detalhe || 'o gh falhou sem dizer o motivo'}\n`)
+    process.exit(1)
+  }
+}
+
+/**
+ * Lê o estado do `quality-check` na saída do `gh pr checks`.
+ *
+ * Separada da chamada para poder ser TESTADA: é ela que autoriza o merge, e
+ * "vermelho aborta" não pode depender de existir um PR vermelho por perto para
+ * alguém conferir à mão. O formato é uma linha por check, com TAB entre as
+ * colunas: `nome \t estado \t duração \t url \t descrição` (conferido com
+ * `od -c` na saída real).
+ *
+ * Estado desconhecido (linha ausente, coluna vazia) NUNCA é tratado como
+ * sucesso — na dúvida, não mergeia.
+ */
+export function extrairEstado(saidaDoGh) {
+  const linhas = String(saidaDoGh ?? '').split('\n')
   const alvo = linhas.find((l) => l.includes('quality-check'))
   if (!alvo) return 'ausente'
-  return (alvo.split(/\s+/)[1] || 'desconhecido').trim()
+  return (alvo.split('\t')[1] || '').trim() || 'desconhecido'
+}
+
+function statusDoCheck(pr) {
+  return extrairEstado(ghOuMorra(['pr', 'checks', String(pr)], `não consegui ler os checks do PR #${pr}`))
 }
 
 function main() {
@@ -70,7 +103,7 @@ function main() {
     return
   }
 
-  sh('gh', ['pr', 'merge', String(pr), '--squash', '--delete-branch'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  ghOuMorra(['pr', 'merge', String(pr), '--squash', '--delete-branch'], `o merge do PR #${pr} falhou`)
   process.stdout.write(`PR #${pr} mergeado (squash).\n`)
 
   // ── Guarda 2: a main local não pode ficar para trás ───────────────────────

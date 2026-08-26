@@ -10,7 +10,7 @@
  * de um script de shell: mora numa função pura, e é ela que este arquivo trava.
  */
 import { describe, it, expect } from 'vitest'
-import { decidirSync } from '../../scripts/pr-merge.mjs'
+import { decidirSync, extrairEstado } from '../../scripts/pr-merge.mjs'
 
 describe('decidirSync', () => {
   /**
@@ -44,6 +44,35 @@ describe('decidirSync', () => {
   })
 })
 
+/**
+ * O "vermelho aborta" não pode depender de existir um PR vermelho por perto
+ * para alguém conferir à mão — por isso o parse do estado é uma função pura.
+ * As fixtures usam o formato REAL do `gh pr checks`: uma linha por check, com
+ * TAB entre as colunas (conferido com `od -c` na saída de um PR de verdade).
+ */
+describe('extrairEstado', () => {
+  const linha = (estado: string) => `Vercel\tpass\t0\thttps://v\tDeployment has completed\nquality-check\t${estado}\t7m59s\thttps://q`
+
+  it('lê o verde', () => {
+    expect(extrairEstado(linha('pass'))).toBe('pass')
+  })
+
+  it.each(['fail', 'pending', 'skipping', 'cancelled'])('%s NÃO é pass — o merge aborta', (estado) => {
+    expect(extrairEstado(linha(estado))).toBe(estado)
+  })
+
+  /** Sem a linha do check, o estado é DESCONHECIDO. Desconhecido não mergeia. */
+  it('check ausente não vira sucesso', () => {
+    expect(extrairEstado('Vercel\tpass\t0\thttps://v')).toBe('ausente')
+    expect(extrairEstado('')).toBe('ausente')
+    expect(extrairEstado(null as never)).toBe('ausente')
+  })
+
+  it('coluna vazia também não vira sucesso', () => {
+    expect(extrairEstado('quality-check\t\t\t')).toBe('desconhecido')
+  })
+})
+
 describe('guardas do script', () => {
   const fonte = require('node:fs').readFileSync(
     require('node:path').join(process.cwd(), 'scripts/pr-merge.mjs'),
@@ -60,6 +89,22 @@ describe('guardas do script', () => {
     expect(codigo).toMatch(/estado !== 'pass'/)
     const antesDoMerge = codigo.slice(0, codigo.indexOf("'merge'"))
     expect(antesDoMerge, 'a checagem precisa vir ANTES do merge').toMatch(/statusDoCheck\(pr\)/)
+  })
+
+  /**
+   * Falha do `gh` (PR inexistente, rede fora, sem permissão) tem que sair como
+   * MENSAGEM. Medido antes do conserto: `pr:merge 999999` cuspia 20 linhas de
+   * stack trace do `execFileSync` e escondia o "Could not resolve to a
+   * PullRequest", que era a única informação útil.
+   */
+  it('toda chamada ao gh passa pelo tratamento de erro', () => {
+    // Fora do CORPO do helper: ele é o único que pode chamar o gh cru, e um
+    // guard que acusa o próprio mecanismo é falso (erro nº 2 da lista do repo).
+    const semHelper = codigo.replace(/function ghOuMorra[\s\S]*?\n\}\n/, '')
+    const chamadasCruas = semHelper.match(/sh\('gh'/g) || []
+    expect(chamadasCruas, "use ghOuMorra — `sh('gh', …)` cru vira stack trace").toHaveLength(0)
+    expect(codigo).toMatch(/ghOuMorra\(\['pr', 'checks'/)
+    expect(codigo).toMatch(/ghOuMorra\(\['pr', 'merge'/)
   })
 
   it('o reset passa pela função que decide, nunca direto', () => {

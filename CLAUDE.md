@@ -1239,6 +1239,20 @@ commitado.** Perdi duas vezes uma reescrita inteira desfazendo a mutação num
 arquivo que ainda não estava no índice. **Commitar ANTES de mutar** — a mutação
 se desfaz com `git checkout` justamente porque o commit existe.
 
+⚠️ **Aconteceu de novo em 25/08/2026**, com a regra já escrita aqui — sinal de
+que ler não basta: no meio de uma prova por mutação, um `git checkout` desfez as
+duas funções que eu tinha acabado de escrever e ainda não commitado. O sintoma é
+traiçoeiro: os testes seguintes passam VERDES (o import quebrado derruba outra
+coisa, ou a mutação nem chega a existir) e você conclui "provado" sobre um
+arquivo que voltou no tempo. Depois de cada `git checkout` de mutação, confira
+que o arquivo ainda tem o que você escreveu (`grep -c` no símbolo novo).
+
+**E confira que a MUTAÇÃO foi aplicada, não só que o teste rodou.** Um `sed`/
+`replace` que não casa devolve o arquivo intacto e o teste passa verde — "provado
+por mutação" vira mentira em silêncio. O jeito barato: `assert novo != antigo`
+antes de rodar. Na mesma sessão, duas mutações escritas em shell morreram em erro
+de aspas, o arquivo não mudou, e o resultado "14 passed" parecia prova.
+
 **Automação do simulador — o que custou toque errado:** as coordenadas são
 PONTOS (440×956 no 17 Pro Max), não pixels do screenshot; um toque convertido de
 px caiu no botão "Duplicar" e criou exercício fantasma no rascunho. O backspace
