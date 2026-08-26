@@ -23,9 +23,15 @@ describe('protocolo do /documentar', () => {
 
   const doc = existsSync(CAMINHO) ? readFileSync(CAMINHO, 'utf8') : ''
 
+  /**
+   * ⚠️ Pelo TÍTULO, não pela menção. A primeira versão usava `toContain('Fase
+   * 3½')` e passou verde com a fase inteira renomeada — porque outro parágrafo
+   * cita "a Fase 3½ decidiu". Guard que casa com a referência não protege a
+   * seção referida.
+   */
   it('tem as sete fases, incluindo as duas que nasceram de furo', () => {
     for (const fase of ['Fase 1', 'Fase 2', 'Fase 3', 'Fase 3½', 'Fase 4', 'Fase 5', 'Fase 5½', 'Fase 6', 'Fase 7']) {
-      expect(doc, `${fase} sumiu do protocolo`).toContain(fase)
+      expect(doc, `${fase} sumiu do protocolo`).toMatch(new RegExp(`^### ${fase}`, 'm'))
     }
   })
 
@@ -35,11 +41,20 @@ describe('protocolo do /documentar', () => {
     expect(doc).toMatch(/vira folclore/)
   })
 
-  /** Sem isto, toda execução engorda o arquivo que é lido em toda sessão. */
+  /**
+   * Sem isto, toda execução engorda o arquivo que é lido em toda sessão.
+   *
+   * ⚠️ Asserção DENTRO do bloco da fase: `docs/<assunto>.md` aparece duas vezes
+   * no documento, e checar o arquivo inteiro passava verde com a regra apagada
+   * da Fase 5½ (medido por mutação).
+   */
   it('tem orçamento: nota longa vai para docs/, e toda execução tenta podar', () => {
-    expect(doc).toMatch(/lido INTEIRO em toda sessão/)
-    expect(doc).toMatch(/docs\/<assunto>\.md/)
-    expect(doc).toMatch(/tornou redundante e apague/)
+    const i = doc.indexOf('### Fase 5½')
+    expect(i, 'a fase do orçamento sumiu').toBeGreaterThan(-1)
+    const bloco = doc.slice(i, doc.indexOf('### Fase 6', i))
+    expect(bloco).toMatch(/lido INTEIRO em toda sessão/)
+    expect(bloco, 'sem destino, "nota longa" não sai do CLAUDE.md').toMatch(/docs\/<assunto>\.md/)
+    expect(bloco).toMatch(/tornou redundante e apague/)
   })
 
   it('separa regra de comportamento (global) de conhecimento do repo (projeto)', () => {
