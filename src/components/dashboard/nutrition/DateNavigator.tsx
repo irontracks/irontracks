@@ -35,7 +35,18 @@ export default function DateNavigator({
   onOpenHistory?: () => void
 }) {
   const isToday = currentDate === todayDate
-  const isFuture = currentDate > todayDate
+  /**
+   * HOJE é o fim da linha — a seta não pode levar para amanhã.
+   *
+   * Era `currentDate > todayDate`: estando em hoje isso é `false`, então a
+   * seta ficava ATIVA e navegava para o dia seguinte. Amanhã não tem refeição
+   * lançada, e o estado vazio da tela diz "nenhuma refeição registrada" — o
+   * app afirmando que a pessoa não comeu num dia que ainda não chegou.
+   *
+   * A volta existia (a seta da esquerda), mas o caminho inteiro é ruído: não há
+   * o que registrar no futuro, porque o dia fecha à meia-noite.
+   */
+  const semProximoDia = currentDate >= todayDate
   const label = formatDateLabel(currentDate, todayDate)
 
   return (
@@ -67,8 +78,8 @@ export default function DateNavigator({
 
       <button
         type="button"
-        onClick={() => !isFuture && onDateChange(shiftDate(currentDate, 1))}
-        disabled={isFuture}
+        onClick={() => !semProximoDia && onDateChange(shiftDate(currentDate, 1))}
+        disabled={semProximoDia}
         className="tap-44 h-9 w-9 grid place-items-center rounded-xl bg-neutral-900/60 border border-neutral-800/60 hover:bg-neutral-800/80 active:scale-95 transition disabled:opacity-30"
         aria-label="Próximo dia"
       >
