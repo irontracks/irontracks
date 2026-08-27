@@ -1615,6 +1615,34 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   **A correção foi provada no mundo real, não só por guard:** dois pushes na
   mesma branch com 28 s de diferença, e o run anterior apareceu `cancelled`.
 
+- **A sessão órfã é a causa MAIS COMUM de "a lista de treinos precisa ter ao
+  menos um card" — e ela não é do PR (26/08/2026).** Aconteceu três vezes num
+  dia (#937 duas vezes, #940 uma), e nas três a investigação começou pelo diff
+  do PR, que não tinha nada a ver. Um deles chegou a ser DIVIDIDO em dois para
+  bisseccionar um culpado que não existia — e a metade separada passou.
+
+  O mecanismo: a limpeza (`descartarSessao`) é feita pela UI, e é justamente
+  quando um caso FALHA que a página fica no estado que o derrubou (modal
+  aberto, hidratação pela metade, botão que não estabiliza). O descarte tem
+  menos chance de funcionar exatamente quando é mais necessário, a linha de
+  `active_workout_sessions` fica no servidor, e o PRÓXIMO run abre o app DENTRO
+  de um treino — sem card nenhum no dashboard.
+
+  **Antes de olhar o diff, consulte a tabela.** Se houver linha parada há mais
+  de alguns minutos, é resíduo: apague e re-rode.
+
+  ```sql
+  select started_at, updated_at, now() from active_workout_sessions
+  where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
+  ```
+
+  Hoje o spec **avisa** quando não conseguiu descartar (o `.catch(() => {})` que
+  embrulhava isso tornava a órfã invisível) e tenta uma última vez no
+  `afterAll`, com PÁGINA NOVA — fora do estado que derrubou o caso. Guard em
+  `src/__tests__/e2eLimpaSessaoAtiva.test.ts`. O que ele trava não é "a limpeza
+  funciona" (depende da UI, e o teste não garante), e sim que ela **não falha
+  em silêncio**.
+
   ⚠️ **Fica um risco residual conhecido:** `concurrency` agrupa por `ref`, então
   dois PRs DIFERENTES rodando ao mesmo tempo ainda dividem a conta. Não foi
   tratado porque exigiria extrair o E2E logado para um job próprio com grupo

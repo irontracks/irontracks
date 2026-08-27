@@ -31,6 +31,9 @@ import { test, expect, type Page } from '@playwright/test'
  *    toda semana (auditoria de design constante); os rótulos, não.
  */
 
+/** O mesmo storageState que o projeto autenticado usa (playwright.config.ts). */
+const STORAGE_STATE = 'e2e/.auth/user.json'
+
 /** Entra no primeiro treino da lista. Devolve o nome, para o log de falha. */
 async function iniciarPrimeiroTreino(page: Page): Promise<void> {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
@@ -107,24 +110,53 @@ async function emSessaoAtiva(page: Page, timeout = 3_000): Promise<boolean> {
  * extenso. Quem marca a presença de uma sessão ativa agora é o FINALIZAR — o
  * rodapé tem uma ação só.
  */
-async function descartarSessao(page: Page): Promise<void> {
+async function descartarSessao(page: Page): Promise<boolean> {
     // SEMPRE recarrega antes: o caso anterior pode ter terminado com um modal
     // aberto (editor completo) ou no meio da EXECUÇÃO de uma série — e nesse
     // estado o cabeçalho esconde as ações (opacity-0 + pointer-events-none),
     // então o menu "…" fica inalcançável. Recarregar não perde a sessão, que é
     // sincronizada pelo servidor.
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' }).catch(() => {})
-    if (!(await emSessaoAtiva(page, 10_000))) return
+    if (!(await emSessaoAtiva(page, 10_000))) return true // nada a descartar
     const menu = page.getByRole('button', { name: /Mais opções/i })
-    if (!(await menu.isVisible({ timeout: 5_000 }).catch(() => false))) return
+    if (!(await menu.isVisible({ timeout: 5_000 }).catch(() => false))) return false
     await menu.click()
     const x = page.getByRole('button', { name: /Descartar treino/i })
-    if (!(await x.isVisible({ timeout: 5_000 }).catch(() => false))) return
+    if (!(await x.isVisible({ timeout: 5_000 }).catch(() => false))) return false
     await x.click()
     const confirmar = page.getByRole('button', { name: /^Descartar$/i })
     if (await confirmar.isVisible({ timeout: 5_000 }).catch(() => false)) await confirmar.click()
-    await expect(page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first())
-        .toBeVisible({ timeout: 20_000 })
+    return await page.getByRole('button', { name: 'INICIAR TREINO', exact: true }).first()
+        .isVisible({ timeout: 20_000 }).catch(() => false)
+}
+
+/**
+ * O que sobra quando o descarte não deu certo — e por que ele precisa GRITAR.
+ *
+ * A limpeza é feita pela UI, e é justamente quando um caso FALHA que a página
+ * fica em estado ruim: modal aberto, hidratação incompleta, botão que não
+ * estabiliza. Ou seja, o descarte tem menos chance de funcionar exatamente
+ * quando é mais necessário — e a linha de `active_workout_sessions` fica no
+ * servidor, compartilhada por todos os clientes da conta de teste.
+ *
+ * O run seguinte então abre o app DENTRO de um treino, não acha card nenhum e
+ * morre em "a lista de treinos precisa ter ao menos um card". Aconteceu três
+ * vezes em 26/08/2026 (PRs #937 duas vezes e #940), e nas três a investigação
+ * começou pelo diff do PR — que não tinha nada a ver. Uma delas chegou a ser
+ * dividida em dois PRs para bisseccionar um culpado que não existia.
+ *
+ * O `.catch(() => {})` que embrulhava isto tornava a falha invisível. Agora ela
+ * aparece no log do CI com a instrução de como resolver, e o `afterAll` tenta
+ * uma última vez com uma PÁGINA NOVA — fora do estado que derrubou o caso.
+ */
+function avisarSessaoOrfa(origem: string): void {
+    console.warn(
+        `\n⚠️  [E2E] Não consegui descartar a sessão de treino (${origem}).\n` +
+        '    A linha de `active_workout_sessions` da conta de teste ficou no servidor\n' +
+        '    e vai derrubar o PRÓXIMO run em "a lista de treinos precisa ter ao menos\n' +
+        '    um card" — que parecerá bug do outro PR, e não é.\n' +
+        '    Para destravar:  delete from active_workout_sessions where user_id = <conta de teste>;\n',
+    )
 }
 
 test.describe('Jornada do treino (UI autenticada)', () => {
@@ -154,7 +186,24 @@ test.describe('Jornada do treino (UI autenticada)', () => {
     test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
     test.afterEach(async ({ page }) => {
-        await descartarSessao(page).catch(() => { })
+        const ok = await descartarSessao(page).catch(() => false)
+        if (!ok) avisarSessaoOrfa('afterEach')
+    })
+
+    /**
+     * Última chance, com PÁGINA NOVA. O `afterEach` herda a página do caso que
+     * acabou — e se ele falhou, ela está no estado que o derrubou. Um contexto
+     * limpo não tem modal aberto nem hidratação pela metade, e costuma
+     * conseguir o que o afterEach não conseguiu.
+     */
+    test.afterAll(async ({ browser }) => {
+        const contexto = await browser.newContext({ storageState: STORAGE_STATE })
+        try {
+            const pagina = await contexto.newPage()
+            if (!(await descartarSessao(pagina).catch(() => false))) avisarSessaoOrfa('afterAll')
+        } finally {
+            await contexto.close()
+        }
     })
 
     test('concluir série registra e mantém o FINALIZAR alcançável durante o descanso', async ({ page }) => {
