@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type PlanItem = { food: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
@@ -174,9 +175,9 @@ export default function PrescribedDietPlan({
                           </div>
                           <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
                             <span>{Math.round(num(it.calories))} kcal</span>
-                            <span className="text-yellow-400/80">P {Math.round(num(it.protein))}g</span>
-                            <span className="text-amber-400/80">C {Math.round(num(it.carbs))}g</span>
-                            <span className="text-red-400/80">G {Math.round(num(it.fat))}g</span>
+                            <span className={MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
+                            <span className={MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
+                            <span className={MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
                           </div>
                         </div>
                       ))}
