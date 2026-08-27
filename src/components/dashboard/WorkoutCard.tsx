@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
-import { Share2, Pencil, Trash2, Loader2, Undo2, MoreHorizontal, ChevronLeft } from 'lucide-react'
+import { Share2, Pencil, Trash2, Loader2, Undo2, MoreHorizontal, ChevronLeft, Play } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
 import { pluralize } from '@/utils/format/plural'
@@ -238,7 +238,7 @@ function WorkoutCardInner({
             {w?.archived_at ? (
               isActionBusy('restore') ? (
                 <>
-                  <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
+                  <Loader2 size={16} className={`animate-spin ${solidCta ? 'text-black' : 'text-yellow-500'}`} /> RESTAURANDO...
                 </>
               ) : (
                 <>
@@ -247,20 +247,15 @@ function WorkoutCardInner({
               )
             ) : isActionBusy('start') ? (
               <>
-                <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
+                <Loader2 size={16} className={`animate-spin ${solidCta ? 'text-black' : 'text-yellow-500'}`} /> INICIANDO...
               </>
             ) : (
               <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="drop-shadow-[0_0_4px_rgba(234,179,8,0.6)]">
-                  <defs>
-                    <linearGradient id="playGold" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#B8860B" />
-                      <stop offset="50%" stopColor="#FFD700" />
-                      <stop offset="100%" stopColor="#D4A017" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M6 3.5L20 12L6 20.5V3.5Z" fill="url(#playGold)" stroke="#FFD700" strokeWidth="0.5" />
-                </svg> {isInProgress ? 'CONTINUAR TREINO' : 'INICIAR TREINO'}
+                {/* O ícone acompanha o FUNDO, como o rótulo. Era um SVG com fill
+                    dourado fixo: sobre o `btn-gold-animated` media 1,19:1 no pico do
+                    gradiente e sumia ciclicamente — lia como falha de render. O `id`
+                    do gradiente também se repetia uma vez por card da lista. */}
+                <Play size={18} className={solidCta ? 'fill-black text-black' : 'fill-yellow-400 text-yellow-400'} /> {isInProgress ? 'CONTINUAR TREINO' : 'INICIAR TREINO'}
               </>
             )}
           </button>

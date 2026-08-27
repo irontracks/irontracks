@@ -399,7 +399,12 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             </div>
           )}
 
-          {/* GPS Cardio Tracking Panel — condicional, ver showCardioPanel acima */}
+          {/* GPS Cardio Tracking Panel — a ÚNICA instância, e ela é condicional.
+              Havia uma segunda cópia incondicional 45 linhas abaixo: o painel
+              aparecia mesmo com `showCardioPanel` falso (e em DOBRO quando
+              verdadeiro), porque o componente não tem guarda interna. Isso
+              anulava o `shouldShowCardioPanel`, que a linha 205 usa para
+              decidir se o menu oferece Cardio GPS. */}
           {showCardioPanel && (
             <CardioGPSPanel
               workoutId={props.session?.workout?.id}
@@ -445,11 +450,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             </div>
           )}
 
-          {/* GPS Cardio Tracking Panel */}
-          <CardioGPSPanel
-            workoutId={props.session?.workout?.id}
-            userId={String(props.settings?.userId ?? props.session?.userId ?? '') || null}
-          />
           <ExerciseList />
         </div>
 
