@@ -926,11 +926,21 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
                           freezeMethods: freezeInferredMethodsBeforeRemoval(sIdx),
                         });
                       }}
+                      // A série concluída vinha VERDE aqui dentro — a cor de
+                      // sucesso, num painel vermelho cuja única função é apagar.
+                      // O `hover:` que a levaria ao vermelho não existe no
+                      // touch: no iPhone o chip ficava permanentemente verde com
+                      // um ✓, convidando ao toque que REMOVE.
+                      //
+                      // A informação (quais séries já foram feitas) é útil para
+                      // escolher qual tirar, e fica — no ícone, não na cor. O
+                      // vermelho vem no `active:`, que é o estado que o dedo
+                      // produz de fato.
                       className={[
                         'tap-44 min-w-[44px] h-9 px-3 inline-flex items-center justify-center gap-1 rounded-xl border text-sm font-bold transition-colors',
-                        sDone
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300'
-                          : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300',
+                        'bg-neutral-900 border-neutral-700 text-neutral-300',
+                        'hover:bg-red-500/15 hover:border-red-500/40 hover:text-red-300',
+                        'active:bg-red-500/20 active:border-red-500/50 active:text-red-200',
                       ].join(' ')}
                     >
                       #{sIdx + 1}
