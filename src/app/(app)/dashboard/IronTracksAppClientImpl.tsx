@@ -1144,6 +1144,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             steps={getTourSteps({
                                 role: user?.role,
                                 hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
+                                // O passo "Cobranças" ensina uma tela que o iOS
+                                // não mostra (política da Apple, o mesmo gate do
+                                // menu). Sem isto, o professor de iPhone termina
+                                // o tour procurando o que não existe para ele.
+                                ocultarCobrancas: hideVipOnIos,
                             })}
                             actions={{
                                 openAdminPanel: (tab: unknown) => {

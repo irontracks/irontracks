@@ -74,7 +74,11 @@ const COACH_STEPS: TourStep[] = [
   {
     id: 'coach-wallet',
     emoji: '💰',
-    title: 'Carteira',
+    // O menu chama de "Cobranças" — "Carteira" foi aposentado na varredura de
+    // UI justamente por ser um segundo nome para o mesmo destino. O tour, que
+    // é onde a pessoa APRENDE o vocabulário do app, seguia ensinando o nome
+    // antigo: ela procuraria "Carteira" e não acharia.
+    title: 'Cobranças',
     body: 'Recebimentos e status de assinatura dos seus alunos VIP. Visibilidade total sobre o financeiro da sua operação.',
   },
 ]
@@ -90,9 +94,20 @@ const FINAL_STEP: TourStep = {
 export function getTourSteps({
   role,
   hasCommunity,
+  ocultarCobrancas,
 }: {
   role?: unknown
   hasCommunity?: unknown
+  /**
+   * No iOS o item "Cobranças" não existe no menu — some por `hideVipCtas`, que
+   * é a política da Apple sobre cobrança fora da loja. O tour ensinava o passo
+   * assim mesmo, então o professor de iPhone terminava o tutorial procurando
+   * uma tela que o app não mostra para ele.
+   *
+   * Tour que ensina o que não está lá é pior que tour curto: ele transfere
+   * para o usuário a culpa por não achar.
+   */
+  ocultarCobrancas?: unknown
 }): TourStep[] {
   const r = String(role || '').toLowerCase()
   const isCoach = r === 'teacher' || r === 'admin'
@@ -102,7 +117,11 @@ export function getTourSteps({
     ? [...BASE_STEPS.slice(0, 5), COMMUNITY_STEP, BASE_STEPS[5]]
     : BASE_STEPS
 
+  const passosDeCoach = Boolean(ocultarCobrancas)
+    ? COACH_STEPS.filter((p) => p.id !== 'coach-wallet')
+    : COACH_STEPS
+
   return isCoach
-    ? [...middle, ...COACH_STEPS, FINAL_STEP]
+    ? [...middle, ...passosDeCoach, FINAL_STEP]
     : [...middle, FINAL_STEP]
 }

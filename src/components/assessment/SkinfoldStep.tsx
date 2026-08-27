@@ -111,45 +111,65 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
     }
   ];
 
+  /**
+   * O app NÃO dá veredicto sobre uma dobra isolada — ele checa se o número é
+   * PLAUSÍVEL.
+   *
+   * Antes havia uma escala clínica a partir do milímetro cru, igual para todos:
+   * < 8 mm era "Baixa", > 35 mm era "Elevada", e entre os dois "Normal" — com
+   * borda VERDE, como se medir 20 mm fosse uma conquista.
+   *
+   * Está errado por três motivos independentes, e cada um sozinho já invalida
+   * o rótulo:
+   *
+   * - **Varia por SÍTIO.** Tríceps de 20 mm é banal; subescapular de 20 mm é
+   *   outra coisa. São sete dobras diferentes sob o mesmo corte.
+   * - **Varia por SEXO.** A distribuição de gordura é diferente; os mesmos
+   *   25 mm não dizem a mesma coisa.
+   * - **Varia por IDADE.** As equações de Jackson & Pollock corrigem por idade
+   *   exatamente porque a mesma soma significa percentuais diferentes.
+   *
+   * E o app TEM idade e sexo — usa os dois no cálculo da densidade corporal.
+   * Ele sabia, e mesmo assim opinava sem usar. Uma mulher com suprailíaca de
+   * 36 mm (normal para ela) lia "Elevada" em amarelo.
+   *
+   * O veredicto correto já existe e é o outro: o %BF calculado pela equação,
+   * que considera soma, idade e sexo. A dobra individual não precisa julgar
+   * nada — só precisa não estar obviamente errada.
+   *
+   * Os limites que sobraram (3 mm e 50 mm) são de PLAUSIBILIDADE de adipômetro,
+   * não de saúde: fora deles é quase certo erro de leitura ou de digitação, e
+   * avisar disso é ajuda de verdade.
+   */
   const getSkinfoldStatus = (value: string) => {
     const numValue = parseFloat(value);
     if (isNaN(numValue) || numValue === 0) return 'empty';
-    if (numValue < 3) return 'very-low';
-    if (numValue > 50) return 'very-high';
-    if (numValue < 8) return 'low';
-    if (numValue > 35) return 'high';
-    return 'normal';
+    if (numValue < 3) return 'implausivel-baixa';
+    if (numValue > 50) return 'implausivel-alta';
+    return 'ok';
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'very-low': return 'Muito baixa - verificar medição';
-      case 'low': return 'Baixa';
-      case 'normal': return 'Normal';
-      case 'high': return 'Elevada';
-      case 'very-high': return 'Muito elevada - verificar medição';
+      case 'implausivel-baixa': return 'Valor muito baixo — confira a medição';
+      case 'implausivel-alta': return 'Valor muito alto — confira a medição';
       default: return '';
     }
   };
 
-  const statusBorder = (status: string) => {
-    if (status === 'normal') return 'border-green-500/30 bg-green-900/10';
-    if (status === 'low' || status === 'high') return 'border-yellow-500/30 bg-yellow-900/10';
-    if (status === 'very-low' || status === 'very-high') return 'border-red-500/30 bg-red-900/10';
-    return 'border-neutral-700 bg-neutral-800';
-  };
+  const implausivel = (status: string) =>
+    status === 'implausivel-baixa' || status === 'implausivel-alta';
 
-  const statusDot = (status: string) => {
-    if (status === 'normal') return 'bg-green-500';
-    if (status === 'low' || status === 'high') return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
+  // Sem verde: registrar uma dobra não é acerto nem erro. Só o implausível
+  // recebe cor, e é âmbar de ATENÇÃO — o vermelho é do que não tem volta.
+  const statusBorder = (status: string) =>
+    implausivel(status) ? 'border-amber-500/30 bg-amber-900/10' : 'border-neutral-700 bg-neutral-800';
 
-  const statusTextColor = (status: string) => {
-    if (status === 'normal') return 'text-green-400';
-    if (status === 'low' || status === 'high') return 'text-yellow-400';
-    return 'text-red-400';
-  };
+  const statusDot = (status: string) =>
+    implausivel(status) ? 'bg-amber-500' : 'bg-neutral-600';
+
+  const statusTextColor = (status: string) =>
+    implausivel(status) ? 'text-amber-400' : 'text-neutral-400';
 
   /** Compute the effective value (average of left+right or single field) for status indicator */
   const effectiveValue = (s: SkinfoldDef): string => {
@@ -236,7 +256,10 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
 
           <p className="text-xs text-neutral-400">{s.description}</p>
 
-          {status !== 'empty' && (
+          {/* Só aparece quando há algo a dizer. Com o veredicto clínico fora,
+              o valor plausível não rende linha nenhuma — um ponto cinza ao lado
+              de um texto vazio seria ruído. */}
+          {implausivel(status) && (
             <div className="flex items-center">
               <div className={`w-2 h-2 rounded-full mr-2 ${statusDot(status)}`} />
               <span className={`text-xs font-bold ${statusTextColor(status)}`}>{getStatusText(status)}</span>
@@ -279,7 +302,10 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
 
           <p className="text-xs text-neutral-400">{s.description}</p>
 
-          {status !== 'empty' && (
+          {/* Só aparece quando há algo a dizer. Com o veredicto clínico fora,
+              o valor plausível não rende linha nenhuma — um ponto cinza ao lado
+              de um texto vazio seria ruído. */}
+          {implausivel(status) && (
             <div className="flex items-center">
               <div className={`w-2 h-2 rounded-full mr-2 ${statusDot(status)}`} />
               <span className={`text-xs font-bold ${statusTextColor(status)}`}>{getStatusText(status)}</span>
