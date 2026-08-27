@@ -61,6 +61,25 @@ describe('documento legal tem data de revisão FIXA', () => {
 })
 
 describe('a versão exibida acompanha a que está na loja', () => {
+    /**
+     * A env NÃO pode entrar aqui.
+     *
+     * A primeira correção dava precedência a `NEXT_PUBLIC_APP_VERSION` por
+     * parecer mais fresca, e em produção a tela de login passou a exibir
+     * "v6dc5e30d": na Vercel aquela variável recebe o SHA do commit, porque ela
+     * é o buster de cache do service worker. Trocar "v1.0" por um hash é
+     * piorar — o número errado ao menos era legível.
+     *
+     * Pego na conferência visual, com todos os testes verdes.
+     */
+    it('a versão exibida não vem do buster de cache', () => {
+        // `executavel`: a nota do módulo CITA a env para explicar por que ela
+        // não serve — guard que acusa o próprio comentário é falso.
+        expect(executavel(versao), 'essa env é o SHA do commit na Vercel')
+            .not.toMatch(/NEXT_PUBLIC_APP_VERSION/)
+        expect(versao).toMatch(/appVersionLabel = \(\) => `v\$\{APP_VERSION\}`/)
+    })
+
     it('o login não traz literal de versão', () => {
         const codigo = executavel(login)
         expect(codigo).not.toMatch(/'v\d+\.\d+'/)
