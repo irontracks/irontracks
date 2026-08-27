@@ -114,6 +114,19 @@ type Props = {
   onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
   currentUserId?: string
   newRecordsReloadKey?: number
+  /**
+   * Painel do Apple Health. Entra como SLOT e não como dado: o shell é dono do
+   * `useHealthKit`, e o dashboard não precisa conhecer o formato do HealthKit
+   * para saber ONDE o painel vai.
+   *
+   * Ele renderizava no shell, ACIMA deste componente — ou seja, acima do
+   * `QuickStartCard`, que é a ação primária desta aba. Passos, kcal, FC e HRV
+   * são dados de CONSULTA: nada ali é acionável agora, e ~90pt de telemetria
+   * empurravam o "Treinar agora" para baixo numa aba chamada TREINOS. É a
+   * mesma lição do PR #747 (o estado vazio de stories ocupando a primeira
+   * dobra), reaparecendo por FORA do container que aquele PR corrigiu.
+   */
+  painelSaude?: React.ReactNode
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
@@ -834,6 +847,10 @@ export default function StudentDashboard(props: Props) {
               )}
 
               <MuscleBalanceCard />
+
+              {/* Vizinho semântico do RecoveryScore: os dois respondem "como
+                  meu corpo está", que é o que se olha DEPOIS de decidir treinar. */}
+              {props.painelSaude}
 
               <RecoveryScore />
 

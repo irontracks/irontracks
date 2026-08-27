@@ -1203,8 +1203,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 {view === 'dashboard' && !nutritionOpen && isCoach && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                                 {view === 'dashboard' && !nutritionOpen && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
 
-                                {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
+                                    painelSaude={appleHealthEnabled ? <HealthWidget data={healthData} /> : null}
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     hasActiveSession={Boolean(activeSession?.workout)}
                                     // Qual treino está rodando, para o card dele dizer
