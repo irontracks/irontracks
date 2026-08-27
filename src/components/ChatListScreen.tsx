@@ -270,11 +270,17 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-white text-sm truncate">{publicDisplayName(u.display_name)}</h4>
-                                    {/* Segunda linha carrega o FATO (presença), não uma instrução.
-                                        "Toque para conversar" era idêntico em todas as linhas: em
-                                        uma lista de 20 contatos, 20 repetições que não informam
-                                        nada e ocupam justamente onde caberia a prévia da conversa. */}
-                                    <p className="text-xs text-green-500/90 truncate">Online agora</p>
+                                    {/* Sem segunda linha AQUI, e é decisão.
+                                        Esta seção já se anuncia "● Online — N" no cabeçalho, com
+                                        fundo verde; cada linha ainda carregava ponto verde no
+                                        avatar E "Online agora" em texto verde. O mesmo fato cinco
+                                        vezes no mesmo bloco — a regra do DESIGN_HIERARCHY é que um
+                                        fato aparece uma vez.
+                                        Fica o PONTO no avatar: ele é o sinal de relance e sobrevive
+                                        ao cabeçalho sair da tela na rolagem. Sai o texto, que é a
+                                        frase do cabeçalho repetida. O espaço não foi preenchido com
+                                        outra coisa porque a prévia da última mensagem — o que
+                                        caberia ali — exige dados que esta tela não busca. */}
                                 </div>
                                 <MessageSquare size={16} className="text-yellow-500/70 flex-shrink-0" />
                             </button>
