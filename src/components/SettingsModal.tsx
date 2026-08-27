@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
@@ -121,16 +121,49 @@ export default function SettingsModal(props: SettingsModalProps) {
   }, [isOpen, base])
 
   const canSave = isOpen && !saving
-  const focusTrapRef = useFocusTrap(isOpen, props?.onClose)
-  useBackHandler(isOpen, () => props?.onClose?.())
+
+  /**
+   * Há alteração pendente? O modal edita um `draft` local e só persiste no
+   * botão Salvar — e as QUATRO saídas (Escape, gesto de voltar, a seta do
+   * cabeçalho e o "Fechar" do rodapé) chamavam `onClose` direto. Quem mexia em
+   * meta, unidade ou notificação saía achando que tinha salvado e descobria
+   * dias depois, pelo comportamento errado do app.
+   */
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(base),
+    [draft, base],
+  )
+
+  /**
+   * Saída única para as quatro portas.
+   *
+   * Polaridade: o `confirm` resolve `false` ao fechar por fora, então DESCARTAR
+   * é o `confirmText` e continuar editando é o caminho do `false`. Invertido,
+   * um toque fora do diálogo jogaria fora o que a pessoa acabou de configurar —
+   * a mesma regra do descartar-treino e do apagar-plano.
+   */
+  const tentarFechar = useCallback(async () => {
+    if (!dirty) { props?.onClose?.(); return }
+    const ok = await confirm(
+      'As alterações que você fez nesta tela não foram salvas.',
+      'Descartar alterações?',
+      { confirmText: 'Descartar', cancelText: 'Continuar editando', destructive: true },
+    )
+    if (ok) props?.onClose?.()
+  }, [dirty, confirm, props])
+  const focusTrapRef = useFocusTrap(isOpen, () => { void tentarFechar() })
+  useBackHandler(isOpen, () => { void tentarFechar() })
 
   // ── Keyboard ESC ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; e.preventDefault(); props?.onClose?.() }
+    // QUINTA saída — o `useFocusTrap` já trata Escape, e este listener o
+    // duplicava chamando `onClose` direto. Uma porta que escapa da porta única
+    // é uma porta que descarta em silêncio.
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; e.preventDefault(); void tentarFechar() }
     try { window.addEventListener('keydown', onKeyDown) } catch { }
     return () => { try { window.removeEventListener('keydown', onKeyDown) } catch { } }
-  }, [isOpen, props])
+  }, [isOpen, tentarFechar])
 
   // ── iOS notification permission check ───────────────────────────────────
   useEffect(() => {
@@ -274,7 +307,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div id="settings-modal-title" className="text-white font-black text-lg truncate">Configurações</div>
             </div>
           </div>
-          <button type="button" onClick={() => props?.onClose?.()} className="tap-44 w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
+          <button type="button" onClick={() => { void tentarFechar() }} className="tap-44 w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
             <ArrowLeft size={18} />
           </button>
         </div>
@@ -560,7 +593,7 @@ export default function SettingsModal(props: SettingsModalProps) {
         <div className="p-4 flex items-center justify-between gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
           <div className="text-[10px] text-neutral-400 font-mono">IronTracks</div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => props?.onClose?.()} className="px-4 py-3 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Fechar</button>
+            <button type="button" onClick={() => { void tentarFechar() }} className="px-4 py-3 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Fechar</button>
             <button type="button" disabled={!canSave} onClick={async () => { try { const ok = await props?.onSave?.(draft); if (ok === false) return; props?.onClose?.() } catch (e: unknown) { await alert('Falha ao salvar: ' + (getErrorMessage(e) ?? String(e))) } }} className={canSave ? 'px-4 py-3 rounded-xl font-black hover:shadow-yellow-500/30 inline-flex items-center gap-2 transition-all btn-gold-animated' : 'px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait inline-flex items-center gap-2'}>
               <Save size={16} />
               {saving ? 'Salvando...' : 'Salvar'}
