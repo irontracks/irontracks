@@ -74,6 +74,8 @@ export default function VipWeeklySummaryCard() {
   )
   const checkins = data?.checkins
   const energyScale = data?.scales?.energy ?? 5
+  /** Metade da escala — o mesmo corte binário que o card de Recordes usa. */
+  const energiaBoa = (data?.checkins?.energy ?? 0) >= energyScale / 2
 
   return (
     <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(234,179,8,0.08) 100%)' }}>
@@ -139,8 +141,11 @@ export default function VipWeeklySummaryCard() {
             {checkins?.energy != null && (
               <div className="rounded-xl p-3" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Activity size={14} className="text-green-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Energia</span>
+                  {/* Verde é a cor de SUCESSO neste app. Fixo, ele afirmava que a
+                      energia estava boa mesmo em 1.2 de 5. O card de Recordes,
+                      logo acima, já faz o certo: a cor acompanha o valor. */}
+                  <Activity size={14} className={energiaBoa ? 'text-green-400' : 'text-neutral-500'} />
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${energiaBoa ? 'text-green-600' : 'text-neutral-400'}`}>Energia</span>
                 </div>
                 <div className="text-xl font-black text-white">{Math.round(checkins.energy * 10) / 10}</div>
                 {/* A escala é 1–5 ('Ótimo/Normal/Cansado'), não 0–10 — sem o rótulo,
