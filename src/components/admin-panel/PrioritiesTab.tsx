@@ -93,12 +93,13 @@ function toPriorityItems(raw: UnknownRecord[]): PriorityItem[] {
 interface ItemCardProps {
     item: PriorityItem;
     isActioning: boolean;
+    erro?: string;
     onDone: () => void;
     onSnooze: () => void;
     onCompose: () => void;
 }
 
-const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, onDone, onSnooze, onCompose }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, erro, onDone, onSnooze, onCompose }) => {
     const cfg = KIND_CONFIG[item.kind] ?? {
         label: item.kind,
         Icon: AlertTriangle,
@@ -160,6 +161,9 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, onDone, onSnooze
                 </button>
                 {isActioning && (
                     <span className="text-xs text-neutral-400 animate-pulse">Salvando…</span>
+                )}
+                {erro && !isActioning && (
+                    <span className="text-xs text-red-400" role="status">Não salvou: {erro}</span>
                 )}
             </div>
         </div>
@@ -322,6 +326,14 @@ export const PrioritiesTab: React.FC = () => {
     } = useAdminPanel();
 
     const [actionLoading, setActionLoading] = useState('');
+    /**
+     * Erro da ação, por item. "Feito" e "Soneca" não conferiam `res.ok` nem
+     * tinham `catch`: o item sumia da lista na releitura seguinte e voltava no
+     * próximo carregamento, sem nada dito. O "Enviar mensagem", no MESMO
+     * arquivo, já tratava as duas coisas — o defeito era de dois handlers, não
+     * do padrão do arquivo.
+     */
+    const [actionError, setActionError] = useState<{ id: string; msg: string } | null>(null);
     const [sendingMsg, setSendingMsg] = useState(false);
     const [sendError, setSendError] = useState('');
 
@@ -341,15 +353,27 @@ export const PrioritiesTab: React.FC = () => {
     ) => {
         const itemId = `${studentUserId}:${kind}`;
         setActionLoading(itemId);
+        setActionError(null);
         try {
             const headers = await getAdminAuthHeaders();
-            await fetch('/api/teacher/inbox/action', {
+            const res = await fetch('/api/teacher/inbox/action', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json', ...headers },
                 body: JSON.stringify({ student_user_id: studentUserId, kind, action, snooze_minutes: snoozeMinutes }),
             });
+            // `fetch` só rejeita em falha de REDE: 4xx e 5xx resolvem normalmente.
+            // Sem esta conferência, um 403 do professor sem permissão passava por
+            // sucesso e o item voltava depois, sem explicação.
+            if (!res.ok) {
+                const corpo: unknown = await res.json().catch(() => null);
+                const detalhe = corpo && typeof corpo === 'object' ? (corpo as Record<string, unknown>).error : null;
+                setActionError({ id: itemId, msg: String(detalhe || `Erro ${res.status}`) });
+                return;
+            }
             await fetchPriorities();
+        } catch (e) {
+            setActionError({ id: itemId, msg: e instanceof Error ? e.message : 'Falha de conexão' });
         } finally {
             setActionLoading('');
         }
@@ -494,6 +518,7 @@ export const PrioritiesTab: React.FC = () => {
                                 key={item.id}
                                 item={item}
                                 isActioning={actionLoading === item.id}
+                                erro={actionError?.id === item.id ? actionError.msg : undefined}
                                 onDone={() => void handleAction(item.student_user_id, item.kind, 'done')}
                                 onSnooze={() => void handleAction(item.student_user_id, item.kind, 'snooze', prioritiesSettings.snoozeDefaultMinutes)}
                                 onCompose={() => openCompose(item)}
