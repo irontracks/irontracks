@@ -25,6 +25,11 @@ import { describe, it, expect } from 'vitest'
 const VERBOS_DESTRUTIVOS = /\b(apagar|apagad|excluir|exclu[íi]d|deletar|deletad|remover|removid|limpar|descartar|descartad)/i
 
 /** Fonte dos arquivos, sem comentários e sem os próprios testes. */
+/** Todo .ts/.tsx do projeto, fora dos testes. */
+const arquivosDoProjeto = () =>
+    execSync("grep -rl 'window\\.\\(confirm\\|alert\\)' src --include=*.ts --include=*.tsx | grep -v __tests__ || true", { encoding: 'utf8' })
+        .trim().split('\n').filter(Boolean)
+
 const arquivos = execSync(
     "grep -rl 'await confirm(' src --include=*.ts --include=*.tsx | grep -v __tests__ || true",
     { encoding: 'utf8' },
@@ -122,6 +127,58 @@ describe('confirm que apaga se declara destrutivo', () => {
             const codigo = semComentarios(readFileSync(e.arquivo, 'utf8'))
             expect(codigo, `${e.arquivo} não contém mais "${e.trecho}"`).toContain(e.trecho)
         }
+    })
+})
+
+/**
+ * `window.confirm` escapava do guard acima — ele varre `await confirm(`, e o do
+ * navegador é SÍNCRONO. Sobraram três depois da primeira varredura: revogar VIP
+ * (acesso pago), apagar exame laboratorial e fechar o upload no meio do
+ * processamento.
+ *
+ * Além de não ter como marcar destrutivo, o diálogo do sistema aparece com a
+ * cara do navegador por cima de um app que tem o próprio — e no WKWebView ele
+ * BLOQUEIA a thread. "Onde o guard NÃO olha?" é a pergunta que faltou.
+ */
+describe('o diálogo é o do app, nunca o do sistema', () => {
+    it('nenhum window.confirm sobrou no código executável', () => {
+        const infratores: string[] = []
+        for (const arquivo of arquivosDoProjeto()) {
+            const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+            if (/\bwindow\.confirm\s*\(/.test(codigo)) infratores.push(arquivo)
+        }
+        expect(
+            infratores,
+            'use o `confirm` do DialogContext: o do sistema não aceita `destructive`, ' +
+                'ignora o visual do app e bloqueia a thread no WKWebView:\n' + infratores.join('\n'),
+        ).toEqual([])
+    })
+
+    /**
+     * `window.alert` é RATCHET, não zero: são telas de pagamento e de
+     * comunidade, e trocá-las exige garantir `DialogProvider` em cada árvore —
+     * escopo próprio, não um efeito colateral desta varredura.
+     *
+     * A lista só ENCOLHE. Arquivo novo reprova, e arquivo que já saiu da lista
+     * também reprova até ser removido daqui — sem isso a allowlist vira papel
+     * de parede e o débito fica congelado com cara de resolvido.
+     */
+    const ALERT_PENDENTE = [
+        'src/app/(app)/community/CommunityClient.tsx',            // fallback quando o toast falha
+        'src/app/marketplace/MarketplaceClient.tsx',              // confirmações de compra/restauro
+        'src/components/assessment/AssessmentButton.tsx',         // 6 erros de import de JSON
+        'src/components/workout/PartnerExerciseOverlay.tsx',      // adapta `alert` para o hook de CRUD
+    ]
+
+    it('window.alert só encolhe', () => {
+        const comAlert = arquivosDoProjeto().filter((arquivo) =>
+            /\bwindow\.alert\s*\(/.test(semComentarios(readFileSync(arquivo, 'utf8'))),
+        )
+        const novos = comAlert.filter((f) => !ALERT_PENDENTE.includes(f))
+        expect(novos, 'arquivo NOVO com window.alert — use o diálogo do app').toEqual([])
+
+        const jaResolvidos = ALERT_PENDENTE.filter((f) => !comAlert.includes(f))
+        expect(jaResolvidos, 'já não usa window.alert — tire da lista').toEqual([])
     })
 })
 

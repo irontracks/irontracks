@@ -100,7 +100,7 @@ export default function OnboardingPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Seu nome"
-                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
               />
             </div>
           </div>
@@ -116,7 +116,7 @@ export default function OnboardingPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-11 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-11 py-3 text-sm text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
               />
               <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-300">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -135,7 +135,7 @@ export default function OnboardingPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="Repita a senha"
-                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
               />
             </div>
           </div>

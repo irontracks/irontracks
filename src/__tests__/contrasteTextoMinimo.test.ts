@@ -42,6 +42,12 @@ const ROOT = join(__dirname, '..')
  * Cada entrada precisa de razão escrita. **A lista só encolhe.**
  */
 const EXCECOES: Record<string, string> = {
+  'components/workout/set-renderers/normalSet.tsx':
+    'placeholder é a SUGESTÃO do plano/motor de carga, não um exemplo: clarear faz ' +
+    'passar por valor já digitado, no campo do peso. Guard próprio: valorVsSugestao.',
+  'components/settings/SettingsSections.tsx':
+    'o "Ex.: Smart Fit" do nome da academia — exemplo que, mais claro, é lido como ' +
+    'resposta já preenchida. Guard próprio: gymGeofenceName.',
   'components/workout/Modals.tsx': 'botão desabilitado — WCAG 1.4.3 isenta controle inativo',
   'components/workout/WorkoutHeader.tsx': 'estado cursor-not-allowed',
   'components/ProgressPhotos.tsx': 'ícone decorativo de estado vazio',
@@ -72,7 +78,29 @@ const EXCECOES: Record<string, string> = {
  * estado transitório que nem existe no celular, e `placeholder:` é texto de
  * dica, que merece frente própria (9 ocorrências, ver o ratchet abaixo).
  */
-const PROIBIDAS = /(?<![:\w-])text-neutral-(500|600|700|800)\b/
+/**
+ * O lookbehind `(?<![:\w-])` existe para deixar passar VARIANTE de estado —
+ * `hover:`, `focus:` —, que é transitória e no celular nem acontece. Só que ele
+ * deixava passar `placeholder:` junto, e placeholder NÃO é estado: é o texto
+ * que fica na tela até a pessoa digitar, dizendo o que ela deve digitar.
+ *
+ * Eram 9 campos com `placeholder:text-neutral-600`, medido a **2,53:1** sobre a
+ * base e **2,23:1** sobre o depth-3 — menos da metade do mínimo do AA. Entre
+ * eles o e-mail e a senha do login, e os campos do onboarding.
+ *
+ * ⚠️ DOIS campos ficam de fora, e não por descuido: onde o placeholder não é
+ * DICA e sim SUGESTÃO — um valor que o app propõe e a pessoa pode aceitar sem
+ * digitar —, clarear faz ele passar por conteúdo já preenchido. Nos campos de
+ * série (`normalSet`) isso significaria registrar a carga sugerida pelo motor
+ * como se fosse a levantada; no nome da academia, um exemplo virando resposta.
+ * Os dois foram escurecidos DE PROPÓSITO em ago/2026, com guard próprio
+ * (`valorVsSugestao`, `gymGeofenceName`) — que foi quem pegou a tentativa de
+ * clarear os dois junto com os outros sete.
+ *
+ * A régua, então, é o PAPEL do placeholder, não o seletor: exemplo se lê,
+ * sugestão se distingue.
+ */
+const PROIBIDAS = /(?<![:\w-])text-neutral-(500|600|700|800)\b|placeholder:text-neutral-(500|600|700|800)\b/
 
 /**
  * Branco com opacidade — a MESMA falha, escrita com outra sintaxe.

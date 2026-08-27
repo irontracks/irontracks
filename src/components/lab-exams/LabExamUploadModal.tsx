@@ -10,6 +10,7 @@ import { VipUpsellCard } from '@/components/vip/VipUpsellCard'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useDialog } from '@/contexts/DialogContext'
 
 type Stage = 'select' | 'processing' | 'result' | 'error' | 'upsell'
 
@@ -28,6 +29,7 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; erro
 }
 
 export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Props) {
+  const { confirm } = useDialog()
   /* `aria-modal` sem confinar o Tab seria promessa falsa — os dois andam juntos. */
   const dlgRef = useFocusTrap(open, onClose)
 
@@ -45,13 +47,20 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
     setProgress(''); setProtocol(null); setErrorMsg('')
   }, [])
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (stage === 'processing') {
-      // Não bloqueia o fechamento — pede confirmação pra não prender o usuário
-      if (typeof window !== 'undefined' && !window.confirm('O processamento ainda está em andamento. Fechar mesmo assim?')) return
+      // Não bloqueia o fechamento — pede confirmação pra não prender o usuário.
+      // O diálogo é do APP: o `window.confirm` do sistema aparecia por cima do
+      // modal com a cara do navegador, e sem o vocabulário visual do IronTracks.
+      const ok = await confirm(
+        'A leitura do exame ainda está rodando. Fechar agora descarta o que já foi processado.',
+        'Fechar mesmo assim?',
+        { confirmText: 'Fechar', cancelText: 'Continuar aguardando', destructive: true },
+      )
+      if (!ok) return
     }
     reset(); onClose()
-  }, [stage, reset, onClose])
+  }, [stage, reset, onClose, confirm])
 
   useBackHandler(open, handleClose)
 

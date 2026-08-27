@@ -67,7 +67,26 @@ interface AssessmentHistoryProps {
   onClose?: () => void;
 }
 
-export default function AssessmentHistory({ studentId: propStudentId, selfView = false, onClose }: AssessmentHistoryProps) {
+/**
+ * O `DialogProvider` envolve a tela INTEIRA, não só o caminho feliz.
+ *
+ * Ele ficava no `return` final, e os branches de carregando/erro/vazio saíam
+ * sem provider. `LabExamsSection` renderiza também no estado VAZIO e passou a
+ * usar `useDialog` para apagar exame — e `useDialog` LANÇA sem provider, o que
+ * derrubaria a rota web `/assessments/[studentId]` justamente para quem ainda
+ * não tem avaliação nenhuma. No dashboard não aparecia: lá já existe um
+ * provider acima.
+ */
+export default function AssessmentHistory(props: AssessmentHistoryProps) {
+  return (
+    <DialogProvider>
+      <GlobalDialog />
+      <AssessmentHistoryInner {...props} />
+    </DialogProvider>
+  );
+}
+
+function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
@@ -207,8 +226,7 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
   }
 
   return (
-    <DialogProvider>
-      <GlobalDialog />
+    <>
       <div className="p-4 text-white">
         <AssessmentHeader
           onCreate={() => setShowForm(true)}
@@ -499,6 +517,6 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
         />
         {photoHistoryOpen ? <BodyPhotoHistoryModal onClose={() => setPhotoHistoryOpen(false)} /> : null}
       </div>
-    </DialogProvider>
+    </>
   );
 }

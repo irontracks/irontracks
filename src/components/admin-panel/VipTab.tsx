@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { plainFieldProps } from '@/utils/ui/textFieldProps'
+import { useDialog } from '@/contexts/DialogContext'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 // ─── Types ────────────────────────────────────────────────────────
 type VipItem = {
@@ -193,6 +195,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
 
 // ─── Main Component ───────────────────────────────────────────────
 export const VipTab: React.FC = () => {
+    const { confirm, alert } = useDialog()
     const [items, setItems] = useState<VipItem[]>([])
     const [loading, setLoading] = useState(true)
     const [query, setQuery] = useState('')
@@ -251,13 +254,27 @@ export const VipTab: React.FC = () => {
     }
 
     // ─── Revoke VIP ──────────────────────────────────────────────
+    /**
+     * Revogar VIP tirava acesso PAGO com o `window.confirm` do sistema — sem
+     * marca de destrutivo e sem dizer o que acontece —, e a falha era engolida
+     * por um catch vazio e silencioso: quando a rota recusava, a lista voltava
+     * igual e o admin achava que tinha revogado.
+     */
     const handleRevoke = async (item: VipItem) => {
-        if (!window.confirm(`Revogar VIP de ${item.name || item.email}?`)) return
+        const quem = item.name || item.email
+        const ok = await confirm(
+            `${quem} perde o acesso VIP agora.`,
+            'Revogar o VIP?',
+            { confirmText: 'Revogar', cancelText: 'Manter', destructive: true },
+        )
+        if (!ok) return
         setRevoking(item.id)
         try {
             await apiAdmin.revokeVip(item.id)
             await fetchList()
-        } catch { /* silent */ }
+        } catch (e) {
+            await alert(getErrorMessage(e) || 'Não consegui revogar o VIP.', 'Falhou', 'error')
+        }
         finally { setRevoking(null) }
     }
 
