@@ -2033,6 +2033,15 @@ build 77 no TestFlight** (leva a ordem das Live Activities; ver a seção da LA)
 O bump é `sed` nas 10 ocorrências do `pbxproj`, e o release refaz com
 `npm run ios:release <build>` para não pular número.
 
+⚠️ **`ios-submit.mjs` roda em LIVE SUBMIT por padrão, e flag desconhecida
+ABORTA desde 27/08/2026.** O parser tinha `else if (!releaseNotes) releaseNotes = a`
+como último caso: qualquer argumento não reconhecido virava as **"Novidades
+desta versão"**. Um `--status` (flag que não existe ali) foi gravado como
+release notes da 1.21.1 e ficou visível no App Store Connect — teria ido a
+review assim se alguém submetesse sem olhar o campo. Nada foi submetido e o
+texto foi limpo no mesmo dia. **Para só CONSULTAR o estado, use `--dry-run`**,
+que lista builds e versão sem tocar em nada.
+
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
 ## Badge do ícone (o "32" no app) — duas metades, e nenhuma marca como lido
