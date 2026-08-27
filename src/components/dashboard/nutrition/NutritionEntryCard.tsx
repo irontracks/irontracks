@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
 import { MACRO_COLORS, MACRO_SEGMENT_GAP_PX, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { horaBrt } from '@/lib/nutrition/dayMeals'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -53,15 +54,18 @@ type NutritionEntryCardProps = {
   onStory?: (item: MealEntry) => void
 }
 
-function formatClock(iso: string) {
-  try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return ''
-  }
-}
+/**
+ * A hora da refeição é BRT, como no resto da aba.
+ *
+ * Era `toLocaleTimeString` SEM `timeZone`, ou seja, o fuso do DISPOSITIVO —
+ * enquanto o histórico de refeições e o relatório do período já usam
+ * `America/Sao_Paulo` explícito (`horaBrt`). A mesma refeição saía com horas
+ * diferentes em duas superfícies da mesma aba, e no SSR (que roda em UTC) o
+ * café da manhã aparecia às 11h.
+ *
+ * Não reimplementa: usa a fonte única que já existe.
+ */
+const formatClock = horaBrt
 
 function NutritionEntryCard({
   item,
