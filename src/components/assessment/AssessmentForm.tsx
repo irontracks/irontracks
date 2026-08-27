@@ -417,9 +417,13 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
           Nova Avaliação Física
         </h1>
-        <p className="text-sm text-neutral-400">
-          Aluno: <span className="font-semibold text-white">{studentName}</span>
-        </p>
+        {/* Sem nome, a linha SOME. "Aluno: " sozinho, ou com um placeholder,
+            afirma menos que o silêncio e ocupa o mesmo espaço. */}
+        {studentName ? (
+          <p className="text-sm text-neutral-400">
+            Aluno: <span className="font-semibold text-white">{studentName}</span>
+          </p>
+        ) : null}
       </div>
 
       <div className="mb-4 sm:mb-6">
@@ -474,12 +478,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               transition={{ duration: 0.2 }}
             >
               {currentStepData.id === 'photos' ? (
-                <PhotoUploadStep
-                  formData={formData}
-                  onUpdate={updateFormData}
-                  onNext={handleNext}
-                  onBack={handlePrevious}
-                />
+                <PhotoUploadStep />
               ) : currentStepData.id === 'results' ? (
                 <ResultsPreview
                   formData={formData}

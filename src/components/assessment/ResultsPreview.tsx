@@ -173,6 +173,21 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
     }
   };
 
+  /**
+   * A data da AVALIAÇÃO, não a do relógio. A tela se chama "confira os
+   * resultados antes de salvar" e mostrava `new Date()` — o único campo que
+   * ela existe para conferir, errado. E `assessment_date` é editável no
+   * primeiro passo.
+   *
+   * Montada com `new Date(y, m-1, d)`: `new Date('2026-08-24')` é interpretado
+   * como UTC e, em São Paulo, volta para o dia 23.
+   */
+  const dataDaAvaliacao = (() => {
+    const bruto = String(formData.assessment_date || '').trim()
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(bruto)
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date()
+  })()
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -195,11 +210,11 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Nome</p>
-            <p className="font-semibold text-white text-sm mt-0.5 truncate">{studentName}</p>
+            <p className="font-semibold text-white text-sm mt-0.5 truncate">{studentName || '—'}</p>
           </div>
           <div>
             <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Data</p>
-            <p className="font-semibold text-white text-sm mt-0.5">{formatDate(new Date())}</p>
+            <p className="font-semibold text-white text-sm mt-0.5">{formatDate(dataDaAvaliacao)}</p>
           </div>
           <div>
             <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Idade</p>
