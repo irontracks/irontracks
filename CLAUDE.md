@@ -1307,7 +1307,15 @@ de aspas, o arquivo não mudou, e o resultado "14 passed" parecia prova.
 
 **Automação do simulador — o que custou toque errado:** as coordenadas são
 PONTOS (440×956 no 17 Pro Max), não pixels do screenshot; um toque convertido de
-px caiu no botão "Duplicar" e criou exercício fantasma no rascunho. O backspace
+px caiu no botão "Duplicar" e criou exercício fantasma no rascunho.
+**O screenshot vem em ~920×1963 px, então o fator é ÷2,09** — ler a coordenada
+na imagem e enviá-la crua é o erro natural, e ele é SILENCIOSO: um `x` acima de
+440 está fora da tela e mesmo assim a ferramenta responde `Tapped at (460, 706)`
+com sucesso. Em 27/08/2026 isso consumiu uma investigação inteira ("o WebView
+parou de aceitar toque"), com o app, a janela do Simulator e o device
+interrogados e inocentados nessa ordem, **com esta regra já escrita aqui**.
+Diagnóstico em 5 segundos: toque aceito e tela idêntica ⇒ confira se `x < 440`
+antes de suspeitar de qualquer outra coisa. O backspace
 (`\b`) NÃO chega ao campo: para limpar, long-press no texto → o iOS seleciona →
 digitar substitui. E a autocorreção do iOS renomeia o que você digita ("Drop
 teste" virou "Frio teste", "Bi A" virou "Vi A") — nomes de teste devem ser

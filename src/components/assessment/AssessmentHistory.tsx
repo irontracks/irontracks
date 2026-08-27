@@ -154,7 +154,11 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
       <div className="p-4">
         <AssessmentHeader
           onCreate={() => studentId && router.push(`/assessments/new/${studentId}`)}
-          onClose={undefined}
+          // Passava `undefined` explícito, o que jogava fora o `onClose` do pai
+          // e fazia o botão cair no `history.back()` do navegador — na aba do
+          // dashboard, que é ESTADO e não rota, o destino era o que estivesse
+          // empilhado, não a tela de onde o usuário veio.
+          onClose={onClose}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
           onPhotoHistory={() => setPhotoHistoryOpen(true)}

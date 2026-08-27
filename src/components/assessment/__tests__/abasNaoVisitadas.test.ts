@@ -23,9 +23,26 @@ import { join } from 'node:path'
 const SRC = join(__dirname, '..', '..')
 const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
 
+/**
+ * O fatiador mirava em `{!onClose ? (…) : null}` — a expressão do PRÓPRIO bug
+ * corrigido em 27/08/2026 (`onClose` era recebido e nunca chamado; fornecê-lo
+ * apagava o botão). Ao consertar, o alvo sumiu e o guard ficaria cego; o caso
+ * `o guard encontrou o botão` é o que impediu isso e apontou o reparo.
+ * Agora ele fatia pelo `aria-label`, que é o que o botão É — não pela condição
+ * que por acaso o envolvia.
+ */
+const fatiarBotao = (src: string, rotulo: string) => {
+  const alvo = src.indexOf(`aria-label="${rotulo}"`)
+  if (alvo === -1) return ''
+  const abre = src.lastIndexOf('<button', alvo)
+  const fecha = src.indexOf('</button>', alvo)
+  if (abre === -1 || fecha === -1) return ''
+  return src.slice(abre, fecha + '</button>'.length)
+}
+
 describe('botão de voltar das Avaliações', () => {
   const src = read('assessment/AssessmentHeader.tsx')
-  const botao = /\{!onClose \? \(([\s\S]*?)\) : null\}/.exec(src)?.[1] ?? ''
+  const botao = fatiarBotao(src, 'Voltar')
 
   it('o guard encontrou o botão', () => {
     expect(botao).not.toBe('')
@@ -36,9 +53,18 @@ describe('botão de voltar das Avaliações', () => {
   })
 
   it('o rótulo nomeia a ação real, não outra', () => {
-    // Executa history.back(): é VOLTAR. "Fechar" prometia coisa diferente.
+    // Volta: chama o `onClose` do pai quando existe, e cai no histórico do
+    // navegador quando não existe. "Fechar" prometia coisa diferente.
     expect(botao).toMatch(/history\.back\(\)/)
+    expect(botao).toMatch(/onClose\(\)/)
     expect(botao).not.toMatch(/title="Fechar"/)
+  })
+
+  it('o ícone concorda com o rótulo', () => {
+    // X é o desenho de fechar/descartar. Num botão que diz "Voltar", quem
+    // enxerga lê uma coisa e quem usa VoiceOver ouve outra.
+    expect(botao).toMatch(/<ArrowLeft\b/)
+    expect(botao).not.toMatch(/<X\b/)
   })
 
   it('não fica no meio da pilha de botões', () => {
