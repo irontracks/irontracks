@@ -194,7 +194,7 @@ export const StudentVideosTab: React.FC = () => {
                                             setExecutionVideoFeedbackDraft((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), [id]: v }));
                                         }}
                                         rows={3}
-                                        className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                        className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
                                         placeholder="Escreva seu feedback..."
                                     />
                                 </div>

@@ -10,6 +10,7 @@ import { LabExamProtocolView } from './LabExamProtocolView'
 import { LabExamMarkersView } from './LabExamMarkersView'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useDialog } from '@/contexts/DialogContext'
 
 /**
  * Seção de Exames Laboratoriais — botão de adicionar, lista de exames e os
@@ -19,6 +20,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
  * studentUserId: null/undefined = autoavaliação; preenchido = fluxo personal.
  */
 export function LabExamsSection({ studentUserId }: { studentUserId?: string | null }) {
+  const { confirm } = useDialog()
   const { exams, loading, error, reload, removeExam } = useLabExams(studentUserId)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [viewing, setViewing] = useState<LabExam | null>(null)
@@ -54,7 +56,12 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
   }
 
   const handleDelete = async (id: string) => {
-    if (typeof window !== 'undefined' && !window.confirm('Apagar este exame e seu protocolo?')) return
+    const ok = await confirm(
+      'O exame e o protocolo gerado a partir dele somem de vez. Isso não pode ser desfeito.',
+      'Apagar este exame?',
+      { confirmText: 'Apagar', cancelText: 'Manter', destructive: true },
+    )
+    if (!ok) return
     await removeExam(id)
   }
 

@@ -637,7 +637,7 @@ const LoginScreen = () => {
                                         placeholder="seu@email.com"
                                         value={emailData.email}
                                         onChange={(e) => setEmailData(prev => ({ ...prev, email: e.target.value }))}
-                                        className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                        className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
                                     />
                                 </div>
                                 <button
@@ -663,7 +663,7 @@ const LoginScreen = () => {
                                     maxLength={6}
                                     value={firstAccessCode}
                                     onChange={(e) => setFirstAccessCode(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.4em] text-white placeholder:text-neutral-700 focus:border-yellow-500 focus:outline-none"
+                                    className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.4em] text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none"
                                 />
                                 <button
                                     type="button"

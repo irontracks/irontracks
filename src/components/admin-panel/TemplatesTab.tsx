@@ -57,7 +57,7 @@ export const TemplatesTab: React.FC = () => {
                         placeholder="Buscar templates..."
                         value={templateQuery}
                         onChange={(e) => setTemplateQuery(e.target.value)}
-                        className="w-full rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none transition-colors"
+                        className="w-full rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none transition-colors"
                         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                     />
                 </div>
