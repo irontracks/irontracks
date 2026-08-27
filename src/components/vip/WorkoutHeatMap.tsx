@@ -45,6 +45,18 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(period)
 
+  /**
+   * A janela e o divisor da frequência saem da MESMA constante.
+   *
+   * Antes eram dois números soltos e incompatíveis: a janela do mês pegava 30
+   * dias e dividia por 4 semanas (são 4,29 — 7% a mais na frequência), e a do
+   * ano pegava 365 e dividia por 52. Trocar de "mês" para "ano" mudava a
+   * frequência exibida sobre a MESMA base de dados, e o usuário não tinha como
+   * entender por quê.
+   */
+  const diasDaJanela = selectedPeriod === 'year' ? 365 : 30
+  const semanasDaJanela = diasDaJanela / 7
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -66,9 +78,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
       }
 
       const now = Date.now()
-      const cutoff = selectedPeriod === 'year'
-        ? now - 365 * 24 * 60 * 60 * 1000
-        : now - 30 * 24 * 60 * 60 * 1000
+      const cutoff = now - diasDaJanela * 24 * 60 * 60 * 1000
 
       const raw: Record<string, unknown>[] = Array.isArray(checkinRes.value.checkins) ? checkinRes.value.checkins : []
       const filtered = raw
@@ -93,7 +103,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
 
     load()
     return () => { cancelled = true }
-  }, [userId, selectedPeriod])
+  }, [userId, selectedPeriod, diasDaJanela])
 
   const emptyReason: EmptyReason = loadError ? 'error' : gymCount === 0 ? 'no-gym' : 'no-checkin'
 
@@ -201,9 +211,7 @@ export default function WorkoutHeatMap({ userId, period = 'month' }: WorkoutHeat
             <div className="rounded-xl p-2 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <p className="text-xs text-white/55">Frequência</p>
               <p className="text-lg font-bold text-white">
-                {selectedPeriod === 'month'
-                  ? `${(totalCheckins / 4).toFixed(1)}`
-                  : `${(totalCheckins / 52).toFixed(1)}`}
+                {(totalCheckins / semanasDaJanela).toFixed(1)}
                 <span className="text-xs text-white/55 ml-0.5">/sem</span>
               </p>
             </div>
