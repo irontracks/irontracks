@@ -94,7 +94,11 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [vipStatus, setVipStatus] = useState<VipStatus | null>(null)
-  const { credits } = useVipCredits()
+  // `refresh` existia no hook e ninguém o pegava. `bumpChatUsage` atualiza
+  // `vipStatus.usage`, mas o chip da tela lê `credits` — duas fontes, e o bump
+  // mexia justamente na que não é exibida. Com `staleTime: 30s`, o contador
+  // ficava parado enquanto o crédito era consumido.
+  const { credits, refresh: refreshCredits } = useVipCredits()
   const { confirm } = useDialog()
   const router = useRouter()
   const chatRef = useRef<HTMLDivElement | null>(null)
@@ -243,6 +247,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       }
 
       const bumpChatUsage = () => {
+        // O chip da tela lê `credits`; sem isto ele não se move ao gastar.
+        refreshCredits()
         if (!vipStatus) return
         setVipStatus(prev => {
           if (!prev) return null
@@ -583,10 +589,20 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             )}
             <button
               type="button"
-              onClick={() => setMessages([])}
+              onClick={async () => {
+                // A limpeza é só da TELA: não existe rota que apague a thread,
+                // e o efeito do histórico recarrega tudo na próxima montagem.
+                // O rótulo dizia "Limpar conversa" e a conversa voltava.
+                const ok = await confirm(
+                  'As mensagens somem desta tela. O histórico salvo não é apagado — ele volta ao reabrir.',
+                  'Limpar a tela?',
+                  { confirmText: 'Limpar', cancelText: 'Manter' },
+                )
+                if (ok) setMessages([])
+              }}
               className="tap-44 w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-red-400 transition-all active:scale-95"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-              aria-label="Limpar conversa"
+              aria-label="Limpar a tela do chat"
             >
               <Trash2 size={14} />
             </button>
