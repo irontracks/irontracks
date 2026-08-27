@@ -641,7 +641,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             <div className="w-full">
                 {systemNotifications.length > 0 && (
                     <div className="flex justify-end mb-2 px-1">
-                        <button onClick={handleClearAll} disabled={clearing} className="text-[10px] text-neutral-400 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1 disabled:opacity-60">
+                        <button onClick={handleClearAll} disabled={clearing} className="tap-44 text-[10px] text-neutral-400 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1 disabled:opacity-60">
                             <Trash2 size={10} /> Limpar tudo
                         </button>
                     </div>
