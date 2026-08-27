@@ -161,7 +161,7 @@ export default function StoryViewer({
   const pausedRef = useRef(false)
   pausedRef.current = isPaused
 
-  const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
+  const name = group.authorId === myId ? 'Você' : publicDisplayName(group.displayName, 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
   const storyId = story?.id
   const storyViewed = Boolean(story?.viewed)
