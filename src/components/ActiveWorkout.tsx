@@ -125,7 +125,11 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
       const descartar = await confirmDialog(
         `Você abriu este treino ${staleSessionAgeLabel(staleRestoreAgeMs)} e nada foi registrado desde então. O tempo parado não entra na conta. Quer continuar de onde parou?`,
         'Treino ficou aberto',
-        { confirmText: 'Descartar treino', cancelText: 'Continuar de onde parei', destructive: true },
+        // "Continuar de onde parei" ocupava 196 dos 198px do botão — o texto
+        // encostava nas duas bordas. O enunciado logo acima já pergunta "Quer
+        // continuar de onde parou?", então o rótulo não precisa repetir a frase
+        // inteira: ele responde a pergunta.
+        { confirmText: 'Descartar treino', cancelText: 'Continuar', destructive: true },
       );
       if (cancelled || !descartar) return;
       cancelWorkoutRef.current?.();

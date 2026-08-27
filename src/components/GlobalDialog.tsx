@@ -162,11 +162,20 @@ const GlobalDialog = () => {
 
 				{/* Action buttons */}
 				{dialog.type !== 'loading' && (
-					<div className="p-4 flex gap-3">
+					// Medido no iPhone 17 Pro Max: o botão tem 198px de caixa e
+					// "Continuar de onde parei" ocupava 196px — cabia em UMA linha com
+					// 2px de folga no total, 1px de cada lado. Não estava cortado;
+					// estava sem respiro nenhum, e é assim que se lê na tela.
+					//
+					// `min-w-0` + `items-stretch` protegem o caso em que um rótulo
+					// futuro quebre em duas linhas: sem eles, o que quebra cresce
+					// sozinho e a dupla desalinha. O padding ficou em `px-2` porque
+					// `px-3` forçaria a quebra justamente nos rótulos que hoje cabem.
+					<div className="p-4 flex gap-3 items-stretch">
 						{(dialog.type === 'confirm' || dialog.type === 'prompt') && (
 							<button
 								onClick={dialog.onCancel}
-								className="flex-1 py-3.5 rounded-xl font-black transition-all duration-200 text-sm active:scale-95 text-neutral-300 hover:text-white"
+								className="flex-1 min-w-0 px-2 py-3.5 rounded-xl font-black transition-all duration-200 text-sm leading-tight active:scale-95 text-neutral-300 hover:text-white"
 								style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
 							>
 								{dialog.cancelText || 'Cancelar'}
@@ -174,7 +183,7 @@ const GlobalDialog = () => {
 						)}
 						<button
 							onClick={handleConfirm}
-							className={`flex-1 py-3.5 rounded-xl font-black transition-all duration-200 text-sm active:scale-95 ${iconConfig.confirmCls}`}
+							className={`flex-1 min-w-0 px-2 py-3.5 rounded-xl font-black transition-all duration-200 text-sm leading-tight active:scale-95 ${iconConfig.confirmCls}`}
 						>
 							{dialog.type === 'confirm' ? (dialog.confirmText || 'Confirmar') : (dialog.confirmText || 'OK')}
 						</button>
