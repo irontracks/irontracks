@@ -62,7 +62,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal(props: SettingsModalProps) {
-  const { alert, confirm } = useDialog()
+  const { alert, confirm, prompt } = useDialog()
   const iosNative = useIsIosNative()
   const isOpen = !!props?.isOpen
   const saving = !!props?.saving
@@ -566,7 +566,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               </button>
             </div>
             <div className="mt-3">
-              <button type="button" disabled={deletingAccount} onClick={async () => { const typed = typeof window !== 'undefined' ? window.prompt('Digite EXCLUIR para confirmar a exclusão da conta:') : null; if (String(typed || '').trim().toUpperCase() !== 'EXCLUIR') return; setDeletingAccount(true); try { const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'EXCLUIR' }) }); const data = await res.json().catch((): null => null); if (!data || !data.ok) { await alert('Falha ao excluir conta: ' + (data?.error || '')); return } try { let supa; try { supa = createClient() } catch { supa = null } if (supa) await supa.auth.signOut({ scope: 'global' }) } catch { } try { window.location.href = '/auth/signin' } catch { } } catch (e: unknown) { await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e))) } finally { setDeletingAccount(false) } }} className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="button" disabled={deletingAccount} onClick={async () => { const typed = await prompt('Isso apaga sua conta e todos os seus dados. Não tem volta.\n\nDigite EXCLUIR para confirmar.', 'Excluir conta'); if (String(typed || '').trim().toUpperCase() !== 'EXCLUIR') return; setDeletingAccount(true); try { const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'EXCLUIR' }) }); const data = await res.json().catch((): null => null); if (!data || !data.ok) { await alert('Falha ao excluir conta: ' + (data?.error || '')); return } try { let supa; try { supa = createClient() } catch { supa = null } if (supa) await supa.auth.signOut({ scope: 'global' }) } catch { } try { window.location.href = '/auth/signin' } catch { } } catch (e: unknown) { await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e))) } finally { setDeletingAccount(false) } }} className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2 disabled:opacity-60">
                 <ShieldAlert size={16} className="text-red-300" /> Excluir minha conta
               </button>
               <div className="mt-2 text-[11px] text-neutral-400">Remove seus dados do app e encerra acesso. Ação irreversível.</div>

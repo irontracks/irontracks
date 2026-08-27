@@ -27,7 +27,7 @@ const VERBOS_DESTRUTIVOS = /\b(apagar|apagad|excluir|exclu[íi]d|deletar|deletad
 /** Fonte dos arquivos, sem comentários e sem os próprios testes. */
 /** Todo .ts/.tsx do projeto, fora dos testes. */
 const arquivosDoProjeto = () =>
-    execSync("grep -rl 'window\\.\\(confirm\\|alert\\)' src --include=*.ts --include=*.tsx | grep -v __tests__ || true", { encoding: 'utf8' })
+    execSync("grep -rl 'window\\.\\(confirm\\|alert\\|prompt\\)' src --include=*.ts --include=*.tsx | grep -v __tests__ || true", { encoding: 'utf8' })
         .trim().split('\n').filter(Boolean)
 
 const arquivos = execSync(
@@ -169,6 +169,32 @@ describe('o diálogo é o do app, nunca o do sistema', () => {
         'src/components/assessment/AssessmentButton.tsx',         // 6 erros de import de JSON
         'src/components/workout/PartnerExerciseOverlay.tsx',      // adapta `alert` para o hook de CRUD
     ]
+
+    /**
+     * `window.prompt` escapava junto com o alert — e o pior caso era a EXCLUSÃO
+     * DE CONTA, que pedia "digite EXCLUIR" pelo diálogo do sistema. Sem
+     * identidade do app, sem safe-area no iPhone, e bloqueando a thread no
+     * WKWebView, num fluxo irreversível e regido por LGPD.
+     *
+     * Sobra um, congelado: o "Copie o código PIX" do marketplace usa o prompt
+     * como CAIXA DE CÓPIA — um hack antigo que funciona porque o texto vem
+     * selecionado. Trocar exige mexer no fluxo de pagamento com
+     * `navigator.clipboard` e fallback, e isso é escopo próprio.
+     */
+    const PROMPT_PENDENTE = [
+        'src/app/marketplace/MarketplaceClient.tsx', // prompt usado como caixa de cópia do PIX
+    ]
+
+    it('window.prompt só encolhe', () => {
+        const comPrompt = arquivosDoProjeto().filter((arquivo) =>
+            /\bwindow\.prompt\s*\(/.test(semComentarios(readFileSync(arquivo, 'utf8'))),
+        )
+        const novos = comPrompt.filter((f) => !PROMPT_PENDENTE.includes(f))
+        expect(novos, 'use o `prompt` do DialogContext').toEqual([])
+
+        const jaResolvidos = PROMPT_PENDENTE.filter((f) => !comPrompt.includes(f))
+        expect(jaResolvidos, 'já não usa window.prompt — tire da lista').toEqual([])
+    })
 
     it('window.alert só encolhe', () => {
         const comAlert = arquivosDoProjeto().filter((arquivo) =>

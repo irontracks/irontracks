@@ -51,6 +51,7 @@ const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStory
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useCustomFoods, customFoodsToExtraFoods, type CustomFood } from './useCustomFoods'
 import { properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { useDialog } from '@/contexts/DialogContext'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -225,6 +226,7 @@ export default function NutritionMixer({
   phaseIsExplicit?: boolean
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const { prompt } = useDialog()
   const isIosNative = useIsIosNative()
   const hideVipCtas = isIosNative
   const [isAndroidNative, setIsAndroidNative] = useState(false)
@@ -890,7 +892,10 @@ export default function NutritionMixer({
 
   const handleBarcodeResult = useCallback(async (ean: string) => {
     setShowBarcodeScanner(false)
-    const gramsStr = window.prompt(`Produto escaneado (EAN: ${ean})\nQuantidade em gramas:`, '100')
+    // Era `window.prompt`: o diálogo do SISTEMA, sem a identidade do app, e que
+    // no WKWebView bloqueia a thread. O do DialogContext é o mesmo que o resto
+    // do app usa.
+    const gramsStr = await prompt('Quantas gramas você consumiu?', `Produto escaneado (EAN ${ean})`, '100')
     const grams = Number(gramsStr)
     if (!grams || grams <= 0) return
 
@@ -920,7 +925,7 @@ export default function NutritionMixer({
     } catch (e: unknown) {
       setError(getErrorMessage(e) || 'Erro ao adicionar produto.')
     }
-  }, [currentDateKey])
+  }, [prompt, currentDateKey])
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
