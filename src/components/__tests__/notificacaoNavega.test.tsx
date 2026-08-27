@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
-import { ConteudoDoCard } from '@/components/NotificationCenter'
+import { ConteudoDoCard, destinoDa, temDestino } from '@/components/NotificationCenter'
 
 /**
  * A Central de Notificações era um beco sem saída.
@@ -132,5 +132,49 @@ describe('mensagem sem remetente ainda chega em algum lugar', () => {
         // O caminho interno continua obrigatório: o payload vem de fora.
         expect(ateOFim).toMatch(/startsWith\('\/'\)/)
         expect(ateOFim).toMatch(/!destino\.startsWith\('\/\/'\)/)
+    })
+})
+
+/**
+ * O card ficou inerte para `weekly_recap` mesmo com tudo verde — e só a
+ * conferência na tela pegou.
+ *
+ * O `.map()` que monta a lista reconstrói cada notificação campo a campo e não
+ * copiava `metadata` nem `sender_id`: eles ficavam só dentro de `data`. Aí
+ * `destinoDa` não achava o `week_start`, devolvia vazio, e `temDestino` dizia
+ * que não havia para onde ir. A lista continua IDÊNTICA na tela — some só o
+ * clique —, então nada acusa.
+ *
+ * Os guards anteriores não pegaram porque mediam o `ConteudoDoCard` isolado e a
+ * forma do código. Este bloco mede a FIAÇÃO: o objeto que a lista monta precisa
+ * carregar o que o destino lê.
+ */
+describe('o item da lista carrega o que o destino precisa ler', () => {
+    it('o map dos itens do banco repassa metadata e sender_id', () => {
+        const bloco = central.slice(central.indexOf('...safeSystem.map('), central.indexOf('].sort('))
+        expect(bloco).toMatch(/metadata: n\.metadata/)
+        expect(bloco).toMatch(/sender_id: n\.sender_id/)
+    })
+
+    it('weekly_recap só tem destino quando sabe QUAL semana', () => {
+        expect(temDestino({ type: 'weekly_recap', metadata: { week_start: '2026-08-17' } })).toBe(true)
+        expect(destinoDa({ type: 'weekly_recap', metadata: { week_start: '2026-08-17' } }))
+            .toBe('/dashboard/report/weekly?week=2026-08-17')
+        // Sem a semana, abrir a tela mostraria o período errado — pior que não
+        // abrir. É exatamente o caso que o `.map()` incompleto produzia para
+        // TODA notificação.
+        expect(temDestino({ type: 'weekly_recap', metadata: {} })).toBe(false)
+        expect(temDestino({ type: 'weekly_recap' })).toBe(false)
+    })
+
+    it('tipo com destino fixo não depende de metadata', () => {
+        expect(temDestino({ type: 'streak_at_risk' })).toBe(true)
+        expect(destinoDa({ type: 'friend_pr' })).toBe('/dashboard/community')
+    })
+
+    it('tipo sem destino continua sem destino', () => {
+        for (const t of ['water_reminder', 'billing_issue', 'broadcast', 'invite']) {
+            expect(temDestino({ type: t }), t).toBe(false)
+        }
     })
 })
