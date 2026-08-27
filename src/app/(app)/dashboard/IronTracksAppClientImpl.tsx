@@ -875,7 +875,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             if (adminTab) { openAdminPanel(adminTab); setView('admin'); return; }
             if (detail?.type === 'message') {
                 const senderId = String(detail?.senderId || '').trim();
-                if (!senderId) return;
+                // Sem remetente não dá para abrir a conversa — mas o `return`
+                // seco também descartava o `link`, e aí o toque não fazia NADA.
+                // As notificações de mensagem gravadas no banco têm `sender_id`
+                // nulo (medido: 11 de 11), então é exatamente esse o caso de
+                // quem toca no card na Central. Deixa cair no fallback, que leva
+                // à lista de conversas.
+                if (!senderId) {
+                    const destino = String(detail?.link || '').trim();
+                    if (destino.startsWith('/') && !destino.startsWith('//')) router.push(destino);
+                    return;
+                }
                 const senderName = String(detail?.senderName || '').trim();
                 setDirectChat({
                     channelId: '',
