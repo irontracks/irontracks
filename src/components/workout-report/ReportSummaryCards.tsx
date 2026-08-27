@@ -54,6 +54,15 @@ export const ReportSummaryCards = memo(({
                         <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                             <Clock size={16} className="text-amber-400" />
                         </div>
+                        {/* Os quatro eyebrows deste bloco são o MESMO nível
+                            hierárquico e agora têm o mesmo tratamento. Dois
+                            deles vinham coloridos com alpha — `orange-500/70` e
+                            `green-500/70` —, o que custava duas coisas: a cor
+                            não codificava nada ("Calorias" não é mais laranja
+                            que "Volume", e o verde do "Status" acendia mesmo em
+                            treino ruim), e o alpha derrubava o contraste para
+                            3,91:1, abaixo do mínimo AA. O valor abaixo do
+                            rótulo é que carrega o destaque. */}
                         <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tempo</p>
                     </div>
                     <p className="text-2xl font-black font-mono text-white">{formatDuration(session?.totalTime)}</p>
@@ -88,7 +97,7 @@ export const ReportSummaryCards = memo(({
                         <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/25 flex items-center justify-center">
                             <Flame size={16} className="text-orange-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-orange-500/70">Calorias</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Calorias</p>
                     </div>
                     <p className="text-2xl font-black font-mono text-orange-200">~{animCal}</p>
                 </div>
@@ -99,7 +108,7 @@ export const ReportSummaryCards = memo(({
                         <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/25 flex items-center justify-center">
                             <Trophy size={16} className="text-green-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-green-500/70">Status</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Status</p>
                     </div>
                     <p className="text-base font-black uppercase text-green-300">Concluído ✓</p>
                 </div>

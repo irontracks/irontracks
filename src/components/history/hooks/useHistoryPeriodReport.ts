@@ -11,6 +11,7 @@ import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
 import { buildPeriodSessionDetails, PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
+import { brtDateKey } from '@/utils/cron/dateBrt';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -73,7 +74,14 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
                 let dayKey = '';
                 try {
                     const t = toDateMs(dateValue);
-                    if (Number.isFinite(t) && t !== null) { dayKey = new Date(t).toISOString().slice(0, 10); uniqueDays.add(dayKey); }
+                    // O dia é o do USUÁRIO, não o do servidor. Era
+                    // `toISOString().slice(0,10)` — dia UTC —, então todo treino
+                    // depois das 21h BRT contava no dia SEGUINTE: "dias
+                    // treinados" e "consistência" saíam inflados no relatório
+                    // que a pessoa manda ao professor. É a mesma classe já
+                    // corrigida no streak (5,7% das sessões caíam em dia
+                    // divergente) e no heatmap de nutrição.
+                    if (Number.isFinite(t) && t !== null) { dayKey = brtDateKey(t); if (dayKey) uniqueDays.add(dayKey); }
                 } catch { }
                 const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
                 sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
