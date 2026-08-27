@@ -349,7 +349,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                     disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                                     onClick={async (e) => {
                                         e.stopPropagation();
-                                        if (!(await confirm('Remover este treino do aluno?'))) return;
+                                        if (!(await confirm('O treino sai da lista do aluno. Isso não pode ser desfeito.', 'Remover este treino do aluno?', { confirmText: 'Remover', cancelText: 'Manter', destructive: true }))) return;
                                         const workoutId = String((w as UnknownRecord)?.id);
                                         setDeletingWorkoutId(workoutId);
                                         try {
@@ -395,7 +395,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                             disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                             onClick={async (e) => {
                                 e.stopPropagation();
-                                if (!(await confirm('Remover este treino do aluno?'))) return;
+                                if (!(await confirm('O treino sai da lista do aluno. Isso não pode ser desfeito.', 'Remover este treino do aluno?', { confirmText: 'Remover', cancelText: 'Manter', destructive: true }))) return;
                                 const workoutId = (w as UnknownRecord)?.id;
                                 setDeletingWorkoutId(String(workoutId));
                                 try {

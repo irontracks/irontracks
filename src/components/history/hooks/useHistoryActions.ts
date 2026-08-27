@@ -7,6 +7,7 @@ import { calculateTotalVolumeFromLogs } from './useHistoryData';
 import { buildReportMetrics } from '@/utils/report/reportMetrics';
 import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics';
 import type { KcalProfileLike } from '@/utils/calories/sessionKcalInputs';
+import type { ConfirmFn } from '@/contexts/DialogContext';
 
 interface UseHistoryActionsProps {
     user: { id?: string; role?: string } | null;
@@ -15,7 +16,7 @@ interface UseHistoryActionsProps {
     supabase: SupabaseClient;
     setHistory: React.Dispatch<React.SetStateAction<WorkoutSummary[]>>;
     alert: (msg: string, title?: string) => Promise<unknown>;
-    confirm: (msg: string, title?: string) => Promise<boolean>;
+    confirm: ConfirmFn;
 }
 
 export function useHistoryActions({ user, settings, supabase, setHistory, alert, confirm }: UseHistoryActionsProps) {
@@ -39,7 +40,11 @@ export function useHistoryActions({ user, settings, supabase, setHistory, alert,
 
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return;
-        if (!(await confirm(`Excluir ${selectedIds.size} itens selecionados?`))) return;
+        if (!(await confirm(
+            `${selectedIds.size === 1 ? 'O treino sai' : `Os ${selectedIds.size} treinos saem`} do histórico de vez. Isso não pode ser desfeito.`,
+            selectedIds.size === 1 ? 'Excluir o treino selecionado?' : `Excluir ${selectedIds.size} treinos selecionados?`,
+            { confirmText: 'Excluir', cancelText: 'Manter', destructive: true },
+        ))) return;
         try {
             const ids = Array.from(selectedIds);
             // R4#1: Add user_id filter to prevent IDOR
@@ -59,7 +64,13 @@ export function useHistoryActions({ user, settings, supabase, setHistory, alert,
     const handleDeleteClick = async (e: React.MouseEvent, session: WorkoutSummary) => {
         e.stopPropagation();
         e.preventDefault();
-        if (!window.confirm('Tem certeza que deseja excluir este histórico permanentemente?')) return;
+        // Era `window.confirm` — o diálogo do SISTEMA no meio de um app que tem
+        // o próprio, e sem nenhum sinal de que a ação não tem volta.
+        if (!(await confirm(
+            'O treino sai do histórico de vez. Isso não pode ser desfeito.',
+            'Excluir este treino?',
+            { confirmText: 'Excluir', cancelText: 'Manter', destructive: true },
+        ))) return;
         try {
             if (session.kind === 'cardio') {
                 const resp = await fetch(`/api/gps/cardio/${session.id}`, { method: 'DELETE' });

@@ -35,9 +35,21 @@ interface DialogState {
     onCancel?: () => void
 }
 
+/**
+ * O contrato do `confirm`, EXPORTADO para quem o recebe por prop.
+ *
+ * Dois hooks declaravam a própria versão sem o 3º parâmetro
+ * (`(msg, title) => Promise<boolean>`), e o efeito não era cosmético: quem
+ * usava aquele tipo NÃO CONSEGUIA passar `destructive: true`, então exclusão de
+ * aluno, de professor e de histórico saíam com o botão dourado de ação
+ * primária. A assinatura truncada era a causa estrutural, não um descuido de
+ * cada chamada.
+ */
+export type ConfirmFn = (message: string, title?: string, options?: ConfirmOptions | null) => Promise<boolean>
+
 interface DialogContextValue {
     dialog: DialogState | null
-    confirm: (message: string, title?: string, options?: ConfirmOptions | null) => Promise<boolean>
+    confirm: ConfirmFn
     alert: (message: string, title?: string, tone?: 'success' | 'info' | 'error') => Promise<boolean>
     prompt: (message: string, title?: string, defaultValue?: string) => Promise<string | null>
     showLoading: (message: string, title?: string) => void

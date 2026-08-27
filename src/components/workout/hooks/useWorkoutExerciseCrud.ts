@@ -14,6 +14,7 @@ import {
   remapIndexSet,
   remapCurrentIndex,
 } from '../helpers/reconcileEditedExercises';
+import type { ConfirmFn } from '@/contexts/DialogContext';
 
 const MAX_EXTRA_SETS_PER_EXERCISE = 50;
 const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
@@ -59,7 +60,7 @@ interface ExerciseCrudDeps {
   setDeleteConfirmIdx: (v: number | null) => void;
   onUpdateSession: ((update: Record<string, unknown>) => void) | undefined;
   alert: (msg: string, title?: string) => Promise<void>;
-  confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>;
+  confirm: ConfirmFn;
 }
 
 export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {

@@ -122,7 +122,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const handleDeleteMessage = async (message: MessageRow) => {
         const id = message?.id ? String(message.id) : '';
         if (!id) return;
-        const ok = await confirm('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
+        const ok = await confirm('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar', destructive: true });
         if (!ok) return;
         try {
             const json = await apiChat.deleteMessage(id, 'direct').catch(() => ({ ok: false })) as Record<string, unknown>;

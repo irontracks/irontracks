@@ -5,6 +5,7 @@ import { useCallback } from 'react'
 import { updateWorkout } from '@/actions/workout-actions'
 import { formatWeekdayWorkoutTitle } from '@/utils/workoutTitle'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -80,7 +81,7 @@ interface UseWorkoutNormalizeOptions {
     programTitleStartDay?: string
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string, tone?: 'success' | 'info' | 'error') => Promise<unknown>
-    confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>
+    confirm: ConfirmFn
 }
 
 interface UseWorkoutNormalizeReturn {

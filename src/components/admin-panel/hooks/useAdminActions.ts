@@ -11,7 +11,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { apiAdmin } from '@/lib/api'
 
 type AlertFn = (msg: string, title?: string) => Promise<unknown>;
-type ConfirmFn = (msg: string, title?: string) => Promise<boolean>;
+// Era uma cópia local SEM o 3º parâmetro, e isso impedia marcar a exclusão de
+// aluno/professor como destrutiva. O contrato mora no contexto.
+import type { ConfirmFn } from '@/contexts/DialogContext';
 
 interface UseAdminActionsParams {
     supabase: SupabaseClient;
@@ -224,7 +226,8 @@ export function useAdminActions({
     const handleDeleteStudent = async (studentId: string, onSuccess?: () => void) => {
         if (!(await confirm(
             'Tem certeza que deseja EXCLUIR este aluno?\n\nIsso irá apagar permanentemente:\n• Todos os treinos e histórico\n• Avaliações e check-ins\n• Notificações e mensagens\n\nEssa ação é irreversível.',
-            'Excluir Aluno'
+            'Excluir Aluno',
+            { confirmText: 'Excluir aluno', cancelText: 'Manter', destructive: true },
         ))) return;
         try {
             const { data: sessionData } = await supabase.auth.getSession();
@@ -248,7 +251,8 @@ export function useAdminActions({
     const handleDeleteTeacher = async (teacherId: string, onSuccess?: () => void) => {
         if (!(await confirm(
             'Tem certeza que deseja EXCLUIR este professor?\n\nIsso irá apagar permanentemente:\n• Todos os dados do professor\n• Todos os alunos vinculados\n• Treinos, histórico e assessments\n\nEssa ação é irreversível.',
-            'Excluir Professor'
+            'Excluir Professor',
+            { confirmText: 'Excluir professor', cancelText: 'Manter', destructive: true },
         ))) return;
         try {
             const { data: sessionData } = await supabase.auth.getSession();

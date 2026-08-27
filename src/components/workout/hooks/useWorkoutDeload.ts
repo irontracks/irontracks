@@ -62,6 +62,7 @@ import {
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 interface UseWorkoutDeloadProps {
   session: WorkoutSession | null;
@@ -73,7 +74,7 @@ interface UseWorkoutDeloadProps {
   getPlanConfig: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   getPlannedSet: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   alert: (msg: string, title?: string) => Promise<void>;
-  confirm: (msg: string, title?: string) => Promise<boolean>;
+  confirm: ConfirmFn;
   /** Dono da sessão — escopa o cache de histórico. Sem ele, não se serve cache. */
   userId: string;
 }

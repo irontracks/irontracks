@@ -16,6 +16,7 @@ import {
 } from '@/lib/sounds'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { parseCheckinWeightKg, shouldSyncProfileWeight } from '@/utils/checkin/bodyWeightSync'
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -39,7 +40,7 @@ interface UseWorkoutCrudOptions {
     justFinishedAtRef?: React.MutableRefObject<number>
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string) => Promise<unknown>
-    confirm: (msg: string, title?: string) => Promise<boolean>
+    confirm: ConfirmFn
     requestPreWorkoutCheckin: (workout: unknown) => Promise<unknown>
     /** Persiste um subconjunto das settings (usado pra sincronizar o peso do check-in). */
     patchSettings?: (patch: Record<string, unknown>) => Promise<void>
@@ -134,8 +135,9 @@ export function useWorkoutCrud({
         // confirmação continua.
         if (activeSession?.workout) {
             const trocar = await confirm(
-                'Você já está treinando. Iniciar este treino vai descartar o treino atual em andamento. Continuar?',
+                'Você já está treinando. Iniciar este treino descarta as séries já registradas na sessão atual. Isso não pode ser desfeito.',
                 'Trocar de treino?',
+                { confirmText: 'Descartar e trocar', cancelText: 'Continuar o atual', destructive: true },
             )
             if (!trocar) return
         }
@@ -489,7 +491,11 @@ export function useWorkoutCrud({
 
     const handleDeleteWorkout = useCallback(async (id: string, title: unknown) => {
         const name = title || (workouts.find((w) => w.id === id)?.title) || 'este treino'
-        if (!(await confirm(`Apagar o treino "${name}"?`, 'Excluir Treino'))) return
+        if (!(await confirm(
+            'O treino sai da sua lista de vez. Isso não pode ser desfeito.',
+            `Apagar o treino "${name}"?`,
+            { confirmText: 'Apagar', cancelText: 'Manter', destructive: true },
+        ))) return
         try {
             const res = await deleteWorkout(id)
             if (!res?.ok) {
