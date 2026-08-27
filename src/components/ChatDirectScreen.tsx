@@ -878,7 +878,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRetryMessage(message)}
-                                                    className="text-[10px] font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-red-700 hover:text-red-800 bg-black/10 active:scale-95 transition-transform"
+                                                    className="tap-44 text-[10px] font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-red-700 hover:text-red-800 bg-black/10 active:scale-95 transition-transform"
                                                     aria-label="Reenviar mensagem"
                                                 >
                                                     <RotateCw size={11} />

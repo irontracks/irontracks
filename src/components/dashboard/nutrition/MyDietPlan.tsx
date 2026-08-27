@@ -209,7 +209,7 @@ export default function MyDietPlan({
           type="button"
           onClick={removePlan}
           disabled={removing}
-          className="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+          className="tap-44 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
         >
           {removing ? '...' : 'Remover'}
         </button>

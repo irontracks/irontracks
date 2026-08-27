@@ -322,7 +322,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
                                             <button
                                                 onClick={() => toggleExerciseType(index, exerciseType)}
-                                                className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
+                                                className={`tap-44 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
                                                     ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
                                                     : 'bg-white/[0.04] text-neutral-400 border-white/[0.08] hover:border-white/20'
                                                     }`}
@@ -333,7 +333,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 <button
                                                     type="button"
                                                     onClick={() => toggleBiSetWithNext(index)}
-                                                    className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-yellow-500/30 text-yellow-500 hover:text-yellow-400 hover:border-yellow-500/50 bg-yellow-500/10 transition-colors"
+                                                    className="tap-44 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-yellow-500/30 text-yellow-500 hover:text-yellow-400 hover:border-yellow-500/50 bg-yellow-500/10 transition-colors"
                                                     title="Deslinkar do próximo"
                                                 >
                                                     Deslinkar

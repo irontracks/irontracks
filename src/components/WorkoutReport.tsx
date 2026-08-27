@@ -505,7 +505,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             {showSplash && (
                 <button
                     type="button"
-                    className="fixed inset-0 z-[1200] flex flex-col items-end justify-end bg-neutral-950 overflow-hidden w-full border-0 p-0 text-left"
+                    className="tap-44 fixed inset-0 z-[1200] flex flex-col items-end justify-end bg-neutral-950 overflow-hidden w-full border-0 p-0 text-left"
                     onClick={() => setShowSplash(false)}
                 >
                     {/* Victory hero — full screen background */}

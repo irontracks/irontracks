@@ -145,7 +145,7 @@ export default function PRPrediction({
                   <button
                     key={increment}
                     onClick={() => setTarget(val)}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                    className={`tap-44 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
                       isActive
                         ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400'
                         : 'bg-neutral-800/50 border border-neutral-700/50 text-neutral-400 hover:text-white'
