@@ -11,6 +11,11 @@ import { readFileSync } from 'node:fs'
  */
 
 const applyMealMock = vi.fn(async () => ({ ok: true }))
+let confirmaRemocao = true
+vi.mock('@/contexts/DialogContext', () => ({
+  useDialog: () => ({ confirm: async () => confirmaRemocao, alert: async () => undefined }),
+}))
+
 vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
   applyGeneratedMealAction: (...args: unknown[]) => applyMealMock(...(args as [])),
 }))
@@ -293,6 +298,32 @@ describe('MyDietPlan', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remover' }))
     await waitFor(() => expect(container.textContent).toBe(''))
     expect(fetchMock.mock.calls.some((c) => (c[1] as RequestInit)?.method === 'DELETE')).toBe(true)
+  })
+
+  /**
+   * Apagar o plano era um toque, sem pergunta — enquanto apagar UMA refeição já
+   * confirmava. A fricção estava na ação de menor dano.
+   */
+  it('desistir da confirmação NÃO apaga o plano', async () => {
+    confirmaRemocao = false
+    try {
+      const fetchMock = mockFetch(dayPlan, (url, init) =>
+        (init as RequestInit)?.method === 'DELETE'
+          ? { ok: true, status: 200, json: async () => ({ ok: true }) }
+          : (void url, null),
+      )
+      const { container } = render(<MyDietPlan dateKey="2026-08-03" canApply />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Remover' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Remover' })).toBeTruthy())
+      expect(
+        fetchMock.mock.calls.some((c) => (c[1] as RequestInit)?.method === 'DELETE'),
+        'o plano foi apagado mesmo com o usuário desistindo',
+      ).toBe(false)
+      expect(container.textContent).not.toBe('')
+    } finally {
+      confirmaRemocao = true
+    }
   })
 })
 

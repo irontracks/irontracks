@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { useDialog } from '@/contexts/DialogContext'
 import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
 
 /**
@@ -43,6 +44,7 @@ export default function MyDietPlan({
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null)
   const [swappingKey, setSwappingKey] = useState<string | null>(null)
   const [rejected, setRejected] = useState<Record<string, string[]>>({})
+  const { confirm } = useDialog()
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -158,6 +160,16 @@ export default function MyDietPlan({
 
   const removePlan = useCallback(async () => {
     if (removing) return
+    // A polaridade importa: o `confirm` resolve `false` ao fechar por fora,
+    // então REMOVER é o confirmText e manter é o caminho do `false`.
+    // Antes disso era um toque só, sem pergunta — e apagar UMA refeição pedia
+    // confirmação enquanto jogar fora o plano inteiro não pedia nada.
+    const ok = await confirm(
+      'O plano inteiro sai, com todos os dias e refeições. Isso não pode ser desfeito.',
+      'Remover este plano alimentar?',
+      { confirmText: 'Remover plano', cancelText: 'Manter', destructive: true },
+    )
+    if (!ok) return
     setRemoving(true); setError(null)
     try {
       const res = await fetch('/api/nutrition/diet-plan', { method: 'DELETE', credentials: 'include' })
@@ -169,7 +181,7 @@ export default function MyDietPlan({
     } finally {
       setRemoving(false)
     }
-  }, [removing])
+  }, [removing, confirm])
 
   if (loading || !row || !days.length) return null
 
