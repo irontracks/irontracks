@@ -128,23 +128,33 @@ export default function PeriodizationCreateModal({
         setError('Data inválida. Use o formato dd/mm/aaaa.')
         return
       }
+      /**
+       * O que o `<select>` devolve é `string`; a rota é `.strict()` com enums.
+       * Normalizar num lugar só — e cair no primeiro valor quando vier algo
+       * fora da lista — é o que garante que o payload SEMPRE case com o schema.
+       */
+      const umDe = <T extends string>(v: unknown, opcoes: readonly T[]): T =>
+        opcoes.includes(String(v) as T) ? (String(v) as T) : opcoes[0]
+
       const payload = {
-        model: form.model,
-        weeks: Number(form.weeks) === 4 ? 4 : Number(form.weeks) === 8 ? 8 : 6,
-        goal: form.goal,
-        level: form.level,
+        // O <select> só oferece estes dois, mas o estado é `string` e a rota
+        // exige o enum. Normalizar aqui é o que faz o TIPO valer alguma coisa —
+        // era a frouxidão do payload antigo que deixava o modal compilar
+        // mandando um objeto que a rota rejeitava.
+        model: umDe(form.model, ['linear', 'undulating'] as const),
+        weeks: (Number(form.weeks) === 4 ? 4 : Number(form.weeks) === 8 ? 8 : 6) as 4 | 6 | 8,
+        goal: umDe(form.goal, ['hypertrophy', 'strength', 'recomp'] as const),
+        level: umDe(form.level, ['beginner', 'intermediate', 'advanced'] as const),
         daysPerWeek: Math.max(2, Math.min(6, Number(form.daysPerWeek) || 4)),
         timeMinutes: Math.max(30, Math.min(90, Number(form.timeMinutes) || 60)),
         equipment: Array.isArray(form.equipment) ? form.equipment : [],
         limitations: safeString(form.limitations),
         startDate: startDateIso,
       }
-      const json = await apiVip.createPeriodization({
-        goal: payload.goal,
-        weeks: payload.weeks,
-        daysPerWeek: payload.daysPerWeek,
-        focusAreas: Array.isArray(payload.equipment) ? payload.equipment : [],
-      }).catch(() => null)
+      // O `payload` acima já é exatamente o shape que a rota espera. Enviar um
+      // subconjunto com `focusAreas` (chave que a rota não conhece) e sem
+      // `model` (obrigatório) fazia o `.strict()` reprovar pelos dois motivos.
+      const json = await apiVip.createPeriodization(payload).catch(() => null)
       if (!json?.ok) {
         setError(friendlyCreateError((json as Record<string, unknown> | null)?.error))
         return

@@ -83,11 +83,29 @@ export interface PeriodizationStatsResult {
   stats: PeriodizationStats | null
 }
 
+/**
+ * Espelha o `BodySchema` de `api/vip/periodization/create`, que é `.strict()`.
+ *
+ * O tipo antigo tinha 4 campos e um deles — `focusAreas` — NÃO EXISTE na rota;
+ * faltavam `model` (obrigatório, sem default) e o resto. Com `.strict()`, chave
+ * desconhecida e campo obrigatório ausente reprovam pelos DOIS motivos: a
+ * criação de periodização devolvia 400 sempre, e é feature paga.
+ *
+ * Manter este tipo colado ao schema é o que impede o descompasso de voltar —
+ * era o tipo frouxo que deixava o modal compilar enviando o objeto errado.
+ */
 export interface CreatePeriodizationPayload {
-  goal: string
-  weeks: number
-  daysPerWeek: number
-  focusAreas?: string[]
+  model: 'linear' | 'undulating'
+  weeks: 4 | 6 | 8
+  goal?: 'hypertrophy' | 'strength' | 'recomp'
+  level?: 'beginner' | 'intermediate' | 'advanced'
+  daysPerWeek?: number
+  timeMinutes?: number
+  equipment?: string[]
+  limitations?: string
+  preferredSplit?: string
+  focusMuscles?: string[]
+  startDate?: string | null
 }
 
 // ─── Client ───────────────────────────────────────────────────────────────────
