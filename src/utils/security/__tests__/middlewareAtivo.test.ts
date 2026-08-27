@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { NextResponse } from 'next/server'
-import { applySecurityHeaders, buildCspHeader, CSP_REPORT_PATH } from '../headers'
+import { applySecurityHeaders, buildCspHeader, cspEnforcedFrom, CSP_REPORT_PATH } from '../headers'
 
 const ROOT = join(__dirname, '..', '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
@@ -74,10 +74,33 @@ describe('CSP entra relatando, não bloqueando', () => {
     expect(res.headers.get('Content-Security-Policy-Report-Only')).toBeNull()
   })
 
-  it('o modo bloqueante só liga por env explícita', () => {
+  /**
+   * A polaridade virou em 27/08/2026: BLOQUEIA por padrão, e `CSP_ENFORCE=false`
+   * é o freio de emergência (env var, sem deploy).
+   *
+   * Antes este caso exigia `=== 'true'` no fonte — um source-guard que
+   * envelheceu junto com a decisão que descrevia. Agora a regra mora em
+   * `cspEnforcedFrom` e é testada por COMPORTAMENTO, com os valores que
+   * realmente chegam de uma env var.
+   */
+  it('bloqueia por padrão — proteger não pode depender de alguém lembrar', () => {
+    for (const valor of [undefined, '', '   ', 'true', 'TRUE', 'sim', '1', '0', 'no', 'falso']) {
+      expect(cspEnforcedFrom(valor), `CSP_ENFORCE=${JSON.stringify(valor)} deveria BLOQUEAR`).toBe(true)
+    }
+  })
+
+  it('só a string exata `false` desliga', () => {
+    for (const valor of ['false', 'FALSE', ' false ', 'False']) {
+      expect(cspEnforcedFrom(valor), `CSP_ENFORCE=${JSON.stringify(valor)} deveria RELATAR`).toBe(false)
+    }
+  })
+
+  it('o middleware consome a regra, não reimplementa', () => {
     const src = read('src/middleware.ts')
-    expect(src).toMatch(/CSP_ENFORCE/)
-    expect(src).toMatch(/=== 'true'/)
+    expect(src).toMatch(/cspEnforcedFrom\(process\.env\.CSP_ENFORCE\)/)
+    // Reimplementar aqui faria a polaridade divergir em silêncio no dia da
+    // próxima mudança — foi assim que o guard anterior ficou obsoleto.
+    expect(src).not.toMatch(/CSP_ENFORCE\s*(\?\?|\|\|)/)
   })
 
   it('as demais proteções continuam saindo nos dois modos', () => {
