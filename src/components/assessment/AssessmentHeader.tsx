@@ -8,7 +8,12 @@ import { Activity, Camera, ChevronDown, Images, User, X } from 'lucide-react'
 
 type AssessmentHeaderProps = {
   onCreate: () => void
-  onShowHistory: () => void
+  /**
+   * Opcional como os outros três atalhos. No estado VAZIO ele era passado como
+   * `() => {}` — um botão "Ver Histórico" que aparecia e não fazia nada, na
+   * única tela em que não existe histórico para ver.
+   */
+  onShowHistory?: () => void
   onClose?: () => void
   /**
    * Quando definido, exibe um botão "+ Bioimpedância" pra registrar
@@ -148,6 +153,7 @@ export const AssessmentHeader = ({
                 Laudos
               </button>
             ) : null}
+            {onShowHistory ? (
             <button
               onClick={onShowHistory}
               className="w-full min-h-[44px] px-4 py-2 rounded-xl border text-neutral-200 font-bold hover:text-yellow-400 hover:border-yellow-500/40 transition-all duration-300 active:scale-95"
@@ -155,6 +161,7 @@ export const AssessmentHeader = ({
             >
               Ver Histórico
             </button>
+            ) : null}
           </div>
           {/* Dizia "Fechar" e fazia `history.back()` — duas coisas diferentes.
               O rótulo agora nomeia a ação real, e existe `aria-label`: em botão

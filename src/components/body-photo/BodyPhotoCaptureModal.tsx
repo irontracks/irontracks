@@ -121,6 +121,12 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
 
     const capturedCount = (Object.keys(photos) as BodyPhotoPose[]).filter((p) => photos[p]).length
     const flexedCount = BODY_PHOTO_FLEXED_POSES.filter((p) => photos[p]).length
+    /**
+     * As 3 RELAXADAS, que são as que o "/3" do botão promete. `capturedCount`
+     * conta as seis poses (relaxadas + contraídas) e o rótulo dizia "(6/3)".
+     * Simétrico ao `flexedCount` logo acima — o padrão já estava aqui.
+     */
+    const relaxedCount = BODY_PHOTO_RELAXED_POSES.filter((p) => photos[p]).length
     const canAnalyze = !!photos.front && capturedCount >= 1
 
     // Um cartão só, usado pelas duas seções (relaxadas e contraídas): duplicar o
@@ -341,7 +347,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                             className="w-full min-h-[48px] rounded-xl text-black font-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 transition active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed btn-gold-animated"
                         >
                             <Sparkles className="w-5 h-5" />
-                            Analisar {capturedCount > 0 ? `(${capturedCount}/3)` : ''}
+                            Analisar {relaxedCount > 0 ? `(${relaxedCount}/3)` : ''}
                         </button>
                     )}
                     {stage === 'result' && (

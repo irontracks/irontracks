@@ -154,7 +154,6 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
       <div className="p-4">
         <AssessmentHeader
           onCreate={() => studentId && router.push(`/assessments/new/${studentId}`)}
-          onShowHistory={() => {}}
           onClose={undefined}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
