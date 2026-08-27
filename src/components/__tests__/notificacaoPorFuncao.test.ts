@@ -49,9 +49,22 @@ describe('notificações — cor por função, não por evento', () => {
     ).not.toMatch(/border-\w+-\d+|bg-\w+-\d+\/|from-\w+-\d+/)
   })
 
+  /**
+   * A lista é NOMEADA, não um teto numérico: cada vermelho precisa de um motivo
+   * que caiba numa linha. Cresceu uma vez, em 27/08/2026, quando a varredura do
+   * banco mostrou que `billing_issue` — falha de PAGAMENTO — chegava como
+   * `social`, a função descrita no componente como "informativo, não
+   * acionável". Dinheiro é o caso para o qual o vermelho existe.
+   *
+   * Continua fora, e de propósito: `streak_at_risk` e `inactivity`. São
+   * cutucões do app; se cutucão for vermelho, a fatura perde como gritar.
+   */
   it('o vermelho é exclusivo do aviso — é a única cor de alarme', () => {
-    const avisos = tipos().filter((t) => t.funcao === 'aviso').map((t) => t.chave)
-    expect(avisos, 'só comunicado do sistema justifica vermelho').toEqual(['broadcast'])
+    const avisos = tipos().filter((t) => t.funcao === 'aviso').map((t) => t.chave).sort()
+    expect(avisos, 'só comunicado do sistema e dinheiro justificam vermelho').toEqual([
+      'billing_issue', // cobrança falhou — o usuário perde acesso se ignorar
+      'broadcast',     // comunicado do sistema
+    ])
   })
 
   it('as cinco funções existem no mapa de estilo, e só elas', () => {
@@ -68,7 +81,28 @@ describe('notificações — cor por função, não por evento', () => {
    */
   it('pedir resposta é raro — se tudo vira ação, nada é ação', () => {
     const rotulos = new Set(tipos().filter((t) => t.funcao === 'acao').map((t) => t.rotulo))
-    expect([...rotulos].sort()).toEqual(['Convite', 'Desafio', 'Mensagem', 'Seguir'])
-    expect(rotulos.size).toBeLessThanOrEqual(4)
+    expect([...rotulos].sort()).toEqual(['Acesso', 'Cadastro', 'Convite', 'Desafio', 'Mensagem', 'Seguir'])
+    expect(rotulos.size).toBeLessThanOrEqual(6)
+  })
+
+  /**
+   * O teto subiu de 4 para 6 em 27/08/2026, e o critério é o que importa: AÇÃO
+   * exige que alguém espere resposta sua E que exista onde responder.
+   *
+   * `Acesso` e `Cadastro` (`admin_access_request` / `admin_new_signup`) passam
+   * nos dois: são pessoas paradas na fila de aprovação, e o painel de admin tem
+   * a aba onde se aprova — o push desses tipos já navega para lá há tempos.
+   * Chegavam como `social`, com a mesma cara de um story curtido.
+   *
+   * Eles não inflam a percepção de quem usa o app para treinar: só administrador
+   * os recebe. Foram 26 em 180 dias, contra 1.840 de `workout_start`.
+   */
+  it('ação exige alguém esperando E onde responder', () => {
+    const acoes = tipos().filter((t) => t.funcao === 'acao').map((t) => t.chave)
+    // Nenhum tipo puramente informativo pode se declarar ação — este é o
+    // deslizamento que o teto existe para pegar.
+    for (const informativo of ['friend_online', 'story_posted', 'workout_start', 'friends_trained_today']) {
+      expect(acoes, `${informativo} não pede resposta de ninguém`).not.toContain(informativo)
+    }
   })
 })
