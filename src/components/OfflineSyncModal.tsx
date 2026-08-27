@@ -123,7 +123,11 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
               type="button"
               disabled={busy || !hasJobs}
               onClick={async () => {
-                const ok = await confirm('Limpar todas as pendências offline deste usuário?')
+                const ok = await confirm(
+                  'As alterações que ainda não subiram são descartadas. Isso não pode ser desfeito.',
+                  'Apagar as pendências offline?',
+                  { confirmText: 'Apagar', cancelText: 'Manter', destructive: true },
+                )
                 if (!ok) return
                 setBusy(true)
                 try {

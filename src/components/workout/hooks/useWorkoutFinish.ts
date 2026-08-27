@@ -23,6 +23,7 @@ import { logWarn } from '@/lib/logger'
 import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
 import { apiAi } from '@/lib/api/ai'
 import * as Sentry from '@sentry/nextjs'
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -41,7 +42,7 @@ interface UseWorkoutFinishProps {
   finishing: boolean
   setFinishing: (v: boolean) => void
   alert: (msg: string, title?: string) => Promise<void>
-  confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>
+  confirm: ConfirmFn
   onFinish?: (session: unknown, showReport: boolean) => void
 }
 

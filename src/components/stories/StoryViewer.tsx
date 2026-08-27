@@ -580,7 +580,7 @@ export default function StoryViewer({
 
   const handleDelete = async () => {
     if (!story?.id || deleting) return
-    const ok = await confirm('Tem certeza que deseja deletar este story?\nEssa ação é irreversível.', 'Deletar story', { confirmText: 'Deletar', cancelText: 'Cancelar' })
+    const ok = await confirm('Tem certeza que deseja deletar este story?\nEssa ação é irreversível.', 'Deletar story', { confirmText: 'Deletar', cancelText: 'Manter', destructive: true })
     if (!ok) return
     setDeleting(true)
     try {

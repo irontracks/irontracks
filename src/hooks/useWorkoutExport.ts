@@ -19,6 +19,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { exportJsonFile } from '@/utils/export/exportJsonFile'
 import { buildWorkoutBackup, buildSingleWorkoutBackup, parseWorkoutBackup } from '@/utils/export/workoutBackupPayload'
 import { z } from 'zod'
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -28,7 +29,7 @@ export type UseWorkoutExportOptions = {
     workouts: Array<Record<string, unknown>>
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string) => Promise<void>
-    confirm: (msg: string, title?: string) => Promise<boolean>
+    confirm: ConfirmFn
 }
 
 export type UseWorkoutExportReturn = {

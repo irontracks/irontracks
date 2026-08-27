@@ -103,7 +103,11 @@ export function useExerciseEditorLogic({
     }, [workout, onChange, normalizeMethod, ensureSetDetails])
 
     const removeExercise = useCallback(async (index: number) => {
-        if (await confirm('Tem certeza que deseja remover este exercício?', 'Remover Exercício')) {
+        if (await confirm(
+            'O exercício sai deste treino, com as séries que ele tem.',
+            'Remover este exercício?',
+            { confirmText: 'Remover', cancelText: 'Manter', destructive: true },
+        )) {
             const newExercises = [...(workout.exercises || [])]
             newExercises.splice(index, 1)
             onChange?.({ ...workout, exercises: newExercises })

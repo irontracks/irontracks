@@ -433,12 +433,35 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         try { await supabase.from('notifications').delete().eq('id', id); } catch (e) { logError('component:NotificationCenter.deleteNotification', e); return; }
     };
 
+    /**
+     * Apagar TODAS as notificações — `delete()` no banco, sem volta.
+     *
+     * A pergunta era `confirm("Limpar todas as notificações?")`, um argumento
+     * só: caíam os defaults, e o botão de confirmar saía DOURADO — a cor da
+     * ação primária do app — sob o título genérico "Confirmação". Um `DELETE`
+     * irreversível se apresentando como pergunta neutra, ao lado de um diálogo
+     * de descartar treino que é vermelho e diz "Isso não pode ser desfeito".
+     *
+     * Não é hipótese: em 27/08/2026 eu mesmo apaguei as notificações da conta
+     * de teste tocando ali sem perceber o que confirmava.
+     *
+     * A contagem entra na mensagem porque é o que dimensiona a perda — "3" e
+     * "47" são decisões diferentes.
+     */
     const handleClearAll = async () => {
         if (clearing) return;
+        const quantas = systemNotifications.length;
+        const confirmed = await confirm(
+            quantas === 1
+                ? 'A notificação é apagada de vez. Isso não pode ser desfeito.'
+                : `As ${quantas} notificações são apagadas de vez. Isso não pode ser desfeito.`,
+            'Apagar todas as notificações?',
+            { confirmText: 'Apagar tudo', cancelText: 'Manter', destructive: true },
+        );
+        if (!confirmed) return;
         setClearing(true);
         try {
-            const confirmed = await confirm("Limpar todas as notificações?");
-            if (!confirmed || !supabase) return;
+            if (!supabase) return;
             const { data: { user: currentUser } } = await supabase.auth.getUser();
             if (!currentUser) return;
             await supabase.from('notifications').delete().eq('user_id', currentUser.id);

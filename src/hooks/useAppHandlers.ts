@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveSession, Exercise, UserRecord } from '@/types/app'
+import type { ConfirmFn } from '@/contexts/DialogContext'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -16,7 +17,7 @@ interface UseAppHandlersParams {
   setCurrentWorkout: (v: ActiveSession | null) => void
   setView: (v: string) => void
   clearClientSessionState: () => void
-  confirm: (msg: string, title?: string) => Promise<boolean>
+  confirm: ConfirmFn
   alert: (msg: string, title?: string) => Promise<boolean>
 }
 
