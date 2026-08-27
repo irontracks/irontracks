@@ -60,7 +60,12 @@ export function LabExamCard({ exam, onView, onDelete }: { exam: LabExam; onView:
               <span className="text-[11px] text-neutral-400">Processando…</span>
             </div>
           ) : isFailed ? (
-            <span className="text-[11px] text-red-400">Falhou — toque para apagar e tentar de novo</span>
+            /* O clique é `onView`, e o botão fica `disabled` sem conteúdo: o
+               texto mandava apagar, e tocar ou ABRIA os resultados ou não fazia
+               nada. Agora ele descreve o que o card de fato faz. */
+            <span className="text-[11px] text-red-400">
+              {temConteudo ? 'Protocolo falhou — toque para ver o que foi lido' : 'Falhou na leitura — apague e envie de novo'}
+            </span>
           ) : (
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {examTypes.slice(0, 2).map((t, i) => (
