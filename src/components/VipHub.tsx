@@ -99,6 +99,25 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const router = useRouter()
   const chatRef = useRef<HTMLDivElement | null>(null)
 
+  /**
+   * O chat tem altura FIXA de 600px e a resposta chega por SSE, token a token,
+   * ABAIXO do viewport do card: o usuário perguntava e olhava para uma tela
+   * parada. O produto funcionava e PARECIA travado — a pior combinação, porque
+   * ele desiste antes de descobrir. O `chatRef` existia, mas preso ao contêiner
+   * externo (`h-[600px] overflow-hidden`, que não rola) e nunca era lido.
+   *
+   * A guarda dos 80px é o ponto: quem rolou para CIMA está lendo uma resposta
+   * anterior, e arrastar a tela de volta a cada token seria sequestrar a
+   * leitura. É o mesmo comportamento do ChatGPT — seguir enquanto o usuário
+   * está no fim, parar quando ele assume o controle.
+   */
+  useEffect(() => {
+    const el = chatRef.current
+    if (!el) return
+    const noFim = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (noFim) el.scrollTop = el.scrollHeight
+  }, [messages])
+
   const [insightsOpen, setInsightsOpen] = useState(false)
 
   // Load VIP Status
@@ -537,7 +556,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       </div>
 
       {/* ── CHAT PAI — Coach IA Premium ─────────────────────────────────── */}
-      <div ref={chatRef} className="rounded-2xl overflow-hidden flex flex-col h-[600px] relative" style={{ border: '1px solid rgba(234,179,8,0.25)', background: 'linear-gradient(180deg, rgba(15,15,14,0.99) 0%, rgba(10,10,9,0.99) 100%)', boxShadow: '0 0 60px rgba(234,179,8,0.06), 0 32px 80px rgba(0,0,0,0.6)' }}>
+      <div className="rounded-2xl overflow-hidden flex flex-col h-[600px] relative" style={{ border: '1px solid rgba(234,179,8,0.25)', background: 'linear-gradient(180deg, rgba(15,15,14,0.99) 0%, rgba(10,10,9,0.99) 100%)', boxShadow: '0 0 60px rgba(234,179,8,0.06), 0 32px 80px rgba(0,0,0,0.6)' }}>
         {/* Shimmer top line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.6) 40%, rgba(251,191,36,1) 50%, rgba(234,179,8,0.6) 60%, transparent 100%)' }} />
 
@@ -600,7 +619,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-center py-8">
               <div className="relative inline-block mb-4">
