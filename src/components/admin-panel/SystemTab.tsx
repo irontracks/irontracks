@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, ChevronDown, FileText } from 'lucide-react';
+import { Download, Upload, MessageSquare, Database, FileText } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { apiAdmin } from '@/lib/api';
 import { NumericInput } from '@/components/ui/NumericInput';
@@ -8,15 +8,6 @@ import { trialStatus, trialStatusLabel, type VigenteRaw } from '@/lib/vip/trialS
 export const SystemTab: React.FC = () => {
     const {
         isAdmin,
-        dangerOpen,
-        setDangerOpen,
-        dangerActionLoading,
-        dangerStudentsConfirm,
-        setDangerStudentsConfirm,
-        dangerTeachersConfirm,
-        setDangerTeachersConfirm,
-        dangerWorkoutsConfirm,
-        setDangerWorkoutsConfirm,
         systemExporting,
         systemImporting,
         broadcastTitle,
@@ -477,104 +468,6 @@ export const SystemTab: React.FC = () => {
                 ) : !grantHistoryLoading ? (
                     <div className="mt-3 text-sm text-neutral-400">Sem histórico ainda.</div>
                 ) : null}
-            </div>
-
-            {/* Danger Zone */}
-            <div className="bg-red-950/20 p-6 rounded-2xl border border-red-900/50 shadow-sm backdrop-blur-sm">
-                <button
-                    onClick={() => setDangerOpen(!dangerOpen)}
-                    className="w-full flex items-center justify-between group"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-red-900/30 rounded-lg border border-red-500/30 group-hover:bg-red-900/50 transition-colors">
-                            <ShieldAlert size={24} className="text-red-500" />
-                        </div>
-                        <div className="text-left">
-                            <h3 className="font-black text-red-500 text-lg">Danger Zone</h3>
-                            <p className="text-xs text-red-400/70">Ações irreversíveis e destrutivas</p>
-                        </div>
-                    </div>
-                    <ChevronDown size={20} className={`text-red-500 transition-transform ${dangerOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {dangerOpen && (
-                    <div className="mt-6 space-y-4 animate-in slide-in-from-top-2">
-                        {/* Students Danger */}
-                        <div className="bg-red-900/20 border border-red-900/30 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-bold text-red-400 flex items-center gap-2">
-                                    <Trash2 size={16} /> Zerar Alunos
-                                </h4>
-                                <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-[10px] uppercase font-bold rounded border border-red-900">Irreversível</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    aria-label="Confirmar apagar alunos"
-                                    value={dangerStudentsConfirm}
-                                    onChange={(e) => setDangerStudentsConfirm(e.target.value)}
-                                    placeholder="Digite APAGAR"
-                                    className="flex-1 bg-neutral-950 border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white focus:border-red-500 outline-none"
-                                />
-                                <button
-                                    disabled={dangerStudentsConfirm.toUpperCase() !== 'APAGAR' || dangerActionLoading === 'students'}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs uppercase"
-                                >
-                                    Apagar Tudo
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Teachers Danger */}
-                        <div className="bg-red-900/20 border border-red-900/30 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-bold text-red-400 flex items-center gap-2">
-                                    <Trash2 size={16} /> Zerar Professores
-                                </h4>
-                                <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-[10px] uppercase font-bold rounded border border-red-900">Irreversível</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    aria-label="Confirmar apagar professores"
-                                    value={dangerTeachersConfirm}
-                                    onChange={(e) => setDangerTeachersConfirm(e.target.value)}
-                                    placeholder="Digite APAGAR"
-                                    className="flex-1 bg-neutral-950 border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white focus:border-red-500 outline-none"
-                                />
-                                <button
-                                    disabled={dangerTeachersConfirm.toUpperCase() !== 'APAGAR' || dangerActionLoading === 'teachers'}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs uppercase"
-                                >
-                                    Apagar Tudo
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Workouts Danger */}
-                        <div className="bg-red-900/20 border border-red-900/30 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-bold text-red-400 flex items-center gap-2">
-                                    <Trash2 size={16} /> Zerar Treinos
-                                </h4>
-                                <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-[10px] uppercase font-bold rounded border border-red-900">Irreversível</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    aria-label="Confirmar apagar treinos"
-                                    value={dangerWorkoutsConfirm}
-                                    onChange={(e) => setDangerWorkoutsConfirm(e.target.value)}
-                                    placeholder="Digite APAGAR"
-                                    className="flex-1 bg-neutral-950 border border-red-900/50 rounded-lg px-3 py-2 text-sm text-white focus:border-red-500 outline-none"
-                                />
-                                <button
-                                    disabled={dangerWorkoutsConfirm.toUpperCase() !== 'APAGAR' || dangerActionLoading === 'workouts'}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs uppercase"
-                                >
-                                    Apagar Tudo
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

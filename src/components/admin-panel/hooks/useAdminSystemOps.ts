@@ -1,35 +1,23 @@
 import { useState, useCallback, useRef } from 'react';
-import type { AdminUser } from '@/types/admin';
-import type { UnknownRecord } from '@/types/app';
 import { useDialog } from '@/contexts/DialogContext';
 import { exportAllData, importAllData } from '@/actions/admin-actions';
 import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
 
-export type UseAdminSystemOpsParams = {
-    setUsersList: React.Dispatch<React.SetStateAction<AdminUser[]>>;
-    setTeachersList: React.Dispatch<React.SetStateAction<AdminUser[]>>;
-    setTemplates: React.Dispatch<React.SetStateAction<UnknownRecord[]>>;
-};
-
-export const useAdminSystemOps = ({
-    setUsersList,
-    setTeachersList,
-    setTemplates,
-}: UseAdminSystemOpsParams) => {
+/**
+ * Não recebe mais as três listas (`setUsersList`, `setTeachersList`,
+ * `setTemplates`): elas serviam só à Danger Zone, que as esvaziava depois de
+ * apagar tudo. A seção foi removida em 27/08/2026 — a UI existia, o backend
+ * não. Ver o comentário no topo do `SystemTab`.
+ */
+export const useAdminSystemOps = () => {
     const { alert, confirm } = useDialog();
 
     // ─── Modal visibility ─────────────────────────────────────────────────────
-    const [dangerOpen, setDangerOpen] = useState<boolean>(false);
     const [exportOpen, setExportOpen] = useState<boolean>(false);
     const [historyOpen, setHistoryOpen] = useState<boolean>(false);
     const [moreTabsOpen, setMoreTabsOpen] = useState<boolean>(false);
 
-    // ─── Danger Zone State ────────────────────────────────────────────────────
-    const [dangerActionLoading, setDangerActionLoading] = useState<string | null>(null);
-    const [dangerStudentsConfirm, setDangerStudentsConfirm] = useState<string>('');
-    const [dangerTeachersConfirm, setDangerTeachersConfirm] = useState<string>('');
-    const [dangerWorkoutsConfirm, setDangerWorkoutsConfirm] = useState<string>('');
 
     // ─── System Export/Import ─────────────────────────────────────────────────
     const [systemExporting, setSystemExporting] = useState<boolean>(false);
@@ -82,45 +70,11 @@ export const useAdminSystemOps = ({
         }
     }, [alert, confirm]);
 
-    const handleDangerAction = useCallback(async (actionName: string, actionFn: () => Promise<UnknownRecord>) => {
-        if (!(await confirm(`Tem certeza que deseja ${actionName}?`, 'ATENÇÃO - PERIGO'))) return false;
-        if (!(await confirm(`Esta ação é IRREVERSÍVEL. Todos os dados serão perdidos. Confirmar mesmo?`, 'CONFIRMAÇÃO FINAL'))) return false;
-        try {
-            const res = await actionFn();
-            if (res?.error) throw new Error(String(res.error));
-            await alert(`${actionName} realizado com sucesso.`, 'Sucesso');
-            setUsersList([]);
-            setTeachersList([]);
-            setTemplates([]);
-            return true;
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert(`Erro ao executar ${actionName}: ` + msg);
-            return false;
-        }
-    }, [alert, confirm, setUsersList, setTeachersList, setTemplates]);
-
-    const runDangerAction = useCallback(async (actionKey: string, actionName: string, actionFn: () => Promise<UnknownRecord>, resetInput: () => void) => {
-        setDangerActionLoading(actionKey);
-        try {
-            const ok = await handleDangerAction(actionName, actionFn);
-            if (ok) resetInput();
-        } finally {
-            setDangerActionLoading(null);
-        }
-    }, [handleDangerAction]);
-
     return {
         // Modal visibility
-        dangerOpen, setDangerOpen,
         exportOpen, setExportOpen,
         historyOpen, setHistoryOpen,
         moreTabsOpen, setMoreTabsOpen,
-        // Danger zone
-        dangerActionLoading, setDangerActionLoading,
-        dangerStudentsConfirm, setDangerStudentsConfirm,
-        dangerTeachersConfirm, setDangerTeachersConfirm,
-        dangerWorkoutsConfirm, setDangerWorkoutsConfirm,
         // System export/import
         systemExporting, setSystemExporting,
         systemImporting, setSystemImporting,
@@ -129,7 +83,5 @@ export const useAdminSystemOps = ({
         handleExportSystem,
         handleImportSystemClick,
         handleImportSystem,
-        handleDangerAction,
-        runDangerAction,
     };
 };
