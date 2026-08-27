@@ -289,8 +289,14 @@ function NotifDot({ color }: { color: string }) {
  *
  * O nome acessível é o TÍTULO da notificação: um leitor de tela anunciaria
  * "botão" e mais nada, e a lista inteira soaria igual.
+ *
+ * Exportado para ser TESTADO de verdade. Montar a Central inteira exigiria
+ * Supabase e dois contextos — e um source-guard aqui é FALSO: com o corpo
+ * trocado por uma `<div>` fixa, o `<button>` continua escrito no arquivo (em
+ * código morto) e a busca por ele passa verde com o card inerte. Medido por
+ * mutação: a versão de forma deste guard não pegou o defeito.
  */
-function Conteudo({
+export function ConteudoDoCard({
     clicavel, onOpen, titulo, children,
 }: { clicavel: boolean; onOpen: () => void; titulo: string; children: React.ReactNode }) {
     if (!clicavel) return <div className="flex gap-3">{children}</div>;
@@ -543,7 +549,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     </div>
                                 )}
 
-                                <Conteudo clicavel={clicavel} onOpen={() => abrirDestino(item)} titulo={String(item.title ?? '')}>
+                                <ConteudoDoCard clicavel={clicavel} onOpen={() => abrirDestino(item)} titulo={String(item.title ?? '')}>
                                     <IconBubble bg={cfg.bg} border={cfg.border}>
                                         {cfg.icon}
                                     </IconBubble>
@@ -560,7 +566,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                         <p className="text-xs text-neutral-400 leading-snug line-clamp-2">{String(item.message ?? "")}</p>
                                         <p className="text-[10px] text-neutral-400 font-medium mt-1.5">{item.timeAgo}</p>
                                     </div>
-                                </Conteudo>
+                                </ConteudoDoCard>
 
                                 {/* Invite actions */}
                                 {item.type === 'invite' && item.data && (

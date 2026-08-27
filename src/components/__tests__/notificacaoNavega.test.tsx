@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, it, expect } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+
+import { ConteudoDoCard } from '@/components/NotificationCenter'
 
 /**
  * A Central de Notificações era um beco sem saída.
@@ -62,6 +65,8 @@ describe('o card leva a algum lugar', () => {
     })
 })
 
+afterEach(cleanup)
+
 describe('o que não leva a lugar nenhum não promete', () => {
     it('o hover de card interativo é condicionado ao destino', () => {
         const codigo = executavel(central)
@@ -77,11 +82,34 @@ describe('o que não leva a lugar nenhum não promete', () => {
         }
     })
 
-    it('o corpo clicável é um button de verdade, com nome próprio', () => {
+    /**
+     * COMPORTAMENTO, não forma. A primeira versão deste bloco procurava
+     * `<button` dentro da função e passou VERDE com o corpo trocado por uma
+     * `<div>` fixa — o botão seguia escrito, em código morto. Medido por
+     * mutação; é o erro "cobrindo as pontas e não a fiação".
+     */
+    it('com destino, o corpo é um button que chama o handler ao ser tocado', () => {
+        const onOpen = vi.fn()
+        render(<ConteudoDoCard clicavel onOpen={onOpen} titulo="Fulano bateu PR"><span>x</span></ConteudoDoCard>)
+        const botao = screen.getByRole('button', { name: 'Abrir: Fulano bateu PR' })
+        fireEvent.click(botao)
+        expect(onOpen).toHaveBeenCalledTimes(1)
+    })
+
+    it('sem destino, não existe controle nenhum para tocar', () => {
+        render(<ConteudoDoCard clicavel={false} onOpen={() => {}} titulo="Beba água"><span>x</span></ConteudoDoCard>)
+        expect(screen.queryByRole('button')).toBeNull()
+    })
+
+    it('o card usa o componente, não desenha a própria linha', () => {
+        expect(executavel(central)).toMatch(/<ConteudoDoCard clicavel=\{clicavel\}/)
+    })
+
+    it('o corpo clicável não engole o botão de remover', () => {
         // Fatiar do início até o FIM da função, não até o fim do arquivo: o
         // botão de remover mora mais abaixo e entraria no bloco, fazendo a
         // asserção de baixo reprovar por motivo errado.
-        const inicio = central.indexOf('function Conteudo')
+        const inicio = central.indexOf('export function ConteudoDoCard')
         const bloco = central.slice(inicio, central.indexOf('\nfunction ', inicio + 1))
         expect(bloco).toMatch(/<button/)
         // Ícone e texto sozinhos fazem o leitor de tela anunciar "botão" e mais
