@@ -34,7 +34,13 @@ import { join } from 'node:path'
 const RAIZES = [join('src', 'components'), join('src', 'app')]
 
 /** Botões cujo alvo pequeno é intencional e não pode crescer. Só encolhe. */
-const NAO_E_ALVO_DE_DEDO: Record<string, string> = {}
+const NAO_E_ALVO_DE_DEDO: Record<string, string> = {
+  // Peças ARRASTÁVEIS do editor de story, posicionadas em `absolute` com
+  // left/top percentuais. Ampliar a área faria peças vizinhas se sobreporem e o
+  // toque pegar a errada — o mesmo raciocínio dos dots do tour, que ganharam
+  // `aria-hidden` em vez de 44pt porque tinham 12px entre centros.
+  'src/components/StoryComposer.tsx': 'peça arrastável — ampliar sobrepõe a vizinha',
+}
 
 const arquivos = RAIZES.flatMap((raiz) =>
   readdirSync(raiz, { recursive: true, encoding: 'utf8' })
@@ -81,10 +87,66 @@ const caixaPequena = (tag: string): boolean => {
   return false
 }
 
+/**
+ * QUARTO buraco do mesmo guard (26/08/2026): botão sem NENHUMA altura
+ * declarada, cuja caixa nasce do `padding` mais a altura da linha.
+ *
+ *     <button className="px-2 py-1 text-[10px]">Remover</button>
+ *
+ * 4px de padding em cima, 4 embaixo e ~15px de linha dão 23px — metade do
+ * mínimo, e o guard não via nada porque não havia `h-*` para ler. Eram **333
+ * botões em 129 arquivos**, mais que os três buracos anteriores somados.
+ *
+ * A altura é ESTIMADA: `2 × padding + line-height`. Não é o valor que o
+ * navegador calcula (não há `border`, `leading-*` nem herança aqui), e não
+ * precisa ser — a pergunta é "cabe um polegar?", e a margem entre 23px e 44px
+ * não depende de um pixel a mais ou a menos. Onde a estimativa erra, ela erra
+ * para MENOS casos, nunca para falso positivo: só entra quem não declarou
+ * altura nenhuma.
+ */
+const alturaPorPadding = (tag: string): number | null => {
+  if (/\b(w-\d+\s+h-\d+|h-\d+|h-\[\d+px\]|min-h-\[\d+px\])\b/.test(tag)) return null
+  const pad = /\bp[yb]?-(\d+(?:\.\d+)?)\b/.exec(tag)
+  if (!pad) return null
+  const px = /text-\[(\d+)px\]/.exec(tag)
+  const nome = /\btext-(xs|sm|base|lg)\b/.exec(tag)
+  const linha = px
+    ? Number(px[1]) * 1.5
+    : ({ xs: 16, sm: 20, base: 24, lg: 28 } as Record<string, number>)[nome?.[1] ?? 'sm'] ?? 20
+  return 2 * Number(pad[1]) * 4 + linha
+}
+
+/** O piso ABSOLUTO do WCAG 2.5.8 (AA). Abaixo disto não há discussão. */
+const PISO_WCAG = 24
+
 const temAlvoAmpliado = (tag: string): boolean =>
   tag.includes('tap-44') || tag.includes('min-h-[44px]') || tag.includes('min-w-[44px]')
 
 describe('alvo de toque mínimo de 44pt', () => {
+  /**
+   * Os 44pt são a HIG da Apple e o alvo deste repo; os 24×24 são o mínimo do
+   * WCAG 2.5.8 nível AA, onde não há discussão possível. Os 333 botões medidos
+   * por padding ficam no ratchet abaixo — mas os 9 que furavam o piso foram
+   * corrigidos na mesma varredura, e este caso impede que voltem.
+   */
+  it('nenhum botão fica abaixo do piso de 24px do WCAG', () => {
+    const abaixoDoPiso: string[] = []
+    for (const rel of arquivos) {
+      if (NAO_E_ALVO_DE_DEDO[rel]) continue
+      const src = readFileSync(rel, 'utf8')
+      for (const tag of tagsDeBotao(src)) {
+        if (temAlvoAmpliado(tag)) continue
+        const h = alturaPorPadding(tag)
+        if (h !== null && h < PISO_WCAG) abaixoDoPiso.push(`${rel} (~${Math.round(h)}px)`)
+      }
+    }
+    expect(
+      abaixoDoPiso,
+      'botão sem altura declarada, com caixa de padding + linha abaixo de 24px. ' +
+        'Use `.tap-44`, que estende a área pelo ::after sem mover pixel nenhum.',
+    ).toEqual([])
+  })
+
   it('todo botão de caixa pequena amplia a área tocável', () => {
     const infratores: string[] = []
     for (const rel of arquivos) {
@@ -144,7 +206,12 @@ describe('alvo de toque mínimo de 44pt', () => {
   it('a allowlist não guarda entrada morta — ela só encolhe', () => {
     const mortas = Object.keys(NAO_E_ALVO_DE_DEDO).filter((rel) => {
       try {
-        return !tagsDeBotao(readFileSync(rel, 'utf8')).some(caixaPequena)
+        // As DUAS formas de ser pequeno: caixa declarada e caixa de padding.
+        // Sem a segunda, uma exceção legítima pelo novo critério é acusada de
+        // morta — e removê-la reabriria o buraco que ela cobre.
+        return !tagsDeBotao(readFileSync(rel, 'utf8')).some(
+          (tag) => caixaPequena(tag) || (alturaPorPadding(tag) ?? 44) < 44,
+        )
       } catch {
         return true
       }

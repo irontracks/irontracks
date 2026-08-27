@@ -451,7 +451,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                         <button
                                             onClick={handleClearAll}
                                             disabled={clearing}
-                                            className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 disabled:opacity-60"
+                                            className="tap-44 flex items-center gap-1 text-[10px] text-neutral-400 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 disabled:opacity-60"
                                         >
                                             <Trash2 size={10} /> Limpar
                                         </button>

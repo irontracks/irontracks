@@ -84,7 +84,7 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
               key={opt}
               type="button"
               onClick={() => { onSelect(opt); setOpen(false) }}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${
+              className={`tap-44 px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${
                 label === opt
                   ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400'
                   : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600 hover:text-neutral-300'
