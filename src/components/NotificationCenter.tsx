@@ -254,7 +254,7 @@ const ROTEADOS_PELO_TIPO = new Set(['admin_access_request', 'admin_new_signup'])
  */
 type ItemComDestino = { type: string; metadata?: Record<string, unknown> | null; sender_id?: string | null }
 
-function destinoDa(item: ItemComDestino): string {
+export function destinoDa(item: ItemComDestino): string {
     const canonical = TYPE_ALIASES[item.type] ?? item.type
     if (canonical === 'weekly_recap') {
         const meta = (item.metadata ?? {}) as Record<string, unknown>
@@ -265,7 +265,7 @@ function destinoDa(item: ItemComDestino): string {
 }
 
 /** O card leva a algum lugar? */
-function temDestino(item: ItemComDestino): boolean {
+export function temDestino(item: ItemComDestino): boolean {
     const canonical = TYPE_ALIASES[item.type] ?? item.type
     return ROTEADOS_PELO_TIPO.has(canonical) || Boolean(destinoDa(item))
 }
@@ -502,6 +502,14 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         ...safeSystem.map(n => ({
             id: n.id, type: n.type || 'default', title: n.title,
             message: String(n.message || (n as unknown as Record<string, unknown>).body || ''),
+            // `metadata` e `sender_id` precisam vir para a LISTA, não só dentro
+            // de `data`: é deles que sai o destino do toque. Sem `metadata` o
+            // `weekly_recap` não acha o `week_start`, `destinoDa` devolve vazio
+            // e o card deixa de ser clicável — em silêncio, porque a lista
+            // continua idêntica na tela. Pego na conferência visual, com os
+            // testes todos verdes.
+            metadata: n.metadata ?? null,
+            sender_id: n.sender_id ?? null,
             timeAgo: formatTime(n.created_at), data: n,
             timestamp: (() => { try { const ms = new Date(n?.created_at || 0).getTime(); return Number.isFinite(ms) ? ms : 0; } catch { return 0; } })(),
             read: !!(n?.read === true || n?.is_read === true),
