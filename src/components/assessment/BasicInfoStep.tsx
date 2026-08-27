@@ -39,7 +39,9 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">Informações Básicas</h2>
         <p className="text-neutral-400">
-          Preencha os dados fundamentais para a avaliação física de <span className="font-semibold text-white">{studentName}</span>
+          {studentName
+            ? <>Preencha os dados fundamentais para a avaliação física de <span className="font-semibold text-white">{studentName}</span></>
+            : 'Preencha os dados fundamentais desta avaliação física'}
         </p>
       </div>
 

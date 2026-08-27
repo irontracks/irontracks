@@ -42,7 +42,6 @@ import {
 import {
   formatDateCompact,
   safeGender,
-  getProgress,
 } from './assessmentChartData';
 
 ChartJS.register(
@@ -224,7 +223,6 @@ export default function AssessmentHistory({ studentId: propStudentId, selfView =
             getBodyFatPercent={getBodyFatPercent}
             getLeanMassKg={getLeanMassKg}
             getBmrKcal={getBmrKcal}
-            getProgress={getProgress}
           />
         )}
 

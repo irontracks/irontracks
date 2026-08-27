@@ -6,6 +6,8 @@ import GlobalDialog from '@/components/GlobalDialog';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import { BackButton } from '@/components/ui/BackButton';
 import { StudentIdParamSchema } from '@/schemas/params';
+import { createClient } from '@/utils/supabase/client';
+import { logWarn } from '@/lib/logger';
 
 export default function NewAssessmentPage() {
   const router = useRouter();
@@ -13,7 +15,37 @@ export default function NewAssessmentPage() {
   const rawId = Array.isArray(params?.studentId) ? params.studentId[0] : params?.studentId;
   const result = StudentIdParamSchema.safeParse({ studentId: rawId });
 
-  const studentName = 'Aluno';
+  /**
+   * O nome REAL do aluno. Era o literal `'Aluno'`, e ele não ficava só no
+   * cabeçalho: essa string é a única fonte de nome do formulário inteiro e
+   * chegava ao PDF e ao JSON exportados — o profissional recebia um laudo de
+   * "Aluno".
+   *
+   * Começa VAZIO e os consumidores omitem a linha enquanto não resolve. Um
+   * placeholder é pior que a ausência: some com a dúvida sem responder nada, e
+   * o nome errado num documento clínico é mais caro que nome nenhum.
+   */
+  const [studentName, setStudentName] = React.useState('');
+
+  const studentIdResolvido = result.success ? result.data.studentId : null;
+  React.useEffect(() => {
+    if (!studentIdResolvido) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('profiles').select('display_name').eq('id', studentIdResolvido).maybeSingle();
+        const nome = String(data?.display_name ?? '').trim();
+        if (vivo && nome) setStudentName(nome);
+      } catch (e) {
+        // Sem nome, o formulário funciona e o laudo sai sem a linha. Falhar
+        // aqui não pode impedir a avaliação de ser registrada.
+        logWarn('NewAssessmentPage', 'falha ao buscar nome do aluno', { error: String(e) });
+      }
+    })();
+    return () => { vivo = false; };
+  }, [studentIdResolvido]);
 
   if (!result.success) {
     return (

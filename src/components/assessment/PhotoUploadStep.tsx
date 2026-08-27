@@ -2,16 +2,9 @@ import React, { useState, useRef } from 'react';
 import NextImage from 'next/image';
 import { motion } from 'framer-motion';
 import { Camera, Upload, X, CheckCircle } from 'lucide-react';
-import { AssessmentFormData } from '@/types/assessment';
 
 const PHOTO_PREVIEW_SIZE = 1024;
 
-interface PhotoUploadStepProps {
-  formData: AssessmentFormData;
-  onUpdate: (data: Partial<AssessmentFormData>) => void;
-  onNext: () => void;
-  onBack: () => void;
-}
 
 interface PhotoPreview {
   id: string;
@@ -20,7 +13,17 @@ interface PhotoPreview {
   type: 'front' | 'side' | 'back';
 }
 
-export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps) {
+/**
+ * O passo das fotos NÃO tem navegação própria — quem avança e volta é o
+ * `AssessmentForm`, como em todos os outros passos.
+ *
+ * Ele era o único que renderizava o próprio par Voltar/Próximo, empilhado sobre
+ * o do formulário: dois rodapés na mesma tela. E o "Próximo" interno tinha
+ * `disabled={!isComplete}` com `isComplete = photos.length > 0` — o passo se
+ * declarava OPCIONAL duas vezes (no título e no rodapé) e travava a saída de
+ * quem não subisse foto.
+ */
+export default function PhotoUploadStep() {
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,11 +112,6 @@ export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps
     setPhotos(prev => prev.filter(p => p.id !== photoId));
   };
 
-  const handleNext = () => {
-    onNext();
-  };
-
-  const isComplete = photos.length > 0;
 
   return (
     <motion.div
@@ -204,21 +202,6 @@ export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps
         className="hidden"
       />
 
-      <div className="flex justify-between pt-6">
-        <button
-          onClick={onBack}
-          className="px-6 py-2 border border-neutral-700 bg-neutral-900 rounded-xl text-neutral-300 hover:bg-neutral-800 transition-colors"
-        >
-          Voltar
-        </button>
-        <button
-          onClick={handleNext}
-          className="px-6 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!isComplete}
-        >
-          Próximo
-        </button>
-      </div>
 
       <p className="text-sm text-neutral-400 text-center">
         As fotos são opcionais mas ajudam a visualizar a evolução física

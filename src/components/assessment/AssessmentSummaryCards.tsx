@@ -1,6 +1,7 @@
 'use client'
 
 import { TrendingUp, TrendingDown, Activity, Scale, Flame, Dumbbell } from 'lucide-react'
+import { computeDelta, type BetterDirection } from './assessmentDelta'
 
 type AssessmentSummaryCardsProps<T> = {
   latestAssessment: T
@@ -9,7 +10,6 @@ type AssessmentSummaryCardsProps<T> = {
   getBodyFatPercent: (a: T) => number | null
   getLeanMassKg: (a: T) => number | null
   getBmrKcal: (a: T) => number | null
-  getProgress: (current: number | null, previous: number | null) => { change: number; percentage: number } | null
 }
 
 export const AssessmentSummaryCards = <T,>({
@@ -19,7 +19,6 @@ export const AssessmentSummaryCards = <T,>({
   getBodyFatPercent,
   getLeanMassKg,
   getBmrKcal,
-  getProgress,
 }: AssessmentSummaryCardsProps<T>) => {
   const metrics = [
     {
@@ -29,7 +28,7 @@ export const AssessmentSummaryCards = <T,>({
       unit: 'kg',
       color: '#facc15',
       bgGlow: 'rgba(250, 204, 21, 0.06)',
-      invertProgress: false,
+      better: null as BetterDirection,
     },
     {
       label: '% Gordura',
@@ -38,7 +37,7 @@ export const AssessmentSummaryCards = <T,>({
       unit: '%',
       color: '#ef4444',
       bgGlow: 'rgba(239, 68, 68, 0.06)',
-      invertProgress: true,
+      better: 'down' as BetterDirection,
     },
     {
       label: 'Massa Magra',
@@ -47,7 +46,7 @@ export const AssessmentSummaryCards = <T,>({
       unit: 'kg',
       color: '#22c55e',
       bgGlow: 'rgba(34, 197, 94, 0.06)',
-      invertProgress: false,
+      better: 'up' as BetterDirection,
     },
     {
       label: 'BMR',
@@ -56,18 +55,28 @@ export const AssessmentSummaryCards = <T,>({
       unit: 'kcal',
       color: '#f59e0b',
       bgGlow: 'rgba(245, 158, 11, 0.06)',
-      invertProgress: false,
+      better: null as BetterDirection,
     },
   ]
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-      {metrics.map(({ label, icon, getValue, unit, color, bgGlow, invertProgress }) => {
+      {metrics.map(({ label, icon, getValue, unit, color, bgGlow, better }) => {
         const current = getValue(latestAssessment)
         const previous = getValue(previousAssessment)
-        const progress = getProgress(current, previous)
-        const isPositive = invertProgress ? (progress?.change ?? 0) < 0 : (progress?.change ?? 0) > 0
-        const TrendIcon = isPositive ? TrendingUp : TrendingDown
+        // `computeDelta` é a MESMA fonte que a lista de avaliações usa. Com
+        // `getProgress`, peso idêntico entre duas medições devolvia
+        // `{change: 0}`, o `isPositive` binário lia isso como negativo, e a tela
+        // pintava "0.0 kg" de VERMELHO com seta para baixo — o app dizia que
+        // piorou quem não mudou. E a direção era um booleano `invertProgress`,
+        // que obriga toda métrica a ter um lado "bom": ganhar peso não é bom nem
+        // ruim sem saber o objetivo. `BetterDirection` admite `null`.
+        const delta = computeDelta(current, previous, better, unit === 'kcal' ? 0 : 1)
+        const TrendIcon = (delta?.diff ?? 0) > 0 ? TrendingUp : TrendingDown
+        const corDoDelta = delta?.tone === 'good' ? '#22c55e' : delta?.tone === 'bad' ? '#ef4444' : '#a3a3a3'
+        // Derivado do MESMO delta, não de um segundo cálculo: com `getProgress`
+        // à parte, os dois podiam discordar sobre a mesma variação.
+        const pct = delta && previous ? Math.abs((delta.diff / previous) * 100) : null
 
         return (
           <div
@@ -98,19 +107,18 @@ export const AssessmentSummaryCards = <T,>({
             </div>
 
             {/* Progress */}
-            {progress && (
+            {delta && (
               <div
                 className="flex items-center gap-1 mt-2 text-xs font-bold"
-                style={{ color: isPositive ? '#22c55e' : '#ef4444' }}
+                style={{ color: corDoDelta }}
               >
                 <TrendIcon className="w-3.5 h-3.5" />
                 <span>
-                  {progress.change > 0 ? '+' : ''}
-                  {unit === 'kcal' ? progress.change.toFixed(0) : progress.change.toFixed(1)} {unit}
+                  {delta.label} {unit}
                 </span>
-                <span className="text-neutral-400 ml-0.5">
-                  ({Math.abs(progress.percentage).toFixed(1)}%)
-                </span>
+                {pct != null && (
+                  <span className="text-neutral-400 ml-0.5">({pct.toFixed(1)}%)</span>
+                )}
               </div>
             )}
 
