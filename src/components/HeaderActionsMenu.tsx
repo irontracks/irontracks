@@ -18,6 +18,7 @@ import {
   Crown,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
+import { useDialog } from '@/contexts/DialogContext'
 
 interface HeaderActionsMenuProps {
   user: {
@@ -177,6 +178,7 @@ export default function HeaderActionsMenu({
   onOpenProfile,
 }: HeaderActionsMenuProps) {
   const [open, setOpen] = useState(false)
+  const { alert, confirm } = useDialog()
   const [cancellingVip, setCancellingVip] = useState(false)
   const [hideVipCtas, setHideVipCtas] = useState(false)
   const [portalMounted, setPortalMounted] = useState(false)
@@ -204,7 +206,22 @@ export default function HeaderActionsMenu({
 
   const cancelVip = async () => {
     if (cancellingVip) return
-    const confirmed = window.confirm('Cancelar sua assinatura VIP agora?')
+    /**
+     * Diálogo do APP, não o do navegador. O `window.confirm` sai sem a
+     * identidade visual, sem o vermelho de destrutivo e sem safe-area no
+     * iPhone — e este é o único ponto do menu que ainda usava o nativo.
+     *
+     * ⚠️ O item aparece para TODO usuário web, tenha assinatura ou não: o menu
+     * não conhece o status VIP, e buscá-lo custaria um fetch a cada abertura.
+     * Por isso o texto não pressupõe que exista assinatura — quem não tem
+     * recebe "nenhuma assinatura ativa" logo depois, que é o caminho que a
+     * rota já trata.
+     */
+    const confirmed = await confirm(
+      'Se houver uma assinatura ativa nesta conta, ela será cancelada.',
+      'Cancelar assinatura VIP?',
+      { confirmText: 'Cancelar assinatura', cancelText: 'Manter', destructive: true },
+    )
     if (!confirmed) return
     setCancellingVip(true)
     try {
@@ -214,7 +231,7 @@ export default function HeaderActionsMenu({
       })
       const json = await res.json().catch(() => ({}))
       if (!json?.ok) {
-        window.alert(String(json?.error || 'Falha ao cancelar assinatura.'))
+        await alert(String(json?.error || 'Falha ao cancelar assinatura.'))
         return
       }
       // Apple IAP: server returns cancelled=false + apple_iap=true + a friendly
@@ -223,16 +240,16 @@ export default function HeaderActionsMenu({
       // which is both wrong (they DO have an active Apple sub) and harmful
       // (Apple keeps charging).
       if (json?.apple_iap) {
-        window.alert(String(json?.message || 'Para cancelar, vá em Ajustes do iPhone → Apple ID → Assinaturas → IronTracks.'))
+        await alert(String(json?.message || 'Para cancelar, vá em Ajustes do iPhone → Apple ID → Assinaturas → IronTracks.'))
         return
       }
       if (!json?.cancelled) {
-        window.alert('Nenhuma assinatura ativa encontrada.')
+        await alert('Nenhuma assinatura ativa encontrada.')
         return
       }
-      window.alert('Assinatura cancelada.')
+      await alert('Assinatura cancelada.')
     } catch {
-      window.alert('Falha ao cancelar assinatura.')
+      await alert('Falha ao cancelar assinatura.')
     } finally {
       setCancellingVip(false)
       close()

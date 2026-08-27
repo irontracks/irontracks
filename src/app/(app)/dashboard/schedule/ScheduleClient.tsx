@@ -380,7 +380,16 @@ export default function SchedulePage() {
         await notifyStudentAppointment(chosenStudentId, baseTitle, start)
       }
 
-      const targetDate = selectedDate || trimmedDate
+      /**
+       * A data do AGENDAMENTO, não a que está na tela.
+       *
+       * Era `selectedDate || trimmedDate`: quem estava vendo o dia 27 e agendava
+       * para o 30 recarregava o 27 — o agendamento existia, sumia da vista, e o
+       * usuário concluía que não salvou. Se a data mudou, a tela vai junto: o
+       * que a pessoa acabou de criar precisa estar visível.
+       */
+      const targetDate = trimmedDate || selectedDate
+      if (targetDate && targetDate !== selectedDate) setSelectedDate(targetDate)
       await loadAppointmentsForDate(targetDate)
 
       setIsModalOpen(false)
@@ -545,7 +554,11 @@ export default function SchedulePage() {
             )}
           </div>
 
-          {error && (
+          {/* Só quando NÃO há modal aberto: o painel de erro vive na página e os
+              modais são z-50/z-[60], então uma falha ao salvar era renderizada
+              ATRÁS do modal que a causou — invisível para quem acabou de tocar
+              em Salvar. Dentro do modal há uma cópia (ver abaixo). */}
+          {error && !isModalOpen && (
             <div className="mb-4 bg-red-500/10 border border-red-500/40 text-red-200 text-sm px-3 py-2.5 rounded-xl">
               {error}
             </div>
@@ -656,6 +669,15 @@ export default function SchedulePage() {
               <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
                 <div className="w-9 h-1 rounded-full bg-white/15" />
               </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className="mx-5 mt-2 bg-red-500/10 border border-red-500/40 text-red-200 text-sm px-3 py-2.5 rounded-xl"
+                >
+                  {error}
+                </div>
+              )}
 
               <div className="px-5 pt-2 pb-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
