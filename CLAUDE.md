@@ -709,7 +709,7 @@ resultado esperado varia com o calendário, o guard **varre a semana inteira** �
 senão ele passa sozinho no dia certo. Mesmo raciocínio vale para fuso e virada
 de mês.
 
-## Guard falso — os sete jeitos de errar que já aconteceram aqui
+## Guard falso — os oito jeitos de errar que já aconteceram aqui
 
 Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padrões que passaram verdes COM o bug presente:
 
@@ -718,8 +718,9 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 3. **Cobrindo as pontas e não a fiação** — algoritmo e coletor corretos isoladamente, e ninguém ligando os dois. Foi assim que remover `knownWeights` da chamada no hook deixou 198 testes verdes.
 4. **Proibindo o consumo CORRETO** — source-guard mirando o NOME do campo (`bodyWeightKg`…) em vez da FONTE: `p.bodyWeightKg` vindo do leitor único é exatamente o certo, e o guard reprovava. Mire em quem LÊ a tabela, não em quem usa o dado (ago/2026, `userSnapshot`).
 5. **O teste que não existe** — declarar "provado por mutação" sem conferir que o caso foi mesmo inserido no arquivo. Um `replace` de script que não casa deixa o teste fora, e a mutação passa verde porque **nada** o exercita. Rode `vitest -t "<nome do caso>"` e confirme `1 passed`, não `0 passed | N skipped`.
-6. **Cego por migração** — ao trocar classe literal por token (`text-violet-300/80` → `MACHINE_ACCENT.text`), `plateHint` e `valorVsSugestao` seguiram procurando a string que deixou de existir: verdes e cegos. Não nasceu de teste mal escrito, e sim de uma migração que o deixou passando por inércia. **Ao trocar classe por token, varra os testes que citam a classe antiga** e mire na FONTE (12/08/2026).
+6. **Ancorado no que a mudança faz DESAPARECER** — o guard cita uma string que deixou de existir e fica sem alvo. Duas formas, a segunda medida em 27/08/2026: (a) *migração* — ao trocar classe literal por token (`text-violet-300/80` → `MACHINE_ACCENT.text`), `plateHint` e `valorVsSugestao` seguiram procurando a string antiga, verdes e cegos; (b) *a própria correção* — `abasNaoVisitadas` fatiava o botão de Voltar por `{!onClose ? … }`, que era **a expressão do bug corrigido**, e `cronometroDescansoUmDono` provava "o tempo extra é da barra" exigindo a frase `"além do planejado"`, que era a duplicata removida. **Ancore no que vai FICAR** — o `aria-label`, a FONTE, o contador que sobrevive —, nunca no que a correção vai apagar. E note por que os dois avisaram em vez de emudecer: ambos tinham um caso do tipo `expect(bloco).not.toBe('')`. Esse caso é o que separa "guard que reclama" de "guard que fica cego."
 7. **Casando com a REFERÊNCIA, não com a seção referida** — `toContain('Fase 3½')` passou verde com a fase inteira renomeada, porque outro parágrafo do mesmo arquivo dizia "a Fase 3½ decidiu". Em documento, mire no TÍTULO (`^### Fase 3½`); e quando o padrão aparece mais de uma vez, **assere dentro do BLOCO** daquela seção, não no arquivo todo — senão apagar a regra de um lugar passa despercebido porque ela existe em outro. Medido por mutação em 25/08/2026, nos guards do próprio `/documentar`.
+8. **LARGO DEMAIS — o oposto do cego, e igualmente inútil** (27/08/2026). Guard que acusa uso CORRETO é afrouxado na primeira semana, e aí não protege mais nada. Três tentativas minhas na mesma sessão, todas descartadas depois de medir: `font-mono text-xs` (para achar painel de stack) acusou volume tabular, percentual de som e coluna de tabela; `text-red-* + font-mono` acusou o contador de créditos esgotados, o cronômetro em overtime e o painel **admin** de erros, onde a stack é o produto; `red-` no arquivo das dobras acusou a validação de formulário. A conclusão que ficou: **a combinação de classes não identifica o defeito — o que identifica é ONDE ela aparece.** Restrinja o guard ao escopo (as superfícies de erro, as funções de status) em vez de abrir exceção para cada uso legítimo; allowlist com seis entradas é o papel de parede que este repo já aprendeu a não construir.
 
 ## Antes do /clear: `/documentar`
 
@@ -810,13 +811,29 @@ O que **não** está feito, para não ser redescoberto nem refeito:
    `__tests__/nonoPixelTextoCorrido.test.ts`, que só desce — o número vinha
    CRESCENDO (47 → 54 em uma semana), porque o piso de 9px virou alvo por
    gravidade. Em corpo, use 10–11px; 9px é para eyebrow label.
-2. **CSP_ENFORCE** — precisa de janela limpa pós-deploy de 12/08 (não é design).
+2. **CSP_ENFORCE** — a coleta ACABOU. A janela foi lida em 24/08 e o que falta é
+   uma decisão de uma linha, não mais dado: ver "Sobra UMA origem viva" na seção
+   do middleware. (Esta linha dizia "precisa de janela limpa pós-deploy de
+   12/08" e ficou contradizendo aquela seção por um mês.)
 3. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram
    o X corrigido e provado por TESTE, mas nunca foram tocados na tela.
 4. **Ordem de foco e agrupamento nas telas logadas** — bloqueado daqui: exige
    Accessibility Inspector (negado 2×) ou o dono no iPhone. **VoiceOver não
    existe no Simulador.** As 11 janelas de ago/2026 têm a semântica provada por
    guard e por tipo, não por leitor de tela real.
+
+### Fechado em 27/08/2026 — varredura dos 123 achados
+
+A auditoria de design de 26/08 produziu **123 achados** (24 críticos, 82
+significativos, 17 de elevação). Em 27/08 os 24 críticos foram verificados um a
+um contra o código: **18 já estavam corrigidos** e 6 estavam vivos. Os
+significativos foram varridos por sintoma detectável.
+
+O que ficou de fora, com motivo, e NÃO deve ser reaberto sem decisão nova:
+`window.prompt` como caixa de cópia do PIX (mexer ali é tocar em pagamento),
+4 arquivos com `window.alert` (exigem provider em cada árvore), e os **57
+achados que os céticos não chegaram a verificar** — esses precisam ser
+confirmados antes de virar trabalho, senão viram caça a fantasma.
 
 ### Fechado em 12/08/2026
 
@@ -939,17 +956,16 @@ Auditadas as nove telas do menu do avatar. O que ficou de lição vale mais que
 as correções: **em seis das nove, o defeito não era feiúra — era um sinal que
 tinha parado de significar.**
 
-| tela | o que estava errado | PR |
-|---|---|---|
-| Menu | dourado dizia categoria + estado + convite ao mesmo tempo | #783 |
-| Configurações | 11 seções, 11 cores; Privacidade em `#ef4444` (a cor de ERRO) | #784 |
-| Histórico | pílulas e botões abaixo de 44pt | #785 |
-| Notificações | 23 tipos em 7 famílias sem critério — **diagnosticado, não corrigido** | #786 |
-| Conversas | "Toque para conversar" repetido em toda linha; e-mail alheio como título | #787, #791 |
-| Agenda | nada — é a melhor tela do app | #788 |
-| Ver tour | dots de 6px que prometiam navegação | #789 |
-| Área do professor · Painel | saudação com handle, alarme aceso com zero, gráfico truncado | #790 |
-| Cobranças | **não existe no iOS** (`hideVipCtas = isIosNative()`, política da Apple) | — |
+O quadro tela a tela era changelog e saiu daqui — está nos PRs #783–#791. Dois
+fatos dele sobrevivem porque são usados em decisão:
+
+- **Cobranças não existe no iOS** (`hideVipCtas = isIosNative()`, política da
+  Apple sobre cobrança fora da loja). Quem mexer em qualquer coisa que aponte
+  para lá precisa do mesmo gate — foi o que o tour de coach esquecia até
+  27/08/2026, ensinando ao professor de iPhone uma tela que ele não tem.
+- **A taxonomia das 23 notificações foi corrigida** no #792 (função, não evento)
+  e a COBERTURA no #959. Esta tabela dizia "diagnosticado, não corrigido" e
+  ficou falsa por duas semanas.
 
 ### As três regras que saíram daqui
 
@@ -1184,6 +1200,24 @@ E ao reportar, dê o NÚMERO, não a impressão: "97,6% de linhas, faltam os
 caminhos com I/O" vale mais que "está bem coberto". Foi medindo que apareceram
 os dois bugs desta auditoria — o protocolo das dobras e o streak em UTC.
 
+## Varrer uma CLASSE: procure pelo símbolo E pela forma visual (27/08/2026)
+
+Os dois ângulos acham conjuntos DIFERENTES, e cada um deixou passar o que o
+outro pegou — medido varrendo as telas de erro que despejavam a exceção crua:
+
+- Procurar pelo **símbolo** (`getErrorMessage(error)`) deixou passar o
+  `dashboard/error.tsx`, que escrevia `{String(errorMessage || error?.toString?.() || …)}`.
+- Procurar pela **forma visual** (`font-mono text-xs break-all`, a assinatura do
+  painel vermelho) achou aquele — e deixou passar o SEGUNDO painel do
+  `SectionErrorBoundary`, que usava `truncate` em vez de `break-all`.
+
+Foram 11 superfícies no total; nenhuma busca sozinha teria fechado. **Ao varrer
+classe, liste os dois: o que o código CHAMA e o que o defeito PARECE.**
+
+E o corolário, que custou três tentativas na mesma sessão: a forma visual serve
+para ENCONTRAR, não para virar guard permanente. Ver o jeito nº 8 da lista de
+guards falsos.
+
 ## Padrão de auditoria (obrigatório fechar com testes)
 **Regra fixa do dono: SEMPRE mirar 100% de cobertura.** Uma auditoria só está concluída quando TODA superfície relacionada foi varrida — inclusive as "menores" (buckets de storage, uploads de avatar/foto, onboarding/access-request, crons, etc.). Nunca deixar uma superfície "de raspão" ou "não abri a fundo": ou varre e confirma sólida, ou reporta o achado. Não encerrar dizendo "falta varrer X" — varrer X.
 
@@ -1286,24 +1320,32 @@ no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
 componente sempre com `typeof X !== 'undefined'`; a medição inicial já cobre o
 caso comum e o observer é só para mudança em voo.
 
-**`git checkout <arquivo>` durante prova por mutação apaga trabalho não
-commitado.** Perdi duas vezes uma reescrita inteira desfazendo a mutação num
-arquivo que ainda não estava no índice. **Commitar ANTES de mutar** — a mutação
-se desfaz com `git checkout` justamente porque o commit existe.
+**Prove por mutação com `npm run mutar` — não à mão.**
 
-⚠️ **Aconteceu de novo em 25/08/2026**, com a regra já escrita aqui — sinal de
-que ler não basta: no meio de uma prova por mutação, um `git checkout` desfez as
-duas funções que eu tinha acabado de escrever e ainda não commitado. O sintoma é
-traiçoeiro: os testes seguintes passam VERDES (o import quebrado derruba outra
-coisa, ou a mutação nem chega a existir) e você conclui "provado" sobre um
-arquivo que voltou no tempo. Depois de cada `git checkout` de mutação, confira
-que o arquivo ainda tem o que você escreveu (`grep -c` no símbolo novo).
+```bash
+npm run mutar -- src/lib/x.ts "a >= b" "a > b" -- npx vitest run src/lib/__tests__/x.test.ts
+```
 
-**E confira que a MUTAÇÃO foi aplicada, não só que o teste rodou.** Um `sed`/
-`replace` que não casa devolve o arquivo intacto e o teste passa verde — "provado
-por mutação" vira mentira em silêncio. O jeito barato: `assert novo != antigo`
-antes de rodar. Na mesma sessão, duas mutações escritas em shell morreram em erro
-de aspas, o arquivo não mudou, e o resultado "14 passed" parecia prova.
+Ele aplica, roda, **restaura do conteúdo** e exige vermelho. As três armadilhas
+do jeito manual somem por construção, e as três já morderam aqui:
+
+1. **`git checkout` apaga trabalho não commitado.** Aconteceu em 15/08, de novo
+   em 25/08 — com a regra escrita neste arquivo — e **três vezes em 27/08**. O
+   sintoma engana: os testes seguintes passam VERDES (o import quebrado derruba
+   outra coisa, ou a mutação nem chega a existir) e você conclui "provado" sobre
+   um arquivo que voltou no tempo. O script restaura da CÓPIA em memória, então
+   rascunho não commitado sobrevive.
+2. **A mutação pode não ser aplicada.** Um `sed`/`replace` que não casa devolve
+   o arquivo intacto, o teste passa, e "provado por mutação" vira mentira em
+   silêncio — em 25/08 duas mutações morreram em erro de aspas e o "14 passed"
+   parecia prova. O script confere a substituição ANTES de rodar e aborta.
+3. **Verde com o bug reposto não gritava.** Agora é saída 1 com "GUARD FALSO: o
+   teste passou COM a mutação aplicada" — e a regra que segue é a de sempre:
+   corrija o TESTE, nunca o afrouxe.
+
+Que ler não bastava, ficou provado: a nota anterior *avisava* sobre o `git
+checkout` e a armadilha pegou o autor do aviso três vezes num dia. Decisões em
+`decidirAplicar`/`interpretarResultado`, travadas em `src/__tests__/mutarDecide.test.ts`.
 
 **Automação do simulador — o que custou toque errado:** as coordenadas são
 PONTOS (440×956 no 17 Pro Max), não pixels do screenshot; um toque convertido de
@@ -1581,8 +1623,23 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   em outro clone existe o script mas não o gatilho. O `user_id` é literal e a
   conta oficial (`djmkapple`) é conferida e recusada; nada mais no banco é
   tocado (medido: apagou 1 linha da conta de teste e preservou as 4 de
-  usuários reais). Só mexe no banco quando há simulador LIGADO — sem isso, um
-  DELETE às cegas alcançaria o iPhone de quem estivesse logado na conta de teste.
+  usuários reais).
+
+  ⚠️ **Ele NUNCA tinha limpado o banco rodando de um worktree** — corrigido em
+  27/08/2026. O script lia `.env.local` ao lado de si mesmo, e worktree não tem
+  esse arquivo (está no `.gitignore`, não é copiado): `lerEnv` voltava vazio e a
+  função saía com `return null` **em silêncio**. Como este repo trabalha em
+  worktrees, o hook rodava a cada resposta sem fazer nada. Só apareceu quando
+  uma órfã de 33 min derrubou o E2E de um PR que só mexia em `.md`. Hoje ele
+  procura também na raiz do checkout principal (`git rev-parse
+  --git-common-dir`) e AVISA quando não acha credencial, em vez de sair mudo.
+
+  Duas portas para mexer no banco: **simulador ligado** (encerra o app e limpa)
+  ou **sessão da conta de teste parada há mais de 30 min**, mesmo sem simulador
+  — porque desligar o simulador depois de abrir um treino deixava a órfã para
+  sempre. A segunda porta é segura porque olha só a conta de TESTE e exige tempo
+  parado: treino real com pausa longa acontece na conta OFICIAL, que o script
+  recusa.
 - Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
   app aberto continua escrevendo. E confira a tabela:
   ```sql
@@ -1788,6 +1845,20 @@ investigação inteira de RLS, RPC e policies atrás de fantasma. Ler a tela de 
 contra o banco de outra não é imprecisão — inverte a conclusão.
 
 **A página `/dashboard/nutrition` NÃO é alcançável dentro do app nativo.** A aba NUTRIÇÃO do dashboard abre o `NutritionOverlay`, que é outro componente; o `VipHub` até tem `router.push('/dashboard/nutrition')`, mas só quando `onOpenNutrition` não é passado — e no dashboard ele é. A página é a superfície WEB. Mexeu nela? A conferência visual pelo simulador não existe: valide pelo overlay (irmão que exibe os mesmos números) ou pelos dados, e **diga que a prova foi numérica, não visual**.
+
+**A suíte verde não vê o que só existe na TELA — dois casos em 27/08/2026, com
+6.7 mil testes passando.** (1) A Central de Notificações ganhou navegação e os
+cards continuavam inertes: o `.map()` que monta a lista reconstrói cada item
+campo a campo e não copiava `metadata`, então o destino nunca era encontrado. A
+lista fica IDÊNTICA — some só o clique. (2) A tela de login passou a exibir
+"V6DC5E30D" no lugar de "v1.21", porque a correção deu precedência a
+`NEXT_PUBLIC_APP_VERSION`, que na Vercel é o SHA do commit (é o buster de cache
+do service worker, nunca a versão pública).
+
+O padrão dos dois: **o guard media a ponta certa e a fiação errada** — o
+componente isolado estava correto, o dado é que não chegava nele. Depois de
+mexer em algo que aparece, abra a tela; e para o que a tela não alcança (a
+página web da nutrição), diga que a prova foi numérica.
 
 **Teste de canvas NÃO prova rendering.** jsdom não implementa `canvas.getContext('2d')`, então `measureText`/matrizes caem em fallback e o teste passa verde com o desenho quebrado. Foi assim que a legenda do Story subiu com 23 guards verdes e o texto invisível no aparelho. Em qualquer coisa que DESENHE, o guard cobre o algoritmo e a fiação; o resultado na tela é conferência visual — declare o limite no próprio arquivo de teste.
 
@@ -2493,9 +2564,10 @@ completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
 | Xcode Cloud sempre vermelho | #815–#819 | verde no run #1732 (ver abaixo) |
 
 **Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
-1. **CSP**: janela limpa de 24 h após o deploy de 14/08 (#812 acrescentou
-   `res.cloudinary.com` ao connect-src — o preloader do StoryViewer) →
-   `CSP_ENFORCE=true` na Vercel. SQL da janela na seção do middleware acima.
+1. **CSP**: a janela JÁ FOI LIDA (24/08) — não falta mais coleta, falta uma
+   decisão sobre `connect.facebook.net`. Ver "Sobra UMA origem viva" na seção do
+   middleware, que é onde este assunto mora. (Esta linha pedia uma janela de 24 h
+   pós-deploy de 14/08 e envelheceu ali, contradizendo a outra seção.)
 2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só LOGA
    (`[origin-guard]` nos runtime logs, kind `cross-origin`|`missing-origin`).
    Janela limpa (especialmente `missing-origin` zerado) →

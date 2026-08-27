@@ -29,9 +29,19 @@
  * qualquer requisição. `djmkapple` tem 129 sessões reais; um DELETE errado ali
  * não teria desfazer.
  *
- * Só mexe no banco quando há simulador LIGADO — sem isso não houve uso do
- * simulador nesta sessão, e apagar às cegas passaria a alcançar o iPhone do
- * dono se ele estivesse logado na conta de teste.
+ * Duas portas para mexer no banco, e a segunda existe por um furo medido:
+ *
+ * 1. **Simulador LIGADO** — houve uso nesta sessão; encerra o app e limpa.
+ * 2. **Sessão de teste PARADA há mais de `MIN_ORFA` minutos**, mesmo sem
+ *    simulador ligado. Sem esta porta, desligar o simulador DEPOIS de abrir um
+ *    treino deixava a linha órfã para sempre: o hook rodava, via zero
+ *    simuladores e saía. Foi o que derrubou o E2E do PR #975 em 27/08/2026 —
+ *    sessão parada há 33 min, num PR que só mexia em `.md`. E o custo cai em
+ *    quem não tem nada a ver: o próximo PR.
+ *
+ * A porta 2 é segura porque olha só a conta de TESTE e exige tempo parado.
+ * Ninguém treina de verdade ali — e o dono já documentou que sessão de treino
+ * real, com pausa longa, acontece na conta OFICIAL, que este script recusa.
  *
  * Sai com 0 SEMPRE: roda como hook `Stop`, e hook que falha vira ruído no fim
  * de toda resposta. Silencioso quando não havia nada para fechar.
@@ -67,26 +77,74 @@ function simuladoresLigados() {
  * Lê `.env.local` sem imprimir valor nenhum. O arquivo tem credencial real de
  * produção: o que sai daqui é booleano ("achei" / "não achei"), nunca o dado.
  */
+/**
+ * Onde procurar o `.env.local`, em ordem.
+ *
+ * ⚠️ WORKTREE NÃO TEM `.env.local` — ele está no `.gitignore`, então não é
+ * copiado. O script lia só o arquivo ao lado dele, não achava, e retornava sem
+ * dizer nada: **o `sim:close` nunca limpou o banco rodando de um worktree**, que
+ * é justamente de onde este repo trabalha. Descoberto em 27/08/2026, depois de
+ * uma órfã de 33 min derrubar o E2E de um PR que só mexia em `.md`.
+ *
+ * O `--git-common-dir` aponta para o `.git` do checkout PRINCIPAL mesmo quando
+ * chamado de dentro de um worktree; o pai dele é a raiz onde o `.env.local`
+ * mora de verdade.
+ */
+function caminhosDoEnv() {
+  const caminhos = [join(RAIZ, '.env.local')]
+  try {
+    const gitComum = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8', cwd: RAIZ, stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    if (gitComum) caminhos.push(join(dirname(gitComum), '.env.local'))
+  } catch { /* fora de repo git: fica só o primeiro caminho */ }
+  return [...new Set(caminhos)]
+}
+
 function lerEnv(chaves) {
   const out = {}
-  try {
-    for (const linha of readFileSync(join(RAIZ, '.env.local'), 'utf8').split('\n')) {
-      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(linha)
-      if (!m || !chaves.includes(m[1])) continue
-      out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
-    }
-  } catch { /* sem .env.local: só o app é encerrado */ }
+  for (const caminho of caminhosDoEnv()) {
+    try {
+      for (const linha of readFileSync(caminho, 'utf8').split('\n')) {
+        const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(linha)
+        if (!m || !chaves.includes(m[1])) continue
+        out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+      }
+      if (chaves.every((k) => out[k])) break
+    } catch { /* este caminho não tem o arquivo — tenta o próximo */ }
+  }
   return out
 }
 
-async function apagarSessaoDeTeste() {
+/**
+ * Apaga a sessão ativa da conta de TESTE.
+ *
+ * `paradaHaMinutos` restringe ao que está parado há pelo menos N minutos — é o
+ * que torna seguro limpar sem simulador ligado. Sem o parâmetro, apaga a sessão
+ * da conta de teste seja qual for a idade (o caso do simulador ligado, em que o
+ * uso acabou de acontecer).
+ */
+async function apagarSessaoDeTeste({ paradaHaMinutos } = {}) {
   if (CONTA_TESTE === CONTA_OFICIAL) return null // guard: alguém trocou o literal
   const env = lerEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'])
   const url = env.NEXT_PUBLIC_SUPABASE_URL
   const key = env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return null
+  if (!url || !key) {
+    // Sem isto a falha era MUDA: o hook saía com 0, ninguém percebia, e a órfã
+    // ficava no banco até derrubar o E2E do próximo PR. "Toda saída silenciosa
+    // em caminho crítico é bomba-relógio."
+    process.stdout.write(
+      '[sim] não achei as credenciais do Supabase — a sessão de teste NÃO foi limpa.\n' +
+      `      Procurei em: ${caminhosDoEnv().join(', ')}\n`,
+    )
+    return null
+  }
 
-  const alvo = `${url}/rest/v1/active_workout_sessions?user_id=eq.${CONTA_TESTE}`
+  let alvo = `${url}/rest/v1/active_workout_sessions?user_id=eq.${CONTA_TESTE}`
+  if (Number.isFinite(paradaHaMinutos) && paradaHaMinutos > 0) {
+    const corte = new Date(Date.now() - paradaHaMinutos * 60_000).toISOString()
+    alvo += `&updated_at=lt.${corte}`
+  }
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), 8000)
   try {
@@ -110,8 +168,19 @@ async function apagarSessaoDeTeste() {
   }
 }
 
+/** Sessão de teste parada por mais que isto é resíduo, não treino. */
+const MIN_ORFA = 30
+
 const ligados = simuladoresLigados()
-if (ligados.length === 0) process.exit(0)
+if (ligados.length === 0) {
+  // Porta 2: sem simulador ligado, ainda vale limpar órfã ANTIGA da conta de
+  // teste — é o caso de ter desligado o simulador depois de abrir um treino.
+  const apagadasSemSim = await apagarSessaoDeTeste({ paradaHaMinutos: MIN_ORFA })
+  if (apagadasSemSim) {
+    process.stdout.write(`[sim] ${apagadasSemSim} sessão(ões) órfã(s) da conta de teste apagada(s).\n`)
+  }
+  process.exit(0)
+}
 
 for (const d of ligados) {
   try {
