@@ -1,6 +1,19 @@
 import { ArrowLeft, ShieldCheck, Database, Lock, UserCheck, Mail } from 'lucide-react'
 import Link from 'next/link'
 
+/**
+ * A data de revisão é FIXA, escrita à mão quando o texto muda.
+ *
+ * Era `new Date().toLocaleDateString('pt-BR')`: o documento anunciava ter sido
+ * atualizado HOJE, todo dia, sem uma vírgula ter mudado. Num documento legal
+ * isso não é um detalhe de UI — é a única pista que o usuário tem de QUAL
+ * versão ele aceitou, e ela mentia para todo mundo, todos os dias.
+ *
+ * Ao editar o texto, atualize esta data no mesmo commit. O guard
+ * `documentoLegalDataFixa` reprova o retorno do relógio.
+ */
+const REVISADO_EM = '26/08/2026' // último commit de conteúdo: 2026-08-26
+
 export default function PrivacyPolicy() {
   const sections = [
     {
@@ -120,7 +133,7 @@ export default function PrivacyPolicy() {
             <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 rounded-full w-fit">
               Válido e em Vigor
             </span>
-            <span>Atualizado em: {new Date().toLocaleDateString('pt-BR')}</span>
+            <span>Atualizado em: {REVISADO_EM}</span>
           </div>
           <p className="mt-6 text-lg text-neutral-400 leading-relaxed max-w-3xl">
             Bem-vindo ao centro de segurança e privacidade. Queremos que você foque 100% no seu treino.
@@ -158,7 +171,7 @@ export default function PrivacyPolicy() {
             Equipe IronTracks
           </p>
           <p className="text-sm text-neutral-400">
-            © {new Date().getFullYear()} Todos os direitos reservados.
+            © 2026 Todos os direitos reservados.
           </p>
         </div>
       </main>
