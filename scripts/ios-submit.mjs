@@ -57,6 +57,23 @@ for (let i = 0; i < args.length; i++) {
     if (a === '--dry-run') dryRun = true
     else if (a === '--no-submit') noSubmit = true // aplica metadata/notas, NÃO submete
     else if (a === '--build') targetBuildNumber = args[++i]
+    else if (a.startsWith('-')) {
+        /**
+         * Flag desconhecida ABORTA — nunca vira texto de loja.
+         *
+         * O `else if (!releaseNotes)` engolia qualquer argumento como as
+         * "Novidades desta versão". Em 27/08/2026 um `--status` (flag que não
+         * existe aqui) foi gravado como release notes da 1.21.1 e ficou lá,
+         * visível para quem abrisse o App Store Connect — e teria ido a review
+         * se alguém submetesse sem olhar. O script roda em LIVE SUBMIT por
+         * padrão, então engolir argumento desconhecido é caro.
+         */
+        console.error(`\nABORTADO: "${a}" não é uma flag conhecida.`)
+        console.error('  Flags: --dry-run | --no-submit | --build <n>')
+        console.error('  Para status sem submeter nada, use: --dry-run')
+        console.error('  Texto de release notes não pode começar com "-".\n')
+        process.exit(2)
+    }
     else if (!releaseNotes) releaseNotes = a
 }
 
