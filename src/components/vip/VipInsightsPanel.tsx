@@ -215,8 +215,11 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
       ) : null}
 
       <div className="mt-3 space-y-2">
+        {/* Com erro na tela, o empty state MENTE: diz que não há treino quando o
+            que houve foi falha de rede — e culpa o usuário por um problema do
+            app. As duas mensagens juntas ainda se contradizem. */}
         {items.length === 0 ? (
-          <div className="text-sm text-neutral-400">Finalize um treino para gerar insights.</div>
+          error ? null : <div className="text-sm text-neutral-400">Finalize um treino para gerar insights.</div>
         ) : (
           items.map((r) => (
             <div

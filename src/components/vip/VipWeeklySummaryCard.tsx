@@ -156,8 +156,15 @@ export default function VipWeeklySummaryCard() {
                   <Moon size={14} className="text-amber-400" />
                   <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Sono</span>
                 </div>
-                <div className="text-xl font-black text-white">{Math.round(checkins.sleep * 10) / 10}</div>
-                <div className="text-[10px] text-neutral-400">média</div>
+                {/* A API entrega `sleep_hours` — HORAS. Sem a unidade, "7.5" ao
+                    lado de uma Energia que diz "média de 5" lê como NOTA numa
+                    escala, e 7,5 de sono (ótimo) parece mediano. O próprio
+                    prompt da IA já escreve "Sono médio: 7.5h". */}
+                <div className="text-xl font-black text-white">
+                  {Math.round(checkins.sleep * 10) / 10}
+                  <span className="text-sm font-bold text-neutral-400 ml-0.5">h</span>
+                </div>
+                <div className="text-[10px] text-neutral-400">média por noite</div>
               </div>
             )}
           </div>
