@@ -864,9 +864,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
                     {/* Right side: buttons */}
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        {extraSeconds > 0 && (
-                            <p className="text-xs font-black text-green-400 mb-1.5">{`+${formatDuration(extraSeconds)} além do planejado`}</p>
-                        )}
+                        {/* O MESMO "+2:31" aparecia aqui e no anel, a centímetros
+                            de distância — e em cores opostas: vermelho no anel
+                            (alarme) e VERDE aqui (conquista). O app dizia as duas
+                            coisas sobre o mesmo fato, e nenhuma delas se sustenta:
+                            passar do descanso planejado não é sucesso.
+
+                            O anel já mostra o número e o rótulo "extra". Um fato
+                            aparece uma vez (docs/DESIGN_HIERARCHY.md) — e o espaço
+                            liberado é dos botões, que já disputam a faixa com o
+                            rodapé do treino. */}
                         {isTransition && (
                             <p className="text-xs font-black text-orange-400 mb-1.5 truncate">
                                 Vá para: {context?.exerciseName ?? 'próximo exercício'}

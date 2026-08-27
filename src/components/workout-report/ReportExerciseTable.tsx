@@ -22,12 +22,19 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
           <div className="text-xs text-neutral-300">Ordem, descanso, volume e calorias (estimativa ~; soma fecha com o total da sessão).</div>
         </div>
       </div>
+      {/* 15 colunas com rolagem horizontal e nenhuma coluna fixa: bastava
+          arrastar para a direita e o NOME do exercício saía da tela — a única
+          coluna que dá sentido às outras catorze. Num app usado em pé, com uma
+          mão, "Δ 1RM: +2,5" sem saber de qual exercício não informa nada.
+
+          As duas primeiras ficam ancoradas (`sticky`), com fundo opaco para o
+          conteúdo não passar por baixo. É o que planilha faz desde sempre. */}
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm text-left">
           <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
             <tr>
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">Exercício</th>
+              <th className="sticky left-0 z-20 bg-neutral-950 px-3 py-2">#</th>
+              <th className="sticky left-[44px] z-20 bg-neutral-950 px-3 py-2">Exercício</th>
               <th className="px-3 py-2 text-center">Séries</th>
               <th className="px-3 py-2 text-center">Reps</th>
               <th className="px-3 py-2 text-center">Execução</th>
@@ -68,8 +75,8 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
               const deltaWeightClass = Number.isFinite(deltaWeight) && deltaWeight < 0 ? 'text-red-300' : 'text-emerald-300'
               return (
                 <tr key={`${name}-${idx}`} className="hover:bg-neutral-800/40">
-                  <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
-                  <td className="px-3 py-2 font-semibold text-white">{name}</td>
+                  <td className="sticky left-0 z-10 w-11 bg-neutral-900 px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
+                  <td className="sticky left-[44px] z-10 bg-neutral-900 px-3 py-2 font-semibold text-white">{name}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? (isPlankEx ? `${repsDone}s` : repsDone) : '—'}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(executionMinutes) && executionMinutes > 0 ? `${executionMinutes.toFixed(1)} min` : '—'}</td>

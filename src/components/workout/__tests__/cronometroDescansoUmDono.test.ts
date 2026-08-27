@@ -78,7 +78,17 @@ describe('cronômetro do descanso × rodapé do treino', () => {
 
     it('o "+extra" também tem um dono só', () => {
         expect(footer, 'o tempo além do planejado é da barra do descanso').not.toMatch(/recoveryExtra/)
-        expect(barra).toMatch(/além do planejado/)
+        /**
+         * Antes este caso mirava na frase "além do planejado" — que era a
+         * SEGUNDA exibição do mesmo número, removida em 27/08/2026 por
+         * duplicar o anel e ainda contradizê-lo na cor (vermelho no anel,
+         * verde no texto).
+         *
+         * O invariante não mudou: quem mostra o tempo extra é a barra do
+         * descanso, e só ela. O que mudou foi a âncora — agora aponta para o
+         * contador que ficou, no anel, em vez de para a cópia que saiu.
+         */
+        expect(barra).toMatch(/formatDuration\(extraSeconds\)/)
     })
 })
 
