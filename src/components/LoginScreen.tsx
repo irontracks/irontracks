@@ -2,13 +2,14 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useLoginScreen } from '@/hooks/useLoginScreen'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { codeFieldProps, plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { appVersionLabel } from '@/lib/appVersion'
 
 // ── Floating Gold Particles Background ──────────────────────────────────────
 
@@ -137,7 +138,7 @@ function GoldParticles() {
 
 const LoginScreen = () => {
     useNativeAppSetup(null)
-    const appVersionLabel = 'v1.0';
+    const versaoDoApp = appVersionLabel();
 
     const {
         isLoading,
@@ -155,20 +156,11 @@ const LoginScreen = () => {
         recoveryCode, setRecoveryCode,
         recoveryPassword2, setRecoveryPassword2,
         recoverCooldownLeft,
-        showRequestModal, setShowRequestModal,
-        reqLoading, reqSuccess, setReqSuccess,
-        reqError, formData, setFormData,
-        emailCrefCheck, requestCrefCheck,
-        verifyEmailCref, verifyRequestCref,
-        resetEmailCrefCheck, resetRequestCrefCheck,
-        handleAppleLogin,
+        emailCrefCheck, verifyEmailCref, resetEmailCrefCheck, handleAppleLogin,
         handleEmailAuth,
-        handleRequestSubmit,
-        handleInputChange,
     } = useLoginScreen()
 
     // Antes do early return do loading: hook não pode ficar atrás de condicional.
-    const requestModalRef = useFocusTrap(!!showRequestModal, () => setShowRequestModal(false))
     const noAccountModalRef = useFocusTrap(!!showNoAccountModal, () => setShowNoAccountModal(false))
 
     if (isLoading) {
@@ -229,23 +221,19 @@ const LoginScreen = () => {
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
 
-                <p className="text-zinc-500 mb-8 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
-                    Sistema de Alta Performance • {appVersionLabel}
+                <p className="text-neutral-400 mb-8 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
+                    Sistema de Alta Performance • {versaoDoApp}
                 </p>
 
-                {authMode === 'menu' && (
-                    <div className="w-full space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* Google button removed */}
-                        <button
-                            type="button"
-                            onClick={() => setAuthMode('login')}
-                            className="w-full flex items-center justify-center gap-3 bg-neutral-800/50 border border-neutral-700 text-white px-6 py-4 rounded-xl font-bold text-sm uppercase tracking-wide hover:bg-neutral-800 hover:border-yellow-500/50 transition-all"
-                        >
-                            <Mail size={20} className="text-yellow-500" />
-                            Entrar com E-mail
-                        </button>
-                    </div>
-                )}
+                {/* O modo 'menu' era um terceiro estado do login (escolher entre
+                    e-mail e outras entradas) que NENHUM caminho ativa: não existe
+                    `setAuthMode('menu')` no repo. Com ele, morriam dois blocos e o
+                    modal PEDIR ACESSO inteiro — 145 linhas que gravavam em
+                    `access_requests` e que ninguém conseguia abrir.
+
+                    O fluxo NÃO se perde: o próprio `signup` já cria o access_request
+                    antes do `signUp` (a trigger de whitelist exige isso), então
+                    'Criar conta' faz o que o modal fazia. Era duplicata legada. */}
 
                 {(authMode === 'login' || authMode === 'signup' || authMode === 'recover' || authMode === 'recover_code') && (
                     <form onSubmit={handleEmailAuth} className="w-full space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
@@ -708,15 +696,6 @@ const LoginScreen = () => {
                 )}
 
                 {/* Request Access Button (only in menu) */}
-                {authMode === 'menu' && (
-                    <button
-                        type="button"
-                        onClick={() => setShowRequestModal(true)}
-                        className="mt-6 text-xs text-neutral-400 font-bold uppercase tracking-widest hover:text-white transition-colors"
-                    >
-                        Não tem acesso? <span className="text-yellow-500 underline decoration-yellow-500/30 underline-offset-4 hover:decoration-yellow-500">Pedir agora</span>
-                    </button>
-                )}
                 </div>
             </div>
 
@@ -725,151 +704,6 @@ const LoginScreen = () => {
             </div>
 
             {/* Access Request Modal */}
-            {showRequestModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-safe pb-safe bg-black/80 backdrop-blur-sm" {...backdropProps(() => setShowRequestModal(false))}>
-                    <div ref={requestModalRef} {...dialogProps('Pedir acesso')} className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
-                        <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
-                            <h3 className="text-lg font-black text-white italic">PEDIR ACESSO</h3>
-                            <button aria-label="Fechar" onClick={() => setShowRequestModal(false)} className="text-neutral-400 hover:text-white">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="p-6">
-                            {reqSuccess ? (
-                                <div className="text-center py-8">
-                                    <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
-                                        <CheckCircle2 size={32} />
-                                    </div>
-                                    <h4 className="text-xl font-bold text-white mb-2">Solicitação Enviada!</h4>
-                                    <p className="text-neutral-400 text-sm mb-6">
-                                        Recebemos seus dados. Se aprovado, você receberá um e-mail com as instruções de acesso.
-                                    </p>
-                                    <button
-                                        onClick={() => { setShowRequestModal(false); setReqSuccess(false); setFormData((prev) => ({ ...prev, full_name: '', email: '', phone: '', birth_date: '' })); }}
-                                        className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold transition-colors"
-                                    >
-                                        Fechar
-                                    </button>
-                                </div>
-                            ) : (
-                                <form onSubmit={handleRequestSubmit} className="space-y-4">
-                                    {reqError && (
-                                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3">
-                                            <AlertCircle size={16} className="text-red-400 shrink-0" />
-                                            <p className="text-red-300 text-xs font-bold">{reqError}</p>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-1">
-                                        <label htmlFor="req-full-name" className="text-xs font-bold text-neutral-400 uppercase">Nome Completo</label>
-                                        <input {...properNameFieldProps}
-                                            id="req-full-name"
-                                            aria-label="Nome Completo"
-                                            required
-                                            name="full_name"
-                                            value={formData.full_name}
-                                            onChange={handleInputChange}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                            placeholder="Ex: João Silva"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label htmlFor="req-email" className="text-xs font-bold text-neutral-400 uppercase">E-mail</label>
-                                        <input
-                                            id="req-email"
-                                            aria-label="E-mail"
-                                            required
-                                            type="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                            placeholder="seu@email.com"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label htmlFor="req-phone" className="text-xs font-bold text-neutral-400 uppercase">WhatsApp</label>
-                                            <input {...plainFieldProps}
-                                                id="req-phone"
-                                                aria-label="Telefone WhatsApp"
-                                                required
-                                                name="phone"
-                                                type="tel"
-                                                value={formData.phone}
-                                                onChange={handleInputChange}
-                                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                                placeholder="(11) 99999-9999"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label htmlFor="req-birth-date" className="text-xs font-bold text-neutral-400 uppercase">Nascimento</label>
-                                            <input
-                                                id="req-birth-date"
-                                                aria-label="Data de Nascimento"
-                                                required
-                                                type="date"
-                                                name="birth_date"
-                                                value={formData.birth_date}
-                                                onChange={handleInputChange}
-                                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        <label htmlFor="req-is-teacher-checkbox" className="flex items-center gap-3 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center w-5 h-5">
-                                                <input
-                                                    id="req-is-teacher-checkbox"
-                                                    aria-label="Sou Personal Trainer / Professor"
-                                                    type="checkbox"
-                                                    checked={formData.is_teacher}
-                                                    onChange={(e) => { resetRequestCrefCheck(); setFormData(prev => ({ ...prev, is_teacher: e.target.checked })); }}
-                                                    className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
-                                                />
-                                                <CheckCircle2 size={12} className="absolute text-black opacity-0 peer-checked:opacity-100 pointer-events-none" />
-                                            </div>
-                                            <span className="text-xs font-bold text-neutral-400 group-hover:text-white transition-colors uppercase tracking-wide">
-                                                Sou Personal Trainer / Professor
-                                            </span>
-                                        </label>
-
-                                        {formData.is_teacher && (
-                                            <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
-                                                <label htmlFor="req-cref-input" className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
-                                                <input {...plainFieldProps}
-                                                    id="req-cref-input"
-                                                    aria-label="Número do CREF"
-                                                    required
-                                                    name="cref"
-                                                    value={formData.cref}
-                                                    onChange={handleInputChange}
-                                                    onBlur={() => void verifyRequestCref()}
-                                                    className="w-full bg-neutral-950 border border-yellow-500/50 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                                    placeholder="Ex: 004955-G/PR"
-                                                />
-                                                <CrefCheckFeedback check={requestCrefCheck} />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={reqLoading || requestCrefCheck.status === 'checking' || requestCrefCheck.status === 'invalid'}
-                                        className="w-full mt-2 bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                                    >
-                                        {reqLoading ? <Loader2 className="animate-spin" size={18} /> : 'ENVIAR SOLICITAÇÃO'}
-                                    </button>
-                                </form>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Modal: Sem Cadastro (Apple Sign-In sem conta) */}
             {showNoAccountModal && (

@@ -842,60 +842,43 @@ function StatsBar() {
   )
 }
 
-// ── TESTIMONIALS ─────────────────────────────────────────────────────────────
-function Testimonials() {
-  const reviews = [
-    { name: 'Carlos M.', role: 'Musculação há 4 anos', text: 'Tentei vários apps, mas nenhum me deu a clareza de progressão que o IronTracks dá. Ver meu PR evoluir semana a semana é viciante.', initials: 'CM', color: '#F5B800' },
-    { name: 'Ana R.', role: 'Treino funcional + corrida', text: 'O cardio GPS junto com o log de musculação em um único app é o que eu precisava. A IA de nutrição então... uso todo dia.', initials: 'AR', color: '#3b82f6' },
-    { name: 'Bruno S.', role: 'Personal trainer, 12 anos', text: 'Recomendo para todos os meus alunos. A organização de treinos e o histórico detalhado são exatamente o que um atleta sério precisa.', initials: 'BS', color: '#2AE870' },
-  ]
-
+// ── PROVA SOCIAL ─────────────────────────────────────────────────────────────
+/**
+ * Esta seção trazia TRÊS depoimentos inventados — nome, profissão e texto, com
+ * iniciais em avatar colorido — sob o título "O que quem treina está dizendo".
+ * Nenhuma daquelas pessoas existe.
+ *
+ * Depoimento fabricado apresentado como real é publicidade enganosa (CDC art.
+ * 37), e o risco não é abstrato: basta um leitor pedir para falar com um deles.
+ * Não há como "melhorar" isso no layout — ou o conteúdo é verdadeiro, ou sai.
+ *
+ * A NOTA ficou porque é verdade e é verificável: consultada em 27/08/2026 na
+ * API pública da Apple (`itunes.apple.com/lookup?id=6758735356&country=br`),
+ * que devolveu média 5,0. O que saiu junto foi a insinuação de VOLUME — a linha
+ * "Avaliado com 5 estrelas na App Store Brasil", ao lado de três clientes
+ * imaginários, sugeria uma base de usuários que aquele número não sustenta. A
+ * nota, dita sozinha, continua sendo exatamente o que ela é.
+ *
+ * Quando houver depoimento REAL — com autorização de quem escreveu —, ele entra
+ * aqui. Até lá, o produto fala por si.
+ */
+function ProvaSocial() {
   return (
-    <section style={{ padding: '120px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <Reveal style={{ textAlign: 'center', marginBottom: 48 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 12 }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} size={18} fill="#F5B800" style={{ color: '#F5B800' }} />
-            ))}
-            <span style={{ marginLeft: 8, color: '#F5B800', fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>5,0</span>
-          </div>
-          <h2 style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 'clamp(24px, 3vw, 36px)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-            O que quem treina está dizendo
-          </h2>
-          <p style={{ color: 'rgba(245,245,245,0.45)', fontSize: 14 }}>Avaliado com 5 estrelas na App Store Brasil</p>
-        </Reveal>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          {reviews.map((r, i) => (
-            <Reveal key={r.name} delay={i * 80} style={{
-              padding: 22, borderRadius: 16,
-              background: '#141414', border: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex', flexDirection: 'column', gap: 16,
-            }}>
-              <div style={{ display: 'flex', gap: 3 }}>
-                {Array.from({ length: 5 }).map((_, j) => (
-                  <Star key={j} size={12} fill="#F5B800" style={{ color: '#F5B800' }} />
-                ))}
-              </div>
-              <p style={{ fontSize: 14, color: 'rgba(245,245,245,0.75)', lineHeight: 1.65, flex: 1, margin: 0 }}>
-                &ldquo;{r.text}&rdquo;
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `${r.color}18`, border: `1px solid ${r.color}35`, color: r.color,
-                  fontSize: 12, fontWeight: 700,
-                }}>{r.initials}</div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(245,245,245,0.4)' }}>{r.role}</div>
-                </div>
-              </div>
-            </Reveal>
+    <section style={{ padding: '96px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Reveal style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} size={18} fill="#F5B800" style={{ color: '#F5B800' }} />
           ))}
+          <span style={{ marginLeft: 8, color: '#F5B800', fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>5,0</span>
         </div>
-      </div>
+        <h2 style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 'clamp(24px, 3vw, 36px)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+          Nota 5,0 na App Store
+        </h2>
+        <p style={{ color: 'rgba(245,245,245,0.45)', fontSize: 14, margin: 0 }}>
+          De quem já treina com o IronTracks no Brasil.
+        </p>
+      </Reveal>
     </section>
   )
 }
@@ -1205,7 +1188,7 @@ export default function ComercialContent() {
       <Showcase />
       <Wearables />
       <StatsBar />
-      <Testimonials />
+      <ProvaSocial />
       <VipHint />
       <FinalCta onAndroidClick={() => setShowAndroid(true)} />
       <Footer />
