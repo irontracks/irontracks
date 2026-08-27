@@ -12,6 +12,7 @@ import { Story, StoryGroup } from '@/types/social'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
+import { publicDisplayName } from '@/lib/user/publicDisplayName'
 import { uploadStoryFile } from '@/utils/storage/mediaUpload'
 import { createStoriesRefreshScheduler } from './storiesRefreshScheduler'
 
@@ -347,7 +348,7 @@ export default function StoriesBar({
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
           const isMine = g.authorId === myId
-          const name = isMine ? 'Seu story' : (String(g.displayName || '').trim() || 'Amigo')
+          const name = isMine ? 'Seu story' : publicDisplayName(g.displayName, 'Amigo')
           // No próprio story, o círculo mostra a prévia da mídia; nos amigos, o avatar.
           const avatarSrc = (isMine ? storyPreviewUrl(g.stories?.[0]) : null) || g.photoUrl
 

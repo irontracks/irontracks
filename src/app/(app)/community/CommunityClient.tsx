@@ -576,7 +576,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                       <div>
                         {followRequests.map((r, i) => {
                           const p = r.follower_profile
-                          const name = safeString(p?.display_name).trim() || 'Usuário'
+                          const name = publicDisplayName(safeString(p?.display_name))
                           const role = formatRoleLabel(p?.role)
                           const roleColor = getRoleColor(p?.role)
                           const photo = safeString(p?.photo_url).trim()
@@ -635,7 +635,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                           const followRow = follows.get(p.id) || null
                           const status = followRow?.status || null
                           const busy = busyId === p.id
-                          const name = safeString(p.display_name).trim() || 'Usuário'
+                          const name = publicDisplayName(safeString(p.display_name))
                           const role = formatRoleLabel(p.role)
                           const roleColor = getRoleColor(p.role)
                           const photo = safeString(p.photo_url).trim()
