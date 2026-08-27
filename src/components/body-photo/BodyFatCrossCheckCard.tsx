@@ -82,7 +82,7 @@ export const BodyFatCrossCheckCard: React.FC<{
                     <div className="text-lg font-black text-white leading-none">
                         {pct(photoLow)}–{pct(photoHigh)}
                     </div>
-                    <div className="text-[10px] text-neutral-600 mt-1">estimativa visual por IA</div>
+                    <div className="text-[10px] text-neutral-400 mt-1">estimativa visual por IA</div>
                 </div>
 
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2.5">
@@ -91,7 +91,7 @@ export const BodyFatCrossCheckCard: React.FC<{
                         <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-400">Medido</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">{pct(reference.percent)}</div>
-                    <div className="text-[10px] text-neutral-600 mt-1">
+                    <div className="text-[10px] text-neutral-400 mt-1">
                         {sourceLabel} · {formatDate(reference.assessmentDate)}
                     </div>
                 </div>

@@ -222,7 +222,7 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
                     <div className="flex items-center gap-2">
                         <div className="flex-1 min-w-0 text-white font-black text-lg leading-tight truncate">{titulo}</div>
                         {onQuickView ? (
-                            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-600" aria-hidden="true" />
+                            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
                         ) : null}
                     </div>
 

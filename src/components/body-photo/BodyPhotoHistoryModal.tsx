@@ -348,7 +348,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                                     onClick={() => setConfirmingDelete(confirming ? null : a.id)}
                                                     disabled={deleting}
                                                     aria-label={`Apagar avaliação de ${formatDate(a.assessment_date)}`}
-                                                    className="px-3 border-l border-neutral-800 text-neutral-600 hover:text-red-400 transition disabled:opacity-40 flex items-center"
+                                                    className="px-3 border-l border-neutral-800 text-neutral-400 hover:text-red-400 transition disabled:opacity-40 flex items-center"
                                                 >
                                                     {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                 </button>

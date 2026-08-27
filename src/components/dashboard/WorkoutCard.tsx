@@ -214,8 +214,8 @@ function WorkoutCardInner({
             botões), não aqui. */}
         <p className="text-[11px] text-neutral-400 font-mono mb-3 flex flex-wrap items-center gap-x-1.5">
           <span>{pluralize(exercisesCount, 'exercício')}</span>
-          {estMinutes > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>~{estMinutes} min</span></>)}
-          {totalSets > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>{pluralize(totalSets, 'série', 'séries')}</span></>)}
+          {estMinutes > 0 && (<><span className="text-neutral-400" aria-hidden>·</span><span>~{estMinutes} min</span></>)}
+          {totalSets > 0 && (<><span className="text-neutral-400" aria-hidden>·</span><span>{pluralize(totalSets, 'série', 'séries')}</span></>)}
         </p>
         {w?.archived_at ? (
           <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">

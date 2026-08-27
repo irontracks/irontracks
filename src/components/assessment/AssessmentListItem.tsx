@@ -58,7 +58,7 @@ const Destaque = ({ rotulo, valor, d, unidade }: {
 
 const Secundario = ({ rotulo, valor }: { rotulo: string; valor: string }) => (
   <div className="min-w-0 flex-1">
-    <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-600">{rotulo}</div>
+    <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-400">{rotulo}</div>
     <div className="mt-0.5 truncate text-[13px] font-bold text-neutral-200 tabular-nums">{valor}</div>
   </div>
 )

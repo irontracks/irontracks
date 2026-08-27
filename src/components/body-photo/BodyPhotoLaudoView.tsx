@@ -208,7 +208,7 @@ export const BodyPhotoLaudoView: React.FC<{ laudo: BodyPhotoLaudo }> = ({ laudo 
                 </Section>
             ) : null}
 
-            <p className="text-[11px] text-neutral-600 leading-snug pt-1">
+            <p className="text-[11px] text-neutral-400 leading-snug pt-1">
                 Estimativa visual gerada por IA — não substitui avaliação presencial, bioimpedância ou dobras cutâneas.
             </p>
         </div>

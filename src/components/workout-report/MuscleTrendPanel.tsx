@@ -59,7 +59,7 @@ export const MuscleTrendPanel = ({ data, muscleById, series, buildSparklinePoint
                             <polyline fill="none" stroke="#eab308" strokeWidth="2" points={sparkPoints} />
                           </svg>
                         ) : (
-                          <span className="text-neutral-600 text-xs">—</span>
+                          <span className="text-neutral-400 text-xs">—</span>
                         )}
                       </td>
                     )}

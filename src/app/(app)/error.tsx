@@ -29,7 +29,7 @@ export default function AppGroupError({ error, reset }: { error: Error & { diges
                     {getErrorMessage(error) || "Erro desconhecido"}
                 </p>
                 {error?.digest && (
-                    <p className="text-neutral-600 font-mono text-[10px] mt-2">
+                    <p className="text-neutral-400 font-mono text-[10px] mt-2">
                         Digest: {error.digest}
                     </p>
                 )}

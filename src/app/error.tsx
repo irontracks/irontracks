@@ -29,7 +29,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           {getErrorMessage(error) || "Erro desconhecido"}
         </p>
         {error?.digest && (
-          <p className="text-neutral-600 font-mono text-[10px] mt-2">
+          <p className="text-neutral-400 font-mono text-[10px] mt-2">
             Digest: {error.digest}
           </p>
         )}
