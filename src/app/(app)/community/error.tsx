@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { CodigoDoErro } from '@/components/errors/CodigoDoErro'
 
 export default function CommunityError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { logError('CommunityError', error) }, [error])
@@ -17,9 +17,7 @@ export default function CommunityError({ error, reset }: { error: Error & { dige
       <p className="text-neutral-400 mb-6 max-w-sm text-sm">
         Não foi possível carregar o feed. Tente novamente.
       </p>
-      <div className="bg-black/50 p-3 rounded-xl mb-6 w-full max-w-md text-left border border-red-900/30">
-        <p className="text-red-400 font-mono text-xs break-all">{getErrorMessage(error)}</p>
-      </div>
+      <CodigoDoErro digest={error.digest} />
       <button onClick={reset} className="flex items-center gap-2 bg-yellow-500 text-black px-5 py-2.5 rounded-xl font-bold hover:bg-yellow-400 transition-all active:scale-95">
         <RefreshCw size={18} />
         Tentar Novamente

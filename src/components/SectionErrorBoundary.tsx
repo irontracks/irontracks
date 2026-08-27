@@ -70,13 +70,10 @@ class SectionErrorBoundary extends React.Component<Props, State> {
           <p className="text-neutral-400 text-sm mb-6 max-w-xs">
             Ocorreu um erro inesperado. Tente novamente.
           </p>
-          {this.state.error && (
-            <div className="bg-black/50 p-3 rounded-lg mb-6 w-full max-w-sm text-left border border-red-900/30 overflow-x-auto">
-              <p className="text-red-400 font-mono text-xs break-all">
-                {this.state.error.message}
-              </p>
-            </div>
-          )}
+          {/* A mensagem da exceção NÃO vai para a tela: para quem está treinando
+              ela não é informação, é ansiedade — e pode carregar nome interno e
+              trecho de payload. O erro já foi para o Sentry no
+              `componentDidCatch`; aqui fica a saída. */}
           <button
             onClick={this.handleReset}
             className="flex items-center gap-2 bg-yellow-500 text-black px-5 py-2.5 rounded-xl font-bold hover:bg-yellow-400 transition-all active:scale-95 text-sm"
@@ -96,11 +93,9 @@ class SectionErrorBoundary extends React.Component<Props, State> {
         </div>
         <div>
           <p className="text-white font-bold text-sm">{section} encontrou um erro</p>
-          {this.state.error && (
-            <p className="text-neutral-400 font-mono text-xs mt-1 max-w-xs truncate">
-              {this.state.error.message}
-            </p>
-          )}
+          {/* Havia um SEGUNDO painel com a mensagem do erro aqui, e ainda
+              `truncate`: entregava a exceção ao usuário e cortava no meio, então
+              não servia nem para diagnóstico. O pior dos dois mundos. */}
         </div>
         <button
           onClick={this.handleReset}

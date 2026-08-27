@@ -3,7 +3,7 @@
 import * as Sentry from "@sentry/nextjs"
 import { useEffect } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { getErrorMessage } from '@/utils/errorMessage'
+import { CodigoDoErro } from '@/components/errors/CodigoDoErro'
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -26,11 +26,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 Ocorreu um erro fatal no carregamento inicial.
             </p>
 
-            <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-                <p className="text-red-400 font-mono text-xs break-all">
-                    {getErrorMessage(error) || "Unknown Error"}
-                </p>
-            </div>
+            <CodigoDoErro digest={error.digest} />
 
             <button
                 onClick={() => window.location.reload()}
