@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
 import { apiVip } from '@/lib/api'
 import PeriodizationCreateModal, { friendlyCreateError } from '@/components/vip/PeriodizationCreateModal'
+import { useDialog } from '@/contexts/DialogContext'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -46,6 +47,7 @@ export default function VipPeriodizationPanel({
   onOpenWorkoutEditor?: (workout: Record<string, unknown>) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
+  const { confirm } = useDialog()
   const isLocked = !!locked
 
   const [loading, setLoading] = useState(false)
@@ -100,9 +102,32 @@ export default function VipPeriodizationPanel({
     return () => window.clearTimeout(t)
   }, [success])
 
+  /**
+   * Arquivar em massa sem perguntar nada.
+   *
+   * O botão dizia "Limpar antigos" e disparava direto: arquiva TODOS os
+   * templates `VIP •` do usuário que não pertencem ao programa ativo (teto de
+   * 2.000 na rota). Um toque, e a lista de treinos muda sem o usuário saber o
+   * que saiu nem quantos.
+   *
+   * A confirmação diz o ESCOPO (o que sai, o que fica) e a REVERSIBILIDADE —
+   * que é o fato que muda a decisão. E não usa `destructive`: arquivar não
+   * apaga nada, e o vermelho é o pigmento de alarme do app; gastá-lo aqui é o
+   * mesmo erro de gastá-lo em categoria, e deixa sem cor o que de fato não tem
+   * volta.
+   *
+   * Polaridade: o `confirm` resolve `false` ao fechar por fora, então arquivar
+   * é o `confirmText` e um toque fora do diálogo NÃO mexe na lista.
+   */
   const cleanupOld = useCallback(async () => {
     if (isLocked) return
     if (cleaning) return
+    const ok = await confirm(
+      'Os treinos das periodizações anteriores saem da lista. Os do plano atual ficam, e você pode desarquivar depois em ARQUIVADOS.',
+      'Arquivar treinos VIP antigos?',
+      { confirmText: 'Arquivar', cancelText: 'Manter' },
+    )
+    if (!ok) return
     setCleaning(true)
     setError('')
     setSuccess('')
@@ -119,7 +144,7 @@ export default function VipPeriodizationPanel({
     } finally {
       setCleaning(false)
     }
-  }, [cleaning, isLocked])
+  }, [cleaning, isLocked, confirm])
 
   const startWorkoutById = useCallback(
     async (workoutId: string) => {
