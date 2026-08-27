@@ -38,14 +38,37 @@ const NAO_E_A_COR_DA_MAQUINA: Record<string, string> = {
     'mesmo caso do VipTab — relatório administrativo, mesma convenção de tier',
 }
 
-const listar = (dir: string): string[] =>
-  readdirSync(join(COMPONENTS, dir), { withFileTypes: true }).flatMap((e) =>
+/**
+ * As DUAS raízes de tela. O guard varria só `src/components` — e telas inteiras
+ * moram em `src/app` (a Comunidade, o Social, o Onboarding, as páginas
+ * públicas). Nenhuma delas usa violeta hoje, e é exatamente por isso que a
+ * varredura precisa alcançá-las: guard só vale onde ainda não há violação.
+ *
+ * É o terceiro guard deste repo com o mesmo ponto cego em 26–27/08/2026 — o de
+ * alvo de toque já tinha ficado preso a `src/components` (2º buraco), e o de
+ * UI-sem-backend nasceu varrendo só `.tsx`. A pergunta ao escrever guard nunca
+ * é "pega o meu caso?", e sim **"onde ele NÃO olha?"**.
+ */
+const RAIZES = [COMPONENTS, join(COMPONENTS, '..', 'app')]
+
+const listar = (raiz: string, dir: string): string[] =>
+  readdirSync(join(raiz, dir), { withFileTypes: true }).flatMap((e) =>
     e.isDirectory()
-      ? (e.name === '__tests__' ? [] : listar(`${dir}/${e.name}`))
+      ? (e.name === '__tests__' ? [] : listar(raiz, `${dir}/${e.name}`))
       : /\.tsx$/.test(e.name) ? [`${dir}/${e.name}`] : [],
   )
 
-const arquivos = listar('.').map((rel) => rel.replace(/^\.\//, ''))
+/**
+ * Rótulo (o que a allowlist usa) + caminho ABSOLUTO (o que o `readFileSync`
+ * precisa). Guardar só o rótulo e resolvê-lo contra `COMPONENTS` fazia o guard
+ * procurar `src/components/app/(app)/…` e morrer em ENOENT.
+ */
+const arquivos = RAIZES.flatMap((raiz, i) =>
+  listar(raiz, '.').map((rel) => {
+    const limpo = rel.replace(/^\.\//, '')
+    return { rotulo: (i === 0 ? '' : 'app/') + limpo, caminho: join(raiz, limpo) }
+  }),
+)
 const VIOLETA = /violet-\d|purple-\d|#8b5cf6|#a855f7|139,\s*92,\s*246/i
 
 describe('violeta só entra pela fonte única', () => {
@@ -54,13 +77,13 @@ describe('violeta só entra pela fonte única', () => {
   })
 
   it('nenhum componente escreve violeta à mão', () => {
-    const infratores = arquivos.filter((rel) => {
-      if (rel in NAO_E_A_COR_DA_MAQUINA) return false
-      const src = readFileSync(join(COMPONENTS, rel), 'utf8')
+    const infratores = arquivos.filter(({ rotulo, caminho }) => {
+      if (rotulo in NAO_E_A_COR_DA_MAQUINA) return false
+      const src = readFileSync(caminho, 'utf8')
       // Só o código: o comentário que EXPLICA a regra não pode acusá-la.
       const codigo = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
       return VIOLETA.test(codigo)
-    })
+    }).map(({ rotulo }) => rotulo)
 
     expect(
       infratores,
@@ -73,9 +96,10 @@ describe('violeta só entra pela fonte única', () => {
   it('as exceções ainda usam violeta — entrada obsoleta reprova', () => {
     // Sem isto, a allowlist vira papel de parede: o arquivo muda, o violeta sai,
     // e a exceção fica registrada dando permissão a um caso que não existe mais.
-    const mortas = Object.keys(NAO_E_A_COR_DA_MAQUINA).filter((rel) => {
-      const src = readFileSync(join(COMPONENTS, rel), 'utf8')
-      return !VIOLETA.test(src)
+    const mortas = Object.keys(NAO_E_A_COR_DA_MAQUINA).filter((rotulo) => {
+      const alvo = arquivos.find((a) => a.rotulo === rotulo)
+      if (!alvo) return true // o arquivo sumiu: a exceção também deve sumir
+      return !VIOLETA.test(readFileSync(alvo.caminho, 'utf8'))
     })
     expect(mortas, 'não usa mais violeta — remova de NAO_E_A_COR_DA_MAQUINA').toEqual([])
   })
