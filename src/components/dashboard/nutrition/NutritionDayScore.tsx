@@ -17,6 +17,22 @@ interface Totals { calories: number; protein: number; carbs: number; fat: number
 interface Props {
   totals: Totals
   goals: Totals
+  /**
+   * O dia já acabou?
+   *
+   * Em dia CORRENTE o score não pode julgar. Às 9h da manhã, com o café da
+   * manhã lançado, a adesão à meta é naturalmente baixa e a nota caía em
+   * "Melhorar" — em VERMELHO, a cor de erro do app. A pessoa abria a aba de
+   * manhã e a primeira coisa que lia era que estava mal, num dia em que ela
+   * ainda vai almoçar e jantar.
+   *
+   * Um número que só faz sentido no fechamento, exibido como veredicto durante
+   * o percurso, não informa: desmotiva exatamente quando o app deveria ajudar.
+   *
+   * Com o dia em andamento, o mesmo número vira PROGRESSO — quanto da meta já
+   * foi batido — e perde o rótulo de qualidade e a cor semântica.
+   */
+  diaEncerrado?: boolean
 }
 
 function scoreMacro(actual: number, goal: number, weight: number): number {
@@ -38,7 +54,7 @@ function gradeLabel(score: number) {
   return { label: 'Melhorar', color: '#ef4444', bg: 'bg-red-500/15 border-red-500/30 text-red-300' }
 }
 
-const NutritionDayScore = memo(function NutritionDayScore({ totals, goals }: Props) {
+const NutritionDayScore = memo(function NutritionDayScore({ totals, goals, diaEncerrado = true }: Props) {
   const [expanded, setExpanded] = useState(false)
 
   const score = useMemo(() => {
@@ -53,17 +69,22 @@ const NutritionDayScore = memo(function NutritionDayScore({ totals, goals }: Pro
 
   if (score === null) return null
 
-  const grade = gradeLabel(score)
+  // Dia em andamento não recebe veredicto: nem rótulo de qualidade, nem cor
+  // semântica. O mesmo número passa a ser lido como progresso.
+  const grade = diaEncerrado ? gradeLabel(score) : null
+  const aparencia = grade
+    ? grade.bg
+    : 'bg-neutral-800/60 border-neutral-700/60 text-neutral-300'
 
   return (
     <button aria-expanded={expanded}
       type="button"
       onClick={() => setExpanded(v => !v)}
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold border transition ${grade.bg}`}
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold border transition ${aparencia}`}
     >
-      <span className="text-base leading-none">🏅</span>
-      <span>Score {score}/100</span>
-      <span className="text-[10px] opacity-70">— {grade.label}</span>
+      <span className="text-base leading-none">{grade ? '🏅' : '⏳'}</span>
+      <span>{grade ? `Score ${score}/100` : `${score}/100 da meta`}</span>
+      <span className="text-[10px] opacity-70">— {grade ? grade.label : 'dia em andamento'}</span>
       {expanded && (
         <span className="ml-1 text-[9px] opacity-60">
           · Cal {scoreMacro(totals.calories, goals.calories, 40)}/40

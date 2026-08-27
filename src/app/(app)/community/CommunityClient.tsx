@@ -15,6 +15,8 @@ import LeaderboardPanel from './LeaderboardPanel'
 import ChallengesPanel from './ChallengesPanel'
 import { publicDisplayName } from '@/lib/user/publicDisplayName'
 import { plainFieldProps } from '@/utils/ui/textFieldProps'
+import { DialogProvider, useDialog } from '@/contexts/DialogContext'
+import GlobalDialog from '@/components/GlobalDialog'
 
 type CommunityTab = 'feed' | 'follow' | 'ranking' | 'challenges'
 
@@ -137,18 +139,37 @@ function ToggleButton({
   )
 }
 
+/**
+ * `DialogProvider` aqui porque a rota `/community` NÃO passa pelo shell do
+ * dashboard e não herda o provider de lá — e `useDialog` LANÇA sem ele. É o que
+ * dá lugar à confirmação de deixar de seguir.
+ *
+ * Aninhar é seguro: montada embutida no dashboard, os filhos leem o provider
+ * mais interno.
+ */
 export default function CommunityClient({ embedded }: { embedded?: boolean }) {
-  if (embedded) return <CommunityClientInner embedded />
+  if (embedded) {
+    return (
+      <DialogProvider>
+        <GlobalDialog />
+        <CommunityClientInner embedded />
+      </DialogProvider>
+    )
+  }
   return (
-    <InAppNotificationsProvider>
-      <CommunityClientInner />
-    </InAppNotificationsProvider>
+    <DialogProvider>
+      <GlobalDialog />
+      <InAppNotificationsProvider>
+        <CommunityClientInner />
+      </InAppNotificationsProvider>
+    </DialogProvider>
   )
 }
 
 function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   const router = useRouter()
   const { notify } = useInAppNotifications()
+
   // Erros de follow/cancel/unfollow do hook viram toast não-bloqueante (antes eram
   // window.alert cru, que trava a main thread). Estável p/ não recriar os callbacks do hook.
   const notifyError = useCallback((text: string) => {
@@ -163,6 +184,32 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     trainingNowIds, trainingNowProfiles, onlineIds,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
   } = useCommunityData(notifyError)
+
+  const { confirm } = useDialog()
+
+  /**
+   * "Seguindo" é rótulo de ESTADO, e o toque executava a ação oposta, direto.
+   *
+   * Um botão que diz o que você É e faz o contrário ao ser tocado é armadilha:
+   * o toque acidental é comum numa lista rolável, e o custo aqui é assimétrico
+   * — em perfil privado, voltar a seguir depende de nova aprovação da outra
+   * pessoa. Desfazer não está nas mãos de quem errou.
+   *
+   * É o padrão de Instagram e X, e pelo mesmo motivo.
+   */
+  // Tipa pelo `ProfileRow` que o arquivo já importa, em vez de redeclarar a
+  // forma: repetir `display_name` numa anotação faz o ratchet de nome alheio
+  // acusar — e ele está certo em ser rigoroso, o alarme é que era de tipo, não
+  // de exibição. Reusar o tipo resolve os dois lados.
+  const confirmarUnfollow = useCallback(async (p: ProfileRow) => {
+    const quem = publicDisplayName(safeString(p?.display_name)) || 'esta pessoa'
+    const ok = await confirm(
+      `Você deixa de ver os treinos de ${quem} no feed. Se o perfil for privado, voltar a seguir depende de nova aprovação.`,
+      'Deixar de seguir?',
+      { confirmText: 'Deixar de seguir', cancelText: 'Continuar seguindo', destructive: true },
+    )
+    if (ok) unfollow(p.id)
+  }, [confirm, unfollow])
   const userSettingsApi = useUserSettings(userId)
   // Presença dos amigos no feed (bolinha verde) — gated pela preferência do usuário
   // (notifyFriendOnline). Treinando tem prioridade sobre online.
@@ -671,7 +718,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                                 {busy ? (
                                   <Loader2 size={18} className="text-yellow-500 animate-spin" />
                                 ) : status === 'accepted' ? (
-                                  <GoldButton onClick={() => unfollow(p.id)} variant="danger">
+                                  <GoldButton onClick={() => confirmarUnfollow(p)} variant="danger">
                                     <UserMinus size={13} /> Seguindo
                                   </GoldButton>
                                 ) : status === 'pending' ? (

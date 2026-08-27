@@ -1171,7 +1171,7 @@ export default function NutritionMixer({
 
       {/* ══ DAY SCORE ════════════════════════════════════════════════════ */}
       {canViewMacros && safeEntries.length > 0 && (
-        <Card className="p-3"><NutritionDayScore totals={totals} goals={safeGoals} /></Card>
+        <Card className="p-3"><NutritionDayScore totals={totals} goals={safeGoals} diaEncerrado={!isToday} /></Card>
       )}
 
       {/* ══ TREINO × NUTRIÇÃO CORRELATION ════════════════════════════════ */}
