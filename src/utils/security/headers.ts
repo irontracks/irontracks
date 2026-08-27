@@ -3,6 +3,24 @@ import { NextResponse } from 'next/server'
 /** Fonte única do caminho: o CSP aponta para cá e a rota vive neste path. */
 export const CSP_REPORT_PATH = '/api/security/csp-report'
 
+/**
+ * O CSP bloqueia? Sim, a menos que alguém peça o contrário.
+ *
+ * A polaridade foi INVERTIDA em 27/08/2026, depois de três janelas em
+ * Report-Only (12/08, 24/08, 27/08). Antes era `=== 'true'`: proteger dependia
+ * de alguém lembrar de setar a variável, e este repo já sabe onde isso dá — a
+ * IA inteira dependeu por meses de o `GOOGLE_GENERATIVE_AI_MODEL_ID` não estar
+ * faltando, com o default apontando para um modelo desligado.
+ *
+ * Só a string exata `false` desliga. Ausente, vazia, `"no"`, `"0"` ou erro de
+ * digitação mantêm o bloqueio: numa flag de segurança, o engano tem que cair
+ * para o lado seguro. Fica aqui, e não no middleware, para ser testada por
+ * COMPORTAMENTO — o source-guard anterior mirava na string `=== 'true'` e
+ * envelheceu junto com a decisão que descrevia.
+ */
+export const cspEnforcedFrom = (valor: string | undefined) =>
+  String(valor ?? '').toLowerCase().trim() !== 'false'
+
 export const buildCspHeader = (nonce: string, isDev: boolean) => {
   // Estes dois hosts NÃO são enfeite: com a política rodando em Report-Only,
   // os primeiros relatórios que chegaram foram exatamente `script-src-elem ←

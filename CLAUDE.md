@@ -643,8 +643,15 @@ aviso de nova versão). As duas entraram no `connect-src`; guard em
 `utils/security/__tests__/cspConnectSrc.test.ts` cobra que o chamador continue
 existindo. **Ligar o enforce antes dessa janela teria derrubado o upload de fotos.**
 
-⚠️ **O enforce continua DESLIGADO** — mas a janela que faltava JÁ FOI LIDA
-(24/08/2026), e o que falta agora é uma decisão de UMA linha, não mais coleta.
+✅ **O enforce está LIGADO desde 27/08/2026** — e a polaridade foi INVERTIDA:
+o default agora BLOQUEIA, e `CSP_ENFORCE=false` na Vercel é o freio de
+emergência (env var, sem deploy). Antes, proteger dependia de alguém lembrar de
+setar `=true`; hoje o esquecimento cai para o lado seguro. Regra em
+`cspEnforcedFrom` (`utils/security/headers.ts`), testada por comportamento —
+só a string exata `false` desliga.
+
+A decisão que faltava era sobre a única origem viva, e o dono autorizou
+bloquear. Histórico da coleta, que continua valendo como método:
 
 **Filtre por `documentHost`, senão a leitura engana.** A pergunta é "o que
 quebra em PRODUÇÃO", e o grosso do volume é de PREVIEW: `vercel.live` soma
@@ -674,8 +681,10 @@ o comportamento CORRETO (é injeção de terceiro em que o app não toca) e nada
 funcional se perde. Antes de virar a chave, alguém precisa dizer se algum
 material de marketing depende desse pixel.
 
-Confirmado isso, **`CSP_ENFORCE=true` na Vercel** basta — env var, sem deploy de
-código.
+Autorizado pelo dono em 27/08/2026 e ligado no mesmo dia. **Se algo quebrar, o
+rollback é `CSP_ENFORCE=false` na Vercel** — env var, sem deploy, volta na hora
+para Report-Only. Vale conferir a janela alguns dias depois: origem legítima que
+não apareceu nas três leituras aparece agora como quebra, não como relatório.
 
 Lembrete que continua valendo: o `script-src` de produção é mais restrito que o
 de dev (que tem `unsafe-inline` e `unsafe-eval`), então dev NÃO prova nada sobre
@@ -811,10 +820,8 @@ O que **não** está feito, para não ser redescoberto nem refeito:
    `__tests__/nonoPixelTextoCorrido.test.ts`, que só desce — o número vinha
    CRESCENDO (47 → 54 em uma semana), porque o piso de 9px virou alvo por
    gravidade. Em corpo, use 10–11px; 9px é para eyebrow label.
-2. **CSP_ENFORCE** — a coleta ACABOU. A janela foi lida em 24/08 e o que falta é
-   uma decisão de uma linha, não mais dado: ver "Sobra UMA origem viva" na seção
-   do middleware. (Esta linha dizia "precisa de janela limpa pós-deploy de
-   12/08" e ficou contradizendo aquela seção por um mês.)
+2. ~~**CSP_ENFORCE**~~ — **FEITO em 27/08/2026.** Ligado, com a polaridade
+   invertida (bloqueia por padrão; `CSP_ENFORCE=false` é o freio).
 3. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram
    o X corrigido e provado por TESTE, mas nunca foram tocados na tela.
 4. **Ordem de foco e agrupamento nas telas logadas** — bloqueado daqui: exige
@@ -2573,10 +2580,8 @@ completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
 | Xcode Cloud sempre vermelho | #815–#819 | verde no run #1732 (ver abaixo) |
 
 **Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
-1. **CSP**: a janela JÁ FOI LIDA (24/08) — não falta mais coleta, falta uma
-   decisão sobre `connect.facebook.net`. Ver "Sobra UMA origem viva" na seção do
-   middleware, que é onde este assunto mora. (Esta linha pedia uma janela de 24 h
-   pós-deploy de 14/08 e envelheceu ali, contradizendo a outra seção.)
+1. ~~**CSP**~~ — **LIGADO em 27/08/2026**, com a polaridade invertida. Detalhes
+   na seção do middleware, que é onde este assunto mora.
 2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só LOGA
    (`[origin-guard]` nos runtime logs, kind `cross-origin`|`missing-origin`).
    Janela limpa (especialmente `missing-origin` zerado) →

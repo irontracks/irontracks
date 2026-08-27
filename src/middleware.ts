@@ -27,23 +27,31 @@
  * dele era cosmético (evitar o flash da tela de login) e hoje é redundante: o
  * `useLoginScreen` já faz isso no cliente, e agora conferindo a sessão.
  *
- * ## CSP entra em modo RELATÓRIO
- * Uma política que nunca rodou em produção quebra terceiros em silêncio. Por
- * isso o default é `Content-Security-Policy-Report-Only`: o navegador REPORTA
- * o que bloquearia, sem bloquear nada. As violações caem em
- * `/api/security/csp-report` → Sentry. Depois de uma janela limpa, ligue
- * `CSP_ENFORCE=true` na Vercel — é env var, não precisa de deploy de código.
+ * ## CSP: BLOQUEANTE desde 27/08/2026
+ * Nasceu em `Report-Only` porque uma política que nunca rodou quebra terceiros
+ * em silêncio — e isso se provou: os primeiros relatórios foram o CDN do Sentry
+ * e a analítica da Vercel, depois o Cloudinary (que teria derrubado TODO upload
+ * de imagem) e o lookup da App Store. As quatro entraram na allowlist por causa
+ * do modo relatório.
+ *
+ * Três janelas lidas (12/08, 24/08 e 27/08) e a última sobrou com UMA origem:
+ * `connect.facebook.net`, 8 eventos, sem pixel do Meta no repo — é o navegador
+ * embutido do Instagram injetando o próprio script numa página que não o pede.
+ * Bloquear é o comportamento correto, e o dono autorizou.
+ *
+ * ⚠️ **Rollback é env var, sem deploy: `CSP_ENFORCE=false` na Vercel** volta
+ * para Report-Only na hora. O default virou bloqueante de propósito — depender
+ * de uma variável ESTAR setada para proteger é a mesma fragilidade que quase
+ * derrubou a IA quando o `GOOGLE_GENERATIVE_AI_MODEL_ID` era o único freio.
+ * Aqui a env var passou a ser o freio de emergência, não o motor.
  */
 import { updateSession } from '@/utils/supabase/middleware'
 import { NextRequest, NextResponse } from 'next/server'
-import { applySecurityHeaders, buildCspHeader } from '@/utils/security/headers'
+import { applySecurityHeaders, buildCspHeader, cspEnforcedFrom } from '@/utils/security/headers'
 import { evaluateOriginGuard, originGuardEnforced } from '@/utils/security/originGuard'
 
-/**
- * Modo bloqueante só quando explicitamente ligado. O default seguro é relatar:
- * um CSP errado derruba o app inteiro, e este nunca foi exercitado de verdade.
- */
-const cspEnforced = () => String(process.env.CSP_ENFORCE || '').toLowerCase() === 'true'
+/** Bloqueante por padrão; `CSP_ENFORCE=false` é o freio. Regra em `headers.ts`. */
+const cspEnforced = () => cspEnforcedFrom(process.env.CSP_ENFORCE)
 
 export async function middleware(request: NextRequest) {
   // ── Guarda de origem para /api/ (SEC-08, auditoria 2026-08-13) ─────────────
