@@ -5,13 +5,13 @@ import {
     Bell, Check, X, Users, MessageSquare, Trophy, Dumbbell,
     Trash2, Sparkles, Activity, Heart, Star,
     UserPlus, Calendar, Utensils, Swords, Flame, Target,
-    Camera, Megaphone
+    Camera, Megaphone, Droplet, BarChart3, Award, Clock, CreditCard
 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { logError } from '@/lib/logger'
+import { logError, logWarnRemote } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { AppNotification } from '@/types/social'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
@@ -101,6 +101,38 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     challenge_declined: tipo(<Swords size={15} />, 'Recusado', 'social'),
     meal_reminder: tipo(<Utensils size={15} />, 'Refeição', 'lembrete'),
     workout_reminder: tipo(<Activity size={15} />, 'Lembrete', 'lembrete'),
+
+    // ── Os 14 tipos que o servidor emite e esta tabela não conhecia ──────────
+    // Medido no banco em 27/08/2026 (180 dias): 620 de 5.212 notificações, ou
+    // 11,9%, caíam no `default` — sino cinza, rótulo "Info", função social.
+    // O comentário no topo diz "Keys MUST match the `type` values emitted by
+    // the server" e ninguém tinha conferido contra o servidor.
+    //
+    // Os dois piores casos mostram o custo: `billing_issue` — falha de
+    // PAGAMENTO — chegava como social neutro, a função reservada para "movimento
+    // da rede, informativo, não acionável"; e os dois tipos de admin, que são
+    // gente esperando aprovação, chegavam com a mesma cara de um story curtido.
+    friends_trained_today: tipo(<Users size={15} />, 'Amigos', 'social'),
+    friend_comeback: tipo(<Activity size={15} />, 'Voltou', 'social'),
+    friend_achievement: tipo(<Award size={15} />, 'Conquista', 'conquista'),
+    friend_weekly_goal: tipo(<Target size={15} />, 'Meta', 'conquista'),
+    morning_briefing: tipo(<Sparkles size={15} />, 'Resumo', 'lembrete'),
+    weekly_recap: tipo(<BarChart3 size={15} />, 'Semana', 'lembrete'),
+    muscle_weekly_insights: tipo(<BarChart3 size={15} />, 'Músculos', 'lembrete'),
+    water_reminder: tipo(<Droplet size={15} />, 'Água', 'lembrete'),
+    pr_close: tipo(<Target size={15} />, 'Perto do PR', 'lembrete'),
+    // `streak_at_risk` e `inactivity` cutucam, não alarmam: AVISO é o ÚNICO
+    // vermelho do app e existe para o que não pode passar batido. Gastar o
+    // pigmento de alarme num streak em risco deixa a cobrança de fatura sem
+    // como gritar.
+    streak_at_risk: tipo(<Flame size={15} />, 'Streak', 'lembrete'),
+    inactivity: tipo(<Clock size={15} />, 'Sumiu', 'lembrete'),
+    // Alguém está esperando uma resposta sua — é a definição de AÇÃO.
+    admin_access_request: tipo(<UserPlus size={15} />, 'Acesso', 'acao'),
+    admin_new_signup: tipo(<UserPlus size={15} />, 'Cadastro', 'acao'),
+    // Dinheiro: o caso para o qual o vermelho existe.
+    billing_issue: tipo(<CreditCard size={15} />, 'Cobrança', 'aviso'),
+
     default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
 
@@ -111,9 +143,33 @@ const TYPE_ALIASES: Record<string, string> = {
     pr: 'friend_pr',
 };
 
+/**
+ * Tipo desconhecido já foi reportado nesta sessão?
+ *
+ * O componente re-renderiza a cada realtime e a cada abertura da lista; sem
+ * dedupe, um único tipo novo viraria centenas de eventos. Módulo-nível de
+ * propósito: a marca precisa sobreviver ao ciclo de vida do componente.
+ */
+const tiposDesconhecidosReportados = new Set<string>();
+
+/**
+ * Cair no `default` era SILENCIOSO — e foi por isso que 14 tipos ficaram meses
+ * como "Info" cinza sem ninguém notar. Só o banco sabia, e ninguém perguntou.
+ *
+ * A lista fixa conserta o passado; este aviso é a defesa contra o futuro, que é
+ * o que de fato importa: tipo novo emitido pelo servidor aparece no Sentry em
+ * vez de virar sino genérico para sempre. "Toda saída silenciosa em caminho
+ * crítico é bomba-relógio" — a regra do repo, aplicada.
+ */
 function getTypeConfig(type: string) {
     const canonical = TYPE_ALIASES[type] ?? type;
-    return TYPE_CONFIG[canonical] ?? TYPE_CONFIG.default;
+    const cfg = TYPE_CONFIG[canonical];
+    if (cfg) return cfg;
+    if (canonical && !tiposDesconhecidosReportados.has(canonical)) {
+        tiposDesconhecidosReportados.add(canonical);
+        logWarnRemote('notifications.tipo-desconhecido', 'tipo sem entrada em TYPE_CONFIG', { type: canonical });
+    }
+    return TYPE_CONFIG.default;
 }
 
 // ─── Micro components ─────────────────────────────────────────────────────────
