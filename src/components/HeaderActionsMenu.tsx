@@ -18,6 +18,7 @@ import {
   Crown,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
+import { backdropProps } from '@/utils/a11y/backdrop'
 import { useDialog } from '@/contexts/DialogContext'
 
 interface HeaderActionsMenuProps {
@@ -349,10 +350,14 @@ export default function HeaderActionsMenu({
       {open && portalMounted && createPortal(
         <>
           {/* Backdrop — fora do stacking context do header, sem clipping */}
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            onClick={closeFromBackdrop}
+          {/* O véu NÃO é um controle: como <button> ele entrava na ordem de foco
+              e era anunciado "Fechar menu, botão" — um alvo de tela inteira que
+              promete uma ação que o próprio menu já oferece. `backdropProps` é
+              o helper que o repo criou para isto no PR #779 (role presentation,
+              tabIndex -1, e o guard de `e.target === e.currentTarget`); este
+              ponto tinha escapado da varredura. */}
+          <div
+            {...backdropProps(closeFromBackdrop, 'Fechar menu')}
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
           />
 
