@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, Camera, ChevronDown, Images, User, X } from 'lucide-react'
+import { Activity, ArrowLeft, Camera, ChevronDown, Images, User } from 'lucide-react'
 
 // Menu de ações fica RECOLHIDO por padrão (pedido do dono, jul/2026): a tela de
 // avaliações abre limpa, mostrando primeiro os números. Toque no título expande.
@@ -14,6 +14,18 @@ type AssessmentHeaderProps = {
    * única tela em que não existe histórico para ver.
    */
   onShowHistory?: () => void
+  /**
+   * Como SAIR desta tela. Quando o pai sabe para onde voltar (a aba do
+   * dashboard é estado, não rota), ele passa a função; sem ela, o fallback é
+   * `history.back()`, que serve à rota web `/assessments/[studentId]`.
+   *
+   * Até 27/08/2026 esta prop era recebida e NUNCA chamada: o botão só era
+   * renderizado `!onClose`, ou seja, fornecer o handler apagava o próprio
+   * botão. No dashboard COM avaliações o header ficava sem saída, e no
+   * dashboard SEM avaliações (que passa `undefined` explícito) a saída era o
+   * `history.back()` do navegador em vez do `setView('dashboard')` que o pai
+   * havia entregue.
+   */
   onClose?: () => void
   /**
    * Quando definido, exibe um botão "+ Bioimpedância" pra registrar
@@ -168,24 +180,32 @@ export const AssessmentHeader = ({
               só de ícone, `title` não é lido de forma confiável por leitor de
               tela, então quem usa VoiceOver ouvia "botão" e mais nada.
 
-              `self-start` tira o X do centro da pilha de cinco botões, onde ele
+              O ÍCONE precisa concordar com esse rótulo. Era um X — o desenho
+              universal de fechar/descartar — numa ação de voltar, então quem
+              enxerga lia uma coisa e quem usa VoiceOver ouvia outra. A seta é a
+              convenção que este mesmo arquivo já segue: o botão Voltar do
+              formulário de avaliação usa `ArrowLeft`.
+
+              `self-start` tira o botão do centro da pilha de cinco, onde ele
               ficava na altura do "Por Foto" e, por proximidade, parecia
               pertencer a ele. No topo, lê como controle do CARD — que é o que
               de fato é. */}
-          {!onClose ? (
-            <button
-              onClick={() => {
-                if (typeof window !== 'undefined') window.history.back()
-              }}
-              className="shrink-0 self-start w-11 h-11 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all duration-300 active:scale-95 flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-              title="Voltar"
-              aria-label="Voltar"
-              type="button"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          ) : null}
+          <button
+            onClick={() => {
+              if (onClose) {
+                onClose()
+                return
+              }
+              if (typeof window !== 'undefined') window.history.back()
+            }}
+            className="shrink-0 self-start w-11 h-11 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all duration-300 active:scale-95 flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+            title="Voltar"
+            aria-label="Voltar"
+            type="button"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </div>
