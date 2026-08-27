@@ -10,7 +10,7 @@
  * de um script de shell: mora numa função pura, e é ela que este arquivo trava.
  */
 import { describe, it, expect } from 'vitest'
-import { decidirSync, extrairEstado } from '../../scripts/pr-merge.mjs'
+import { decidirPosFalhaDeMerge, decidirSync, extrairEstado } from '../../scripts/pr-merge.mjs'
 
 describe('decidirSync', () => {
   /**
@@ -98,17 +98,66 @@ describe('guardas do script', () => {
    * PullRequest", que era a única informação útil.
    */
   it('toda chamada ao gh passa pelo tratamento de erro', () => {
-    // Fora do CORPO do helper: ele é o único que pode chamar o gh cru, e um
-    // guard que acusa o próprio mecanismo é falso (erro nº 2 da lista do repo).
-    const semHelper = codigo.replace(/function ghOuMorra[\s\S]*?\n\}\n/, '')
+    // Fora do CORPO dos helpers: eles são os únicos que podem chamar o gh cru,
+    // e um guard que acusa o próprio mecanismo é falso (erro nº 2 da lista do
+    // repo). São DOIS porque `pr merge --delete-branch` sai com erro depois de
+    // mergear no servidor — ali morrer seria mentir; ver `ghOuDiagnostique`.
+    const semHelper = codigo
+      .replace(/function ghOuMorra[\s\S]*?\n\}\n/, '')
+      .replace(/function ghOuDiagnostique[\s\S]*?\n\}\n/, '')
     const chamadasCruas = semHelper.match(/sh\('gh'/g) || []
-    expect(chamadasCruas, "use ghOuMorra — `sh('gh', …)` cru vira stack trace").toHaveLength(0)
+    expect(chamadasCruas, "use ghOuMorra/ghOuDiagnostique — `sh('gh', …)` cru vira stack trace").toHaveLength(0)
     expect(codigo).toMatch(/ghOuMorra\(\['pr', 'checks'/)
-    expect(codigo).toMatch(/ghOuMorra\(\['pr', 'merge'/)
+    // O merge pode falhar POR CIMA de um merge feito, então ele é o único que
+    // diagnostica em vez de morrer — e o resultado tem que passar pela função
+    // pura que separa "não mergeou" de "mergeou e a limpeza local falhou".
+    expect(codigo).toMatch(/ghOuDiagnostique\(\['pr', 'merge'/)
+    expect(codigo).toMatch(/decidirPosFalhaDeMerge\(/)
+  })
+
+  it('a falha do merge é confrontada com o ESTADO do PR, não com o código de saída', () => {
+    const bloco = codigo.slice(codigo.indexOf("ghOuDiagnostique(['pr', 'merge'"))
+    expect(bloco).toMatch(/'pr', 'view'[\s\S]{0,120}'state'/)
   })
 
   it('o reset passa pela função que decide, nunca direto', () => {
     const linhaReset = codigo.slice(codigo.indexOf("'reset'") - 400, codigo.indexOf("'reset'"))
     expect(linhaReset).toMatch(/decidirSync|acao === 'abortar'/)
+  })
+})
+
+/**
+ * `gh pr merge --delete-branch` sai da branch mergeada para poder apagá-la. Num
+ * WORKTREE isso esbarra em `fatal: 'main' is already used by worktree at …` — e
+ * o `gh` devolve código ≠ 0 DEPOIS de o merge já ter acontecido no servidor.
+ *
+ * O script anunciava "ABORTADO: o merge do PR #957 falhou" com o PR mergeado.
+ * Mentira sobre o estado do repositório, e do tipo que faz alguém retentar um
+ * merge já feito. Medido em 27/08/2026.
+ */
+describe('decidirPosFalhaDeMerge', () => {
+  it('PR MERGED: o que falhou foi a limpeza local, não o merge', () => {
+    const r = decidirPosFalhaDeMerge({ estadoPr: 'MERGED' })
+    expect(r.acao).toBe('seguir')
+    expect(r.aviso).toMatch(/limpeza local/)
+  })
+
+  it('PR ainda aberto: o merge falhou de verdade e o script aborta', () => {
+    expect(decidirPosFalhaDeMerge({ estadoPr: 'OPEN' }).acao).toBe('abortar')
+  })
+
+  it('PR fechado sem merge aborta', () => {
+    expect(decidirPosFalhaDeMerge({ estadoPr: 'CLOSED' }).acao).toBe('abortar')
+  })
+
+  /**
+   * Estado desconhecido NUNCA vira "mergeou". Na dúvida o script não afirma que
+   * o merge aconteceu — é a mesma regra do `extrairEstado`, que também trata
+   * ausência de informação como falha.
+   */
+  it('estado desconhecido não é tratado como sucesso', () => {
+    for (const estadoPr of [undefined, null, '', 'merged', 'QUALQUER']) {
+      expect(decidirPosFalhaDeMerge({ estadoPr }).acao).toBe('abortar')
+    }
   })
 })
