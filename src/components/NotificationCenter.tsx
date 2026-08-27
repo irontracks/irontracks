@@ -25,6 +25,12 @@ interface NotificationCenterProps {
     initialOpen?: boolean;
     embedded?: boolean;
     open?: boolean; // When embedded, used to trigger markRead and control visibility awareness
+    /**
+     * Fecha a Central. Em modo `embedded` quem controla a visibilidade é o pai,
+     * então navegar sem avisá-lo deixaria o modal aberto POR CIMA do destino —
+     * o usuário chegaria onde pediu e não veria.
+     */
+    onNavigate?: () => void;
 }
 
 // ─── Notification type config ─────────────────────────────────────────────────
@@ -172,11 +178,131 @@ function getTypeConfig(type: string) {
     return TYPE_CONFIG.default;
 }
 
+/**
+ * Para onde cada notificação leva.
+ *
+ * A Central era um beco sem saída: 24 tipos, e o card não tinha `onClick`
+ * nenhum. Pior que não levar a lugar nenhum, ele PROMETIA — `hover:scale` e
+ * `hover:shadow` são o vocabulário de card interativo. O usuário toca no aviso
+ * de que um amigo bateu PR e a tela não muda.
+ *
+ * O destino NÃO é decidido aqui: o app já tem o roteador de notificações
+ * (`irontracks:push:navigate`, no shell do dashboard), que é quem sabe abrir
+ * uma conversa, um painel de admin ou uma rota interna. Tocar no card emite o
+ * MESMO evento que o toque no push emite. Escrever "tipo → destino" num segundo
+ * lugar é a duplicação que este repo já pagou caro várias vezes.
+ *
+ * Só entra tipo cujo destino é INEQUÍVOCO. Ficam de fora, e sem prometer
+ * clique:
+ *
+ * - `meal_reminder` / `water_reminder` — a Nutrição é um overlay, não uma rota;
+ *   `/dashboard/nutrition` não é alcançável dentro do app nativo e cairia no
+ *   dashboard, que não é o destino que o card sugere.
+ * - `muscle_weekly_insights`, `billing_issue`, `broadcast` — sem tela própria
+ *   ou, no caso de cobrança, com o gate de iOS por cima.
+ * - `invite` — tem os próprios botões de aceitar/recusar no card.
+ *
+ * Levar para o lugar errado é pior que não levar: o usuário perde o contexto e
+ * ainda tem que achar o caminho de volta.
+ */
+const COMUNIDADE = '/dashboard/community'
+const DESTINO_POR_TIPO: Record<string, string> = {
+    // Movimento de quem ele segue — tudo isso vive no feed.
+    friend_pr: COMUNIDADE,
+    friend_streak: COMUNIDADE,
+    friend_goal: COMUNIDADE,
+    friend_weekly_goal: COMUNIDADE,
+    friend_achievement: COMUNIDADE,
+    friend_comeback: COMUNIDADE,
+    friends_trained_today: COMUNIDADE,
+    friend_online: COMUNIDADE,
+    workout_start: COMUNIDADE,
+    workout_finish: COMUNIDADE,
+    milestone: COMUNIDADE,
+    story_posted: COMUNIDADE,
+    story_like: COMUNIDADE,
+    story_reaction: COMUNIDADE,
+    like: COMUNIDADE,
+    follow_request: COMUNIDADE,
+    follow_accepted: COMUNIDADE,
+    challenge_created: COMUNIDADE,
+    challenge_accepted: COMUNIDADE,
+    challenge_declined: COMUNIDADE,
+
+    message: '/dashboard/chat',
+    appointment: '/dashboard/schedule',
+    appointment_created: '/dashboard/schedule',
+
+    // Cutucões sobre o próprio treino: o destino é a lista de treinos, de onde
+    // se começa um.
+    workout_reminder: '/dashboard',
+    streak_at_risk: '/dashboard',
+    inactivity: '/dashboard',
+    pr_close: '/dashboard',
+    morning_briefing: '/dashboard',
+}
+
+/** Tipos que o roteador resolve pelo TYPE, sem precisar de link. */
+const ROTEADOS_PELO_TIPO = new Set(['admin_access_request', 'admin_new_signup'])
+
+/**
+ * O link do destino, ou string vazia quando não há para onde ir.
+ *
+ * `weekly_recap` é o único que monta parâmetro: a tela do resumo semanal quer
+ * saber QUAL semana, e o metadata guarda `week_start`. Sem ele o link não é
+ * emitido — abrir a semana errada é pior que não abrir.
+ */
+type ItemComDestino = { type: string; metadata?: Record<string, unknown> | null; sender_id?: string | null }
+
+function destinoDa(item: ItemComDestino): string {
+    const canonical = TYPE_ALIASES[item.type] ?? item.type
+    if (canonical === 'weekly_recap') {
+        const meta = (item.metadata ?? {}) as Record<string, unknown>
+        const semana = String(meta.week_start ?? '').trim()
+        return semana ? `/dashboard/report/weekly?week=${encodeURIComponent(semana)}` : ''
+    }
+    return DESTINO_POR_TIPO[canonical] ?? ''
+}
+
+/** O card leva a algum lugar? */
+function temDestino(item: ItemComDestino): boolean {
+    const canonical = TYPE_ALIASES[item.type] ?? item.type
+    return ROTEADOS_PELO_TIPO.has(canonical) || Boolean(destinoDa(item))
+}
+
 // ─── Micro components ─────────────────────────────────────────────────────────
 
 function NotifDot({ color }: { color: string }) {
     return (
         <span className={`flex-shrink-0 w-2 h-2 rounded-full ${color} shadow-lg ring-2 ring-black`} />
+    );
+}
+
+/**
+ * O corpo do card: um `<button>` quando leva a algum lugar, uma `<div>` quando
+ * não leva.
+ *
+ * Ele não pode ENVOLVER o card inteiro, porque o botão de remover mora ali
+ * dentro e botão dentro de botão é HTML inválido — o navegador desaninha e o
+ * clique passa a cair no lugar errado. Envolvendo só o texto, o remover fica
+ * fora e continua alcançável por teclado como um controle próprio.
+ *
+ * O nome acessível é o TÍTULO da notificação: um leitor de tela anunciaria
+ * "botão" e mais nada, e a lista inteira soaria igual.
+ */
+function Conteudo({
+    clicavel, onOpen, titulo, children,
+}: { clicavel: boolean; onOpen: () => void; titulo: string; children: React.ReactNode }) {
+    if (!clicavel) return <div className="flex gap-3">{children}</div>;
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-label={titulo ? `Abrir: ${titulo}` : 'Abrir notificação'}
+            className="flex gap-3 w-full text-left cursor-pointer"
+        >
+            {children}
+        </button>
     );
 }
 
@@ -190,7 +316,7 @@ function IconBubble({ children, bg, border }: { children: React.ReactNode; bg: s
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open: externalOpen }: NotificationCenterProps) => {
+const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open: externalOpen, onNavigate }: NotificationCenterProps) => {
     const { alert, confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     const panelRef = useFocusTrap(isOpen, () => setIsOpen(false));
@@ -271,6 +397,29 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     }, [effectiveOpen, supabase, safeUserId]);
 
     // ─── Actions ─────────────────────────────────────────────────────────────
+    /**
+     * Tocar no card leva ao destino — pelo MESMO evento que o toque no push
+     * dispara, então "tipo de notificação → tela" continua morando num lugar só.
+     *
+     * O modal fecha ANTES de emitir: o roteador troca a `view` por baixo, e um
+     * modal ainda aberto cobriria o destino inteiro.
+     */
+    const abrirDestino = (item: ItemComDestino) => {
+        if (!temDestino(item)) return;
+        const canonical = TYPE_ALIASES[item.type] ?? item.type;
+        onNavigate?.();
+        setIsOpen(false);
+        window.dispatchEvent(
+            new CustomEvent('irontracks:push:navigate', {
+                detail: {
+                    type: canonical,
+                    link: destinoDa(item),
+                    senderId: String(item.sender_id ?? '').trim() || undefined,
+                },
+            }),
+        );
+    };
+
     const handleDelete = async (id: string | null, e?: React.MouseEvent) => {
         try { e?.stopPropagation?.(); } catch { }
         if (!id || !supabase) return;
@@ -376,10 +525,16 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                 <div className="p-3 flex flex-col gap-2">
                     {allNotifications.map(item => {
                         const cfg = getTypeConfig(item.type);
+                        // Card sem destino não pode usar o vocabulário de card
+                        // interativo: `hover:scale` e `hover:shadow` prometem um
+                        // toque que não acontece. Promessa quebrada é pior que
+                        // ausência de affordance — o usuário toca, nada muda, e
+                        // ele conclui que o app travou.
+                        const clicavel = temDestino(item);
                         return (
                             <div
                                 key={String(item.id ?? "")}
-                                className={`group relative rounded-2xl border bg-gradient-to-br ${cfg.bg} ${cfg.border} p-3.5 transition-all duration-200 hover:scale-[1.01] hover:shadow-lg`}
+                                className={`group relative rounded-2xl border bg-gradient-to-br ${cfg.bg} ${cfg.border} p-3.5 transition-all duration-200${clicavel ? ' hover:scale-[1.01] hover:shadow-lg' : ''}`}
                             >
                                 {/* Unread dot */}
                                 {!item.read && (
@@ -388,7 +543,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     </div>
                                 )}
 
-                                <div className="flex gap-3">
+                                <Conteudo clicavel={clicavel} onOpen={() => abrirDestino(item)} titulo={String(item.title ?? '')}>
                                     <IconBubble bg={cfg.bg} border={cfg.border}>
                                         {cfg.icon}
                                     </IconBubble>
@@ -405,7 +560,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                         <p className="text-xs text-neutral-400 leading-snug line-clamp-2">{String(item.message ?? "")}</p>
                                         <p className="text-[10px] text-neutral-400 font-medium mt-1.5">{item.timeAgo}</p>
                                     </div>
-                                </div>
+                                </Conteudo>
 
                                 {/* Invite actions */}
                                 {item.type === 'invite' && item.data && (

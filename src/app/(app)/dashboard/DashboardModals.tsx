@@ -443,7 +443,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         </div>
                         <div className="p-4 relative">
                             <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
-                                <NotificationCenter user={user as AdminUser} onStartSession={handleStartSession} embedded initialOpen open={showNotifCenter} />
+                                <NotificationCenter user={user as AdminUser} onStartSession={handleStartSession} embedded initialOpen open={showNotifCenter} onNavigate={() => setShowNotifCenter(false)} />
                             </SectionErrorBoundary>
                         </div>
                     </div>
