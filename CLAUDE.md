@@ -1623,8 +1623,23 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   em outro clone existe o script mas não o gatilho. O `user_id` é literal e a
   conta oficial (`djmkapple`) é conferida e recusada; nada mais no banco é
   tocado (medido: apagou 1 linha da conta de teste e preservou as 4 de
-  usuários reais). Só mexe no banco quando há simulador LIGADO — sem isso, um
-  DELETE às cegas alcançaria o iPhone de quem estivesse logado na conta de teste.
+  usuários reais).
+
+  ⚠️ **Ele NUNCA tinha limpado o banco rodando de um worktree** — corrigido em
+  27/08/2026. O script lia `.env.local` ao lado de si mesmo, e worktree não tem
+  esse arquivo (está no `.gitignore`, não é copiado): `lerEnv` voltava vazio e a
+  função saía com `return null` **em silêncio**. Como este repo trabalha em
+  worktrees, o hook rodava a cada resposta sem fazer nada. Só apareceu quando
+  uma órfã de 33 min derrubou o E2E de um PR que só mexia em `.md`. Hoje ele
+  procura também na raiz do checkout principal (`git rev-parse
+  --git-common-dir`) e AVISA quando não acha credencial, em vez de sair mudo.
+
+  Duas portas para mexer no banco: **simulador ligado** (encerra o app e limpa)
+  ou **sessão da conta de teste parada há mais de 30 min**, mesmo sem simulador
+  — porque desligar o simulador depois de abrir um treino deixava a órfã para
+  sempre. A segunda porta é segura porque olha só a conta de TESTE e exige tempo
+  parado: treino real com pausa longa acontece na conta OFICIAL, que o script
+  recusa.
 - Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
   app aberto continua escrevendo. E confira a tabela:
   ```sql
