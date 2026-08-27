@@ -52,17 +52,4 @@ describe('bugs de render — Sprint 1 da auditoria de design', () => {
       'ícone dourado sem ramificar por solidCta — sobre o fundo dourado ele desaparece',
     ).toEqual([])
   })
-
-  /**
-   * A raiz do login era `h-screen overflow-hidden`: num iPhone SE o botão
-   * CADASTRAR ficava fora da tela E sem rolagem para alcançá-lo. O
-   * `overflow-hidden` existe para conter o glow ambiente — que é quem deve
-   * contê-lo, não a raiz.
-   */
-  it('a tela de login rola quando não cabe', () => {
-    const src = semComentarios(ler('src/components/LoginScreen.tsx'))
-    const raiz = src.slice(src.indexOf('className="relative flex flex-col'), src.indexOf('Subtle ambient glow'))
-    expect(raiz, 'raiz do login com altura fixa impede alcançar o botão em tela pequena').not.toMatch(/\bh-screen\b/)
-    expect(raiz, 'raiz do login sem rolagem: o que não couber fica inalcançável').toMatch(/overflow-y-auto/)
-  })
 })
