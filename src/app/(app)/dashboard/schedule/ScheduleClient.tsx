@@ -604,7 +604,7 @@ export default function SchedulePage() {
                           <span className="truncate">{secondary}</span>
                         </div>
                       ) : (
-                        <div className="text-xs text-neutral-600">Sem aluno vinculado</div>
+                        <div className="text-xs text-neutral-400">Sem aluno vinculado</div>
                       )}
                     </div>
 

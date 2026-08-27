@@ -268,7 +268,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                 ) : null}
                             </div>
                             {errorMsg ? <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{errorMsg}</p> : null}
-                            <p className="text-[11px] text-neutral-600">Suas fotos ficam privadas (bucket criptografado, só você e seu personal acessam) e podem ser apagadas a qualquer momento.</p>
+                            <p className="text-[11px] text-neutral-400">Suas fotos ficam privadas (bucket criptografado, só você e seu personal acessam) e podem ser apagadas a qualquer momento.</p>
                         </div>
                     )}
 

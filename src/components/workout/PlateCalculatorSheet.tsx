@@ -277,7 +277,7 @@ export default function PlateCalculatorSheet({
                   {totals.length >= 24 ? ' …' : ''}
                 </p>
                 {step != null ? (
-                  <p className="text-neutral-600 text-[11px] mt-1">Menor salto: {fmt(step)} kg</p>
+                  <p className="text-neutral-400 text-[11px] mt-1">Menor salto: {fmt(step)} kg</p>
                 ) : null}
               </div>
 
@@ -376,7 +376,7 @@ export default function PlateCalculatorSheet({
                   {totals.length >= 24 ? ' …' : ''}
                 </p>
                 {step != null ? (
-                  <p className="text-neutral-600 text-[11px] mt-1.5">Menor salto: {fmt(step)} kg</p>
+                  <p className="text-neutral-400 text-[11px] mt-1.5">Menor salto: {fmt(step)} kg</p>
                 ) : null}
               </div>
 

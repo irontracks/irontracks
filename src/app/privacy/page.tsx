@@ -154,7 +154,7 @@ export default function PrivacyPolicy() {
 
         {/* Footer info inside Privacy */}
         <div className="mt-20 pt-8 border-t border-white/5 flex flex-col items-center justify-center text-center">
-          <p className="text-xs font-bold text-neutral-600 uppercase tracking-widest mb-2">
+          <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">
             Equipe IronTracks
           </p>
           <p className="text-sm text-neutral-400">

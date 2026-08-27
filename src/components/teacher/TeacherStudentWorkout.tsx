@@ -149,7 +149,7 @@ export function TeacherStudentWorkout() {
         </div>
         <div>
           <p className="text-sm font-bold text-neutral-300">Nenhum treino em andamento</p>
-          <p className="text-xs text-neutral-600 mt-1">
+          <p className="text-xs text-neutral-400 mt-1">
             {String(selectedStudent?.name ?? 'O aluno')} não está treinando agora.
           </p>
         </div>

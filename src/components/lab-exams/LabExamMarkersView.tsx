@@ -105,7 +105,7 @@ export function LabExamMarkersView({ extracted }: { extracted: LabExamExtracted 
 
             {normais.length ? (
                 <div>
-                    <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-neutral-600">
+                    <div className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-neutral-400">
                         Dentro da referência ({normais.length})
                     </div>
                     <div className="space-y-1.5">

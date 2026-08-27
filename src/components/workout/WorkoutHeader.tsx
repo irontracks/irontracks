@@ -213,7 +213,7 @@ export default function WorkoutHeader() {
                 {totalSets > 0 && (
                   <>
                     <span className="font-mono tabular-nums text-neutral-400">
-                      {completedSets}<span className="text-neutral-600">/{totalSets}</span>
+                      {completedSets}<span className="text-neutral-400">/{totalSets}</span>
                     </span>
                     <span className="h-3 w-px bg-white/10" />
                   </>

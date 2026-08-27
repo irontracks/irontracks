@@ -108,7 +108,7 @@ export const AssessmentSummaryCards = <T,>({
                   {progress.change > 0 ? '+' : ''}
                   {unit === 'kcal' ? progress.change.toFixed(0) : progress.change.toFixed(1)} {unit}
                 </span>
-                <span className="text-neutral-600 ml-0.5">
+                <span className="text-neutral-400 ml-0.5">
                   ({Math.abs(progress.percentage).toFixed(1)}%)
                 </span>
               </div>

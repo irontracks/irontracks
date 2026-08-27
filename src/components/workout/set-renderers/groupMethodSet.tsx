@@ -222,7 +222,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
         <div className="space-y-1.5">
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
               <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}

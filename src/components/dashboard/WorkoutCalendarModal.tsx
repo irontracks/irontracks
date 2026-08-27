@@ -268,7 +268,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                     }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className={`text-sm font-black ${inMonth ? 'text-white' : 'text-neutral-600'}`}>{d.getDate()}</div>
+                    <div className={`text-sm font-black ${inMonth ? 'text-white' : 'text-neutral-400'}`}>{d.getDate()}</div>
                     {isToday ? <div className="text-[10px] font-black text-yellow-500">HOJE</div> : null}
                   </div>
                   <div className="mt-1 flex items-center gap-1">
@@ -276,7 +276,7 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
                     {hasWorkout ? (
                       <div className="text-[10px] font-bold text-neutral-300">{pluralize(dayWorkouts.length, 'treino')}</div>
                     ) : (
-                      <div className="text-[10px] font-bold text-neutral-600">—</div>
+                      <div className="text-[10px] font-bold text-neutral-400">—</div>
                     )}
                   </div>
                   {hasAnyCheckin ? <div className="mt-1 text-[10px] font-bold text-neutral-300">check-in</div> : <div className="mt-1 text-[10px]" aria-hidden="true">&nbsp;</div>}

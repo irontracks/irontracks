@@ -174,7 +174,7 @@ export default function UserProfileModal({
                             </span>
                           ))}
                         </div>
-                        <div className="text-[10px] text-neutral-600 mt-1">
+                        <div className="text-[10px] text-neutral-400 mt-1">
                           {new Date(pr.createdAt).toLocaleDateString('pt-BR')}
                         </div>
                       </div>

@@ -85,7 +85,7 @@ export function LabExamsSection({ studentUserId }: { studentUserId?: string | nu
         <div className="rounded-2xl border border-dashed border-neutral-800 p-6 text-center">
           <FlaskConical className="w-8 h-8 text-neutral-600 mx-auto mb-2" />
           <p className="text-sm text-neutral-400">Nenhum exame ainda.</p>
-          <p className="text-[11px] text-neutral-600 mt-1">Suba seus exames de sangue e receba um protocolo integrado de treino, dieta e suplementação.</p>
+          <p className="text-[11px] text-neutral-400 mt-1">Suba seus exames de sangue e receba um protocolo integrado de treino, dieta e suplementação.</p>
         </div>
       ) : (
         <div className="space-y-2">

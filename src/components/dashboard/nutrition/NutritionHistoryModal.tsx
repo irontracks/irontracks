@@ -420,7 +420,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
               className="rounded-2xl px-6 py-8 text-center"
               style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
-              <UtensilsCrossed className="mx-auto mb-2 h-6 w-6 text-neutral-600" aria-hidden="true" />
+              <UtensilsCrossed className="mx-auto mb-2 h-6 w-6 text-neutral-400" aria-hidden="true" />
               <p className="text-sm font-black text-white">Nenhum dia registrado nesta janela.</p>
               <p className="mt-1 text-xs text-neutral-400">Lance uma refeição e ela aparece aqui.</p>
             </div>

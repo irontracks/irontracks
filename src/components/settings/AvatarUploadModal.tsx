@@ -241,7 +241,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
             </div>
           )}
 
-          <p className="text-[10px] text-neutral-600 text-center">JPG, PNG ou WebP. Máximo 5MB.</p>
+          <p className="text-[10px] text-neutral-400 text-center">JPG, PNG ou WebP. Máximo 5MB.</p>
         </div>
       </div>
     </div>

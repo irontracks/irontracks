@@ -52,7 +52,7 @@ export default function WaterTracker({
           <div className={`text-sm font-bold tabular-nums ${pct >= 100 ? 'text-amber-400' : 'text-neutral-400'}`}>
             {pct}%
           </div>
-          <div className="text-[10px] text-neutral-600">{glasses} copos</div>
+          <div className="text-[10px] text-neutral-400">{glasses} copos</div>
         </div>
       </div>
 

@@ -43,9 +43,7 @@ const ROOT = join(__dirname, '..')
  */
 const EXCECOES: Record<string, string> = {
   'components/workout/Modals.tsx': 'botão desabilitado — WCAG 1.4.3 isenta controle inativo',
-  'components/workout/CardioSetInput.tsx': 'variante disabled: do input',
   'components/workout/WorkoutHeader.tsx': 'estado cursor-not-allowed',
-  'components/LoginScreen.tsx': 'border-neutral-700, não é cor de texto',
   'components/ProgressPhotos.tsx': 'ícone decorativo de estado vazio',
   'components/admin-panel/StudentProfileTab.tsx': 'ícone decorativo de estado vazio',
   'components/admin-panel/TeachersTab.tsx': 'ícone decorativo de estado vazio',
@@ -56,11 +54,25 @@ const EXCECOES: Record<string, string> = {
 }
 
 /**
- * As três faixas reprovadas em TEXTO. `500` entrou em 11/08/2026, depois da
+ * As faixas reprovadas em TEXTO. `500` entrou em 11/08/2026, depois da
  * varredura que zerou as 380 ocorrências — antes dela, travar aqui só produziria
  * um teste vermelho que alguém afrouxaria.
+ *
+ * ⚠️ `600` entrou em 26/08/2026, e o motivo é constrangedor: o cabeçalho deste
+ * arquivo SEMPRE documentou que ele mede 2.53:1 e falha — e a regex listava
+ * 500, 700 e 800. A faixa mais citada na documentação do guard era a única que
+ * ele não proibia. Eram 62 ocorrências, e entre elas o aviso "suas fotos ficam
+ * privadas" e o texto do card de exames: os dois textos que mais precisam ser
+ * lidos, nos menores contrastes da tela. 33 viraram `neutral-400` na mesma
+ * varredura.
+ *
+ * O lookbehind isenta os prefixos que têm regra PRÓPRIA, e cada um por um
+ * motivo diferente — colapsar os três num só critério é que produz guard
+ * falso: `disabled:` é isento pelo WCAG 1.4.3 (controle inativo), `hover:` é
+ * estado transitório que nem existe no celular, e `placeholder:` é texto de
+ * dica, que merece frente própria (9 ocorrências, ver o ratchet abaixo).
  */
-const PROIBIDAS = /text-neutral-(500|700|800)\b/
+const PROIBIDAS = /(?<![:\w-])text-neutral-(500|600|700|800)\b/
 
 /**
  * Branco com opacidade — a MESMA falha, escrita com outra sintaxe.
@@ -82,6 +94,21 @@ const BRANCO_FRACO = /(?<!hover:)\btext-white\/(?:[0-4]?[0-9])\b/
 /** Exceções do branco fraco. Vazia — a varredura de 12/08/2026 zerou o débito. */
 const EXCECOES_BRANCO: Record<string, string> = {}
 
+/**
+ * Ícone, não texto — e a diferença importa: o WCAG pede 4.5:1 de TEXTO, 3:1 de
+ * objeto gráfico, e ISENTA o gráfico puramente decorativo (`aria-hidden`).
+ *
+ * A marca de ícone aqui é a tag AUTO-FECHADA: `<ChevronRight className="…" />`
+ * é componente, `<p className="…">texto</p>` não é. Foi medido nas 62
+ * ocorrências de `neutral-600` de 26/08/2026 — os 17 ícones eram todos
+ * auto-fechados e nenhum texto real era.
+ *
+ * ⚠️ O limite: um componente auto-fechado que RENDERIZE texto passaria batido.
+ * Não há caso assim hoje, e a alternativa — 16 exceções por arquivo — vira
+ * papel de parede na primeira semana. Se aparecer, registre em `EXCECOES`.
+ */
+const ehIcone = (linha: string): boolean => /\/>\s*\}?\s*$|aria-hidden="true"/.test(linha.trim())
+
 const arquivos = readdirSync(ROOT, { recursive: true, encoding: 'utf8' })
   .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__'))
   // Windows devolve '\' — normaliza para casar com as chaves de EXCECOES.
@@ -94,7 +121,7 @@ describe('contraste mínimo de texto', () => {
       const src = readFileSync(join(ROOT, rel), 'utf8')
       if (!PROIBIDAS.test(src)) continue
       if (EXCECOES[rel]) continue
-      infratores.push(rel)
+      if (src.split('\n').some((linha) => PROIBIDAS.test(linha) && !ehIcone(linha))) infratores.push(rel)
     }
     expect(
       infratores,

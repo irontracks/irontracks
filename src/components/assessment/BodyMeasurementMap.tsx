@@ -114,7 +114,7 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData, bodyFatP
       <div className="relative z-10 flex items-center justify-between px-5 pt-4">
         <div className="flex items-center gap-2">
           <div className="w-1 h-1 rounded-full bg-yellow-500/50" />
-          <span className="text-[10px] font-medium text-neutral-600 uppercase tracking-[0.18em]">Mapa Corporal</span>
+          <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-[0.18em]">Mapa Corporal</span>
         </div>
         <div className="flex items-center gap-2">
           <span

@@ -117,7 +117,7 @@ export default function WorkoutRecoveryBanner({ userId }: WorkoutRecoveryBannerP
         <button aria-label="Dispensar"
           onClick={dismissRecovery}
           disabled={recovering}
-          className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-600 hover:text-neutral-400 transition-colors flex-shrink-0"
+          className="tap-44 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white transition-colors flex-shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
