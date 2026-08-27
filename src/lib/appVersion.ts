@@ -11,14 +11,17 @@
  * guard compara os dois: bumpar o iOS e esquecer a web vira CI vermelho, em vez
  * de virar um número errado na cara de quem abre o app.
  *
- * `NEXT_PUBLIC_APP_VERSION` tem precedência quando existe — é o que o service
- * worker já usa para invalidar cache —, mas ela não pode ser a única fonte: o
- * app nativo carrega o front do servidor, e uma env ausente devolveria o
- * fallback silenciosamente. Foi assim que a IA inteira quase dependeu de uma
- * variável não estar faltando (ver "Qual modelo Gemini o app usa").
+ * ⚠️ NÃO leia `NEXT_PUBLIC_APP_VERSION` aqui. A primeira versão desta função
+ * dava precedência a ela por parecer "mais fresca", e o resultado foi imediato
+ * em produção: a tela de login passou a exibir **"v6dc5e30d"**. Aquela variável
+ * é o BUSTER DE CACHE do service worker — na Vercel ela recebe o SHA do commit
+ * (`VERCEL_GIT_COMMIT_SHA`), que muda a cada deploy justamente porque o cache
+ * precisa mudar. Ela nunca foi a versão pública, e trocar "v1.0" por um hash é
+ * piorar: o número errado ao menos era legível.
+ *
+ * A versão pública tem UMA fonte, e é a mesma que a App Store publica.
  */
 export const APP_VERSION = '1.21'
 
 /** Como a versão é ESCRITA na interface. */
-export const appVersionLabel = () =>
-  `v${String(process.env.NEXT_PUBLIC_APP_VERSION || APP_VERSION).replace(/^v/, '')}`
+export const appVersionLabel = () => `v${APP_VERSION}`
