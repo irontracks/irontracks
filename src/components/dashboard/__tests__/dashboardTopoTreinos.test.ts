@@ -175,3 +175,48 @@ describe('linha de ações não transborda em tela estreita', () => {
     expect(minWidths.length).toBeGreaterThanOrEqual(3)
   })
 })
+
+/**
+ * O SHELL também empilha coisa acima da ação primária — e este guard não via.
+ *
+ * `StudentDashboard` abre com o comentário "AÇÃO PRIMÁRIA PRIMEIRO" e o
+ * `QuickStartCard` como primeiro filho. Só que `IronTracksAppClientImpl`
+ * renderiza irmãos ANTES dele, e um deles — o `HealthWidget` — não é
+ * condicional a nada além de o Apple Health estar ligado: aparecia TODO dia,
+ * com ~90pt de passos, kcal, FC e HRV empurrando o "Treinar agora" para baixo.
+ *
+ * É a lição do PR #747 reaparecendo por FORA do container que aquele PR
+ * corrigiu — o mesmo padrão do `NutritionOverlay`, que escapou do #802 por
+ * estar POR CIMA do shell: **corrigir o contêiner não corrige quem está
+ * em volta dele.**
+ *
+ * Passos, kcal e HRV são dados de CONSULTA. Nada ali é acionável agora, e o
+ * repo já decidiu, no #747, que progresso é o que se olha DEPOIS de decidir
+ * treinar — foi por isso que Iron Rank, Recuperação e Mapa Muscular foram para
+ * o fim da lista. O HealthWidget agora entra por slot, ao lado do
+ * RecoveryScore, seu vizinho semântico.
+ */
+describe('shell: nada de consulta acima da ação primária', () => {
+  const SHELL = join(process.cwd(), 'src', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx')
+  const shell = codeOnly(readFileSync(SHELL, 'utf8'))
+
+  it('o HealthWidget não renderiza acima do StudentDashboard', () => {
+    const dashboard = shell.indexOf('<StudentDashboard')
+    const widget = shell.indexOf('<HealthWidget')
+    expect(dashboard, 'o StudentDashboard sumiu do shell').toBeGreaterThan(-1)
+    if (widget === -1) return // não montado aqui: nada a checar
+    expect(
+      widget,
+      'telemetria passiva acima da ação primária: ~90pt de passos/kcal/HRV ' +
+      'empurram o "Treinar agora" para baixo numa aba chamada TREINOS',
+    ).toBeGreaterThan(dashboard)
+  })
+
+  it('ele chega por slot, para o dashboard mandar na ORDEM', () => {
+    expect(
+      shell,
+      'passado como prop de slot, quem decide a posição é o StudentDashboard — ' +
+      'que é onde a regra do #747 está escrita',
+    ).toMatch(/painelSaude=\{/)
+  })
+})
