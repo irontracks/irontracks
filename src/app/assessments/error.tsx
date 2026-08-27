@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { useRouter } from 'next/navigation';
+import { CodigoDoErro } from '@/components/errors/CodigoDoErro'
 
 export default function AssessmentsError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     const router = useRouter();
@@ -27,11 +27,7 @@ export default function AssessmentsError({ error, reset }: { error: Error & { di
                 Não foi possível carregar os dados da avaliação física.
             </p>
 
-            <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-                <p className="text-red-400 font-mono text-xs break-all">
-                    {getErrorMessage(error) || "Erro desconhecido"}
-                </p>
-            </div>
+            <CodigoDoErro digest={error.digest} />
 
             <div className="flex gap-3">
                 <button

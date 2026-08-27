@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { CodigoDoErro } from '@/components/errors/CodigoDoErro'
 
 export default function AuthError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     useEffect(() => {
@@ -24,11 +24,7 @@ export default function AuthError({ error, reset }: { error: Error & { digest?: 
                 Não foi possível completar o processo de login.
             </p>
 
-            <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-                <p className="text-red-400 font-mono text-xs break-all">
-                    {getErrorMessage(error) || "Erro desconhecido"}
-                </p>
-            </div>
+            <CodigoDoErro digest={error.digest} />
 
             <button
                 onClick={() => reset()}

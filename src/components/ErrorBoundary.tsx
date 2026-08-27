@@ -58,11 +58,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             Ocorreu um erro inesperado. Tente recarregar a página.
           </p>
 
-          <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-            <p className="text-red-400 font-mono text-xs break-all">
-                {this.state.error && this.state.error.toString()}
-            </p>
-          </div>
+          {/* Sem a exceção na tela: `error.toString()` entrega a classe e a
+              mensagem do erro ao usuário, que não pode fazer nada com isso. O
+              registro vai para o Sentry. */}
 
           <button
             onClick={() => window.location.reload()}

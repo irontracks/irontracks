@@ -551,7 +551,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-1.5">
                     <button
                         onClick={onClose}
-                        className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition-colors text-sm font-black"
+                        // A ÚNICA saída do relatório em tela cheia, e era o
+                        // único botão da barra sem alvo de toque: só texto de
+                        // 14px, ~20px de altura, enquanto os dois vizinhos
+                        // (compartilhar, PDF) já tinham `tap-44`. Quem quer sair
+                        // mira no menor alvo da tela.
+                        className="tap-44 min-h-[36px] flex items-center gap-1.5 px-1 text-neutral-400 hover:text-white transition-colors text-sm font-black"
                     >
                         <ArrowLeft size={16} /> Fechar
                     </button>

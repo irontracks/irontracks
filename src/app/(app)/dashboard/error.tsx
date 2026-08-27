@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { AlertCircle, RefreshCw, LogIn } from 'lucide-react'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { CodigoDoErro } from '@/components/errors/CodigoDoErro'
 
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const errorMessage = String(getErrorMessage(error) || '')
@@ -32,9 +33,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
       <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Ops! Algo deu errado.</h1>
       <p className="text-neutral-400 mb-8 max-w-sm">Se isso persistir, recarregue o app ou volte para o login.</p>
 
-      <div className="bg-black/50 p-4 rounded-xl mb-6 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-        <p className="text-red-400 font-mono text-xs break-all">{String(errorMessage || error?.toString?.() || 'Erro desconhecido')}</p>
-      </div>
+      <CodigoDoErro digest={error.digest} />
 
       <div className="w-full max-w-md grid grid-cols-1 gap-3">
         <button
