@@ -174,27 +174,16 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
 
     // ─── System Ops (extracted) ───────────────────────────────────────────────
     const {
-        dangerOpen, setDangerOpen,
         exportOpen, setExportOpen,
         historyOpen, setHistoryOpen,
         moreTabsOpen, setMoreTabsOpen,
-        dangerActionLoading, setDangerActionLoading,
-        dangerStudentsConfirm, setDangerStudentsConfirm,
-        dangerTeachersConfirm, setDangerTeachersConfirm,
-        dangerWorkoutsConfirm, setDangerWorkoutsConfirm,
         systemExporting, setSystemExporting,
         systemImporting, setSystemImporting,
         systemFileInputRef,
         handleExportSystem,
         handleImportSystemClick,
         handleImportSystem,
-        handleDangerAction,
-        runDangerAction,
-    } = useAdminSystemOps({
-        setUsersList,
-        setTeachersList,
-        setTemplates: (v) => setTemplates(v as Parameters<typeof setTemplates>[0]),
-    });
+    } = useAdminSystemOps();
 
     // Wrap export handlers to close the modal after export
     const handleExportPdfWithClose = useCallback(async () => {
@@ -432,11 +421,6 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
         templateQuery, setTemplateQuery,
 
         // System
-        dangerOpen, setDangerOpen,
-        dangerActionLoading, setDangerActionLoading,
-        dangerStudentsConfirm, setDangerStudentsConfirm,
-        dangerTeachersConfirm, setDangerTeachersConfirm,
-        dangerWorkoutsConfirm, setDangerWorkoutsConfirm,
         exportOpen, setExportOpen,
         historyOpen, setHistoryOpen,
         moreTabsOpen, setMoreTabsOpen,
@@ -558,8 +542,6 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
         handleEditStudent,
         handleSaveStudentEdit,
         handleSaveTemplate,
-        handleDangerAction,
-        runDangerAction,
         // Pending self-registered users
         pendingProfiles, setPendingProfiles,
         approvePendingProfile,
