@@ -194,3 +194,32 @@ describe('alvos de toque', () => {
     expect(pequenos, `alvos abaixo de 44px: ${pequenos.join(', ')}`).toHaveLength(0)
   })
 })
+
+/**
+ * A hora da refeição saía no fuso do DISPOSITIVO.
+ *
+ * `toLocaleTimeString('pt-BR', { hour, minute })` sem `timeZone` usa o fuso de
+ * quem renderiza. O histórico de refeições e o relatório de período já usam
+ * `America/Sao_Paulo` explícito (`horaBrt`), então a MESMA refeição aparecia
+ * com horas diferentes em duas superfícies da mesma aba — e no SSR, que roda em
+ * UTC, o café da manhã virava 11h.
+ *
+ * ⚠️ Este caso só reprova sozinho onde o runner NÃO está em BRT (o CI, em UTC):
+ * na máquina do dono ele passa verde com o `timeZone` removido. Por isso o
+ * source-guard vem junto — é a metade que fecha o buraco localmente. Mesma
+ * lição do guard de hora do histórico de refeições.
+ */
+describe('a hora da refeição é sempre BRT', () => {
+    it('não formata hora sem fuso explícito', () => {
+        const src = readFileSync(join(__dirname, '..', 'NutritionEntryCard.tsx'), 'utf8')
+        const codigo = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, '')
+        expect(codigo, 'sem timeZone, usa o fuso de quem renderiza').not.toMatch(/toLocaleTimeString\(/)
+        expect(codigo, 'reusa a fonte única em vez de reimplementar').toMatch(/horaBrt/)
+    })
+
+    it('e o formatador continua sendo o do histórico', () => {
+        const fonte = readFileSync(join(__dirname, '..', '..', '..', '..', 'lib', 'nutrition', 'dayMeals.ts'), 'utf8')
+        expect(fonte).toMatch(/const FUSO = 'America\/Sao_Paulo'/)
+        expect(fonte).toMatch(/export function horaBrt/)
+    })
+})
