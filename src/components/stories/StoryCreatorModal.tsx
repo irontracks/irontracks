@@ -516,9 +516,17 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     onClick={() => { /* Optional: Edit on click */ }}
                                 >
                                     {ov.content}
+                                    {/* Era `opacity-0 hover:opacity-100`. No iPhone não existe
+                                        hover, então o botão ficava PERMANENTEMENTE invisível — e
+                                        `opacity-0` não bloqueia toque, então ele continuava
+                                        clicável. Um controle destrutivo invisível: quem queria
+                                        apagar não achava, e quem não queria apagava sem ver o
+                                        que tocou. É o editor, não o story final: aqui o controle
+                                        deve estar à mão. `tap-44` dá o alvo de toque pelo
+                                        `::after`, sem mover pixel (o botão tinha ~20px). */}
                                     <button aria-label="Remover elemento"
                                         onClick={(e) => { e.stopPropagation(); removeOverlay(ov.id); }}
-                                        className="absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 opacity-0 hover:opacity-100 transition-opacity"
+                                        className="tap-44 absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 shadow-lg shadow-black/40 active:scale-95 transition-transform"
                                     >
                                         <X size={12} />
                                     </button>

@@ -34,9 +34,26 @@ export default function AppLoadingOverlay() {
   }
 
   useEffect(() => {
-    // Auto-dismiss immediately for pages that never fire the ready event
-    const skipPaths = ['/auth/', '/wait-', '/offline', '/privacy', '/marketplace', '/dashboard/', '/para-professores', '/comercial']
-    if (pathname && skipPaths.some((p) => pathname.startsWith(p))) {
+    /**
+     * Cobre só quem ANUNCIA prontidão — antes era o contrário.
+     *
+     * A regra era uma lista de exceções (`skipPaths`) sobre um overlay que
+     * cobria TUDO, e só duas telas do app disparam `irontracks:app:ready`: a
+     * raiz (`login-gate`) e o dashboard. Toda página pública fora daquela lista
+     * ficava coberta até o timeout de 12 s — e aos 8 s o `LoadingScreen` acende
+     * "Voltar ao início", ou seja, o app anuncia que travou numa página que
+     * carregou na hora.
+     *
+     * Estavam de fora, medido em 27/08/2026: `/terms` e `/excluir-conta`, as
+     * duas server components ESTÁTICAS, sem nada para anunciar. A segunda é o
+     * caminho de exclusão de conta que a App Store exige acessível.
+     *
+     * Invertido, o defeito não volta pela porta que o criou: página pública
+     * nova nasce dispensando o overlay, em vez de nascer presa por 12 s até
+     * alguém lembrar de acrescentá-la a uma lista.
+     */
+    const anunciaProntidao = (p: string) => p === '/' || p.startsWith('/dashboard')
+    if (pathname && !anunciaProntidao(pathname)) {
       dismiss()
       return
     }

@@ -176,7 +176,26 @@ const LoginScreen = () => {
     }
 
     return (
-        <div className="relative flex flex-col items-center justify-center min-h-dvh overflow-y-auto overflow-x-hidden bg-neutral-950 text-white p-4">
+        /*
+         * Altura FIXA + rolagem interna, e centragem por margin auto no card.
+         *
+         * Era `min-h-dvh … justify-center`: o container crescia com o conteúdo,
+         * e `html, body { height: 100% }` (globals.css) trava o documento na
+         * viewport — então o excedente ficava fora da tela e NADA rolava.
+         * Medido em produção com 375×667 (iPhone SE), no formulário de cadastro:
+         * 998px de conteúdo, 331px inalcançáveis, levando junto e-mail, senha,
+         * confirmar senha e o próprio botão CRIAR CONTA. Não é aperto de
+         * layout: é cadastro impossível naquele aparelho.
+         *
+         * `justify-center` não serve aqui — quando o conteúdo excede, ele corta
+         * o TOPO e o começo fica inalcançável mesmo com scroll. `my-auto`
+         * centraliza enquanto cabe e cede quando não cabe.
+         *
+         * `shrink-0` no card é obrigatório: sem ele o flex comprime o card para
+         * caber na altura fixa, e como o card tem `overflow-hidden`, o conteúdo
+         * é cortado EM SILÊNCIO — medido ao validar esta correção.
+         */
+        <div className="relative flex flex-col items-center h-dvh overflow-y-auto overflow-x-hidden bg-neutral-950 text-white p-4">
             {/* Subtle ambient glow */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/8 rounded-full blur-[100px]" />
@@ -187,7 +206,7 @@ const LoginScreen = () => {
             <GoldParticles />
 
             {/* Card with integrated hero */}
-            <div className="relative z-10 w-full max-w-sm rounded-[2rem] border border-white/5 bg-neutral-900/60 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500 overflow-hidden">
+            <div className="relative z-10 my-auto shrink-0 w-full max-w-sm rounded-[2rem] border border-white/5 bg-neutral-900/60 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500 overflow-hidden">
 
                 {/* Hero image section — visible on all devices */}
                 <div className="relative w-full h-48 sm:h-56">
