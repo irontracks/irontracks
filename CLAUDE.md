@@ -259,11 +259,36 @@ Guard em `src/__tests__/muscleOverlayAlphaRecortado.test.ts` (provado por
 mutação, três casos): PNG sem alfa na pasta reprova, overlay citado no código sem
 PNG reprova, e pasta paralela `muscle-overlays-*` reprova.
 
-⚠️ **Bug ABERTO, dos dois gêneros, não corrigido aqui:** `front-forearms.png`
-está fora de escala e, depois da máscara, acende as **MÃOS** em vez dos
-antebraços — visível na conferência visual de 26/08. É 16% de pixels opacos
-contra 1–3% dos outros 14, o que denuncia o arquivo sem precisar olhar a tela.
-Corrigir é reexportar a arte, não mexer em código.
+✅ **O antebraço que acendia as MÃOS — CORRIGIDO em 28/08/2026**, e não foi
+preciso reexportar arte nenhuma (esta nota dizia que seria).
+
+O defeito era geométrico: os dois antebraços da arte ocupavam x=[77,206] e
+[432,562] numa tela de 640, **fora do corpo** (a silhueta vai de 178 a 462).
+Como a composição recorta pela máscara, sobrava só a interseção — que calha de
+ser a região das mãos. Medido: **2,3%** da tinta caía dentro da silhueta, e o
+arquivo tinha 66.132 px opacos, MAIS que o corpo inteiro (62.884). A arte em si
+sempre esteve certa: são antebraços anatômicos, desde o commit que a criou.
+
+A correção veio da geometria que o projeto já tinha: **a forma do antebraço é a
+própria silhueta do manequim entre o cotovelo e o punho**, e a arte entra como
+TEXTURA. `scripts/gerar-overlay-antebraco.mjs` regenera o PNG a partir da fonte
+preservada em `scripts/assets/` — reprodutível, e com `--check` para medir o
+arquivo atual sem escrever nada.
+
+O cotovelo (y=252) e o punho (y=314) saíram da largura do braço linha a linha:
+37px na articulação, afunilando até 22px no punho e alargando de novo para 33px
+quando começa a mão. A forma sai da INTERSEÇÃO das silhuetas masculina e
+feminina (que diferem por 1–3 px ali), então serve os dois gêneros — que é como
+esta pasta funciona.
+
+⚠️ **O guard que faltava, e é ele que importa:**
+`src/__tests__/muscleOverlayDentroDoCorpo.test.ts` mede quanto da tinta de cada
+overlay cai DENTRO da silhueta. O teste de alfa que já existia passava verde com
+o bug vivo — o arquivo tinha alfa, tinha recorte, só estava no lugar errado.
+Limiares medidos nos 15 overlays reais, não escolhidos no chute: o pior
+legítimo é `back-delts_rear` no feminino, com 63,5%; o piso é 50%. Provado por
+mutação repondo o PNG defeituoso. Conferido na tela do app (simulador, conta de
+teste): antebraços acesos do cotovelo ao punho, mãos apagadas.
 
 **Heatmap Treino × Nutrição:** o bucketing por dia vive em `lib/nutrition/correlationDays.ts` (função pura, dia sempre BRT). Antes a rota fazia `toISOString().slice(0,10)` — dia UTC —, então **todo treino depois das 21h BRT acendia o quadrado do dia seguinte** e o próprio "hoje" da grade virava amanhã. A rota não devolve mais `workout_calories`: era o literal `300` por sessão exibido como se fosse medição.
 
