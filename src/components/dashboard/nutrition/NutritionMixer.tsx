@@ -9,7 +9,9 @@ import { saveNutritionPhase } from '@/actions/nutrition-actions'
 import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
-import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard, Mic, Square } from 'lucide-react'
+import { useSpeechToText } from '@/hooks/useSpeechToText'
+import { juntarDitado, suportaDitado } from '@/lib/nutrition/ditado'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -277,6 +279,25 @@ export default function NutritionMixer({
   const entriesRef = useRef<MealEntry[]>([])
   useEffect(() => { entriesRef.current = entries }, [entries])
   const [input, setInput] = useState('')
+
+  // ── Ditar a refeição ────────────────────────────────────────────────────
+  // Digitar "150g de arroz, 200g de patinho e uma banana" no celular, comendo,
+  // é o pior momento possível para teclado. O texto ditado ENTRA NO CAMPO em
+  // vez de lançar direto: o parser já mostra a simulação com kcal e macros
+  // enquanto se digita, e o usuário confere (ou corrige "duzentos" que virou
+  // "200g") antes de gravar. Ditado que lança sozinho tiraria essa conferência
+  // justamente de quem não estava olhando a tela.
+  // `suportaDitado` lê o `window`; em estado, para o primeiro HTML (servidor)
+  // não decidir "não suporta" e apagar o botão.
+  const [podeDitar, setPodeDitar] = useState(false)
+  useEffect(() => { setPodeDitar(suportaDitado()) }, [])
+
+  const ditado = useSpeechToText({
+    onFinal: (texto) => {
+      setInput((atual) => juntarDitado(atual, texto))
+      try { inputRef.current?.focus() } catch { }
+    },
+  })
   const [mealName, setMealName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -1403,6 +1424,25 @@ export default function NutritionMixer({
                   ? 'Processando…'
                   : <><Plus size={15} strokeWidth={3} aria-hidden="true" />Lançar</>}
             </button>
+            {podeDitar && !schemaMissing && (
+              /* Ditar a refeição. Mesma anatomia do scanner ao lado: são as
+                 duas formas de NÃO digitar, e ficam juntas.
+                 Gravando, o botão vira "parar" e ganha o dourado da ação em
+                 curso — sem vermelho, que neste app é erro e estouro de meta. */
+              <button
+                type="button"
+                onClick={() => (ditado.gravando ? ditado.parar() : ditado.iniciar())}
+                aria-label={ditado.gravando ? 'Parar de ditar' : 'Ditar a refeição'}
+                aria-pressed={ditado.gravando}
+                className={`flex size-11 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 ${
+                  ditado.gravando
+                    ? 'border-yellow-500/50 bg-yellow-500/15 text-yellow-300 animate-pulse'
+                    : 'border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:border-yellow-500/30 hover:text-white'
+                }`}
+              >
+                {ditado.gravando ? <Square size={16} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
+              </button>
+            )}
             {isNative && (
               /* Ícone órfão de 36px num cinza mudo — agora com a mesma altura e
                  a mesma linguagem de borda dos secundários, e alvo de 44px. */
@@ -1416,6 +1456,36 @@ export default function NutritionMixer({
               </button>
             )}
           </div>
+
+          {/* Ouvindo. O parcial fica à vista para o usuário saber que o
+              aparelho o entendeu ANTES de o texto cair no campo — sem isso,
+              ditar é falar para um ícone e esperar. */}
+          {ditado.gravando && (
+            <div
+              className="mt-2 flex items-start gap-2 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] px-3 py-2.5"
+              role="status"
+              aria-live="polite"
+            >
+              <Mic size={14} className="mt-0.5 shrink-0 animate-pulse text-yellow-400" aria-hidden="true" />
+              <span className="min-w-0 text-xs text-yellow-100/90">
+                {ditado.parcial || 'Ouvindo… fale o que você comeu.'}
+              </span>
+            </div>
+          )}
+
+          {ditado.erro && !ditado.gravando && (
+            <div className="mt-2 flex items-start gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+              <span className="min-w-0 text-xs text-neutral-300">{ditado.erro}</span>
+              <button
+                type="button"
+                onClick={ditado.limparErro}
+                aria-label="Dispensar aviso do ditado"
+                className="ml-auto shrink-0 text-neutral-400 transition hover:text-white"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+          )}
 
           {/* ══ AÇÕES DE IA ═══════════════════════════════════════════════
               "Perguntar" e "Gerar dieta" viviam soltos na tela — um acima dos

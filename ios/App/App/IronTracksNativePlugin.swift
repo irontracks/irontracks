@@ -2173,8 +2173,39 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         }
         recognitionRequest.shouldReportPartialResults = true
 
+        // ⚠️ A ORDEM AQUI DERRUBAVA O APP INTEIRO (28/08/2026).
+        //
+        // Antes, o formato era lido e o tap instalado ANTES de a AVAudioSession
+        // ir para uma categoria de gravação. Fora de `.record`/`.playAndRecord`
+        // o `inputNode` não tem entrada: `outputFormat(forBus:)` devolve 0 canais
+        // e 0 Hz, e `installTap(onBus:...)` com formato inválido lança uma
+        // NSException do Objective-C — que Swift NÃO captura com `do/catch`.
+        // Resultado: SIGABRT, app fechado, sem log para o usuário.
+        //
+        // E o estado de partida é justamente esse: `stopRecognitionEngine()` (e o
+        // AppDelegate) deixam a sessão em `.playback`, para a música do usuário
+        // seguir tocando. Ou seja, o crash não era exceção — era o caminho comum.
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            call.resolve(["error": "audio_session_failed", "message": error.localizedDescription])
+            return
+        }
+
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+
+        // Cinto de segurança: mesmo com a sessão ativa, o formato pode vir
+        // inválido (sem rota de entrada — fone conectando, chamada em curso,
+        // simulador sem microfone). Instalar o tap assim mataria o processo, e
+        // um erro tratado é sempre melhor que um app que some da tela.
+        guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            call.resolve(["error": "no_audio_input", "message": "Sem entrada de áudio disponível."])
+            return
+        }
 
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             self.recognitionRequest?.append(buffer)
@@ -2182,11 +2213,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
 
         audioEngine.prepare()
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
             try audioEngine.start()
         } catch {
+            inputNode.removeTap(onBus: 0)
             call.resolve(["error": "audio_engine_failed", "message": error.localizedDescription])
             return
         }
