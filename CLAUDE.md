@@ -473,6 +473,37 @@ Testado antes de virar padrão: texto, JSON estruturado (`responseMimeType` +
 nos quatro. Qualidade conferida com o prompt real de estimativa de macros em 4
 refeições brasileiras: JSON válido em 4/4, números equivalentes.
 
+**Transcrição por ÁUDIO: os modelos existem, e o app NÃO os usa (27/08/2026).**
+Conferido contra a chave de produção: `gemini-3.5-transcribe` e
+`gemini-3.5-transcribe-live` estão entre os 53 modelos que ela alcança, e o SDK
+novo (`@google/genai`) já está instalado. Quem transcreve hoje é o APARELHO —
+Web Speech no navegador, `SFSpeechRecognizer` no iOS —, de graça; o Gemini só
+limpa a bagunça depois, e o prompt de `parse-exercise-voice` diz isso com todas
+as letras ("corrija erros de transcrição de voz, ex: 'super intro' → 'Supino
+Reto'"). **Adotar é SOMAR custo, não trocar**: o transcribe devolve texto, não a
+estrutura de exercícios, então seriam duas chamadas onde hoje há uma. O que ele
+compra de verdade é (a) vocabulário personalizado de até 1.000 termos — a lista
+de exercícios do usuário e o jargão que nenhum reconhecedor genérico conhece —,
+e (b) entrada por voz onde não existe nenhuma, como lançar refeição.
+
+⚠️ **Se um dia adotar, `-transcribe` PRECISA entrar em `OTHER_MODALITY_PATTERNS`.**
+A lista de hoje cobre `-image`, `imagen-`, `-tts`, `-native-audio`, `-live`,
+`-computer-use` e `robotics`: o `-live` protege o `transcribe-live` por acidente,
+e **`gemini-3.5-transcribe` não casa com nada**. Passa intacto agora, mas no dia
+em que a família 3.5 entrar em `SUNSETTING_PATTERNS` (hoje só `^gemini-2\.5`) ele
+seria trocado pelo modelo de TEXTO — o app pediria transcrição e receberia prosa,
+exatamente a falha invisível que aquela lista existe para evitar.
+
+**Suspeita, NÃO confirmada — sobre a voz que já existe.** Em
+`VoiceWorkoutModal.startRecording` o guard `if (!SpeechRecognitionAPI) return`
+(linha 411) vem ANTES do bloco `if (isIosNative())` (482) que usa o
+`SFSpeechRecognizer`. Se o WKWebView não expuser `webkitSpeechRecognition`, o
+iPhone mostra "Reconhecimento de voz não suportado neste dispositivo" e nunca
+alcança o caminho escrito para ele. **Não medi no aparelho** — o comentário do
+próprio código diz que a API existe mas é "unreliable" no WKWebView, o que sugere
+que o guard passa. Medir custa 30 s: abrir o assistente de criar treino e tocar
+no microfone.
+
 **Como saber o que a chave alcança hoje** (grátis, não custa chamada):
 `GET https://generativelanguage.googleapis.com/v1beta/models?key=$K` — traz
 `supportedGenerationMethods` e a lista real. Faça isso antes de supor que um
@@ -591,7 +622,7 @@ assinatura QStash no `rest/fire`). A CSRF genérica também está mitigada:
 `getSupabaseCookieOptions()` usa `sameSite: 'lax'`, então POST cross-site não
 carrega o cookie de sessão.
 
-### Ativado em 11/08/2026 — e o CSP está em modo RELATÓRIO
+### Ativado em 11/08/2026 — o CSP nasceu em modo RELATÓRIO (bloqueia desde 27/08)
 
 O arquivo foi movido para `src/middleware.ts` e **hoje roda**. O que ele faz:
 renova a sessão (`updateSession`), redireciona `www` → apex e aplica os security
@@ -612,7 +643,8 @@ volta do `updateSession`). O que roda em toda navegação não pode ter caminho 
 lance: um throw vira 500 no site inteiro de uma vez — e, como o app nativo carrega
 o front deste servidor, levaria junto todos os aparelhos instalados.
 
-**CSP: `Content-Security-Policy-Report-Only` por padrão.** Uma política que nunca
+**CSP: `Content-Security-Policy-Report-Only` foi o padrão até 27/08/2026** (hoje
+o default BLOQUEIA — ver a seção da inversão de polaridade abaixo). Uma política que nunca
 rodou quebra terceiros em silêncio — e isso não é teórico: os PRIMEIROS relatórios
 que chegaram foram `script-src-elem ← browser.sentry-cdn.com` e
 `← va.vercel-scripts.com`, ou seja, em modo bloqueante o app teria perdido o
@@ -620,15 +652,9 @@ Sentry e a analítica sem ninguém perceber. Os dois já entraram na allowlist.
 Violações vão para `POST /api/security/csp-report` → Sentry
 (`security.csp.violation`) **e `audit_events`** — o Sentry sozinho não serve para
 decidir, porque o token não existe neste repo e a pista fica ilegível de onde se
-investiga (mesma lição da Live Activity). Para saber se dá para ligar o modo
-bloqueante:
-
-```sql
-select metadata->>'directive' as diretiva, metadata->>'blocked' as origem,
-       count(*), max(created_at)
-from audit_events where action = 'csp_violation'
-group by 1, 2 order by 3 desc;
-```
+investiga (mesma lição da Live Activity). A consulta para ler as violações está
+mais abaixo, na versão COM o filtro de `documentHost` — a sem filtro só mostra
+preview e engana.
 
 A rota é **pública e escreve** (o navegador posta sem sessão — é assim que o
 mecanismo funciona), então os freios são rate limit por IP, dedupe por par
@@ -1885,6 +1911,22 @@ npm run sim:local    # aponta o simulador para http://localhost:3000 e relança
 npm run sim:prod     # devolve para produção ao terminar
 npm run sim:status   # para onde está apontando agora
 ```
+
+⚠️ **A porta 3000 desta máquina NÃO é necessariamente o IronTracks (27/08/2026).**
+Medido: quem escuta `127.0.0.1:3000` é o `Instagram/mk-dashboard`, servido em
+standalone — e ele **respawna sozinho** segundos depois de ser derrubado (tem
+supervisor). Como o `npm run dev` daqui fixa `--port 3000`, os dois convivem em
+pilhas diferentes (um em IPv4, outro em `[::1]`) e o simulador pode carregar o
+app ERRADO sem nenhum aviso. Diagnóstico em duas linhas:
+
+```bash
+lsof -nP -iTCP:3000 -sTCP:LISTEN
+lsof -p <pid> | awk '$4=="cwd"{print $NF}'
+```
+
+Saída: subir este repo em outra porta (`npx next dev --webpack --port 3010`) e
+apontar o simulador para ela — **`sim:local` aceita porta ou URL inteira**:
+`npm run sim:local 3010`.
 
 `scripts/sim-server.mjs` reescreve o `server.url` do `capacitor.config.json` **dentro
 do bundle já instalado** (o bundle do simulador é um diretório no disco do Mac, sem
