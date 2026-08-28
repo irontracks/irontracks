@@ -14,6 +14,7 @@ import { WorkoutTimerProvider } from './workout/WorkoutTimerContext';
 import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
 import WorkoutHeader from './workout/WorkoutHeader';
 import ExerciseList from './workout/ExerciseList';
+import WorkoutExerciseRail from './workout/WorkoutExerciseRail';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
@@ -330,6 +331,11 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         className="fixed inset-0 z-[50] flex flex-col bg-neutral-950 text-white overflow-x-hidden"
       >
         <WorkoutHeader />
+
+        {/* Tira de navegação: irmã do header, FORA do contêiner que rola, para
+            continuar alcançável no meio da lista — que é justamente quando ela
+            serve. Ela se esconde sozinha em treino curto. */}
+        <WorkoutExerciseRail />
 
         {/* Scrollable content — sits below the fixed header. overflow-x-hidden
             here as belt + suspenders: even if some descendant (an exercise

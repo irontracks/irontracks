@@ -51,6 +51,23 @@ os três pelo resto da sessão, inclusive a única saída sem gravar. Guard:
 
 CRUD/organizar/editor-completo em `components/workout/hooks/useWorkoutExerciseCrud.ts`; editar mid-sessão remapeia os logs por índice (`helpers/reconcileEditedExercises.ts`).
 
+**A tira de navegação do treino ativo (28/08/2026).** Treino de 10 exercícios só
+tinha rolagem — nenhum índice, nenhum salto. `WorkoutExerciseRail` é irmã do
+header (FORA do contêiner que rola), some sozinha abaixo de
+`MINIMO_PARA_MOSTRAR_TIRA` exercícios, e o toque chama o MESMO `focusExercise`
+do "fazer depois".
+
+Ela não guarda estado: cor e progresso saem de `lib/workout/exerciseRail.ts`
+sobre logs + adiados. **`atual` é independente do estado** (dá para estar num
+card concluído), então a COR diz o estado e o ANEL diz onde você está —
+colapsar os dois num campo faria a tira mentir sobre um deles. E concluído
+vence guardado, o mesmo critério do aviso de finalizar; se divergirem, a tira
+cobra um exercício que o diálogo já não cobra.
+
+Alvo de 44px REAIS (`h-11 min-w-11`), não `.tap-44`: numa fileira horizontal a
+área estendida do `::after` invadiria o card de baixo e roubaria o toque da
+primeira série — é o mesmo problema dos dots do tour, por outro caminho.
+
 **Renderers de série — 14 irmãos, mas 12 agora desenham pelo MESMO molde** (`components/workout/set-renderers/`): `ExerciseCard.renderSet` roteia cada série pro renderer do método (normal, drop, rest-pause, cluster, grupo/Bi-Set, stripping, FST-7, ponto zero, forçadas, negativas, parciais, sistema 21, onda, cardio/plank). Até 20/08/2026 cada um reimplementava peso/reps/RPE/concluir por conta própria — daí os bugs: em jul/2026 o Bi-Set exigia reps pra concluir (a normal não exige) e travava o botão sem explicar, e o drop escondia o peso das etapas porque o `truncate` colapsava o texto inline. **Hoje os 11 métodos que abrem MODAL (drop, rest-pause, cluster, stripping, FST-7, heavy duty, ponto zero, forçadas, negativas, parciais, sistema 21, onda) usam `AdvancedSetRow.tsx`** — a linha vira UM componente, com a MESMA grade da série normal (`32px nº · 36px notas · 1fr campos · 92px Concluir`); no lugar de peso/reps/RPE inline, a faixa de 1fr é o botão "Abrir" que preenche tudo (pedido do dono, 19–20/08/2026). Rest-Pause e Cluster, que têm peso inline, passam ele por `weightSlot` — divide a faixa com o "Abrir". `normalSet` (a referência, campos inline) e `groupMethodSet` (Bi-Set/Super-Set/Tri-Set/Giant-Set, sem modal) ficam de fora por desenho. Guard de CLASSE em `set-renderers/__tests__/moldeUnicoAvancado.test.ts`: método novo que desenhe a própria linha reprova; a lista de exceção também reprova quem já migrou (não vira papel de parede). **Mexeu em comportamento de série avançada, mexa no molde — não em 11 arquivos.** Cardio/plank e `normalSet`/`groupMethodSet` continuam por conta própria; se algo parecer divergência entre eles, aí sim varra manualmente.
 
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
