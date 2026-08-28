@@ -432,6 +432,28 @@ em background); máximo de 5 participantes com o host incluso. E a armadilha que
 fechou o PR #506 continua valendo: marcar o canal como `private: true` sem as
 policies de `realtime.messages` derruba o sync em vez de protegê-lo.
 
+**"Conversas" — lista de CONVERSAS, não catálogo (28/08/2026).** A tela listava
+até 200 perfis de `profiles_public` por `last_seen`: nomes, sem prévia, sem
+horário, sem não-lidas. Quem tinha três conversas não sabia qual tinha mensagem
+nova.
+
+**Não precisou de schema novo** — `direct_channels.last_message_at` e
+`direct_messages.is_read/sender_id/content` já existiam; faltava alguém LER.
+Duas consultas (canais + amostra das mensagens recentes deles), agrupadas por
+`lib/social/conversationList.ts`. O N+1 óbvio (uma busca de "última mensagem"
+por canal) faria a tela abrir devagar justamente para quem mais usa o chat.
+
+Três decisões que a implementação ingênua erra: **não lida é só o que EU
+recebi** (`is_read=false` E `sender_id≠eu`) — contar as minhas encheria de badge
+quem mandou mensagem e não foi respondido; **canal fora da amostra não some**,
+aparece sem prévia, porque perder a prévia é aceitável e perder a conversa não;
+e **quem está em Conversas sai do catálogo**, senão o mesmo nome aparece duas
+vezes.
+
+⚠️ **O horário é BRT explícito** (`formatarQuandoDaConversa`). Sem `timeZone`, a
+mensagem das 22h de ontem aparece como sendo de hoje — o mesmo defeito que já
+pegou o heatmap de nutrição e o streak aqui.
+
 **Dashboard shell:** `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx` é o client component central; navega por estado `view` ('dashboard'|'active'|'edit'|'assessments'|'community'|'vip'). Boot: `/api/dashboard/bootstrap` (RPC `get_dashboard_bootstrap`) + `useBootstrap` + `useWorkoutFetch`. **Toda hidratação da lista de treinos (SSR inicial, bootstrap, refetch) deve ordenar por `sortWorkoutsByOrder`** (`utils/mapWorkoutRow.ts`) — senão a lista pisca desordenada.
 
 **Contexto do coach (`utils/ai/userContext.ts`) — as 12 rotas de IA bebem daqui.** O setor `profile` lia SÓ de `vip_profile`, tabela do fluxo VIP com 3 linhas para 57 contas: o bloco `[PERFIL E OBJETIVO]` chegava VAZIO para ~95% dos usuários, e o coach respondia sem saber objetivo, nível nem antropometria. Agora lê também `user_settings.preferences` (objetivo de treino, fase da dieta, nível, antropometria rotulada como "declarado" para não competir com a AVALIAÇÃO medida). Sem `nutrition_goals` salvo, a meta é derivada do TDEE e rotulada — antes o coach ficava sem meta nenhuma e podia contradizer o número na tela do usuário. **Hoje este arquivo só FORMATA o prompt:** perfil e meta chegam prontos do `userSnapshot` (uma leitura por chamada, setores sob demanda). Campo novo do perfil entra no snapshot, não aqui — e um guard reprova se ele voltar a ler `user_settings`/`nutrition_goals` direto.
