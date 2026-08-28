@@ -519,7 +519,26 @@ em que a família 3.5 entrar em `SUNSETTING_PATTERNS` (hoje só `^gemini-2\.5`) 
 seria trocado pelo modelo de TEXTO — o app pediria transcrição e receberia prosa,
 exatamente a falha invisível que aquela lista existe para evitar.
 
-**A voz que já existe FUNCIONA no iPhone — suspeita MEDIDA e derrubada
+⚠️ **A voz DERRUBAVA O APP — crash medido e corrigido em 28/08/2026.**
+`IronTracksNativePlugin.startSpeechRecognition` lia o formato do `inputNode` e
+instalava o tap **antes** de pôr a `AVAudioSession` numa categoria de gravação.
+Fora de `.record`/`.playAndRecord` o nó de entrada não existe:
+`outputFormat(forBus:)` devolve 0 canais / 0 Hz e `installTap(onBus:)` lança
+**NSException do Objective-C — que Swift não captura com `do/catch`**. SIGABRT,
+app fechado, nenhum log para o usuário.
+
+E o estado de partida era exatamente esse: `stopRecognitionEngine()` e o
+AppDelegate deixam a sessão em `.playback` (para a música do usuário continuar).
+O crash não era caso raro — era o caminho comum. Reproduzido no simulador nos
+DOIS pontos de entrada (criar treino por voz e o ditado novo da nutrição), e a
+pista veio do `.ips` em `~/Library/Logs/DiagnosticReports/`, não do JS: pelo
+lado web o sintoma é o app "sumir da tela", sem erro nenhum.
+
+Hoje a sessão é configurada primeiro, e há uma guarda que recusa iniciar quando
+o formato vem inválido (`no_audio_input`) em vez de matar o processo. **Mudança
+NATIVA: só chega ao usuário com build nova no TestFlight.**
+
+**A voz alcança o caminho nativo no iPhone — suspeita MEDIDA e derrubada
 (28/08/2026).** Esta nota já disse o contrário: que o guard
 `if (!SpeechRecognitionAPI) return` (`VoiceWorkoutModal.startRecording`, linha
 411) barraria o iPhone antes do bloco `if (isIosNative())` (482) que usa o
