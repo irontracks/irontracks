@@ -11,6 +11,14 @@ import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { publicDisplayName } from '@/lib/user/publicDisplayName'
+import {
+    buildConversationList,
+    formatarQuandoDaConversa,
+    rotuloNaoLidas,
+    type CanalDireto,
+    type MensagemDireta,
+    type ResumoDeConversa,
+} from '@/lib/social/conversationList'
 
 interface ChatUser {
     id: string;
@@ -35,6 +43,7 @@ interface ChatListScreenProps {
 }
 const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }: ChatListScreenProps) => {
     const [users, setUsers] = useState<ChatUser[]>([]);
+    const [conversas, setConversas] = useState<ResumoDeConversa[]>([]);
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
     const { alert } = useDialog();
@@ -78,7 +87,58 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
         }
     }, [safeUserId, alert, supabase]);
 
+    /**
+     * As CONVERSAS — o que faltava para esta tela deixar de ser um catálogo.
+     *
+     * Duas consultas, não uma por conversa: os canais (que já trazem
+     * `last_message_at`) e uma amostra das mensagens mais recentes deles, que o
+     * helper agrupa. O N+1 (uma busca de "última mensagem" por canal) seria o
+     * caminho óbvio e faria a tela abrir devagar para quem mais usa o chat.
+     *
+     * A amostra é limitada de propósito: com muitas conversas, alguma pode
+     * ficar sem prévia — e aí ela ainda aparece, ordenada pelo carimbo do
+     * canal. Perder a PRÉVIA é aceitável; perder a CONVERSA não é.
+     *
+     * Falhar aqui não derruba a lista: sem conversas, a tela volta a ser o
+     * catálogo de contatos que já era.
+     */
+    const loadConversas = useCallback(async () => {
+        if (!safeUserId) { setConversas([]); return; }
+        try {
+            const { data: canais, error: errCanais } = await supabase
+                .from('direct_channels')
+                .select('id, user1_id, user2_id, last_message_at')
+                .or(`user1_id.eq.${safeUserId},user2_id.eq.${safeUserId}`)
+                .order('last_message_at', { ascending: false, nullsFirst: false })
+                .limit(60);
+            if (errCanais) throw errCanais;
+
+            const ids = (canais || []).map((c) => String(c.id)).filter(Boolean);
+            if (ids.length === 0) { setConversas([]); return; }
+
+            const { data: mensagens, error: errMsgs } = await supabase
+                .from('direct_messages')
+                .select('channel_id, sender_id, content, is_read, created_at')
+                .in('channel_id', ids)
+                .order('created_at', { ascending: false })
+                .limit(300);
+            if (errMsgs) throw errMsgs;
+
+            setConversas(buildConversationList(
+                (canais || []) as CanalDireto[],
+                (mensagens || []) as MensagemDireta[],
+                safeUserId,
+            ));
+        } catch (e) {
+            // Sem conversas a tela segue servindo como catálogo — um erro aqui
+            // não pode custar a lista inteira de contatos.
+            logError('error', 'Erro ao carregar conversas:', e);
+            setConversas([]);
+        }
+    }, [safeUserId, supabase]);
+
     useEffect(() => { loadUsers(); }, [loadUsers]);
+    useEffect(() => { loadConversas(); }, [loadConversas]);
 
     // Presença dos contatos: canal ÚNICO por usuário + subscription ESTREITADA aos ids da
     // lista (id=in.(...)). Antes escutava TODA UPDATE de `profiles` (presença de TODO
@@ -184,6 +244,37 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
         }
     };
 
+    const perfilPorId = useMemo(() => {
+        const m = new Map<string, ChatUser>();
+        for (const u of users) m.set(String(u?.id || ''), u);
+        return m;
+    }, [users]);
+
+    /**
+     * Conversa de verdade: já teve mensagem E o outro lado ainda é um perfil
+     * conhecido. Canal órfão (conta apagada) sairia como uma linha sem nome nem
+     * foto — e sem para onde levar.
+     */
+    const conversasComPerfil = useMemo(
+        () => conversas
+            .filter((c) => c.previa !== '' || c.naoLidas > 0)
+            .map((c) => ({ resumo: c, perfil: perfilPorId.get(c.outroUsuarioId) }))
+            .filter((x): x is { resumo: ResumoDeConversa; perfil: ChatUser } => Boolean(x.perfil)),
+        [conversas, perfilPorId],
+    );
+
+    // Quem já está em CONVERSAS não se repete nas listas de contato: o mesmo
+    // nome em dois lugares faz o usuário achar que são coisas diferentes.
+    const idsEmConversa = useMemo(
+        () => new Set(conversasComPerfil.map((c) => String(c.perfil.id))),
+        [conversasComPerfil],
+    );
+    const contatos = useMemo(
+        () => users.filter((u) => !idsEmConversa.has(String(u?.id || ''))),
+        [users, idsEmConversa],
+    );
+
+
     if (loading) {
         return (
             <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden" style={{ background: '#0a0a0a' }}>
@@ -206,8 +297,8 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
         );
     }
 
-    const onlineUsers = users.filter(u => isUserOnline(u.last_seen ?? null));
-    const offlineUsers = users.filter(u => !isUserOnline(u.last_seen ?? null));
+    const onlineUsers = contatos.filter(u => isUserOnline(u.last_seen ?? null));
+    const offlineUsers = contatos.filter(u => !isUserOnline(u.last_seen ?? null));
 
     return (
         <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#0a0a0a' }}>
@@ -251,6 +342,60 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
                     </div>
                 ) : (
                     <div>
+                        {conversasComPerfil.length > 0 && (
+                            <div className="px-4 py-2" style={{ background: 'rgba(234,179,8,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <p className="text-[10px] font-black text-yellow-500 uppercase tracking-[0.18em]">Conversas</p>
+                            </div>
+                        )}
+                        {conversasComPerfil.map(({ resumo, perfil }) => {
+                            const nome = publicDisplayName(perfil.display_name);
+                            const naoLidas = rotuloNaoLidas(resumo.naoLidas);
+                            return (
+                                <button
+                                    key={resumo.channelId}
+                                    onClick={() => handleOpenChat(perfil)}
+                                    className="w-full px-4 py-3.5 flex items-center gap-3.5 transition-colors hover:bg-white/[0.03] active:bg-white/5 text-left"
+                                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <div className="w-11 h-11 rounded-full overflow-hidden" style={{ boxShadow: '0 0 0 1.5px rgba(234,179,8,0.25)' }}>
+                                            {perfil.photo_url ? (
+                                                <Image src={perfil.photo_url} width={44} height={44} className="w-full h-full object-cover" alt={nome} loading="lazy" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center font-black text-sm" style={{ background: 'rgba(30,30,30,0.99)', color: 'rgba(234,179,8,0.8)' }}>{nome[0]?.toUpperCase() || '?'}</div>
+                                            )}
+                                        </div>
+                                        {isUserOnline(perfil.last_seen ?? null) && (
+                                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 bg-green-500" style={{ borderColor: '#0a0a0a' }} />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-baseline gap-2">
+                                            <h4 className="font-bold text-white text-sm truncate">{publicDisplayName(perfil.display_name)}</h4>
+                                            {/* O horário fica na LINHA DO NOME, não na da prévia:
+                                                a prévia é a informação longa e precisa da largura
+                                                inteira para não virar três palavras e reticências. */}
+                                            <span className="ml-auto flex-shrink-0 text-[11px] text-neutral-400 tabular-nums">
+                                                {formatarQuandoDaConversa(resumo.quandoIso, nowMs ? new Date(nowMs) : undefined)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <p className={`min-w-0 flex-1 truncate text-xs ${resumo.naoLidas > 0 ? 'text-neutral-200 font-semibold' : 'text-neutral-400'}`}>
+                                                {resumo.previa}
+                                            </p>
+                                            {naoLidas && (
+                                                <span
+                                                    className="flex-shrink-0 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-yellow-500 text-black text-[11px] font-bold tabular-nums"
+                                                    aria-label={`${resumo.naoLidas} não lida${resumo.naoLidas > 1 ? 's' : ''}`}
+                                                >
+                                                    {naoLidas}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
                         {onlineUsers.length > 0 && (
                             <div className="px-4 py-2" style={{ background: 'rgba(34,197,94,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                 <p className="text-[10px] font-black text-green-500 uppercase tracking-[0.18em]">● Online — {onlineUsers.length}</p>
