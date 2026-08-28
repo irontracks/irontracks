@@ -494,15 +494,22 @@ em que a família 3.5 entrar em `SUNSETTING_PATTERNS` (hoje só `^gemini-2\.5`) 
 seria trocado pelo modelo de TEXTO — o app pediria transcrição e receberia prosa,
 exatamente a falha invisível que aquela lista existe para evitar.
 
-**Suspeita, NÃO confirmada — sobre a voz que já existe.** Em
-`VoiceWorkoutModal.startRecording` o guard `if (!SpeechRecognitionAPI) return`
-(linha 411) vem ANTES do bloco `if (isIosNative())` (482) que usa o
-`SFSpeechRecognizer`. Se o WKWebView não expuser `webkitSpeechRecognition`, o
-iPhone mostra "Reconhecimento de voz não suportado neste dispositivo" e nunca
-alcança o caminho escrito para ele. **Não medi no aparelho** — o comentário do
-próprio código diz que a API existe mas é "unreliable" no WKWebView, o que sugere
-que o guard passa. Medir custa 30 s: abrir o assistente de criar treino e tocar
-no microfone.
+**A voz que já existe FUNCIONA no iPhone — suspeita MEDIDA e derrubada
+(28/08/2026).** Esta nota já disse o contrário: que o guard
+`if (!SpeechRecognitionAPI) return` (`VoiceWorkoutModal.startRecording`, linha
+411) barraria o iPhone antes do bloco `if (isIosNative())` (482) que usa o
+`SFSpeechRecognizer`, deixando o microfone do assistente morto no aparelho de
+toda a base.
+
+Medido no simulador contra PRODUÇÃO, no caminho real (Criar treino → Por Voz →
+tocar no microfone): aparecem os DOIS prompts nativos do iOS, primeiro o do
+microfone e depois o do **Reconhecimento de Voz** — e quem pede o segundo é o
+`SFSpeechRecognizer`. Ou seja, o WKWebView expõe `webkitSpeechRecognition`, o
+guard passa, e o caminho nativo é alcançado.
+
+A ordem dos dois blocos continua frágil (o guard fala de uma API que o caminho
+nativo não usa), mas **não há bug aqui** — não "conserte" isso atrás de um
+sintoma que não existe.
 
 **Como saber o que a chave alcança hoje** (grátis, não custa chamada):
 `GET https://generativelanguage.googleapis.com/v1beta/models?key=$K` — traz
