@@ -2194,16 +2194,38 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             return
         }
 
+        // ⚠️ ENGINE NOVO, e só DEPOIS de a sessão estar em gravação.
+        //
+        // `AVAudioEngine` materializa o `inputNode` no primeiro acesso e CACHEIA
+        // o formato do hardware daquele instante. A instância era única e vivia
+        // pela vida do app, e `stopRecognitionEngine()` — chamado no início
+        // deste método e no fim de cada ditado — toca em
+        // `audioEngine.inputNode.removeTap(onBus:)` com a sessão já devolvida a
+        // `.playback`. Ou seja: o nó era renovado com ZERO canais, e o formato
+        // velho sobrevivia à ativação de `.record` que vem depois.
+        //
+        // Foi isso que o dono viu no iPhone (28/08/2026): com o crash corrigido,
+        // a guarda abaixo passou a barrar um aparelho que TEM microfone —
+        // "Sem entrada de áudio disponível" num iPhone, sem entrada nenhuma
+        // indisponível. Recriar o engine aqui faz o formato ser lido com a rota
+        // de gravação já ativa.
+        audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        // Cinto de segurança: mesmo com a sessão ativa, o formato pode vir
-        // inválido (sem rota de entrada — fone conectando, chamada em curso,
-        // simulador sem microfone). Instalar o tap assim mataria o processo, e
-        // um erro tratado é sempre melhor que um app que some da tela.
+        // Cinto de segurança: mesmo assim o formato pode vir inválido (sem rota
+        // de entrada — fone conectando, chamada em curso, simulador sem
+        // microfone). Instalar o tap assim mataria o processo, e um erro tratado
+        // é sempre melhor que um app que some da tela. Os números vão na
+        // mensagem: sem eles, diagnosticar isto exige outra build.
         guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            call.resolve(["error": "no_audio_input", "message": "Sem entrada de áudio disponível."])
+            call.resolve([
+                "error": "no_audio_input",
+                "message": "Sem entrada de áudio disponível.",
+                "channels": Int(recordingFormat.channelCount),
+                "sampleRate": recordingFormat.sampleRate,
+            ])
             return
         }
 
