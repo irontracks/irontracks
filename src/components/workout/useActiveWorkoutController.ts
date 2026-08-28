@@ -21,6 +21,14 @@ import {
 import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
 import { buildWeightReference } from '@/lib/workout/weightOutlier';
 import { resolveWorkoutKey } from '@/lib/workout/workoutKey';
+import { buildExerciseGroups } from '@/lib/workoutGroups';
+import {
+  exerciseNameAt,
+  exercisesToDefer,
+  nextPendingExercise,
+  pendingDeferred,
+} from '@/lib/workout/deferredExercises';
+import { scrollToExercise } from './helpers/scrollToExercise';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
@@ -112,13 +120,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // This prevents the controller from re-rendering every second.
 
   // Persist collapsed card indices across app restarts
-  const collapsedKey = (() => {
-    const id = String(session?.id || (session as Record<string, unknown>)?.startedAt || '').trim();
-    return id ? `irontracks.collapsed.v1.${id}` : null;
+  const sessionStorageId = (() => {
+    return String(session?.id || (session as Record<string, unknown>)?.startedAt || '').trim();
   })();
+  const collapsedKey = sessionStorageId ? `irontracks.collapsed.v1.${sessionStorageId}` : null;
+  // "Fazer depois" mora ao lado do collapsed: estado de EXECUÇÃO desta sessão.
+  const deferredKey = sessionStorageId ? `irontracks.deferred.v1.${sessionStorageId}` : null;
 
   const {
     collapsed, setCollapsed,
+    deferredExercises, setDeferredExercises,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
     linkedWeightExercises, setLinkedWeightExercises,
@@ -159,7 +170,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     clusterRefs,
     restPauseDraftsRef,
     dropSetDraftsRef,
-  } = useWorkoutModals(collapsedKey);
+  } = useWorkoutModals(collapsedKey, deferredKey);
 
 
   const getLog = useCallback((key: string): UnknownRecord => {
@@ -500,6 +511,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const exerciseCrud = useWorkoutExerciseCrud({
     workout, exercises, logs, getLog,
     collapsed, setCollapsed,
+    setDeferredExercises,
     linkedWeightExercises, setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
     setEditExerciseOriginal,
@@ -586,6 +598,21 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   }, [setOpenNotesKeys]);
 
 
+  // ── "Fazer depois" ────────────────────────────────────────────────────────
+  // Adiar NÃO conclui nem remove nada: o exercício segue na lista, sem série
+  // marcada, contando como pendente. O que muda é para onde o app leva o
+  // usuário — e, por tabela, o que a Ilha Dinâmica / tela bloqueada mostram,
+  // já que a Live Activity lê `currentExerciseIdx`.
+  const deferralCtx = useMemo(
+    () => ({ exercises: exercises as unknown[], logs: logs as Record<string, unknown>, deferred: deferredExercises }),
+    [exercises, logs, deferredExercises],
+  );
+  const deferredPending = useMemo(() => pendingDeferred(deferralCtx), [deferralCtx]);
+  const deferredPendingNames = useMemo(
+    () => deferredPending.map((idx) => exerciseNameAt(exercises as unknown[], idx)),
+    [deferredPending, exercises],
+  );
+
   // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
   const finishHook = useWorkoutFinish({
     session, workout, exercises, logs, ui,
@@ -598,10 +625,58 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     finishing, setFinishing,
     alert: alertVoid,
     confirm, onFinish: props.onFinish as ((session: unknown, showReport: boolean) => void) | undefined,
+    deferredPendingNames,
   });
   const { finishWorkout } = finishHook;
 
 
+
+
+  /** Traz um exercício para o foco: expande, marca como atual e rola até ele. */
+  const focusExercise = useCallback((exIdx: number) => {
+    if (!Number.isFinite(exIdx) || exIdx < 0) return;
+    setCurrentExerciseIdx(exIdx);
+    setCollapsed((prev) => {
+      if (!prev.has(exIdx)) return prev;
+      const next = new Set(prev);
+      next.delete(exIdx);
+      return next;
+    });
+    scrollToExercise(exIdx);
+  }, [setCurrentExerciseIdx, setCollapsed]);
+
+  const deferExercise = useCallback((exIdx: number) => {
+    const groups = buildExerciseGroups(exercises as unknown[]);
+    // Bi-Set e irmãos vão inteiros: metade de um par adiado deixaria o outro
+    // membro alternando com um card que o usuário mandou embora.
+    const targets = exercisesToDefer(exIdx, groups);
+    const nextDeferred = new Set<number>([...deferredExercises, ...targets]);
+    setDeferredExercises(nextDeferred);
+    // Recolhe o que foi adiado — card aberto de algo que não vai ser feito agora
+    // é só ocupação de tela entre o usuário e o próximo exercício.
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      for (const i of targets) next.add(i);
+      return next;
+    });
+    const from = targets.length > 0 ? Math.max(...targets) : exIdx;
+    const next = nextPendingExercise({ ...deferralCtx, deferred: nextDeferred }, from);
+    // `null` = não sobrou pendente. Ficar onde está é o certo: mover o foco para
+    // um card já concluído ou para outro adiado seria inventar destino.
+    if (next !== null) focusExercise(next);
+    triggerHaptic('light').catch(() => { });
+  }, [exercises, deferredExercises, setDeferredExercises, setCollapsed, deferralCtx, focusExercise]);
+
+  const resumeExercise = useCallback((exIdx: number) => {
+    const groups = buildExerciseGroups(exercises as unknown[]);
+    const targets = exercisesToDefer(exIdx, groups);
+    setDeferredExercises((prev) => {
+      const next = new Set(prev);
+      for (const i of targets) next.delete(i);
+      return next;
+    });
+    focusExercise(exIdx);
+  }, [exercises, setDeferredExercises, focusExercise]);
 
   const currentExercise = exercises[currentExerciseIdx] ?? null;
 
@@ -703,6 +778,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     onSavePlateSetup: props.onSavePlateSetup,
     collapsed,
     setCollapsed,
+    deferredExercises,
+    deferredPending,
+    deferExercise,
+    resumeExercise,
+    focusExercise,
     finishing,
     openNotesKeys,
     setOpenNotesKeys,
@@ -858,6 +938,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     sessionForContext, anyModalOpen, workout, exercises, ui, settings,
     props.onSavePlateSetup,
     collapsed, setCollapsed, finishing,
+    deferredExercises, deferredPending, deferExercise, resumeExercise, focusExercise,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,

@@ -27,6 +27,13 @@ interface ExerciseCrudDeps {
   getLog: (key: string) => UnknownRecord;
   collapsed: Set<number>;
   setCollapsed: React.Dispatch<React.SetStateAction<Set<number>>>;
+  /**
+   * Índices adiados ("fazer depois"). Anda JUNTO com `collapsed` em todo
+   * remapeamento de índice: sem isso, remover ou reordenar um exercício deixa a
+   * marca no índice antigo e o selo "FAZER DEPOIS" aparece no card errado — o
+   * mesmo defeito que o remap de `collapsed`/`linkedWeights` existe para evitar.
+   */
+  setDeferredExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
   linkedWeightExercises: Set<number>;
   setLinkedWeightExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
   editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
@@ -67,6 +74,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   const {
     workout, exercises, logs,
     setCollapsed,
+    setDeferredExercises,
     setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
     setEditExerciseOriginal,
@@ -509,6 +517,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       }
       // collapsed e linked-weights seguem o mesmo remapeamento de índice
       setCollapsed((prev) => { const n = new Set<number>(); for (const i of prev) n.add(remapIdx(i)); return n; });
+      setDeferredExercises((prev) => { const n = new Set<number>(); for (const i of prev) n.add(remapIdx(i)); return n; });
       setLinkedWeightExercises((prev) => { const n = new Set<number>(); for (const i of prev) n.add(remapIdx(i)); return n; });
       organizeBaseKeysRef.current = draftOrderKeys(organizeDraft);
       setOrganizeOpen(false);
@@ -546,6 +555,11 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     }
 
     setCollapsed((prev) => {
+      const next = new Set<number>();
+      for (const i of prev) { if (i !== idx) next.add(i > idx ? i - 1 : i); }
+      return next;
+    });
+    setDeferredExercises((prev) => {
       const next = new Set<number>();
       for (const i of prev) { if (i !== idx) next.add(i > idx ? i - 1 : i); }
       return next;
@@ -644,6 +658,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     // Aplica na sessão ativa (sempre).
     onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
     setCollapsed((prev) => remapIndexSet(prev, remap));
+    setDeferredExercises((prev) => remapIndexSet(prev, remap));
     setLinkedWeightExercises((prev) => remapIndexSet(prev, remap));
     if (typeof currentExerciseIdx === 'number' && typeof setCurrentExerciseIdx === 'function') {
       setCurrentExerciseIdx(remapCurrentIndex(currentExerciseIdx, remap, nextExercises.length));

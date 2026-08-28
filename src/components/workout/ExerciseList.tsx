@@ -5,6 +5,7 @@ import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import ExerciseCard from './ExerciseCard';
 import SessionDeloadBanner from './SessionDeloadBanner';
 import { buildExerciseGroups } from '@/lib/workoutGroups';
+import { nextPendingExercise, pendingDeferred } from '@/lib/workout/deferredExercises';
 import dynamic from 'next/dynamic';
 
 const TeamProgressPanel = dynamic(
@@ -41,7 +42,7 @@ function GroupConnector({ method }: { method: string }) {
 }
 
 export default function ExerciseList() {
-  const { exercises, session, collapsed, setCollapsed } = useWorkoutContext();
+  const { exercises, session, collapsed, setCollapsed, deferredExercises, focusExercise } = useWorkoutContext();
   const logs = useWorkoutLogs();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const prevCompletedRef = React.useRef<Set<number>>(new Set());
@@ -102,6 +103,35 @@ export default function ExerciseList() {
     const setIdx = parseInt(newlyDone.slice(dash + 1), 10);
     if (!Number.isFinite(exIdx) || !Number.isFinite(setIdx)) return;
 
+    // ── "Depois" chegou ────────────────────────────────────────────────────
+    // O exercício guardado fica NO LUGAR (decisão do dono): sem um caminho de
+    // volta, terminar o resto do treino deixaria o usuário rolando a lista
+    // atrás do card que ele mesmo adiou. Quando não sobra mais nada pendente
+    // fora dos guardados, o app o leva até lá.
+    //
+    // Levar NÃO é retomar: a marca fica, e sair dela continua sendo um toque do
+    // usuário ("Retomar", no próprio card). Apagá-la aqui também apagaria o
+    // aviso do FINALIZAR, que é o que impede fechar o treino esquecendo o que
+    // foi adiado de propósito.
+    const deferralCtx = {
+      exercises: exercises as unknown[],
+      logs: logsObj as Record<string, unknown>,
+      deferred: (deferredExercises ?? new Set<number>()) as ReadonlySet<number>,
+    };
+    const guardados = pendingDeferred(deferralCtx);
+    if (guardados.length > 0 && nextPendingExercise(deferralCtx, exIdx) === null) {
+      const alvo = guardados[0];
+      if (collapsed?.has(alvo)) {
+        setCollapsed?.((prev: Set<number>) => {
+          const next = new Set(prev);
+          next.delete(alvo);
+          return next;
+        });
+      }
+      focusExercise?.(alvo);
+      return;
+    }
+
     const g = groups.get(exIdx);
     if (!g) return;
 
@@ -136,7 +166,7 @@ export default function ExerciseList() {
       } catch { /* silenced */ }
     }, 250);
     return () => clearTimeout(t);
-  }, [logs, groups, exercises, collapsed, setCollapsed]);
+  }, [logs, groups, exercises, collapsed, setCollapsed, deferredExercises, focusExercise]);
 
   const exerciseList = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
 

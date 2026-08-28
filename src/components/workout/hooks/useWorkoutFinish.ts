@@ -24,6 +24,7 @@ import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/
 import { apiAi } from '@/lib/api/ai'
 import * as Sentry from '@sentry/nextjs'
 import type { ConfirmFn } from '@/contexts/DialogContext'
+import { buildFinishQuestion } from '@/lib/workout/deferredExercises'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -41,6 +42,13 @@ interface UseWorkoutFinishProps {
   persistDeloadHistoryFromSession: () => void
   finishing: boolean
   setFinishing: (v: boolean) => void
+  /**
+   * Nomes dos exercícios que o usuário mandou "fazer depois" e ainda não fez.
+   *
+   * Chega pronto (nomes, não índices) porque este hook não deve reimplementar o
+   * que conta como pendente — a regra vive em `lib/workout/deferredExercises`.
+   */
+  deferredPendingNames?: string[]
   alert: (msg: string, title?: string) => Promise<void>
   confirm: ConfirmFn
   onFinish?: (session: unknown, showReport: boolean) => void
@@ -65,6 +73,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     postCheckinResolveRef, persistDeloadHistoryFromSession,
     finishing, setFinishing,
     alert, confirm, onFinish: _onFinish,
+    deferredPendingNames,
   } = props
 
   const requestPostWorkoutCheckin = async (): Promise<unknown | null> => {
@@ -100,12 +109,13 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     // Always show report (removed "Gerar relatório?" dialog per user request)
     const showReport = true
 
-    // Confirm finish
+    // Confirm finish — a pergunta muda quando há exercício guardado para depois
+    // (a regra e o texto vivem em lib/workout/deferredExercises).
     let ok = false
     try {
       ok =
         typeof confirm === 'function'
-          ? await confirm('Deseja finalizar o treino?', 'Finalizar treino', {
+          ? await confirm(buildFinishQuestion(deferredPendingNames), 'Finalizar treino', {
             confirmText: 'Sim',
             cancelText: 'Não',
           })

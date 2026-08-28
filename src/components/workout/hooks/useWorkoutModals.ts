@@ -16,20 +16,23 @@ type InputRefMap = Record<string, Array<HTMLInputElement | null>>;
  * - Post-checkin form
  * - Invite, notes, linked weights
  */
-export function useWorkoutModals(collapsedKey: string | null) {
+/** Lê um Set<number> persistido em localStorage; devolve vazio em qualquer falha. */
+function readIndexSet(key: string | null): Set<number> {
+    if (!key) return new Set<number>();
+    try {
+        if (typeof window === 'undefined') return new Set<number>();
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return new Set<number>();
+        const arr: unknown = JSON.parse(raw);
+        return new Set<number>(Array.isArray(arr) ? arr.filter((n): n is number => typeof n === 'number') : []);
+    } catch {
+        return new Set<number>();
+    }
+}
+
+export function useWorkoutModals(collapsedKey: string | null, deferredKey: string | null = null) {
     // ---- Collapsed cards (persisted) ----
-    const [collapsed, setCollapsed] = useState<Set<number>>(() => {
-        if (!collapsedKey) return new Set<number>();
-        try {
-            if (typeof window === 'undefined') return new Set<number>();
-            const raw = window.localStorage.getItem(collapsedKey);
-            if (!raw) return new Set<number>();
-            const arr: unknown = JSON.parse(raw);
-            return new Set<number>(Array.isArray(arr) ? arr.filter((n): n is number => typeof n === 'number') : []);
-        } catch {
-            return new Set<number>();
-        }
-    });
+    const [collapsed, setCollapsed] = useState<Set<number>>(() => readIndexSet(collapsedKey));
 
     useEffect(() => {
         if (!collapsedKey) return;
@@ -38,6 +41,21 @@ export function useWorkoutModals(collapsedKey: string | null) {
             window.localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
         } catch { }
     }, [collapsed, collapsedKey]);
+
+    // ---- "Fazer depois" (persisted) ----
+    // Mesmo armazenamento do `collapsed`: é estado de EXECUÇÃO desta sessão, não
+    // do plano de treino. Sobrevive a fechar e reabrir o app (o caso real: adiar
+    // um exercício, guardar o celular, voltar dez minutos depois); perder a marca
+    // só devolve o card ao estado normal — nenhum log é afetado.
+    const [deferredExercises, setDeferredExercises] = useState<Set<number>>(() => readIndexSet(deferredKey));
+
+    useEffect(() => {
+        if (!deferredKey) return;
+        try {
+            if (typeof window === 'undefined') return;
+            window.localStorage.setItem(deferredKey, JSON.stringify([...deferredExercises]));
+        } catch { }
+    }, [deferredExercises, deferredKey]);
 
     // ---- Notes & UI ----
     const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
@@ -197,6 +215,8 @@ export function useWorkoutModals(collapsedKey: string | null) {
         deleteConfirmIdx, setDeleteConfirmIdx,
         // Collapsed
         collapsed, setCollapsed,
+        // "Fazer depois"
+        deferredExercises, setDeferredExercises,
         // Notes & UI flags
         openNotesKeys, setOpenNotesKeys,
         inviteOpen, setInviteOpen,

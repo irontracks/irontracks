@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy, Weight } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, RotateCcw, Share2, SkipForward, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import { stripRedundantOpening, noteNeedsExpand } from './helpers/exerciseNotePreview';
@@ -84,6 +84,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     settings,
     updateLog,
     onSavePlateSetup,
+    deferredExercises,
+    deferExercise,
+    resumeExercise,
   } = useWorkoutContext();
 
   const teamCtx = useSafeTeamWorkout();
@@ -125,6 +128,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
 
   // Compute whether all sets in this exercise are marked done
   const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
+
+  // "Fazer depois": o exercício continua aqui, na mesma posição, só marcado —
+  // e o app leva o usuário ao próximo pendente. Não oferecemos a ação num
+  // exercício já CONCLUÍDO: adiar o que acabou de ser feito não quer dizer nada.
+  const isDeferred = !!deferredExercises?.has(exIdx);
+  const canDefer = !allSetsDone && typeof deferExercise === 'function';
 
   // ── Calculadora de anilhas ────────────────────────────────────────────────
   // Só aparece em exercício de BARRA: em máquina/cabo/halter não existe anilha por
@@ -801,6 +810,29 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
         </div>
       </div>
 
+      {isDeferred && (
+        // Fica FORA do `!collapsedNow`: adiar recolhe o card, e um "Retomar"
+        // escondido atrás de uma expansão obrigaria dois toques justamente na
+        // hora em que o usuário voltou para fazer o exercício.
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
+          <SkipForward size={14} className="flex-shrink-0 text-amber-400/80" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-[11px] leading-snug text-amber-200/80">
+            Guardado para fazer depois.
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              try { e.preventDefault(); e.stopPropagation(); } catch { }
+              resumeExercise?.(exIdx);
+            }}
+            className="tap-44 h-9 px-3 inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 text-amber-200 text-xs font-bold active:scale-95 transition-transform"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            Retomar
+          </button>
+        </div>
+      )}
+
       {plateCalcOpen ? (
         <PlateCalculatorSheet
           isOpen={plateCalcOpen}
@@ -894,6 +926,24 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               <Trash2 size={16} />
             </button>
           </div>
+
+          {canDefer && !isDeferred && (
+            // Linha PRÓPRIA, abaixo de "Série extra": é uma ação sobre o
+            // EXERCÍCIO inteiro, não sobre as séries dele, e dividir a mesma
+            // linha com "Série extra" colocaria lado a lado um botão que
+            // ACRESCENTA trabalho e outro que o adia.
+            //
+            // Sem cor de marca: o dourado é da ação primária (fazer a série).
+            // Pular é uma saída legítima, não o caminho que o app recomenda.
+            <button
+              type="button"
+              onClick={() => deferExercise?.(exIdx)}
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/50 text-neutral-300 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
+            >
+              <SkipForward size={15} aria-hidden="true" />
+              <span className="text-sm font-bold">Pular — fazer depois</span>
+            </button>
+          )}
 
           {/* Escolha da série a remover. Fica FORA da linha dos botões (uma lixeira
               por série apertaria 14 renderers diferentes; aqui a mesma escolha vale
