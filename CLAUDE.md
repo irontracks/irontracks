@@ -3041,6 +3041,17 @@ ficava zerado o domingo inteiro.
 
 ## ⚠️ O FUNIL — medido em 29/08/2026, e é o maior problema do produto
 
+**O que já foi feito com isso:** o estado vazio parou de oferecer ESPERAR como
+alternativa a criar, e ganhou **"Já tenho a ficha — importar foto ou PDF"**. O
+import por foto existia desde ago/2026, mas só depois de abrir o wizard e ler
+quatro opções: **13 pessoas chegam ao dashboard e 4 abrem o editor**, então
+quem chega com o papel do personal na mão não descobria que ele cabe ali. O
+atalho é SECUNDÁRIO de propósito (criar segue sendo a ação primária no
+onboarding — regra do PR #749), e a intenção é limpa ao fechar o wizard, senão
+quem a usou uma vez cairia no import em toda abertura seguinte. Guard em
+`dashboard/__tests__/atalhoDaFichaNoVazio.test.ts`.
+
+
 Três em cada quatro pessoas que entram no app nunca criam um treino. Números do
 banco de produção, não estimativa:
 

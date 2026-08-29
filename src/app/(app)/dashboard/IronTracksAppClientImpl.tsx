@@ -206,6 +206,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // este componente quando ESSE slice muda — antes 11 useStates causavam
     // re-render global do god component a cada toggle.
     const createWizardOpen = useModalStore((s) => s.createWizardOpen)
+    const createWizardNoImport = useModalStore((s) => s.createWizardNoImport)
     const setCreateWizardOpen = useModalStore((s) => s.setCreateWizardOpen)
     const expressWorkoutOpen = useModalStore((s) => s.expressWorkoutOpen)
     const setExpressWorkoutOpen = useModalStore((s) => s.setExpressWorkoutOpen)
@@ -1378,6 +1379,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             <WorkoutWizardModal
                                 isOpen={createWizardOpen}
+                                abrirImportDeFoto={createWizardNoImport}
                                 onClose={() => setCreateWizardOpen(false)}
                                 onManual={() => openManualWorkoutEditor()}
                                 onGenerate={handleWizardGenerate}
