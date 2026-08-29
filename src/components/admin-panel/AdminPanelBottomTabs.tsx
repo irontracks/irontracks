@@ -20,6 +20,7 @@ import {
   type AdminCategory,
 } from './adminPanelTabs'
 import { useAdminPanel } from './AdminPanelContext'
+import { ouvirSolicitacoesMudaram } from '@/lib/admin/solicitacoesEvent'
 
 interface AdminPanelBottomTabsProps {
   currentTab: string
@@ -60,7 +61,12 @@ export const AdminPanelBottomTabs = ({
     void fetchPending()
     // Refresh quando o tab muda — captura "voltei de outra tela, talvez
     // alguém solicitou" sem polling agressivo.
-    return () => { cancelled = true }
+    //
+    // E ao resolver uma solicitação SEM sair da aba: o caminho natural é abrir
+    // Solicitações e despachar várias seguidas, e só com a dependência de
+    // `currentTab` o badge ficava preso no número velho até o admin navegar.
+    const pararDeOuvir = ouvirSolicitacoesMudaram(() => { void fetchPending() })
+    return () => { cancelled = true; pararDeOuvir() }
   }, [ctrl.supabase, currentTab])
 
   const handleSelect = (categoryId: AdminCategory) => {

@@ -33,7 +33,12 @@ const KIND_CONFIG: Record<string, {
     border: string;
 }> = {
     churn_risk: {
-        label: 'Risco de Churn',
+        // "Sumido", não "Risco de Churn": o app inteiro fala português (os
+        // botões deste mesmo card dizem "Enviar mensagem", "Soneca", "Feito") e
+        // o coach não usa vocabulário de métrica de SaaS. E cobre os DOIS casos
+        // reais — quem parou de vir e quem nunca veio —, que "Parou de treinar"
+        // não cobriria.
+        label: 'Sumido',
         Icon: UserX,
         bg: 'bg-red-500/10',
         text: 'text-red-400',
@@ -216,7 +221,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, loading, error,
                 </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {field('Dias sem treinar (Churn)', 'churnDays', 1, 60, 'dias')}
+                {field('Dias sem treinar', 'churnDays', 1, 60, 'dias')}
                 {field('Queda de volume (%)', 'volumeDropPct', 5, 90, '% de queda')}
                 {field('Aumento de carga (%)', 'loadSpikePct', 10, 300, '% de aumento')}
                 {field('Volume mínimo prev. 7d', 'minPrev7Volume', 0, 1000000, 'kg vol')}
@@ -439,7 +444,7 @@ export const PrioritiesTab: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <h3 className="font-black text-white text-base flex items-center gap-2">
                         <Inbox size={18} className="text-yellow-500" />
-                        Coach Inbox
+                        Sua fila
                     </h3>
                     {items.length > 0 && (
                         <span className="text-[11px] font-black bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">

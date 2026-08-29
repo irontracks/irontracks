@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown, Gamepad2, Loader2 } from 'lucide-react';
+import { rotuloDeStatus } from '@/lib/admin/studentStatus';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
@@ -180,10 +181,18 @@ export const StudentsTab: React.FC = () => {
                             {vipLabel}
                         </span>
                     )}
-                    {/* Status badge (read-only display) */}
-                    <span className={`${vipLabel ? '' : 'ml-auto'} flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(String(s.status || 'pendente'))}`}>
-                        {String(s.status || 'pendente')}
-                    </span>
+                    {/* Status — SÓ para quem não tem o select logo abaixo.
+                        Para o admin, o mesmo estado aparecia duas vezes na
+                        mesma linha: este badge e o `<select>` de pagamento,
+                        com o badge ocupando o canto superior direito, que é
+                        onde o olho procura o estado. Um fato, um lugar
+                        (`docs/DESIGN_HIERARCHY.md`). Para o professor, que não
+                        recebe o select, ele continua sendo a única leitura. */}
+                    {!isAdmin && (
+                        <span className={`${vipLabel ? '' : 'ml-auto'} flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(String(s.status || 'pendente'))}`}>
+                            {rotuloDeStatus(s.status)}
+                        </span>
+                    )}
                 </div>
 
                 {/* Controls row — stop propagation so selects/buttons don't trigger card click */}

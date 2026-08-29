@@ -63,7 +63,6 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
         teacherMatchesQuery: _teacherMatchesQuery,
         templateMatchesQuery: _templateMatchesQuery,
         totalStudents: _totalStudents, studentsWithTeacher: _studentsWithTeacher, studentsWithoutTeacher: _studentsWithoutTeacher, totalTeachers: _totalTeachers,
-        studentStatusStats: _studentStatusStats,
         dashboardCharts,
         coachInboxItems,
         studentsWithTeacherFiltered,

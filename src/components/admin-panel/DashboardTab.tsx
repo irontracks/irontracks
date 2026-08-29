@@ -469,7 +469,7 @@ export const DashboardTab: React.FC = () => {
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="font-black text-white text-lg flex items-center gap-2">
                                 <Clock size={20} className="text-yellow-500" />
-                                Coach Inbox
+                                Sua fila
                             </h3>
                             <span className="text-xs font-bold text-neutral-400 bg-neutral-900 px-3 py-1 rounded-full border border-neutral-800">
                                 Alunos inativos (+7 dias)

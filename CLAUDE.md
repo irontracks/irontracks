@@ -1004,6 +1004,68 @@ voltar o `uppercase` do título), edite o arquivo e apague o guard correspondent
 em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
 caso, e é assim que ele avisa que a decisão está sendo revertida de propósito.
 
+## Área administrativa — a sala que não tinha passado pela régua (28/08/2026)
+
+Painel de Controle: **15 abas em 4 categorias** (`admin-panel/adminPanelTabs.ts`);
+Área do Professor: **7 seções** que reusam os MESMOS componentes de aba numa
+casca própria (`teacher-area/teacherAreaSections.ts`). A navegação é boa e a
+decisão está documentada no próprio arquivo — o que faltava régua era o
+conteúdo.
+
+⚠️ **Lista fixa de categorias apodrece contra o banco.** O gráfico "Status dos
+Alunos" tinha cinco colunas — Pago · Pendente · Atrasado · Cancelar · Outros — e
+a tabela `students` tem **dois** status: `pago` (32) e `ativo` (24). Três colunas
+permanentemente vazias, e **43% da base rotulada como "Outros"**, porque `ativo`
+não estava na lista. Ninguém olhou o gráfico depois de escrevê-lo. Hoje as
+categorias saem de `lib/admin/studentStatus.ts`, que agrupa pelos status que
+APARECEM — status novo no banco ganha nome sozinho, e a tabela de conhecidos só
+dá rótulo e cor melhores, **nunca filtra o que pode ser exibido** (senão o
+próximo status volta a cair em "Outros").
+
+Dois defeitos de vocabulário no mesmo lugar: **"Cancelar" é verbo** (rótulo de
+botão, não de estado) e **aluno sem status virava "Pendente"**
+(`String(raw || 'pendente')`), inventando categoria que o banco não tem — hoje é
+"Sem status", que é a verdade e é acionável.
+
+⚠️ **ABERTO — card e gráfico ainda contam "pendente" por regras diferentes.** O
+card do dashboard exige `status === 'pendente'` e ignora vazio
+(`DashboardTab.tsx:87`); o módulo novo trata vazio como "Sem status". Enquanto a
+base estiver limpa os dois concordam; no dia em que entrar aluno sem status, o
+painel se contradiz na mesma tela. A fonte única é trabalho de Sprint 2.
+
+**Padding no topo de um container que hospeda bloco `sticky` vira FRESTA.** Os
+chips de sub-aba são `sticky top-0` dentro do container de rolagem, e o `pt-2`
+dele ficava ACIMA da zona de grude: na aba Alunos aparecia uma faixa com "Pago",
+"MK" e dois ícones cortados ao meio, presa entre o cabeçalho e os chips, o tempo
+todo em que se rolava. Parecia defeito de renderização. O respiro do conteúdo
+mora no filho, que rola junto.
+
+**O badge de pendentes só recontava ao NAVEGAR** (o efeito dependia de
+`currentTab`) — e o caminho natural é abrir Solicitações e despachar várias sem
+sair da aba. Hoje há `lib/admin/solicitacoesEvent.ts`. Badge que mente é pior
+que badge nenhum: ele é a única razão de o admin abrir aquela aba.
+
+**Jargão de métrica não é vocabulário de usuário.** A fila do coach abria com
+"Coach Inbox" e quinze cartões "RISCO DE CHURN" em vermelho, com botões
+"Enviar mensagem / Soneca / Feito" logo abaixo. Hoje "Sua fila" e **"Sumido"** —
+que cobre os dois casos reais (parou de vir e nunca veio), o que "Parou de
+treinar" não cobriria. `churnDays` continua sendo chave de API.
+
+**O que está CERTO e não deve ser "corrigido":** a exclusão de aluno e de
+professor pergunta antes, lista o que se perde e tem a polaridade correta
+(`cancelText: 'Manter'`); o `overflow-x-hidden` do container é obrigatório (ver
+o comentário no arquivo — a página inteira deslizava); e o `TabErrorBoundary`
+por aba impede que uma aba quebrada derrube o painel.
+
+**Aberto, do mesmo relatório** (`Relatorio/design-area-administrativa-2026-08-28.md`
+— a pasta `Relatorio/` é ignorada pelo git, então o arquivo é local; o que
+segue é o resumo que sobrevive):
+o mesmo `statusDistribution` alimenta um `Doughnut` E um `Bar` na mesma tela; o
+gráfico "Distribuição por Professor" repete dois números que o card TOTAL ALUNOS
+já diz em texto; os quinze cartões da fila são idênticos e não mostram há quanto
+tempo o aluno sumiu; e há ~65pt de preto morto acima do cabeçalho — **medido na
+tela, causa NÃO isolada** (o `pt-safe` do header sozinho não explica o valor).
+
 ## Débito ABERTO em design/a11y (atualizado 12/08/2026, pós-varredura)
 
 O que **não** está feito, para não ser redescoberto nem refeito:
