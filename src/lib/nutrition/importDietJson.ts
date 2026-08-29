@@ -19,6 +19,8 @@
  */
 
 /** Limites espelhados do `BodySchema` de `api/nutrition/diet-plan`. */
+import { foodDatabase } from './food-database'
+
 export const LIMITES = {
     refeicoesPorDia: 10,
     itensPorRefeicao: 20,
@@ -142,6 +144,99 @@ export function diaDaSemana(v: unknown): number | undefined {
     return mapa[s]
 }
 
+/**
+ * Macros por 100 g/ml, pela base LOCAL do app (`food-database.ts`).
+ *
+ * Existe porque a dieta de nutricionista quase nunca traz macro por alimento —
+ * traz "200 g de arroz" e a meta do dia. Sem isto o plano entra com tudo
+ * zerado, que é pior do que não entrar: parece importado e não soma nada.
+ *
+ * É a MESMA base que o lançamento por texto usa, então o plano importado e o
+ * que a pessoa registra depois falam a mesma língua. E é local: não custa nada,
+ * que é a premissa deste caminho.
+ */
+export function macrosDaBase(nome: string): { kcal: number; p: number; c: number; f: number } | null {
+    const chave = chaveDaBase(nome)
+    if (!chave) return null
+    const f = foodDatabase[chave]
+    return { kcal: f.kcal, p: f.p, c: f.c, f: f.f }
+}
+
+/** Palavras que não distinguem alimento nenhum. */
+const VAZIAS = new Set(['de', 'do', 'da', 'com', 'e', 'ou', 'sem', 'a', 'o', 'em', 'inteiro', 'inteiros', 'inteira'])
+
+/** Tokens úteis do nome, sem acento, sem plural simples e sem palavra vazia. */
+function tokens(nome: string): string[] {
+    return semAcento(nome.replace(/[_\s-]+/g, ' '))
+        .split(/(?=[a-z])/)
+        .join('')
+        .split(' ')
+        .length === 1
+        ? nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(semPlural).filter((t) => t.length > 2 && !VAZIAS.has(t))
+        : []
+}
+
+function semPlural(t: string): string {
+    if (t.endsWith('oes')) return t.slice(0, -3) + 'ao'
+    if (t.endsWith('ns')) return t.slice(0, -2) + 'm'
+    if (t.endsWith('s') && t.length > 3) return t.slice(0, -1)
+    return t
+}
+
+/**
+ * A entrada da base que melhor descreve este nome.
+ *
+ * Casa por TOKENS, não por substring: "arroz branco cozido" precisa achar
+ * 'arroz cozido' (o "branco" no meio quebrava o `includes`), "ovos inteiros"
+ * precisa achar 'ovo' (plural), e "Doce de leite Tirol" precisa achar
+ * 'doce de leite' e não 'leite desnatado'.
+ *
+ * A pontuação é quantos tokens da CHAVE aparecem no nome; exige-se que TODOS
+ * apareçam, e entre as candidatas vence a mais específica (mais tokens). Assim
+ * 'arroz cozido' (2) ganha de 'arroz' (1), e nada casa por acidente de uma
+ * palavra só quando existe opção melhor.
+ */
+export function chaveDaBase(nome: string): string | null {
+    const alvo = semAcento(nome)
+    if (!alvo) return null
+    const chaves = Object.keys(foodDatabase)
+
+    const exata = chaves.find((k) => semAcento(k) === alvo)
+    if (exata) return exata
+
+    const listaDoNome = tokens(nome)
+    const doNome = new Set(listaDoNome)
+    if (!doNome.size) return null
+
+    let melhor: string | null = null
+    let melhorPontos = 0
+    let melhorDistancia = Infinity
+    for (const k of chaves) {
+        const daChave = tokens(k)
+        if (!daChave.length) continue
+        if (!daChave.every((t) => doNome.has(t))) continue
+        // Desempate: entre chaves com o MESMO número de tokens, vence a que
+        // aparece mais cedo no nome. "feijão PRETO cozido" casa com
+        // 'feijao preto' e 'feijao cozido' — as duas com dois tokens —, e é
+        // 'preto' (posição 1) que descreve o feijão, não 'cozido' (posição 2).
+        const distancia = daChave.reduce((soma, t) => soma + listaDoNome.indexOf(t), 0)
+        if (daChave.length > melhorPontos || (daChave.length === melhorPontos && distancia < melhorDistancia)) {
+            melhorPontos = daChave.length
+            melhorDistancia = distancia
+            melhor = k
+        }
+    }
+    return melhor
+}
+
+/** Equivalência de unidade → gramas, da própria base ('unidade', 'fatia'…). */
+function gramasPorUnidade(nome: string): number | null {
+    const chave = chaveDaBase(nome)
+    const aprox = chave ? foodDatabase[chave].approx : undefined
+    const porUnidade = aprox?.unidade ?? aprox?.fatia ?? aprox?.dose ?? aprox?.scoop
+    return typeof porUnidade === 'number' && porUnidade > 0 ? porUnidade : null
+}
+
 function lerItem(raw: unknown): ItemImportado | null {
     if (typeof raw === 'string') {
         // Item só com o nome ("100g de arroz"): entra com macros zerados em vez
@@ -152,13 +247,44 @@ function lerItem(raw: unknown): ItemImportado | null {
     if (!ehObjeto(raw)) return null
     const food = texto(campo(raw, 'food', 'alimento', 'nome', 'name', 'item', 'descricao'), LIMITES.nomeDoAlimento)
     if (!food) return null
+    // Peso: gramas, mililitros (1 ml ≈ 1 g nos líquidos desta base) ou unidades
+    // convertidas pela equivalência da própria base.
+    let grams = numeroTolerante(campo(raw, 'grams', 'gramas', 'quantidadeg', 'quantidade', 'qtd', 'peso', 'porcao'))
+    if (!grams) grams = numeroTolerante(campo(raw, 'ml', 'quantidademl', 'mililitros', 'volume'))
+    if (!grams) {
+        const unidades = numeroTolerante(campo(raw, 'quantidadeunidades', 'unidades', 'unidade', 'qtdunidades'))
+        const porUnidade = unidades ? gramasPorUnidade(food) : null
+        if (unidades && porUnidade) grams = unidades * porUnidade
+    }
+    grams = limitar(grams, LIMITES.gramas)
+
+    let calories = numeroTolerante(campo(raw, 'calories', 'calorias', 'kcal', 'energia'))
+    let protein = numeroTolerante(campo(raw, 'protein', 'proteina', 'proteinas', 'prot', 'p'))
+    let carbs = numeroTolerante(campo(raw, 'carbs', 'carboidratos', 'carboidrato', 'carbo', 'cho', 'c'))
+    let fat = numeroTolerante(campo(raw, 'fat', 'gordura', 'gorduras', 'lipidios', 'g'))
+
+    // Nenhum macro declarado + peso conhecido: deriva da base local. Só quando
+    // NENHUM veio — um plano que traz kcal e omite proteína está declarando
+    // zero de proteína, e sobrescrever isso seria inventar sobre o que o
+    // nutricionista escreveu.
+    if (!calories && !protein && !carbs && !fat && grams > 0) {
+        const base = macrosDaBase(food)
+        if (base) {
+            const fator = grams / 100
+            calories = base.kcal * fator
+            protein = base.p * fator
+            carbs = base.c * fator
+            fat = base.f * fator
+        }
+    }
+
     return {
         food,
-        grams: limitar(numeroTolerante(campo(raw, 'grams', 'gramas', 'quantidade', 'qtd', 'peso', 'porcao')), LIMITES.gramas),
-        calories: limitar(numeroTolerante(campo(raw, 'calories', 'calorias', 'kcal', 'energia')), LIMITES.kcalItem),
-        protein: limitar(numeroTolerante(campo(raw, 'protein', 'proteina', 'proteinas', 'prot', 'p')), LIMITES.proteinaItem),
-        carbs: limitar(numeroTolerante(campo(raw, 'carbs', 'carboidratos', 'carboidrato', 'carbo', 'cho', 'c')), LIMITES.carboItem),
-        fat: limitar(numeroTolerante(campo(raw, 'fat', 'gordura', 'gorduras', 'lipidios', 'g')), LIMITES.gorduraItem),
+        grams,
+        calories: limitar(calories, LIMITES.kcalItem),
+        protein: limitar(protein, LIMITES.proteinaItem),
+        carbs: limitar(carbs, LIMITES.carboItem),
+        fat: limitar(fat, LIMITES.gorduraItem),
     }
 }
 
@@ -218,13 +344,25 @@ export function importarDietaDeJson(textoCru: string): ResultadoDeImport {
     const notes = texto(campo(raiz, 'notes', 'observacoes', 'obs', 'notas'), 500)
 
     const diasCrus = campo(raiz, 'days', 'dias', 'semana', 'week')
-    if (Array.isArray(diasCrus) && diasCrus.length) {
-        let days = diasCrus
+    // `semana` também vem como OBJETO com o dia na CHAVE — foi a forma da
+    // primeira dieta real importada: { "segunda": {...}, "terca": {...} }.
+    // Vira array, com o dia herdado da chave.
+    const listaDeDias: unknown[] = Array.isArray(diasCrus)
+        ? diasCrus
+        : ehObjeto(diasCrus)
+            ? Object.entries(diasCrus)
+                .map(([chave, valor]) => (ehObjeto(valor) ? { ...valor, __diaDaChave: chave } : null))
+                .filter((d) => d !== null)
+            : []
+
+    if (listaDeDias.length) {
+        let days = listaDeDias
             .map((d) => {
                 if (!ehObjeto(d)) return null
                 const meals = lerRefeicoes(campo(d, 'meals', 'refeicoes', 'refeicao'), avisos)
                 if (!meals.length) return null
                 const weekday = diaDaSemana(campo(d, 'weekday', 'dia', 'diadasemana', 'day'))
+                    ?? diaDaSemana(d.__diaDaChave)
                 return { ...(weekday !== undefined ? { weekday } : {}), meals }
             })
             .filter((d): d is DiaImportado => d !== null)
