@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ClipboardPaste, Check, AlertTriangle, Copy } from 'lucide-react'
+import { ClipboardPaste, Check, AlertTriangle, Copy, Camera, Loader2 } from 'lucide-react'
 import { FullscreenPortal } from '@/components/stories/FullscreenPortal'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -60,6 +60,8 @@ export default function DietJsonImportModal({ open, onClose, onImported }: Props
     // Sem ela, alimento fora da base local entra com macro zerado — e a base
     // local existe para o que o brasileiro digita, não para cobrir tudo.
     const [taco, setTaco] = useState<TabelaDeAlimentos | undefined>()
+    const [lendoArquivo, setLendoArquivo] = useState(false)
+    const arquivoRef = useRef<HTMLInputElement | null>(null)
     const focusTrapRef = useFocusTrap(open, onClose)
     useBackHandler(open, onClose)
     const areaId = useId()
@@ -102,6 +104,39 @@ export default function DietJsonImportModal({ open, onClose, onImported }: Props
         } catch {
             // Sem permissão de área de transferência: o texto está na tela e
             // pode ser selecionado à mão. Não é motivo para alarme.
+        }
+    }
+
+    // Foto/PDF → JSON. A extração é a ÚNICA parte paga: o resultado cai no
+    // mesmo campo de texto e segue pelo fluxo do import por JSON, com a mesma
+    // prévia, os mesmos tetos e a mesma resolução de macros.
+    const lerArquivo = async (file: File) => {
+        setLendoArquivo(true)
+        setErro(null)
+        try {
+            const fd = new FormData()
+            fd.append('file', file)
+            const res = await fetch('/api/ai/diet-photo-extract', { method: 'POST', body: fd, credentials: 'include' })
+            const json = await res.json().catch(() => null)
+            if (!res.ok || !json?.ok) {
+                const mensagens: Record<string, string> = {
+                    vip_required: String(json?.message || 'Importar por foto é exclusivo VIP. Por JSON continua livre.'),
+                    file_too_large: 'Arquivo muito grande (máx 15 MB).',
+                    invalid_file_type: 'Envie uma foto (JPG, PNG, HEIC) ou um PDF.',
+                    could_not_read: 'Não consegui ler essa dieta. Tente uma foto mais nítida, ou cole o JSON.',
+                    rate_limited: 'Muitas leituras seguidas. Tente daqui a pouco.',
+                }
+                setErro(mensagens[String(json?.error)] ?? 'Não consegui ler o arquivo. Tente de novo ou cole o JSON.')
+                return
+            }
+            // Vai para o campo de texto — e não direto para o salvamento — de
+            // propósito: a pessoa PRECISA conferir o que a IA leu do papel dela
+            // antes de isso virar o plano dela.
+            setTexto(JSON.stringify(json.diet, null, 2))
+        } catch {
+            setErro('Sem conexão para ler o arquivo agora.')
+        } finally {
+            setLendoArquivo(false)
         }
     }
 
@@ -181,6 +216,33 @@ export default function DietJsonImportModal({ open, onClose, onImported }: Props
                         </button>
                     </div>
                 </div>
+
+                {/* Caminho da foto/PDF: some o passo de levar a outro
+                    assistente. É o único que gasta IA nossa, daí o gate. */}
+                <input
+                    ref={arquivoRef}
+                    type="file"
+                    // O campo é escondido e acionado pelo botão abaixo, que tem
+                    // o texto visível — mas o `aria-label` é obrigatório: sem
+                    // ele o leitor de tela anuncia um controle sem nome.
+                    aria-label="Escolher foto ou PDF da dieta"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) void lerArquivo(f)
+                        e.target.value = ''
+                    }}
+                />
+                <button
+                    type="button"
+                    onClick={() => arquivoRef.current?.click()}
+                    disabled={lendoArquivo}
+                    className="mb-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-yellow-500/30 bg-yellow-500/[0.06] text-sm font-bold text-yellow-300 transition active:scale-[0.98] disabled:opacity-50"
+                >
+                    {lendoArquivo ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Camera size={16} aria-hidden="true" />}
+                    {lendoArquivo ? 'Lendo a dieta…' : 'Enviar foto ou PDF da dieta'}
+                </button>
 
                 <label htmlFor={areaId} className="mb-1.5 block text-xs font-semibold text-neutral-300">
                     JSON da dieta
