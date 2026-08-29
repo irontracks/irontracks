@@ -9,7 +9,7 @@ import { saveNutritionPhase } from '@/actions/nutrition-actions'
 import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
-import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard, Mic, Square } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard, Mic, Square, ClipboardPaste } from 'lucide-react'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { juntarDitado, suportaDitado } from '@/lib/nutrition/ditado'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
@@ -40,6 +40,7 @@ const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: fa
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
 const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
+const DietJsonImportModal = dynamic(() => import('./DietJsonImportModal'), { ssr: false })
 const PrescribedDietPlan = dynamic(() => import('./PrescribedDietPlan'), { ssr: false })
 const MyDietPlan = dynamic(() => import('./MyDietPlan'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
@@ -373,6 +374,11 @@ export default function NutritionMixer({
   // diferentes da tela e agora as duas ações moram no mesmo card.
   const canChat = !!canViewMacros && isToday && !chatOffline
   const canGenerateDiet = !!canViewMacros && isToday && safeGoals.calories > 0
+  // Importar é GRÁTIS (parsing local, sem IA) e por isso o gate é mais frouxo
+  // que o de gerar: não exige meta salva nem que seja o dia de hoje — nenhum
+  // dos dois muda o que um JSON de dieta contém.
+  const canImportDiet = !!canViewMacros
+  const [importOpen, setImportOpen] = useState(false)
 
   // Nomeado porque agora decide DUAS coisas: o atributo `disabled` e a cor do
   // botão. Como expressão inline repetida, as duas divergiriam no primeiro
@@ -1498,7 +1504,7 @@ export default function NutritionMixer({
               - !chatOffline: o Mixer tem refeições otimistas que ainda não estão
                 no banco — offline, o chat contradiria o anel da própria tela.
               - goals.calories > 0: sem meta não há dieta a gerar. */}
-          {(canChat || canGenerateDiet) && (
+          {(canChat || canGenerateDiet || canImportDiet) && (
             <div className="mt-2 flex items-center gap-2">
               {canChat && (
                 <button
@@ -1525,7 +1531,25 @@ export default function NutritionMixer({
                   {dietOpen ? 'Fechar dieta' : 'Gerar dieta'}
                 </button>
               )}
+              {canImportDiet && (
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(true)}
+                  className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-[0.98]"
+                >
+                  <ClipboardPaste size={14} className="text-yellow-500" aria-hidden="true" />
+                  Importar
+                </button>
+              )}
             </div>
+          )}
+
+          {canImportDiet && (
+            <DietJsonImportModal
+              open={importOpen}
+              onClose={() => setImportOpen(false)}
+              onImported={() => setEntriesTick(v => v + 1)}
+            />
           )}
 
           {canGenerateDiet && dietOpen && (
