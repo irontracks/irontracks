@@ -2896,6 +2896,52 @@ Bug extra achado no caminho: o ranking fazia `monday.setDate(getDate() -
 getDay() + 1)`, que **no domingo aponta para amanhã** — o ranking da semana
 ficava zerado o domingo inteiro.
 
+## ⚠️ O FUNIL — medido em 29/08/2026, e é o maior problema do produto
+
+Três em cada quatro pessoas que entram no app nunca criam um treino. Números do
+banco de produção, não estimativa:
+
+| etapa | pessoas | % |
+|---|---|---|
+| cadastrados | 59 | 100% |
+| criaram ao menos um treino | 20 | 34% |
+| treinaram 1× | 17 | 29% |
+| treinaram 5× | 12 | 20% |
+| **ativos nos últimos 30 dias** | **6** | **10%** |
+
+**O gargalo NÃO é a aprovação nem a entrega de e-mail** — as duas hipóteses
+óbvias, as duas derrubadas: dos pedidos de acesso, **42 foram aprovados e zero
+estão pendentes**; e dos 39 aprovados com conta, **34 chegaram a logar**. O
+problema mora na primeira sessão DENTRO do app.
+
+Das **25** pessoas que foram aprovadas, logaram e nunca criaram um treino:
+**13 (52%) tiveram só a primeira sessão** — entraram uma vez e não voltaram —, a
+média até o último login é de **1,7 dia**, e **22 das 25 não têm professor**
+(ou seja, não estavam esperando ninguém).
+
+O que já foi feito com isso: o estado vazio da lista de treinos parou de
+oferecer ESPERAR como alternativa a criar (a frase dizia "ou espere o treino do
+seu professor", inútil para 88% delas). Guard em
+`dashboard/__tests__/onboardingNaoConvidaAEsperar.test.ts`.
+
+**O que falta é decisão de produto e depende do dono**, que é o coach dessas
+pessoas: o banco não sabe o que elas viram nem por que saíram. Instrumentar a
+primeira sessão, ou perguntar a elas, são os dois caminhos.
+
+⚠️ **Duas prioridades documentadas neste arquivo foram MEDIDAS e não se
+sustentam** — não gaste sessão com elas antes de reler:
+
+1. **"Push Android mudo desde 24/07"** sugere urgência que os dados negam. Há
+   **5 tokens Android de 4 contas**, e as quatro são: o dono (`djmkapple`), a
+   conta de TESTE (`djmkbrasil`), o revisor da Apple
+   (`apple.review@irontracks.com.br`) e um professor com 0 sessões. O último
+   token foi visto em **22/07/2026**. Configurar o FCM hoje entregaria push para
+   **zero usuários reais**.
+2. **A dívida do 2º branch do bootstrap** (usuário sem template recebe "qualquer
+   workout", com o `notes` inteiro) é real e hoje afeta **UMA pessoa**: dos 39
+   sem template, só 1 tem sessões — 6 sessões, ~6,8 kB de `notes` cada. O
+   ratchet continua valendo como defesa futura; a correção não é urgente.
+
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 
