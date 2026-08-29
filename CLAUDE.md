@@ -2921,11 +2921,37 @@ completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
 **Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
 1. ~~**CSP**~~ — **LIGADO em 27/08/2026**, com a polaridade invertida. Detalhes
    na seção do middleware, que é onde este assunto mora.
-2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só LOGA
-   (`[origin-guard]` nos runtime logs, kind `cross-origin`|`missing-origin`).
-   Janela limpa (especialmente `missing-origin` zerado) →
-   `ORIGIN_GUARD_ENFORCE=true` na Vercel. Função pura em
-   `utils/security/originGuard.ts`; bearer/webhook/cron passam SEMPRE.
+2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só
+   RELATA (kind `cross-origin`|`missing-origin`). Janela limpa (especialmente
+   `missing-origin` zerado) → `ORIGIN_GUARD_ENFORCE=true` na Vercel. Função
+   pura em `utils/security/originGuard.ts`; bearer/webhook/cron passam SEMPRE.
+
+   ⚠️ **A janela NÃO EXISTIA até 29/08/2026, e esta nota prometia lê-la.** O
+   relato era só `console.error('[origin-guard]', …)`, ou seja runtime log da
+   Vercel — cuja retenção não passa de ~1 dia: buscar 7 dias responde que o
+   intervalo excede a retenção e 24 h volta vazio. `audit_events` não tinha
+   NENHUMA linha de origin. Ficaram 15 dias em modo relatório sem nada
+   observável, exatamente a lição que o CSP já tinha aprendido duas seções
+   acima (log expira e fica ilegível de onde se investiga; o banco não).
+
+   Hoje o mismatch também vai para `audit_events` via
+   `utils/security/originReport.ts` — dedupe por (tipo, origem, ROTA), teto de
+   10 linhas por instância, `waitUntil` para a instância não ser congelada
+   antes do envio, e **silêncio deliberado em toda falha**: isto roda no
+   middleware, e um throw ali vira 500 no site inteiro (com o app nativo
+   carregando o front deste servidor, levaria todos os aparelhos junto). A
+   escrita sai do middleware e não de uma rota — no CSP a rota existe porque
+   quem reporta é o NAVEGADOR; aqui quem detecta é o próprio servidor.
+
+   ```sql
+   select metadata->>'kind' as tipo, metadata->>'originHost' as origem,
+          metadata->>'path' as rota, count(*) as n, max(created_at) as ultimo
+   from audit_events where action = 'origin_guard_mismatch'
+   group by 1,2,3 order by 4 desc;
+   ```
+
+   **Espere alguns dias de tráfego real antes de decidir** — a tabela começou
+   vazia em 29/08.
 
 **Catálogo LGPD (`lib/account/userDataCatalog.ts`) — ler ANTES de mexer em
 export/delete de conta.** Fatos medidos que ele carrega: a maioria das
