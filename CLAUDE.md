@@ -426,6 +426,43 @@ chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo
 
 **O gerador de cardápio tinha o MESMO defeito de fonte — e ninguém percebeu porque o consertado foi o outro caminho.** O motor de TROCA migrou para `nutrition_meal_entries.items` em 03/08; o de GERAÇÃO (`food-profile.ts` → prompt do `dietGenerate`) ficou lendo o cru até 04/08/2026. Duas fontes erradas: (1) `nutrition_meal_entries.food_name` é o nome da REFEIÇÃO, então o prompt mandava "os alimentos que este usuário já come: Almoço (36×), Pós treino (21×), Janta (19×), Café da manhã (18×)…" — 13 dos 20 eram rótulo; (2) `nutrition_learned_foods` sem crivo. O modelo improvisava em cima disso e o dono recebeu um "Plano Cardioprotetor" com **whey 30 g e aveia 40 g secos** no café da manhã e pão francês no almoço. Hoje o repertório sai dos ITENS, passa pelo mesmo `foodItemSanity` da troca e vai ao prompt **agrupado por refeição** (`foodProfileToPromptSections`: "- Almoço: arroz, feijão, patinho") — é o agrupamento, não uma lista fixa, que impede pão com doce de leite de cair no almoço. **Ao tocar em qualquer coisa que alimente prompt de nutrição, cheque as DUAS pontas: o que a troca lê e o que a geração lê.**
 
+**Importar dieta por JSON — a porta GRÁTIS (29/08/2026).** A nutrição não tinha
+nenhuma forma de trazer uma dieta pronta: `diet-generate` GERA, `export-pdf`
+EXPORTA, e `CustomFoodScanner`/`BarcodeScanner` leem **um produto**, não um
+cardápio. Quem chegava com o PDF do nutricionista digitava tudo.
+
+O caminho é `lib/nutrition/importDietJson.ts` → `POST /api/nutrition/diet-plan`
+(a rota que já salvava o plano próprio: valida com Zod, arquiva o anterior,
+grava `created_by = user_id`). **Nenhuma rota de IA no meio — é por isso que é
+grátis**, e o guard reprova se `/api/ai/` aparecer no modal. Decisão do dono:
+"importar com ferramenta que não gasta nada como json pode ser free". Ler o PDF
+pelo NOSSO Gemini seria outra conversa, com gate.
+
+**A tolerância é o produto.** O JSON vem de um modelo que ninguém controla, e um
+parser que só aceitasse as chaves exatas reprovaria a maioria dos casos reais:
+aceita `refeicoes`/`meals`, `carboidratos`/`carbs`, `Proteína` com acento e
+maiúscula, `"120g"`, `"1.200"`, `"35,5"`, item que é só uma string, array de
+refeições solto, e nome de dia (`"terça"`, `"seg"`) virando índice.
+
+⚠️ **`"1.200"` é AMBÍGUO** — mil e duzentos em pt-BR, um vírgula dois em inglês.
+A régua é a contagem de casas: exatamente três dígitos depois do ponto é
+milhar. Escolhida pelo erro na outra direção — ler "1.200 kcal" como 1,2 apaga
+uma refeição, enquanto o contrário dá um número que o usuário vê e corrige na
+prévia.
+
+Os tetos (10 refeições, 20 itens, 7 dias, 5.000 g) são os do `BodySchema` da
+rota, espelhados no parser **de propósito**: estourar lá devolve 400 "Invalid
+input", mensagem que não ensina nada a quem colou o JSON. Aqui corta e avisa.
+
+**O prompt de conversão é parte da feature, não enfeite.** Quem abre o modal tem
+o PDF, não o JSON — sem o texto pronto para levar ao ChatGPT, a feature só serve
+a quem já sabe o formato.
+
+⚠️ **O guard `overlayPrecisaDePortal` pegou este modal** antes do aparelho: a
+Nutrição é um overlay `fixed z-[25]`, e quem nasce lá dentro herda o stacking
+context (o `z-[1600]` vale 25) e o containing block (o `fixed` rola junto e o
+topo sai da tela). `FullscreenPortal` é obrigatório aqui.
+
 **Bater o macro não é entregar comida — `lib/nutrition/mealCoherence.ts`.** Guard determinístico sobre o cardápio gerado, em duas classes: veículo faltando (pó sem líquido) é objetivo e **repara** (acrescenta Água 0 kcal para whey/creatina, Leite desnatado para aveia/sucrilhos); incoerência de composição (dois doces na mesma refeição, doce dominando as kcal) só REPORTA, e o motor devolve o problema ao modelo numa única retentativa. Nunca ampute o prato num reparo mecânico: remover comida derruba o plano abaixo da meta. Armadilha do módulo: `/leite/` casa com "doce de leite" e "leite condensado" — sem `NOT_A_LIQUID` o guard declara que o café da manhã do caso real já tinha líquido, ou seja, passa verde exatamente na refeição que existe para pegar. Fiação provada em `__tests__/dietGenerateCoherence.test.ts` (Gemini mockado devolvendo o cardápio real reprovado).
 
 **A variação da SEMANA desfazia a coerência do dia-base — conserte os dois motores, sempre.** Testado no simulador em 04/08/2026 sobre um plano recém-gerado: o dia base saiu "Leite desnatado · Whey · Sucrilhos · Pão" e a terça, derivada pelo motor de troca, virou "**ovo mexido** · Whey · Sucrilhos · Pão". Causa: leite desnatado tem 36% das kcal em proteína, então `classifyFood` o põe em `protein` — mesma classe do ovo mexido. Pelo macro a troca é impecável; na prática devolve o prato seco. Três correções: (1) `isVehicleLoadBearing` tira do sorteio o item que sustenta o veículo; (2) `liquidKindOf` distingue líquido **cremoso** de **fino** — água satisfaz whey e NÃO satisfaz sucrilhos/aveia (o guard antigo só perguntava "tem líquido?" e deixou passar "sucrilhos + Água"); (3) `isCondiment`/`isPreparedPlate` no `foodItemSanity` — maionese entrou no lugar do abacate (ambos `fat`) e "pedaços de pizza de alcatra acebolada" no lugar do patinho (ambos `protein`). O `buildWeekFromDay` ainda repara cada dia derivado, porque a troca pode INTRODUZIR um pó onde não havia. **Guard só vale com macro real: com `protein: 9, fat: 1` no leite a troca nem acontece e o teste passa verde com o bug reposto** — a fixture usa os números que estavam no banco.
