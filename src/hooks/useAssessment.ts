@@ -24,6 +24,7 @@ import {
   calculateBodyFatPercentage,
   calculateBMR,
   calculateBMI,
+  bmiForStorage,
   calculateFatMass,
   calculateLeanMass,
   calculateBodyDensity,
@@ -607,9 +608,12 @@ export const useAssessment = (): UseAssessmentReturn => {
       const canonicalLeanMass = typeof data.bia_lean_mass === 'number' && data.bia_lean_mass > 0
         ? data.bia_lean_mass : undefined;
 
-      // BMI calculado quando temos peso E altura — caso contrário deixa
-      // o backend/UI tratarem (não persistimos lixo).
-      const bmi = (weight > 0 && height > 0) ? Number(((weight / Math.pow(height / 100, 2))).toFixed(1)) : undefined;
+      // BMI pela FONTE ÚNICA. A conta à mão que estava aqui não tinha o clamp
+      // de `calculateBMI` (o mesmo que a tela usa na linha ~427), então altura
+      // digitada em metros gravava IMC 261 no banco enquanto a tela exibia 60 —
+      // dois números para o mesmo corpo. Segue devolvendo `undefined` sem peso
+      // ou altura: não persistimos lixo.
+      const bmi = bmiForStorage(weight, height);
 
       const payload = {
         student_id: resolvedStudentId,

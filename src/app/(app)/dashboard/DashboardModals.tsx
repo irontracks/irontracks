@@ -210,7 +210,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
     const preCheckinWeightValue = (() => {
         const draftWeight = String((preCheckinDraft as Record<string, unknown>)?.weight ?? '').trim()
         if (draftWeight) return draftWeight
-        return profileBodyWeightKg ? String(profileBodyWeightKg) : ''
+        // pt-BR no campo, como no texto ao lado e no placeholder ("Ex: 85,0").
+        // `String(94.6)` põe PONTO: a mesma tela mostrava "94.6" no campo e
+        // "94,6 kg" uma linha abaixo. Salvar segue normalizando para ponto
+        // (`preCheckinResolvedDraft`), então o formato é só de exibição.
+        return profileBodyWeightKg ? formatKgPtBr(profileBodyWeightKg) : ''
     })()
 
     // Peso efetivo salvo ao continuar (o digitado ou o do perfil confirmado).

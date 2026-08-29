@@ -17,7 +17,7 @@ import {
     estimateCaloriesMet,
 } from '@/utils/calories/metEstimate'
 import { isWorkingSet, setVolume, setBestE1rm, clusterVolume, stagesVolume, waveVolume, setTopWeightReps, parseWeightValue, parseRepsValue, nonWorkingSetLabel, isNonWorkingSet } from '@/utils/report/setVolume'
-import { calculateBodyDensity, calculateBodyFatPercentage, calculateBMI, sumSkinfoldsJP7 } from '@/utils/calculations/bodyComposition'
+import { BMI_MAX, calculateBodyDensity, calculateBodyFatPercentage, calculateBMI, sumSkinfoldsJP7 } from '@/utils/calculations/bodyComposition'
 import { learnWeightGrid, snapToLearnedGrid } from '@/utils/autoload/machineGrid'
 import { planPlatesPerSide } from '@/utils/autoload/plateBreakdown'
 import { resolveIncrement, roundToIncrement, roundSuggestedWeight as roundSuggestedWeight2 } from '@/utils/autoload/plateMath'
@@ -174,7 +174,10 @@ describe('composição corporal — as guardas que lançam', () => {
     it('IMC recusa peso/altura inválidos e clampa extremos', () => {
         expect(() => calculateBMI(0, 178)).toThrow()
         expect(() => calculateBMI(80, 0)).toThrow()
-        expect(calculateBMI(300, 140)).toBeLessThanOrEqual(60)
+        // Teto de 80 desde 28/08/2026 — 60 apagava obesidade grau III, que é
+        // pessoa real; o clamp existe para o erro de digitação (altura em
+        // metros no campo de centímetros dá IMC 261).
+        expect(calculateBMI(300, 140)).toBeLessThanOrEqual(BMI_MAX)
         expect(calculateBMI(30, 200)).toBeGreaterThanOrEqual(10)
     })
 

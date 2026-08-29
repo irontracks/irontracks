@@ -89,6 +89,46 @@ auditoria de tela isso PARECE crash: o app some sozinho. Custou uma
 investigação de crash report para descobrir que a causa era o próprio
 ferramental. Ao percorrer telas, relance o app a cada turno.
 
+**Segunda rodada da mesma auditoria — quatro achados, 28/08/2026.** As duas
+primeiras são CLASSES que este arquivo já descreve e que continuavam vivas em
+lugares novos; procure por elas antes de supor que a varredura fechou.
+
+⚠️ **A cota diária VIP contava o dia UTC** (`utils/vip/limits.ts`, quatro
+pontos) — ou seja, virava às **21h de Brasília**. Quem usava a IA às 21h30
+consumia a cota de amanhã e quem estourava às 20h50 esperava dez minutos por
+uma cota nova. Medido em produção: 12 de 186 usos (6,5%) na janela, e é Gemini
+PAGO. O efeito grave era silencioso: o REEMBOLSO usa a mesma conta de dia, então
+consumo às 20h59 gravava o dia X e o reembolso às 21h01 procurava X+1 — não
+achava a linha e a cota **não voltava** para quem não recebeu resposta. O reset
+SEMANAL do mesmo arquivo já era BRT (`weekReset.ts`); era só o dia que estava
+fora de linha. Hoje `brtDateKey()`, guard em `vip/__tests__/cotaDiariaBrt.test.ts`.
+Mesma classe do heatmap de nutrição e do streak: **dia UTC em app brasileiro é
+sempre suspeito**.
+
+⚠️ **Mídia e GIF do chat gravavam sem olhar o `{ error }`** — e disparavam o
+push antes. Como **o supabase-js não lança em erro de escrita**, a mensagem não
+gravava, ninguém via erro, e o destinatário recebia notificação de uma mensagem
+que não existe: abria o chat e não havia nada. O envio de TEXTO, no MESMO
+arquivo, sempre checou `insertError` e ainda oferece "Reenviar" — era lapso, não
+desenho, e é o padrão a copiar. Guard de FORMA em
+`chatMidiaNaoFalhaEmSilencio.test.ts` (montar o `ChatDirectScreen` mediria o
+harness): ele exige a DESTRUTURAÇÃO daquela chamada. A primeira versão aceitava
+qualquer "error" na vizinhança — inclusive o `logError` do bloco ao lado — e
+passou verde com a mutação. É o jeito nº 8 da lista de guards falsos.
+
+**O IMC gravado no banco divergia do exibido.** `calculateBMI` clampa; o
+`useAssessment` gravava `weight / altura²` cru. Duas telas do mesmo laudo, dois
+números. Fonte única em `bmiForStorage`. E **o teto subiu de 60 para 80**: 60
+apaga obesidade grau III, que é pessoa real — o clamp existe para o erro de
+digitação (altura em metros no campo de centímetros dá IMC 261), não para negar
+o caso extremo verdadeiro.
+
+**O check-in escrevia ponto e ensinava vírgula.** O campo de peso vinha com
+`String(94.6)` → "94.6", o texto embaixo dizia "94,6 kg" e o placeholder,
+"Ex: 85,0" — três formatos do mesmo número na mesma tela. É só exibição: salvar
+segue normalizando vírgula → ponto (`Number("95,5")` é `NaN` e o peso sumiria do
+cálculo calórico).
+
 **A tira de navegação do treino ativo (28/08/2026).** Treino de 10 exercícios só
 tinha rolagem — nenhum índice, nenhum salto. `WorkoutExerciseRail` é irmã do
 header (FORA do contêiner que rola), some sozinha abaixo de

@@ -632,11 +632,19 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 }
 
                 if (payload) {
-                    await supabase.from('direct_messages').insert({
+                    // ⚠️ O supabase-js NÃO LANÇA em erro de escrita — devolve
+                    // `{ error }`. Sem esta checagem o insert falhava em
+                    // silêncio, o `catch` externo (que só pega exceção) não via
+                    // nada, e o push saía assim mesmo: o destinatário recebia
+                    // "📷 Imagem" e abria um chat vazio.
+                    const { error: erroMidia } = await supabase.from('direct_messages').insert({
                         channel_id: channelId,
                         sender_id: safeUserId,
                         content: JSON.stringify(payload)
                     });
+                    if (erroMidia) throw erroMidia;
+                    // O push só depois de a mensagem existir. Avisar de algo que
+                    // não foi gravado é pior que não avisar.
                     notifyRecipientPush(payload.type === 'video' ? '🎥 Vídeo' : '📷 Imagem');
                 }
             }
@@ -675,12 +683,20 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         const payload = { type: 'gif', media_url: trimmedUrl }
         setSendingGif(true);
         try {
-            await supabase.from('direct_messages').insert({
+            // Mesmo caso da mídia: `{ error }` em vez de exceção. Aqui não havia
+            // nem `catch` — o GIF sumia, o push era enviado e o usuário ficava
+            // achando que tinha mandado.
+            const { error: erroGif } = await supabase.from('direct_messages').insert({
                 channel_id: channelId,
                 sender_id: safeUserId,
                 content: JSON.stringify(payload)
             });
+            if (erroGif) throw erroGif;
             notifyRecipientPush('🎬 GIF');
+        } catch (err) {
+            logError('error', 'Erro ao enviar GIF:', err);
+            const msg = (err as Record<string, unknown>)?.message
+            await alert('Não consegui enviar o GIF: ' + (typeof msg === 'string' ? msg : String(err)))
         } finally {
             setSendingGif(false);
         }
