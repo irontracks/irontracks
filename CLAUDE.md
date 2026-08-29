@@ -483,6 +483,33 @@ Nutrição é um overlay `fixed z-[25]`, e quem nasce lá dentro herda o stackin
 context (o `z-[1600]` vale 25) e o containing block (o `fixed` rola junto e o
 topo sai da tela). `FullscreenPortal` é obrigatório aqui.
 
+**Dieta por FOTO/PDF (29/08/2026) — o caminho pago, ao lado do grátis.**
+`POST /api/ai/diet-photo-extract` recebe a foto ou o PDF do nutricionista
+(multipart, 15 MB, sem bucket — o padrão do `scan-nutrition-label`; o import de
+TREINO usa bucket porque guarda o arquivo para reprocessar, aqui ele é lido e
+descartado) e devolve **o mesmo JSON que o import por texto já lê**.
+
+⚠️ **A rota NÃO normaliza nada.** Devolve o JSON cru, e quem normaliza é
+`importarDietaDeJson` no cliente — assim a tolerância, os tetos e a resolução de
+macros valem de graça, e não nasce um segundo normalizador para divergir do
+primeiro (o padrão que este repo já pagou caro em 14 renderers, 5 listas de
+status e 3 cálculos de semana).
+
+**O gate mora AQUI e só aqui** (`utils/vip/dietImportAccess.ts`): VIP, com a
+primeira por nossa conta — mesma tese da ficha de treino. **O import por JSON
+continua livre e sem limite**, porque não gasta IA nenhuma; há guard que reprova
+se o caminho do texto passar a chamar `/api/ai/`.
+
+Três decisões que o guard trava: o gate roda **antes** de ler o arquivo (travar
+depois gastaria a banda do usuário para negar em seguida); o registro em
+`audit_events` acontece **depois** da extração (leitura falha não queima a
+demonstração gratuita); e falha ao CONTAR não vira acesso liberado, que seria
+bypass por indisponibilidade do banco. A contagem sai de `audit_events`
+(`action = 'diet_photo_import'`) para não exigir migration de um contador.
+
+**O resultado cai no CAMPO DE TEXTO, não no salvamento.** A IA leu o papel da
+pessoa; ela precisa conferir antes de aquilo substituir o plano dela.
+
 **A primeira dieta REAL importada (29/08/2026) mostrou o que faltava.** O JSON
 veio no formato que os assistentes de fato produzem, e nada nele funcionava:
 **34 itens sem macro e ~700 kcal/dia abaixo das metas declaradas**. Três

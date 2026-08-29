@@ -34,10 +34,20 @@ describe('o import é grátis — e o gate prova isso', () => {
         expect(MIXER.slice(Math.max(0, at - 300), at)).toMatch(/canImportDiet && \(/)
     })
 
-    it('NÃO chama nenhuma rota de IA — é isso que o torna grátis', () => {
-        // Se algum dia passar por /api/ai/, o custo volta e o gate precisa
-        // voltar junto. O guard existe para essa mudança ser consciente.
-        expect(MODAL).not.toMatch(/\/api\/ai\//)
+    it('o caminho do JSON não passa por rota de IA — é isso que o torna grátis', () => {
+        // Desde 29/08/2026 o modal tem DOIS caminhos: o JSON (local, grátis) e
+        // a foto/PDF (Gemini, gateado). O guard antigo proibia IA no arquivo
+        // inteiro e passou a reprovar o caminho pago legítimo — hoje ele mira
+        // só no fluxo do texto.
+        const ini = MODAL.indexOf('const salvar')
+        expect(ini, 'o salvamento sumiu — o guard perdeu o alvo').toBeGreaterThan(-1)
+        const corpo = MODAL.slice(ini, MODAL.indexOf('if (!open) return null', ini))
+        expect(corpo, 'salvar o JSON não pode custar IA').not.toMatch(/\/api\/ai\//)
+    })
+
+    it('e a ÚNICA rota de IA do modal é a da foto/PDF', () => {
+        const rotas = [...MODAL.matchAll(/'\/api\/ai\/[^']+'/g)].map((m) => m[0])
+        expect(rotas).toEqual(["'/api/ai/diet-photo-extract'"])
     })
 })
 
