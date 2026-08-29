@@ -50,6 +50,10 @@ export const foodDatabase: Record<string, FoodItem> = {
   'leite desnatado': { kcal: 35, p: 3.4, c: 5, f: 0.1, approx: { copo: 250, xicara: 240 } },
   'iogurte natural': { kcal: 61, p: 3.5, c: 4.7, f: 3.3, approx: { unidade: 170, copo: 200 } },
   'iogurte grego': { kcal: 97, p: 9, c: 3.6, f: 5, approx: { unidade: 100, copo: 200 } },
+  // "muçarela" é grafia corrente em pt-BR (a base tinha só "mussarela", com ss)
+  // e apareceu na primeira dieta real importada.
+  'mucarela': { kcal: 300, p: 22, c: 3, f: 22, approx: { fatia: 20, pedaco: 30 } },
+  'muçarela': { kcal: 300, p: 22, c: 3, f: 22, approx: { fatia: 20, pedaco: 30 } },
   'queijo mussarela': { kcal: 300, p: 22, c: 3, f: 22, approx: { fatia: 20, pedaco: 30 } },
   'queijo branco': { kcal: 264, p: 17, c: 3, f: 20, approx: { fatia: 30, pedaco: 30 } },
   'queijo minas': { kcal: 264, p: 17, c: 3, f: 20, approx: { fatia: 30 } },
@@ -164,6 +168,19 @@ export const foodDatabase: Record<string, FoodItem> = {
   'pizza': { kcal: 266, p: 11, c: 33, f: 10, approx: { fatia: 120, unidade: 800 } },
   'hamburguer': { kcal: 295, p: 17, c: 24, f: 14, approx: { unidade: 200 } },
   'sopa': { kcal: 40, p: 2, c: 6, f: 1, approx: { prato: 300, concha: 150 } },
+  // Entraram em 29/08/2026, com a primeira dieta real importada por JSON — os
+  // quatro que a base não tinha. Valores da TACO/USDA por 100 g/ml.
+  'legumes': { kcal: 40, p: 2, c: 8, f: 0.4, approx: { colher: 25, prato: 150 } },
+  'legumes e salada': { kcal: 33, p: 1.8, c: 6, f: 0.4, approx: { prato: 200 } },
+  'kefir': { kcal: 60, p: 3.3, c: 4.5, f: 3.3, approx: { copo: 200, xicara: 240 } },
+  'doce de leite': { kcal: 315, p: 6.5, c: 55, f: 7, approx: { colher: 20 } },
+  'coxa de frango': { kcal: 160, p: 25, c: 0, f: 6, approx: { unidade: 100 } },
+  'sobrecoxa de frango': { kcal: 165, p: 24, c: 0, f: 7, approx: { unidade: 110 } },
+  // Formas curtas: "coxa ou sobrecoxa sem pele" não traz a palavra "frango", e
+  // o casamento por tokens exige que TODOS os tokens da chave apareçam.
+  // Não conflita com 'coxao mole' (carne bovina) — token diferente.
+  'coxa': { kcal: 160, p: 25, c: 0, f: 6, approx: { unidade: 100 } },
+  'sobrecoxa': { kcal: 165, p: 24, c: 0, f: 7, approx: { unidade: 110 } },
   'salada': { kcal: 20, p: 1.5, c: 3, f: 0.3, approx: { prato: 150 } },
 
   // ── Pratos que o usuário lança e NINGUÉM tinha ────────────────────────────

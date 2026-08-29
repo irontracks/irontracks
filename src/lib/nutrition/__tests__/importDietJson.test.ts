@@ -4,6 +4,7 @@ import {
     numeroTolerante,
     diaDaSemana,
     resumoDoImport,
+    chaveDaBase,
     LIMITES,
 } from '../importDietJson'
 
@@ -293,5 +294,120 @@ describe('resumoDoImport — o usuário confere ANTES de substituir o plano atua
         expect(r.ok).toBe(true)
         if (!r.ok) return
         expect(resumoDoImport(r.payload).kcal).toBe(1500)
+    })
+})
+
+// ─── O que a PRIMEIRA dieta real importada exigiu (29/08/2026) ───────────────
+//
+// O JSON veio de um assistente externo, no formato que eles realmente
+// produzem — e nenhuma das três coisas abaixo funcionava. Antes: 34 itens sem
+// macro e ~700 kcal/dia a menos que a meta declarada. Depois: os sete dias
+// dentro de 1–5% das metas.
+
+describe('semana como OBJETO, com o dia na chave', () => {
+    it('vira lista de dias, com o índice tirado da chave', () => {
+        const r = importarDietaDeJson(JSON.stringify({
+            nome: 'Dieta Semanal MK',
+            semana: {
+                segunda: { refeicoes: [{ nome: 'Almoço', alimentos: [{ alimento: 'Arroz cozido', quantidade_g: 200 }] }] },
+                domingo: { refeicoes: [{ nome: 'Almoço', alimentos: [{ alimento: 'Arroz cozido', quantidade_g: 180 }] }] },
+            },
+        }))
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(r.payload.days?.map((d) => d.weekday).sort()).toEqual([0, 1])
+        expect(r.payload.meals).toBeUndefined()
+    })
+
+    it('o `weekday` de dentro do objeto vence a chave', () => {
+        const r = importarDietaDeJson(JSON.stringify({
+            semana: { qualquer: { weekday: 4, refeicoes: [{ nome: 'X', alimentos: [{ alimento: 'Aveia', quantidade_g: 50 }] }] } },
+        }))
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(r.payload.days![0].weekday).toBe(4)
+    })
+})
+
+describe('quantidade em g, ml e unidades', () => {
+    it('quantidade_g é peso', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Aveia","quantidade_g":50}]}]}')
+        expect(r.ok && r.payload.meals![0].items[0].grams).toBe(50)
+    })
+
+    it('quantidade_ml conta como grama — nos líquidos desta base 1 ml ≈ 1 g', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Leite desnatado","quantidade_ml":250}]}]}')
+        expect(r.ok && r.payload.meals![0].items[0].grams).toBe(250)
+    })
+
+    it('quantidade_unidades usa a equivalência da própria base', () => {
+        // 'ovo' tem approx.unidade = 50 g. Sem isto, "2 ovos" entrava com 0 g e
+        // sem macro nenhum — foi um dos 34 itens vazios da primeira importação.
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Ovos inteiros","quantidade_unidades":2}]}]}')
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(r.payload.meals![0].items[0].grams).toBe(100)
+        expect(r.payload.meals![0].items[0].protein).toBeGreaterThan(0)
+    })
+})
+
+describe('macros derivados da base local quando o JSON não os traz', () => {
+    it('dieta de nutricionista raramente traz macro por alimento — e mesmo assim entra completa', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"Almoço","items":[{"food":"Arroz branco cozido","quantidade_g":200}]}]}')
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        const item = r.payload.meals![0].items[0]
+        // 'arroz cozido': 130 kcal / 28 c por 100 g.
+        expect(item.calories).toBe(260)
+        expect(item.carbs).toBe(56)
+    })
+
+    it('macro DECLARADO nunca é sobrescrito pela base', () => {
+        // Um plano que traz kcal e omite proteína está declarando zero de
+        // proteína; completar seria inventar sobre o que o nutricionista disse.
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Arroz cozido","grams":200,"calories":999}]}]}')
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(r.payload.meals![0].items[0].calories).toBe(999)
+        expect(r.payload.meals![0].items[0].protein).toBe(0)
+    })
+
+    it('alimento fora da base entra sem macro, não fora do plano', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Torta capixaba da vó","quantidade_g":150}]}]}')
+        expect(r.ok).toBe(true)
+        if (!r.ok) return
+        expect(r.payload.meals![0].items[0]).toMatchObject({ grams: 150, calories: 0 })
+    })
+})
+
+describe('chaveDaBase — casamento por TOKENS, não por substring', () => {
+    it('acha a entrada mesmo com palavra no MEIO do nome', () => {
+        // "arroz BRANCO cozido" quebrava o `includes('arroz cozido')`.
+        expect(chaveDaBase('Arroz branco cozido')).toBe('arroz cozido')
+    })
+
+    it('prefere a entrada mais específica', () => {
+        // 'arroz cozido' (2 tokens) tem que ganhar de 'arroz' isolado.
+        expect(chaveDaBase('arroz cozido')).toBe('arroz cozido')
+        expect(chaveDaBase('Doce de leite Tirol')).toBe('doce de leite')
+    })
+
+    it('resolve plural', () => {
+        expect(chaveDaBase('Ovos inteiros')).toBe('ovo')
+    })
+
+    it('é indiferente a acento', () => {
+        expect(chaveDaBase('Maçã')).toBe('maca')
+        expect(chaveDaBase('Feijão preto cozido')).toBe('feijao preto')
+    })
+
+    it('nome desconhecido não casa por acaso', () => {
+        expect(chaveDaBase('xyzabc')).toBeNull()
+        expect(chaveDaBase('')).toBeNull()
+    })
+
+    it('NÃO confunde "coxa" de frango com "coxão mole" (carne bovina)', () => {
+        // Tokens diferentes: 'coxa' nunca casa com 'coxao mole'.
+        expect(chaveDaBase('Coxa ou sobrecoxa sem pele')).toMatch(/^(coxa|sobrecoxa)$/)
     })
 })

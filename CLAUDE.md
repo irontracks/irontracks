@@ -463,6 +463,34 @@ Nutrição é um overlay `fixed z-[25]`, e quem nasce lá dentro herda o stackin
 context (o `z-[1600]` vale 25) e o containing block (o `fixed` rola junto e o
 topo sai da tela). `FullscreenPortal` é obrigatório aqui.
 
+**A primeira dieta REAL importada (29/08/2026) mostrou o que faltava.** O JSON
+veio no formato que os assistentes de fato produzem, e nada nele funcionava:
+**34 itens sem macro e ~700 kcal/dia abaixo das metas declaradas**. Três
+correções, e os sete dias passaram a bater dentro de 1–5%:
+
+1. **`semana` como OBJETO com o dia na CHAVE** (`{"segunda": {...}}`), não array.
+2. **`quantidade_g` / `quantidade_ml` / `quantidade_unidades`** — as unidades
+   viram gramas pela equivalência da PRÓPRIA base (`approx.unidade`), então
+   "2 ovos" deixa de entrar com 0 g.
+3. **Macros derivados da base local** quando o JSON não os traz — que é o caso
+   comum: dieta de nutricionista dá "200 g de arroz" e a meta do dia, não macro
+   por alimento. Sem isso o plano entra zerado, o que é pior que não entrar:
+   parece importado e não soma nada. ⚠️ **Só quando NENHUM macro veio** — um
+   plano que traz kcal e omite proteína está declarando zero, e completar seria
+   inventar sobre o que o nutricionista escreveu.
+
+⚠️ **O casamento é por TOKENS, não por substring** (`chaveDaBase`). O
+`includes` falhava em "arroz **branco** cozido" (palavra no meio), "ovo**s**"
+(plural) e "Doce de leite Tirol" (que casava com 'leite desnatado'). Exige que
+TODOS os tokens da chave estejam no nome, vence a mais específica, e o empate
+desempata pelo que aparece mais cedo — "feijão **preto** cozido" casa com
+'feijao preto' e 'feijao cozido' com dois tokens cada, e é 'preto' que descreve
+o feijão.
+
+A base ganhou 9 entradas que essa dieta pediu (`legumes`, `legumes e salada`,
+`kefir`, `doce de leite`, `coxa`, `sobrecoxa`, as duas de frango e a grafia
+`muçarela`/`mucarela` — a base só tinha "mussarela").
+
 **Bater o macro não é entregar comida — `lib/nutrition/mealCoherence.ts`.** Guard determinístico sobre o cardápio gerado, em duas classes: veículo faltando (pó sem líquido) é objetivo e **repara** (acrescenta Água 0 kcal para whey/creatina, Leite desnatado para aveia/sucrilhos); incoerência de composição (dois doces na mesma refeição, doce dominando as kcal) só REPORTA, e o motor devolve o problema ao modelo numa única retentativa. Nunca ampute o prato num reparo mecânico: remover comida derruba o plano abaixo da meta. Armadilha do módulo: `/leite/` casa com "doce de leite" e "leite condensado" — sem `NOT_A_LIQUID` o guard declara que o café da manhã do caso real já tinha líquido, ou seja, passa verde exatamente na refeição que existe para pegar. Fiação provada em `__tests__/dietGenerateCoherence.test.ts` (Gemini mockado devolvendo o cardápio real reprovado).
 
 **A variação da SEMANA desfazia a coerência do dia-base — conserte os dois motores, sempre.** Testado no simulador em 04/08/2026 sobre um plano recém-gerado: o dia base saiu "Leite desnatado · Whey · Sucrilhos · Pão" e a terça, derivada pelo motor de troca, virou "**ovo mexido** · Whey · Sucrilhos · Pão". Causa: leite desnatado tem 36% das kcal em proteína, então `classifyFood` o põe em `protein` — mesma classe do ovo mexido. Pelo macro a troca é impecável; na prática devolve o prato seco. Três correções: (1) `isVehicleLoadBearing` tira do sorteio o item que sustenta o veículo; (2) `liquidKindOf` distingue líquido **cremoso** de **fino** — água satisfaz whey e NÃO satisfaz sucrilhos/aveia (o guard antigo só perguntava "tem líquido?" e deixou passar "sucrilhos + Água"); (3) `isCondiment`/`isPreparedPlate` no `foodItemSanity` — maionese entrou no lugar do abacate (ambos `fat`) e "pedaços de pizza de alcatra acebolada" no lugar do patinho (ambos `protein`). O `buildWeekFromDay` ainda repara cada dia derivado, porque a troca pode INTRODUZIR um pó onde não havia. **Guard só vale com macro real: com `protein: 9, fat: 1` no leite a troca nem acontece e o teste passa verde com o bug reposto** — a fixture usa os números que estavam no banco.
