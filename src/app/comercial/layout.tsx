@@ -79,6 +79,34 @@ export default function ComercialLayout({ children }: { children: ReactNode }) {
           }
 
           /* Bento grid responsive */
+          /* Card de feature com imagem: UMA coluna no celular.
+             O grid interno era grid-template-columns: 1fr 1fr em style
+             INLINE, e inline nenhuma media query alcança — então em mobile o
+             card de 335px ficava dividido em duas faixas de 167px. Medido em
+             375px de viewport: o parágrafo caía para 119px de largura (36% do
+             card) e quebrava em duas ou três palavras por linha, com a coluna
+             da imagem espremida ao lado. O grid EXTERNO (.com-bento) já era
+             mobile-first; só o de dentro não era.
+             ATENÇÃO: este CSS vive num template literal — crase aqui dentro
+             encerra a string e quebra o build (aconteceu ao escrever isto). */
+          .com-feat-split {
+            display: grid;
+            grid-template-columns: 1fr;
+            /* 300px, não 190: o print é retrato (295x640) e entra com
+               object-fit: cover / position top. Numa faixa baixa o recorte
+               mostra só a barra de status do iPhone — preta — e o card parece
+               vazio. Medido: a 300px vê-se ~41% da altura do print, que é
+               header + primeiros cards do app. */
+            grid-template-rows: auto 300px;
+            overflow: hidden;
+          }
+          @media (min-width: 700px) {
+            .com-feat-split {
+              grid-template-columns: 1fr 1fr;
+              grid-template-rows: 1fr;
+            }
+          }
+
           .com-bento {
             display: grid;
             grid-template-columns: 1fr;

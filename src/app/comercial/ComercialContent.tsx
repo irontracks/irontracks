@@ -449,16 +449,16 @@ function FeatCard({
   if (big && imgSrc) {
     return (
       <div ref={ref}
-        className={`com-feat com-bento-${span}`}
+        className={`com-feat com-feat-split com-bento-${span}`}
         onMouseMove={onMouseMove}
-        style={{ ...baseStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', overflow: 'hidden' }}
+        style={baseStyle}
       >
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {textContent}
         </div>
         <div style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 48, background: 'linear-gradient(90deg, #141414, transparent)', zIndex: 1, pointerEvents: 'none' }} />
-          <Image src={imgSrc} alt={title} fill sizes="(max-width: 768px) 50vw, 33vw" style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top' }} />
+          <Image src={imgSrc} alt={title} fill sizes="(max-width: 700px) 100vw, 33vw" style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top' }} />
         </div>
       </div>
     )
