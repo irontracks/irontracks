@@ -1057,13 +1057,44 @@ professor pergunta antes, lista o que se perde e tem a polaridade correta
 o comentário no arquivo — a página inteira deslizava); e o `TabErrorBoundary`
 por aba impede que uma aba quebrada derrube o painel.
 
+**Sprint 2 — o vocabulário de status tinha CINCO donos (29/08/2026).** A mesma
+decisão estava escrita em cinco lugares, com conteúdos diferentes: as opções do
+`<select>` (`STATUS_OPTIONS`), o `switch` das classes do badge, os rótulos com
+emoji do diálogo de confirmação, as labels do gráfico, e os chips de filtro.
+Hoje tudo sai de `lib/admin/studentStatus.ts`.
+
+⚠️ **O `<select>` de status não oferecia `ativo` — o status de 24 alunos (43%).**
+Um `<select>` cujo `value` não casa com nenhuma `<option>` não consegue exibir o
+estado real: o navegador cai na primeira opção. Hoje `opcoesDeStatus(atual)`
+sempre inclui o status atual, mesmo desconhecido — a classe do problema, não o
+caso. Pelo mesmo motivo os chips de filtro passaram a sair dos DADOS: havia um
+chip "Ativos" que filtrava `pago` e nenhum para `ativo`, então aqueles 24 alunos
+não eram alcançáveis por filtro nenhum.
+
+⚠️ **"Ativos" significava duas coisas na mesma tela.** O card do topo contava
+`status = 'pago'` (28) e o gráfico, uma rolagem abaixo, mostrava `Ativo` (20).
+O card virou **PAGANTES**. Guard de CLASSE: nenhuma contagem de status no
+`DashboardTab` pode normalizar à mão — mirar em `|| 'pendente'` deixava passar
+`String(u?.status || '').toLowerCase()`, que é a mesma decisão reescrita
+(provado por mutação).
+
+**Correção de um achado meu que estava ERRADO:** o relatório dizia que o
+`Doughnut` "Status Geral" e o `Bar` "Status dos Alunos" desenhavam o mesmo dado
+na MESMA tela. Não desenham — o Doughnut está sob `{isTeacher &&}` e as barras
+sob `{isAdmin &&}`. O que era real e foi removido é o **"Distribuição por
+Professor"**: 210px de gráfico para dois números que o card TOTAL ALUNOS já diz
+em texto ("49" e "25 sem professor").
+
+**Dado sujo conhecido, NÃO corrigido:** `teachers` tem **41 linhas para 7
+e-mails distintos**. A UI já mostra 7 (o fetch deduplica), então não é bug de
+tela — mexer nas linhas é decisão do dono.
+
 **Aberto, do mesmo relatório** (`Relatorio/design-area-administrativa-2026-08-28.md`
 — a pasta `Relatorio/` é ignorada pelo git, então o arquivo é local; o que
 segue é o resumo que sobrevive):
-o mesmo `statusDistribution` alimenta um `Doughnut` E um `Bar` na mesma tela; o
-gráfico "Distribuição por Professor" repete dois números que o card TOTAL ALUNOS
-já diz em texto; os quinze cartões da fila são idênticos e não mostram há quanto
-tempo o aluno sumiu; e há ~65pt de preto morto acima do cabeçalho — **medido na
+os quinze cartões da fila continuam sem mostrar há quanto tempo o aluno sumiu
+quando ele NUNCA treinou (a API não manda o dado — o que saiu foi a repetição
+tripla); e há ~65pt de preto morto acima do cabeçalho — **medido na
 tela, causa NÃO isolada** (o `pt-safe` do header sozinho não explica o valor).
 
 ## Débito ABERTO em design/a11y (atualizado 12/08/2026, pós-varredura)

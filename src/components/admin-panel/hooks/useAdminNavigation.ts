@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin';
-import { resumirStatusDeAlunos, graficoDeStatus } from '@/lib/admin/studentStatus';
+import { resumirStatusDeAlunos, graficoDeStatus, normalizarStatus } from '@/lib/admin/studentStatus';
 
 /**
  * useAdminNavigation
@@ -75,16 +75,10 @@ export function useAdminNavigation(
     // ---- Derived: dashboard charts ----
     const dashboardCharts = useMemo(() => {
         const baseTotalStudents = typeof totalStudents === 'number' && Number.isFinite(totalStudents) && totalStudents > 0 ? totalStudents : 0;
-        const baseWith = typeof studentsWithTeacher === 'number' && Number.isFinite(studentsWithTeacher) && studentsWithTeacher > 0 ? studentsWithTeacher : 0;
-        const baseWithout = typeof studentsWithoutTeacher === 'number' && Number.isFinite(studentsWithoutTeacher) && studentsWithoutTeacher > 0 ? studentsWithoutTeacher : 0;
-        const teacherData = {
-            labels: ['Com professor', 'Sem professor'],
-            datasets: [{ label: 'Alunos', data: [baseWith, baseWithout], backgroundColor: ['rgba(250, 204, 21, 0.9)', 'rgba(82, 82, 82, 0.9)'], borderRadius: 999, maxBarThickness: 40 }]
-        };
         const totalStatus = studentStatusSlices.reduce((soma, f) => soma + f.quantidade, 0);
         const statusData = graficoDeStatus(studentStatusSlices);
-        return { teacherDistribution: { data: teacherData }, statusDistribution: { data: statusData }, statusTotal: totalStatus, statusSlices: studentStatusSlices, totalStudents: baseTotalStudents };
-    }, [totalStudents, studentsWithTeacher, studentsWithoutTeacher, studentStatusSlices]);
+        return { statusDistribution: { data: statusData }, statusTotal: totalStatus, statusSlices: studentStatusSlices, totalStudents: baseTotalStudents };
+    }, [totalStudents, studentStatusSlices]);
 
     // ---- Derived: coach inbox (teacher-specific) ----
     const INACTIVE_THRESHOLD = 7;
@@ -100,7 +94,7 @@ export function useAdminNavigation(
             .map((s) => {
                 const workouts = Array.isArray(s.workouts) ? s.workouts : [];
                 const nonTemplate = workouts.filter((w) => w && typeof w === 'object' && w.is_template !== true);
-                if (!nonTemplate.length) return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: s.status || 'pendente', hasWorkouts: false, daysSinceLastWorkout: null };
+                if (!nonTemplate.length) return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: normalizarStatus(s.status), hasWorkouts: false, daysSinceLastWorkout: null };
                 let lastWorkoutMs = 0;
                 nonTemplate.forEach((w) => {
                     try {
@@ -113,10 +107,10 @@ export function useAdminNavigation(
                         if (t > lastWorkoutMs) lastWorkoutMs = t;
                     } catch { }
                 });
-                if (!lastWorkoutMs) return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: s.status || 'pendente', hasWorkouts: false, daysSinceLastWorkout: null };
+                if (!lastWorkoutMs) return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: normalizarStatus(s.status), hasWorkouts: false, daysSinceLastWorkout: null };
                 const diffMs = todayMs - lastWorkoutMs;
                 const days = diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0;
-                return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: s.status || 'pendente', hasWorkouts: true, daysSinceLastWorkout: days };
+                return { id: s.id, name: s.name || s.email || '', email: s.email || '', status: normalizarStatus(s.status), hasWorkouts: true, daysSinceLastWorkout: days };
             })
             .filter((item) => item && typeof item === 'object')
             .filter((item) => { if (!item.hasWorkouts) return true; const days = safeDays(item.daysSinceLastWorkout); return days >= INACTIVE_THRESHOLD; });
@@ -131,17 +125,17 @@ export function useAdminNavigation(
     // ---- Derived: filtered lists ----
     const studentsWithTeacherFiltered = useMemo<AdminUser[]>(() => {
         const list = Array.isArray(usersList) ? usersList : [];
-        return list.filter((s) => !!s?.teacher_id).filter(studentMatchesQuery).filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
+        return list.filter((s) => !!s?.teacher_id).filter(studentMatchesQuery).filter((s) => statusMatches(normalizarStatus(s?.status), studentStatusFilter));
     }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
 
     const studentsWithoutTeacherFiltered = useMemo<AdminUser[]>(() => {
         const list = Array.isArray(usersList) ? usersList : [];
-        return list.filter((s) => !s?.teacher_id).filter(studentMatchesQuery).filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
+        return list.filter((s) => !s?.teacher_id).filter(studentMatchesQuery).filter((s) => statusMatches(normalizarStatus(s?.status), studentStatusFilter));
     }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
 
     const teachersFiltered = useMemo<AdminTeacher[]>(() => {
         const list = Array.isArray(teachersList) ? teachersList : [];
-        return list.filter(teacherMatchesQuery).filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
+        return list.filter(teacherMatchesQuery).filter((t) => statusMatches(normalizarStatus(t?.status), teacherStatusFilter));
     }, [statusMatches, teacherMatchesQuery, teacherStatusFilter, teachersList]);
 
     const templatesFiltered = useMemo<AdminWorkoutTemplate[]>(() => {

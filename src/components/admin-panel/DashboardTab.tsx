@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { useTeacherPlan } from '@/hooks/useTeacherPlan';
+import { normalizarStatus } from '@/lib/admin/studentStatus';
 import dynamic from 'next/dynamic';
 
 /**
@@ -84,7 +85,13 @@ export const DashboardTab: React.FC = () => {
 
 
 
-    const qtdPendentes = usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length;
+    // Mesma normalização do gráfico (`lib/admin/studentStatus.ts`). As duas
+    // superfícies contavam "pendente" por regras DIFERENTES: aqui vazio não
+    // contava, no gráfico vazio VIRAVA pendente. Com a base limpa os números
+    // concordavam por sorte; bastava entrar um aluno sem status para o painel
+    // se contradizer a uma rolagem de distância.
+    const qtdPendentes = usersList.filter(u => normalizarStatus(u?.status) === 'pendente').length;
+    const qtdPagantes = usersList.filter(u => normalizarStatus(u?.status) === 'pago').length;
     const temPendentes = qtdPendentes > 0;
     const [upgradeOpen, setUpgradeOpen] = useState(false);
 
@@ -328,10 +335,14 @@ export const DashboardTab: React.FC = () => {
                         <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
                             <UserCheck size={18} className="text-green-500" />
                         </div>
-                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-green-400 transition-colors">Ativos</span>
+                        {/* "Pagantes", não "Ativos": este card conta `pago`, e
+                            existe um status `ativo` — 43% da base — que é outra
+                            coisa. Os dois números apareciam na mesma tela, a uma
+                            rolagem um do outro, com a mesma palavra. */}
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-green-400 transition-colors">Pagantes</span>
                     </div>
                     <div className="text-2xl font-black text-white ml-1 group-hover:text-green-400 transition-colors">
-                        {usersList.filter(u => String(u?.status || '').toLowerCase() === 'pago').length}
+                        {qtdPagantes}
                     </div>
                 </button>
 
@@ -552,16 +563,14 @@ export const DashboardTab: React.FC = () => {
                 </div>
             )}
 
-            {/* Gráficos Admin */}
+            {/* Gráficos Admin
+                "Distribuição por Professor" foi REMOVIDO: era um gráfico de
+                210px para mostrar dois números — 24 com professor e 25 sem —
+                que o card TOTAL ALUNOS, na mesma tela e a uma rolagem de
+                distância, já diz em texto ("49" e "25 sem professor"). Um fato
+                aparece uma vez (`docs/DESIGN_HIERARCHY.md`). */}
             {isAdmin && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
-                        <h3 className="font-black text-white text-base mb-4">Distribuição por Professor</h3>
-                        <div className="h-[210px] w-full">
-                            <Bar data={dashboardCharts.teacherDistribution.data} options={chartOptions} />
-                        </div>
-                    </div>
-
+                <div className="grid grid-cols-1 gap-6">
                     <div className="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
                         <h3 className="font-black text-white text-base mb-4">Status dos Alunos</h3>
                         <div className="h-[210px] w-full">

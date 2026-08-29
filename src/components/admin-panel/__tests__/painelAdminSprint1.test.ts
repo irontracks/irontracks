@@ -80,7 +80,10 @@ describe('o badge de solicitações não fica preso no número velho', () => {
 describe('um fato, um lugar: o status do aluno', () => {
     it('o badge de status só existe para quem NÃO tem o select', () => {
         const fonte = semComentarios(ler(ALUNOS))
-        const at = fonte.indexOf('statusBadgeClass(')
+        // Ancorado em `badgeDeStatus(`, que é o que FICA. A primeira versão
+        // mirava em `statusBadgeClass(`, removido quando o vocabulário de
+        // status ganhou fonte única — e o caso quebrou na hora, como devia.
+        const at = fonte.indexOf('badgeDeStatus(')
         expect(at, 'o badge de status sumiu — o guard perdeu o alvo').toBeGreaterThan(-1)
         // Os ~200 caracteres antes do badge têm que carregar a condição.
         expect(
@@ -127,5 +130,122 @@ describe('o gráfico de status consome o módulo, não uma lista fixa', () => {
         const fonte = semComentarios(ler(NAV))
         expect(fonte, 'a lista fixa desenhava três colunas permanentemente vazias').not.toMatch(/'Cancelar'/)
         expect(fonte).not.toMatch(/'Outros'/)
+    })
+})
+
+// ─── Sprint 2 ────────────────────────────────────────────────────────────────
+
+describe('o vocabulário de status tem UM dono', () => {
+    it('a lista de alunos não mantém listas próprias', () => {
+        const fonte = semComentarios(ler(ALUNOS))
+        expect(fonte, 'STATUS_OPTIONS não conhecia `ativo` — 43% da base').not.toMatch(/const STATUS_OPTIONS\s*=/)
+        expect(fonte, 'o switch de classes conhecia três status').not.toMatch(/const statusBadgeClass\s*=/)
+    })
+
+    it('e consome o módulo para opções, badge e normalização', () => {
+        const fonte = semComentarios(ler(ALUNOS))
+        for (const fn of ['opcoesDeStatus(', 'badgeDeStatus(', 'normalizarStatus(']) {
+            expect(fonte, `${fn} deveria vir da fonte única`).toContain(fn)
+        }
+    })
+
+    it('o diálogo de confirmação usa o mesmo rótulo', () => {
+        const fonte = semComentarios(ler('src/components/admin-panel/hooks/useAdminActions.ts'))
+        expect(fonte, 'era a quarta lista — a única com emoji').not.toMatch(/const statusLabels\s*=/)
+        expect(fonte).toMatch(/rotuloDeStatus\s*\(/)
+    })
+
+    it('ninguém mais inventa "pendente" para aluno sem status', () => {
+        // Era a regra que fazia card e gráfico discordarem: aqui vazio não
+        // contava, lá vazio VIRAVA pendente.
+        for (const arquivo of [
+            ALUNOS,
+            'src/components/admin-panel/DashboardTab.tsx',
+            'src/components/admin-panel/hooks/useAdminNavigation.ts',
+            'src/components/admin-panel/hooks/useAdminActions.ts',
+            'src/components/admin-panel/StudentDetailPanel.tsx',
+        ]) {
+            expect(semComentarios(ler(arquivo)), `${arquivo} ainda inventa "pendente"`).not.toMatch(/\|\|\s*'pendente'/)
+        }
+    })
+})
+
+describe('"Ativos" não pode significar duas coisas na mesma tela', () => {
+    const DASH = 'src/components/admin-panel/DashboardTab.tsx'
+
+    it('o card que conta `pago` se chama Pagantes', () => {
+        const fonte = semComentarios(ler(DASH))
+        expect(fonte).toContain('Pagantes')
+        // Existe um status `ativo` (43% da base) que é OUTRA coisa, e o gráfico
+        // logo abaixo o mostra com esse nome.
+        expect(fonte, 'o card rotulado "Ativos" contava `pago`').not.toMatch(/>Ativos</)
+    })
+
+    it('e conta pela fonte única', () => {
+        expect(semComentarios(ler(DASH))).toMatch(/normalizarStatus\(u\?\.status\)\s*===\s*'pago'/)
+    })
+
+    it('NENHUMA contagem de status normaliza à mão', () => {
+        // Guard de CLASSE, não do caso: mirar em `|| 'pendente'` deixa passar
+        // `String(u?.status || '').toLowerCase()`, que é a mesma decisão escrita
+        // de novo — e foi essa forma que fez card e gráfico discordarem.
+        // Provado por mutação: repor aquela expressão reprova aqui.
+        const fonte = semComentarios(ler(DASH))
+        expect(
+            fonte,
+            'compare status pelo `normalizarStatus` — regra própria diverge em silêncio',
+        ).not.toMatch(/String\([^)]*\.status[^)]*\)\s*\.toLowerCase\(\)/)
+    })
+
+    it('e as contagens continuam existindo — o guard acima precisa de alvo', () => {
+        const fonte = semComentarios(ler(DASH))
+        expect(fonte).toMatch(/normalizarStatus\(u\?\.status\)\s*===\s*'pendente'/)
+    })
+})
+
+describe('os chips de filtro cobrem todos os status que existem', () => {
+    it('saem dos dados, não de uma lista fixa', () => {
+        const fonte = semComentarios(ler(ALUNOS))
+        expect(fonte).toMatch(/resumirStatusDeAlunos\s*\(/)
+        // A lista fixa tinha um chip "Ativos" que filtrava `pago`, e NENHUM
+        // chip para `ativo`: aqueles alunos não eram alcançáveis por filtro.
+        expect(fonte).not.toMatch(/key:\s*'pago',\s*label:\s*'Ativos'/)
+    })
+})
+
+describe('um fato, um lugar: os gráficos', () => {
+    const DASH = 'src/components/admin-panel/DashboardTab.tsx'
+
+    it('"Distribuição por Professor" saiu — o card acima já diz os dois números', () => {
+        expect(semComentarios(ler(DASH))).not.toContain('Distribuição por Professor')
+    })
+
+    it('e o dado que o alimentava não ficou órfão no hook', () => {
+        expect(semComentarios(ler('src/components/admin-panel/hooks/useAdminNavigation.ts')))
+            .not.toMatch(/teacherDistribution/)
+    })
+
+    it('o gráfico de status continua lá — não foi isso que saiu', () => {
+        expect(semComentarios(ler(DASH))).toContain('Status dos Alunos')
+    })
+})
+
+describe('a fila não repete a mesma frase três vezes', () => {
+    it('o último treino só aparece quando o motivo NÃO fala dele', () => {
+        const fonte = semComentarios(ler(PRIORIDADES))
+        // Em `churn_risk` o `reason` da API já é "N dias sem treinar".
+        expect(fonte).toMatch(/item\.kind\s*!==\s*'churn_risk'[\s\S]{0,300}formatLastWorkout/)
+    })
+
+    it('e continua aparecendo nos outros motivos, onde é dado novo', () => {
+        expect(semComentarios(ler(PRIORIDADES))).toMatch(/formatLastWorkout\(item\.last_workout_at\)/)
+    })
+})
+
+describe('os selects da lista de alunos dizem o que são', () => {
+    it('cada um tem rótulo visível, não só `aria-label`', () => {
+        const fonte = semComentarios(ler(ALUNOS))
+        expect(fonte, 'o olho não tinha como saber qual select é qual').toContain('>Pagamento<')
+        expect(fonte).toContain('>Professor<')
     })
 })

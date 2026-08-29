@@ -7,6 +7,7 @@ import {
     FileText, Loader2, TrendingUp, MessageSquare
 } from 'lucide-react';
 import { OPEN_TEACHER_CHAT_EVENT } from '@/components/teacher-area/TeacherChatHost';
+import { rotuloDeStatus } from '@/lib/admin/studentStatus';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
 import { parseJsonWithSchema } from '@/utils/zod';
@@ -88,7 +89,7 @@ export const StudentDetailPanel: React.FC = () => {
 
     // Local computed vars (derived from context state — belong in render body)
     const selectedStatus = normalizeText(selectedStudent?.status || '');
-    const selectedStatusLabel = String(selectedStudent?.status || 'pendente');
+    const selectedStatusLabel = rotuloDeStatus(selectedStudent?.status);
     const selectedStatusTone = selectedStatus === 'pago'
         ? 'bg-green-500/10 text-green-400 border-green-500/30'
         : (selectedStatus === 'atrasado'

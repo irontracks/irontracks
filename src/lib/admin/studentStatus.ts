@@ -32,23 +32,69 @@ export interface FatiaDeStatus {
 }
 
 const CINZA_NEUTRO = 'rgba(82, 82, 82, 0.9)'
+const BADGE_NEUTRO = 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30'
+
+interface Conhecido {
+    rotulo: string
+    /** Cor da barra/fatia no Chart.js. */
+    cor: string
+    /** Classes do badge de status na lista de alunos. */
+    badge: string
+    /** Aparece no `<select>` de status? Grafia legada e "sem status" não. */
+    escolhivel?: boolean
+}
 
 /**
- * Rótulo e cor dos status conhecidos. Status novo que apareça no banco não
- * precisa entrar aqui para funcionar — ganha rótulo capitalizado e cor neutra,
- * e aparece no gráfico. A lista existe para dar NOME e COR melhores aos que já
- * conhecemos, nunca para filtrar o que pode ser exibido.
+ * Rótulo, cor e badge dos status conhecidos — a ÚNICA lista.
+ *
+ * Antes desta tabela o vocabulário estava escrito em quatro lugares, com
+ * conteúdos diferentes: as opções do `<select>` (`STATUS_OPTIONS`, sem `ativo`),
+ * o `switch` das classes do badge (três casos), os rótulos com emoji do diálogo
+ * de confirmação, e as labels do gráfico. Divergiram, como sempre divergem.
+ *
+ * Status novo que apareça no banco não precisa entrar aqui para ser EXIBIDO —
+ * ganha rótulo capitalizado e cor neutra. A lista existe para dar nome e cor
+ * melhores aos que conhecemos, nunca para filtrar o que pode aparecer.
  */
-const CONHECIDOS: Record<string, { rotulo: string; cor: string }> = {
-    pago: { rotulo: 'Pago', cor: 'rgba(34, 197, 94, 0.9)' },
-    ativo: { rotulo: 'Ativo', cor: 'rgba(59, 130, 246, 0.9)' },
-    pendente: { rotulo: 'Pendente', cor: 'rgba(234, 179, 8, 0.9)' },
-    atrasado: { rotulo: 'Atrasado', cor: 'rgba(248, 113, 113, 0.9)' },
-    // `cancelar` é a grafia legada (verbo) — mapeada para o substantivo, que é
-    // o que um status deve ser.
-    cancelar: { rotulo: 'Cancelado', cor: 'rgba(148, 163, 184, 0.9)' },
-    cancelado: { rotulo: 'Cancelado', cor: 'rgba(148, 163, 184, 0.9)' },
-    inativo: { rotulo: 'Inativo', cor: CINZA_NEUTRO },
+const CONHECIDOS: Record<string, Conhecido> = {
+    pago: {
+        rotulo: 'Pago',
+        cor: 'rgba(34, 197, 94, 0.9)',
+        badge: 'text-green-500 bg-green-500/10 border-green-500/20',
+        escolhivel: true,
+    },
+    // `ativo` NÃO era oferecido pelo `<select>` — e 24 alunos (43% da base) o
+    // tinham no banco em 28/08/2026. Um `<select>` cujo `value` não casa com
+    // nenhuma `<option>` não tem como exibir o estado real do aluno.
+    ativo: {
+        rotulo: 'Ativo',
+        cor: 'rgba(59, 130, 246, 0.9)',
+        badge: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+        escolhivel: true,
+    },
+    pendente: {
+        rotulo: 'Pendente',
+        cor: 'rgba(234, 179, 8, 0.9)',
+        badge: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20',
+        escolhivel: true,
+    },
+    atrasado: {
+        rotulo: 'Atrasado',
+        cor: 'rgba(248, 113, 113, 0.9)',
+        badge: 'text-red-500 bg-red-500/10 border-red-500/20',
+        escolhivel: true,
+    },
+    // `cancelar` é a grafia GRAVADA (verbo, legado) — o rótulo é o substantivo,
+    // que é o que um status deve ser. O valor não muda: mexer nele reescreveria
+    // dado de produção para ganhar nada.
+    cancelar: {
+        rotulo: 'Cancelado',
+        cor: 'rgba(148, 163, 184, 0.9)',
+        badge: BADGE_NEUTRO,
+        escolhivel: true,
+    },
+    cancelado: { rotulo: 'Cancelado', cor: 'rgba(148, 163, 184, 0.9)', badge: BADGE_NEUTRO },
+    inativo: { rotulo: 'Inativo', cor: CINZA_NEUTRO, badge: BADGE_NEUTRO },
 }
 
 /** Chave usada quando o aluno não tem status preenchido. */
@@ -133,4 +179,34 @@ export function graficoDeStatus(fatias: ReadonlyArray<FatiaDeStatus>) {
             },
         ],
     }
+}
+
+/** Classes do badge de status — mesma tabela do rótulo e da cor. */
+export function badgeDeStatus(bruto: unknown): string {
+    return CONHECIDOS[normalizarStatus(bruto)]?.badge ?? BADGE_NEUTRO
+}
+
+export interface OpcaoDeStatus {
+    value: string
+    label: string
+}
+
+/**
+ * Opções do `<select>` de status.
+ *
+ * `statusAtual` entra na lista mesmo quando não é escolhível: um `<select>`
+ * cujo `value` não casa com nenhuma `<option>` não exibe o estado do aluno — o
+ * navegador cai na primeira opção, e a tela passa a afirmar um status que o
+ * banco não tem. Era o caso dos 24 alunos `ativo`, que o select não oferecia.
+ */
+export function opcoesDeStatus(statusAtual?: unknown): OpcaoDeStatus[] {
+    const opcoes: OpcaoDeStatus[] = Object.entries(CONHECIDOS)
+        .filter(([, v]) => v.escolhivel)
+        .map(([value, v]) => ({ value, label: v.rotulo }))
+
+    const atual = normalizarStatus(statusAtual)
+    if (atual !== CHAVE_SEM_STATUS && !opcoes.some((o) => o.value === atual)) {
+        opcoes.push({ value: atual, label: rotuloDeStatus(atual) })
+    }
+    return opcoes
 }
