@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
-import { Plus, Loader2, Sparkles, Crown, Zap, Activity, Archive, ListOrdered, Wrench } from 'lucide-react'
+import { Plus, Loader2, Sparkles, Crown, Zap, Activity, Archive, ListOrdered, Wrench, Camera } from 'lucide-react'
+import { useModalStore } from '@/lib/state/modalStore'
 const MuscleBalanceCard = dynamic(() => import('@/components/MuscleBalanceCard'), { ssr: false })
 import { EmptyState } from '@/components/ui/EmptyState'
 
@@ -331,6 +332,9 @@ export default function StudentDashboard(props: Props) {
    * Estava inline no onClick; o estado vazio precisava da MESMA ação (com o mesmo
    * fallback de loading), e copiar o bloco significaria duas versões do reset.
    */
+  // Atalho da ficha no estado vazio (ver o botão lá embaixo).
+  const abrirWizardNoImport = useModalStore((st) => st.abrirWizardNoImport)
+
   const handleCreateWorkout = useCallback(() => {
     setCreatingWorkout(true)
     // Fallback de segurança: garante que o botão não fique travado em loading caso
@@ -791,6 +795,25 @@ export default function StudentDashboard(props: Props) {
                           >
                             {creatingWorkout ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                             {creatingWorkout ? 'Abrindo...' : 'Criar meu primeiro treino'}
+                          </button>
+                        )}
+                        {/* "Já tenho a ficha" — o atalho para quem chega com o
+                            papel do personal na mão.
+                            Medido em 29/08/2026: de quem nunca criou um treino,
+                            13 chegaram ao dashboard e só 4 abriram o editor. O
+                            import por foto/PDF já existia, mas só depois de
+                            abrir o wizard e ler quatro opções.
+                            Fica SECUNDÁRIO de propósito: criar continua sendo a
+                            ação primária no onboarding (a regra do PR #749), e
+                            dois botões dourados lado a lado não priorizam nada. */}
+                        {workoutsTab !== 'periodized' && (
+                          <button
+                            type="button"
+                            onClick={() => abrirWizardNoImport()}
+                            className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.10] px-5 py-3 text-sm font-bold text-neutral-300 transition-all hover:border-yellow-500/30 hover:text-white active:scale-95"
+                          >
+                            <Camera size={15} className="text-yellow-500" aria-hidden="true" />
+                            Já tenho a ficha — importar foto ou PDF
                           </button>
                         )}
                       </>

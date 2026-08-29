@@ -25,7 +25,11 @@ import { create } from 'zustand'
 interface ModalStoreState {
   // ─── Boolean toggles ────────────────────────────────────────────────────
   createWizardOpen: boolean
+  /** Abre o wizard já no import por foto/PDF (atalho do estado vazio). */
+  createWizardNoImport: boolean
   setCreateWizardOpen: (v: boolean) => void
+  /** Atalho do estado vazio: abre o wizard direto no import por foto/PDF. */
+  abrirWizardNoImport: () => void
 
   expressWorkoutOpen: boolean
   setExpressWorkoutOpen: (v: boolean) => void
@@ -60,7 +64,11 @@ interface ModalStoreState {
 
 export const useModalStore = create<ModalStoreState>((set) => ({
   createWizardOpen: false,
-  setCreateWizardOpen: (v) => set({ createWizardOpen: v }),
+  createWizardNoImport: false,
+  setCreateWizardOpen: (v) => set({ createWizardOpen: v, ...(v ? {} : { createWizardNoImport: false }) }),
+  // Fechar o wizard limpa a intenção acima: sem isso, quem abriu uma vez pelo
+  // atalho da ficha cairia no import em toda abertura seguinte.
+  abrirWizardNoImport: () => set({ createWizardOpen: true, createWizardNoImport: true }),
 
   expressWorkoutOpen: false,
   setExpressWorkoutOpen: (v) => set({ expressWorkoutOpen: v }),

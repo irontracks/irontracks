@@ -56,6 +56,15 @@ type Props = {
   onGenerate: (answers: WorkoutWizardAnswers, options?: { mode?: GenerateMode }) => MaybePromise<GenerateResult>
   onUseDraft: (draft: WorkoutDraft) => void
   onSaveDrafts?: (drafts: WorkoutDraft[]) => MaybePromise<void>
+  /**
+   * Abre já no import por foto/PDF, pulando a lista de entradas.
+   *
+   * Existe pelo funil: de quem nunca criou um treino, 13 chegam ao dashboard e
+   * só 4 abrem o editor. Quem chega com a ficha do personal na mão não deveria
+   * ter de descobrir que ela cabe aqui — o atalho entra no estado VAZIO da
+   * lista, ao lado de "Criar meu primeiro treino".
+   */
+  abrirImportDeFoto?: boolean
 }
 
 const clampDays = (n: number): 2 | 3 | 4 | 5 | 6 => {
@@ -230,6 +239,13 @@ export default function WorkoutWizardModal(props: Props) {
   const [error, setError] = useState('')
   const [showVoice, setShowVoice] = useState(false)
   const [showPhotoImport, setShowPhotoImport] = useState(false)
+
+  // Abre direto no import quando o atalho do estado vazio pediu. Depende de
+  // `isOpen` também: sem isso, fechar o import deixaria a flag ligada e ele
+  // reabriria sozinho na próxima vez que o wizard subisse.
+  useEffect(() => {
+    if (props.isOpen && props.abrirImportDeFoto) setShowPhotoImport(true)
+  }, [props.isOpen, props.abrirImportDeFoto])
   /** Limite semanal batido → card de venda inline (era um confirm() seco). */
   const [showUpsell, setShowUpsell] = useState(false)
 
