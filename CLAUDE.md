@@ -168,6 +168,14 @@ candidato apareça no nome — sem isso, digitar "halteres" devolveria "Elevaç�
 lateral com halteres". Empate desempata pelo nome mais CURTO, que é o mais
 genérico e o palpite mais seguro.
 
+⚠️ **A similaridade do grafo é 0–1; a UI e a IA falam 0–100.** A coluna
+`exercise_substitutions.similarity` guarda fração, mas `AIExerciseSwap` escreve
+`{similarity}%` e a rota de IA sempre devolveu percentual. Enquanto o grafo
+repassava a fração crua, **uma alternativa perfeita aparecia como "1%"** na
+tela. Nenhum teste pegaria: os dois lados são números válidos isoladamente, e o
+defeito só existe no CONTRATO entre eles — foi a conferência no aparelho que
+mostrou. Guard em `similaridadeEmPorcento.test.ts`.
+
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
 
 **Escrever peso sem dizer a FONTE trava o campo (22/08/2026).** O dono relatou
