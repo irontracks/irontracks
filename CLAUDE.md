@@ -148,6 +148,26 @@ primeira série — é o mesmo problema dos dots do tour, por outro caminho.
 
 **Renderers de série — 14 irmãos, mas 12 agora desenham pelo MESMO molde** (`components/workout/set-renderers/`): `ExerciseCard.renderSet` roteia cada série pro renderer do método (normal, drop, rest-pause, cluster, grupo/Bi-Set, stripping, FST-7, ponto zero, forçadas, negativas, parciais, sistema 21, onda, cardio/plank). Até 20/08/2026 cada um reimplementava peso/reps/RPE/concluir por conta própria — daí os bugs: em jul/2026 o Bi-Set exigia reps pra concluir (a normal não exige) e travava o botão sem explicar, e o drop escondia o peso das etapas porque o `truncate` colapsava o texto inline. **Hoje os 11 métodos que abrem MODAL (drop, rest-pause, cluster, stripping, FST-7, heavy duty, ponto zero, forçadas, negativas, parciais, sistema 21, onda) usam `AdvancedSetRow.tsx`** — a linha vira UM componente, com a MESMA grade da série normal (`32px nº · 36px notas · 1fr campos · 92px Concluir`); no lugar de peso/reps/RPE inline, a faixa de 1fr é o botão "Abrir" que preenche tudo (pedido do dono, 19–20/08/2026). Rest-Pause e Cluster, que têm peso inline, passam ele por `weightSlot` — divide a faixa com o "Abrir". `normalSet` (a referência, campos inline) e `groupMethodSet` (Bi-Set/Super-Set/Tri-Set/Giant-Set, sem modal) ficam de fora por desenho. Guard de CLASSE em `set-renderers/__tests__/moldeUnicoAvancado.test.ts`: método novo que desenhe a própria linha reprova; a lista de exceção também reprova quem já migrou (não vira papel de parede). **Mexeu em comportamento de série avançada, mexa no molde — não em 11 arquivos.** Cardio/plank e `normalSet`/`groupMethodSet` continuam por conta própria; se algo parecer divergência entre eles, aí sim varra manualmente.
 
+**Trocar exercício: o GRAFO primeiro, a IA como fallback (29/08/2026).**
+`exercise_substitutions` tem **8.262 arestas cobrindo 248 exercícios, 2.702
+delas CURADAS à mão**, índice próprio `(from_id, similarity desc)` e RLS de
+leitura — e ficou desde jul/2026 **sem nenhum leitor de produto** (só aparecia
+num teste de RLS e no catálogo LGPD), enquanto `/api/ai/exercise-swap` chamava o
+**Gemini** para responder exatamente a mesma pergunta.
+
+Hoje a rota consulta `lib/workout/exerciseSwapGraph.ts` ANTES da IA e responde
+com `source: 'graph'`. O contexto decide: quem toca em "trocar exercício" está
+de pé na academia com o aparelho ocupado e a rede que a academia tem. A IA segue
+para o que o grafo não cobre — o usuário digita nome livre, e a biblioteca tem
+251 entradas.
+
+⚠️ **O nome do treino quase nunca casa exato com a biblioteca.** "Supino reto"
+não existe lá (existem "supino reto com barra" e "supino reto na maquina"), então
+`escolherDaBiblioteca` casa por tokens e exige que a **MAIORIA** dos tokens do
+candidato apareça no nome — sem isso, digitar "halteres" devolveria "Elevação
+lateral com halteres". Empate desempata pelo nome mais CURTO, que é o mais
+genérico e o palpite mais seguro.
+
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
 
 **Escrever peso sem dizer a FONTE trava o campo (22/08/2026).** O dono relatou

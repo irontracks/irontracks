@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { alternativasDoGrafo } from '@/lib/workout/exerciseSwapGraph'
+import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
@@ -58,14 +60,32 @@ export async function POST(req: Request) {
       )
     }
 
+    const parsed = await parseJsonBody(req, ZodBody)
+    if (parsed.response) return parsed.response
+    const body = parsed.data as z.infer<typeof ZodBody>
+
+    // ── Grafo primeiro: instantâneo, de graça e sem depender de rede boa ──────
+    // `exercise_substitutions` tem 8.262 arestas (2.702 CURADAS à mão) e um
+    // índice feito para esta busca — e ficou desde jul/2026 sem nenhum leitor
+    // de produto, enquanto esta rota pagava Gemini para responder o mesmo.
+    //
+    // Quem toca em "trocar exercício" está de pé na academia com o aparelho
+    // ocupado: quer a alternativa AGORA. A IA continua abaixo, para o que o
+    // grafo não cobre (o usuário digita nome livre).
+    try {
+      const doGrafo = await alternativasDoGrafo(supabase, body.exerciseName)
+      if (doGrafo?.length) {
+        return NextResponse.json({ ok: true, alternatives: doGrafo, source: 'graph' })
+      }
+    } catch (e: unknown) {
+      // Falha aqui não pode custar a troca ao usuário: segue para a IA.
+      logError('ai:exercise-swap:graph', e)
+    }
+
     const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json({ ok: false, error: 'AI não configurada' }, { status: 400 })
     }
-
-    const parsed = await parseJsonBody(req, ZodBody)
-    if (parsed.response) return parsed.response
-    const body = parsed.data as z.infer<typeof ZodBody>
 
     const userCtx = await buildUserContextBlock(supabase, userId, ['profile'])
 
