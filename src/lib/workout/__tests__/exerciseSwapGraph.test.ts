@@ -106,3 +106,23 @@ describe('contrato', () => {
         expect(QUANTAS_ALTERNATIVAS).toBe(4)
     })
 })
+
+describe('a similaridade sai em PERCENTUAL, como a UI escreve', () => {
+    // A coluna do banco é 0–1; a UI renderiza `{similarity}%` e a IA sempre
+    // devolveu 0–100. Sem converter, 1.000 aparecia como "1%" na tela — visto
+    // no aparelho, e invisível para teste que só compare números.
+    const converter = (fracao: number) => Math.round(Math.max(0, Math.min(1, fracao)) * 100)
+
+    it('1.000 do banco é 100%, não 1%', () => {
+        expect(converter(1)).toBe(100)
+    })
+
+    it('0.85 é 85%', () => {
+        expect(converter(0.85)).toBe(85)
+    })
+
+    it('valor fora da faixa é limitado, não propagado', () => {
+        expect(converter(1.5)).toBe(100)
+        expect(converter(-1)).toBe(0)
+    })
+})

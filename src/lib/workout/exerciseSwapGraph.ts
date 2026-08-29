@@ -24,6 +24,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export interface AlternativaDoGrafo {
     name: string
     reason: string
+    /**
+     * PERCENTUAL (0–100), não a fração do banco.
+     *
+     * A coluna `exercise_substitutions.similarity` é 0–1, mas a UI escreve
+     * `{similarity}%` e a IA sempre devolveu 0–100. Sem a conversão, uma
+     * alternativa perfeita (1.000) aparecia como **"1%"** na tela — e nenhum
+     * teste pegaria, porque o número trafega igual dos dois lados.
+     * Visto no aparelho em 29/08/2026.
+     */
     similarity: number
     muscleGroups: string[]
     equipment: string
@@ -171,7 +180,7 @@ export async function alternativasDoGrafo(
         const secundarios = Array.isArray(alvoEx?.secondary_muscles) ? (alvoEx?.secondary_muscles as string[]) : []
         out.push({
             name: nome,
-            similarity: Number(a.similarity) || 0,
+            similarity: Math.round(Math.max(0, Math.min(1, Number(a.similarity) || 0)) * 100),
             equipment: equipamento || 'livre',
             muscleGroups: [primario, ...secundarios].filter(Boolean),
             reason: motivoDaTroca({
