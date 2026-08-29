@@ -18,6 +18,7 @@ import {
   Crown,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
+import { rotuloDePapel } from '@/lib/user/rotuloDePapel'
 import { backdropProps } from '@/utils/a11y/backdrop'
 import { useDialog } from '@/contexts/DialogContext'
 
@@ -259,7 +260,7 @@ export default function HeaderActionsMenu({
 
   const displayName = String(user?.displayName || '').trim() || 'Usuário'
   const initial = displayName.slice(0, 1).toUpperCase()
-  const roleLabel = isCoach ? 'Coach' : user?.role === 'admin' ? 'Admin' : null
+  const roleLabel = rotuloDePapel({ role: user?.role, isCoach })
 
   // Long-press detection for "add story"
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)

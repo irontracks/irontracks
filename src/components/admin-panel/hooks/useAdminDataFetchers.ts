@@ -80,9 +80,13 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     void data; // connection OK
                 }
             } catch (e: unknown) {
+                // A exceção CRUA ia para a tela — o banner vermelho do header a
+                // exibia com `break-all`, e o admin recebia um stack no lugar de
+                // uma instrução. É a mesma classe varrida no resto do app em
+                // 27/08/2026; esta superfície tinha ficado de fora. O detalhe
+                // continua indo para o log, que é onde ele serve.
                 logError('error', "ERRO DE CONEXÃO/FETCH:", e);
-                const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-                setDebugError("Erro Catch: " + msg);
+                setDebugError("Não foi possível carregar os dados do painel. Verifique sua conexão e recarregue a página.");
             }
         };
         testConnection();
