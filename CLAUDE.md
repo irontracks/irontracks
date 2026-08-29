@@ -880,6 +880,29 @@ rollback é `CSP_ENFORCE=false` na Vercel** — env var, sem deploy, volta na ho
 para Report-Only. Vale conferir a janela alguns dias depois: origem legítima que
 não apareceu nas três leituras aparece agora como quebra, não como relatório.
 
+**Primeira leitura PÓS-ENFORCE (29/08/2026) — e ela pagou por si de novo.**
+Duas origens na janela de 4 dias, filtrando preview: `connect.facebook.net`
+(3 eventos, o último em 27/08, decisão já tomada de bloquear) e **uma NOVA:
+`fonts.googleapis.com` em `connect-src`**, em 28/08 — ou seja, depois de o
+enforce entrar. Exatamente o que esta seção previa.
+
+⚠️ **`<link rel="preconnect">` é regido por `connect-src`**, não por `style-src`.
+O layout RAIZ fazia preconnect para `fonts.googleapis.com`, que está em
+`style-src` (a folha da `/comercial`) e em `font-src` via gstatic (os arquivos),
+mas nunca esteve no `connect-src`.
+
+**A saída foi REMOVER, não liberar** — e é o ponto: a Inter vem de
+`next/font/google`, que a **self-hospeda no build**, então o app não pede nada
+ao Google em runtime. Quem usa Google Fonts de verdade é `/comercial`
+(Space Grotesk + JetBrains Mono), e o layout dela **já tinha os próprios
+preconnects**. Os do raiz eram redundantes para aquela página e inúteis para
+todas as outras, cobrando duas vezes: violação de CSP e uma conexão com o
+Google a cada carregamento do app — IP de usuário entregue à toa.
+
+Guard de CLASSE em `__tests__/cspPreconnectFontes.test.ts`: todo host de
+`preconnect`/`dns-prefetch` do layout raiz precisa estar no `connect-src`
+(curingas incluídos). O defeito não era aquele host, era a regra.
+
 Lembrete que continua valendo: o `script-src` de produção é mais restrito que o
 de dev (que tem `unsafe-inline` e `unsafe-eval`), então dev NÃO prova nada sobre
 produção.

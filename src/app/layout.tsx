@@ -89,9 +89,16 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="dns-prefetch" href="https://enbueukmvgodngydkpzm.supabase.co" />
         <link rel="preconnect" href="https://api.cloudinary.com" />
         <link rel="dns-prefetch" href="https://api.cloudinary.com" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        {/* SEM preconnect para as fontes do Google aqui.
+            A Inter vem de `next/font/google`, que a SELF-HOSPEDA no build — o
+            app não pede nada ao Google em runtime. Quem usa Google Fonts de
+            verdade é `/comercial` (Space Grotesk + JetBrains Mono), e o layout
+            dela já traz os próprios preconnects.
+            Estes eram redundantes para aquela página e inúteis para todas as
+            outras, e cobravam duas vezes: `preconnect` é regido por
+            `connect-src`, então virava violação de CSP em produção (medida em
+            28/08/2026, depois do enforce), e abria conexão com o Google a cada
+            carregamento do app — que é IP de usuário entregue à toa. */}
         <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
         {process.env.NODE_ENV === 'production' && (
           <Script src="/recovery.js" strategy="afterInteractive" nonce={nonce || undefined} />
