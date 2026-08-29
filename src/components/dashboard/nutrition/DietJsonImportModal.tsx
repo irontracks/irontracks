@@ -20,7 +20,9 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { codeFieldProps } from '@/utils/ui/textFieldProps'
-import { importarDietaDeJson, resumoDoImport, type PayloadDeImport } from '@/lib/nutrition/importDietJson'
+import { importarDietaDeJson, resumoDoImport, type PayloadDeImport, type TabelaDeAlimentos } from '@/lib/nutrition/importDietJson'
+import { loadTacoFoods } from '@/lib/nutrition/sources/taco-source'
+import { createClient } from '@/utils/supabase/client'
 
 /** O texto que a pessoa leva ao assistente dela. É o produto tanto quanto o parser. */
 export const PROMPT_DE_CONVERSAO = `Converta a dieta em anexo para JSON EXATAMENTE neste formato, sem texto em volta e sem crases:
@@ -54,6 +56,10 @@ export default function DietJsonImportModal({ open, onClose, onImported }: Props
     const [erro, setErro] = useState<string | null>(null)
     const [salvando, setSalvando] = useState(false)
     const [copiado, setCopiado] = useState(false)
+    // A TACO (590 alimentos no banco) complementa a base local (~200, curada).
+    // Sem ela, alimento fora da base local entra com macro zerado — e a base
+    // local existe para o que o brasileiro digita, não para cobrir tudo.
+    const [taco, setTaco] = useState<TabelaDeAlimentos | undefined>()
     const focusTrapRef = useFocusTrap(open, onClose)
     useBackHandler(open, onClose)
     const areaId = useId()
@@ -63,11 +69,27 @@ export default function DietJsonImportModal({ open, onClose, onImported }: Props
         if (!open) { setTexto(''); setErro(null); setSalvando(false) }
     }, [open])
 
+    // Carrega uma vez, ao abrir. Falha aqui não impede o import: sem a TACO o
+    // parser usa só a base local, que é o comportamento anterior.
+    useEffect(() => {
+        if (!open || taco) return
+        let cancelado = false
+        void (async () => {
+            try {
+                const tabela = await loadTacoFoods(createClient())
+                if (!cancelado && Object.keys(tabela).length) setTaco(tabela)
+            } catch {
+                /* segue com a base local */
+            }
+        })()
+        return () => { cancelado = true }
+    }, [open, taco])
+
     useEffect(() => () => { if (timerCopia.current) clearTimeout(timerCopia.current) }, [])
 
     // A prévia é derivada do texto — nada de estado paralelo que envelhece
     // quando a pessoa edita o JSON depois de conferir.
-    const analise = useMemo(() => (texto.trim() ? importarDietaDeJson(texto) : null), [texto])
+    const analise = useMemo(() => (texto.trim() ? importarDietaDeJson(texto, taco) : null), [texto, taco])
     const payload: PayloadDeImport | null = analise?.ok ? analise.payload : null
     const resumo = payload ? resumoDoImport(payload) : null
 

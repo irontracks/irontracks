@@ -411,3 +411,39 @@ describe('chaveDaBase — casamento por TOKENS, não por substring', () => {
         expect(chaveDaBase('Coxa ou sobrecoxa sem pele')).toMatch(/^(coxa|sobrecoxa)$/)
     })
 })
+
+describe('a TACO complementa a base local (ideia #6)', () => {
+    // A base local tem ~200 alimentos curados, com nomes do jeito que o
+    // brasileiro escreve e `approx` para unidades. A TACO tem 590 no banco e
+    // cobre o que a local não tem. Sem ela, alimento fora da local entrava com
+    // macro zerado.
+    const taco: Record<string, { kcal: number; p: number; c: number; f: number }> = {
+        'quiabo refogado': { kcal: 40, p: 2, c: 7, f: 0.5 },
+        'arroz cozido': { kcal: 999, p: 999, c: 999, f: 999 }, // colide de propósito
+    }
+
+    it('alimento que a base local NÃO tem passa a entrar completo', () => {
+        const semTaco = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Quiabo refogado","grams":100}]}]}')
+        expect(semTaco.ok && semTaco.payload.meals![0].items[0].calories).toBe(0)
+
+        const comTaco = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Quiabo refogado","grams":100}]}]}', taco)
+        expect(comTaco.ok && comTaco.payload.meals![0].items[0].calories).toBe(40)
+    })
+
+    it('a base LOCAL vence em caso de colisão', () => {
+        // A local é curada e tem `approx`; a TACO é complemento, não
+        // substituta. Invertida a ordem, "arroz cozido" viria com 999 kcal.
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Arroz cozido","grams":100}]}]}', taco)
+        expect(r.ok && r.payload.meals![0].items[0].calories).toBe(130)
+    })
+
+    it('sem TACO o comportamento é exatamente o anterior', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Arroz cozido","grams":200}]}]}')
+        expect(r.ok && r.payload.meals![0].items[0].calories).toBe(260)
+    })
+
+    it('unidades continuam saindo só da base local — a TACO não tem `approx`', () => {
+        const r = importarDietaDeJson('{"meals":[{"name":"X","items":[{"food":"Ovos inteiros","quantidade_unidades":2}]}]}', taco)
+        expect(r.ok && r.payload.meals![0].items[0].grams).toBe(100)
+    })
+})
