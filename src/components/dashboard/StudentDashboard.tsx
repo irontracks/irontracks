@@ -755,7 +755,17 @@ export default function StudentDashboard(props: Props) {
                               ? (vipLocked
                                 ? 'Programas estruturados de 4, 6 ou 8 semanas fazem parte do VIP.'
                                 : 'Monte um programa de 4, 6 ou 8 semanas aqui mesmo.')
-                              : 'Monte o seu com a IA, ou espere o treino do seu professor.'
+                              // "ou espere o treino do seu professor" convidava a
+                              // ESPERAR — e, medido em 29/08/2026, **22 das 25**
+                              // pessoas que entraram no app e nunca criaram um
+                              // treino não têm professor nenhum. Para 88% delas a
+                              // segunda metade da frase era uma desculpa para não
+                              // agir, apontando para alguém que não existe.
+                              //
+                              // A menção não sumiu (quem TEM professor precisa
+                              // saber que o treino dele chega aqui), mas deixou de
+                              // ser alternativa à ação: é informação, não convite.
+                              : 'Monte o seu com a IA — leva 1 minuto. Se você tiver professor, o treino dele aparece aqui também.'
                           }
                           compact
                         />
