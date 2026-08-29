@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin';
+import { resumirStatusDeAlunos, graficoDeStatus } from '@/lib/admin/studentStatus';
 
 /**
  * useAdminNavigation
@@ -61,22 +62,10 @@ export function useAdminNavigation(
     }, [normalizeText, templateQuery]);
 
     // ---- Derived: status stats ----
-    const studentStatusStats = useMemo(() => {
-        const list = Array.isArray(usersList) ? usersList : [];
-        const stats = { pago: 0, pendente: 0, atrasado: 0, cancelar: 0, outros: 0 };
-        for (const s of list) {
-            try {
-                const rawStatus = s && typeof s === 'object' ? s.status : null;
-                const key = String(rawStatus || 'pendente').toLowerCase().trim();
-                if (Object.prototype.hasOwnProperty.call(stats, key)) {
-                    (stats as Record<string, number>)[key] += 1;
-                } else {
-                    stats.outros += 1;
-                }
-            } catch { }
-        }
-        return stats;
-    }, [usersList]);
+    // As categorias saem dos status que EXISTEM na base (ver
+    // `lib/admin/studentStatus.ts`). A lista fixa anterior desenhava três
+    // colunas permanentemente vazias e jogava 43% dos alunos em "Outros".
+    const studentStatusSlices = useMemo(() => resumirStatusDeAlunos(usersList ?? []), [usersList]);
 
     const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
     const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
@@ -92,16 +81,10 @@ export function useAdminNavigation(
             labels: ['Com professor', 'Sem professor'],
             datasets: [{ label: 'Alunos', data: [baseWith, baseWithout], backgroundColor: ['rgba(250, 204, 21, 0.9)', 'rgba(82, 82, 82, 0.9)'], borderRadius: 999, maxBarThickness: 40 }]
         };
-        const totalStatus = studentStatusStats.pago + studentStatusStats.pendente + studentStatusStats.atrasado + studentStatusStats.cancelar + studentStatusStats.outros;
-        const statusValues = totalStatus > 0
-            ? [studentStatusStats.pago, studentStatusStats.pendente, studentStatusStats.atrasado, studentStatusStats.cancelar, studentStatusStats.outros]
-            : [0, 0, 0, 0, 0];
-        const statusData = {
-            labels: ['Pago', 'Pendente', 'Atrasado', 'Cancelar', 'Outros'],
-            datasets: [{ label: 'Alunos', data: statusValues, backgroundColor: ['rgba(34, 197, 94, 0.9)', 'rgba(234, 179, 8, 0.9)', 'rgba(248, 113, 113, 0.9)', 'rgba(148, 163, 184, 0.9)', 'rgba(82, 82, 82, 0.9)'], borderRadius: 12, maxBarThickness: 32 }]
-        };
-        return { teacherDistribution: { data: teacherData }, statusDistribution: { data: statusData }, statusTotal: totalStatus, totalStudents: baseTotalStudents };
-    }, [totalStudents, studentsWithTeacher, studentsWithoutTeacher, studentStatusStats]);
+        const totalStatus = studentStatusSlices.reduce((soma, f) => soma + f.quantidade, 0);
+        const statusData = graficoDeStatus(studentStatusSlices);
+        return { teacherDistribution: { data: teacherData }, statusDistribution: { data: statusData }, statusTotal: totalStatus, statusSlices: studentStatusSlices, totalStudents: baseTotalStudents };
+    }, [totalStudents, studentsWithTeacher, studentsWithoutTeacher, studentStatusSlices]);
 
     // ---- Derived: coach inbox (teacher-specific) ----
     const INACTIVE_THRESHOLD = 7;
@@ -190,7 +173,6 @@ export function useAdminNavigation(
         templateMatchesQuery,
         // Stats
         totalStudents, studentsWithTeacher, studentsWithoutTeacher, totalTeachers,
-        studentStatusStats,
         dashboardCharts,
         coachInboxItems,
         // Filtered lists

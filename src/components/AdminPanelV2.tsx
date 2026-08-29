@@ -182,7 +182,14 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     lados enquanto se rolava para baixo, cortando os nomes ("...ncine
                     Kokott"). A regra da casa: conteúdo largo rola dentro do próprio
                     container, o corpo da página nunca. */}
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pt-2 pb-32">
+                {/* Sem `pt-2` AQUI. Os chips de sub-aba são `sticky top-0` dentro
+                    deste container: qualquer padding no topo do container fica
+                    ACIMA da zona de grude, e nesses pixels o conteúdo rola à
+                    vista — na aba Alunos aparecia uma faixa com "Pago", "MK" e
+                    dois ícones cortados ao meio, presa entre o cabeçalho e os
+                    chips, o tempo todo. O respiro do conteúdo é do filho abaixo,
+                    que já tem o mesmo `pt-2` e rola junto. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 pb-32">
                     <AdminPanelSubTabs
                         category={activeCategory}
                         currentTab={tab}

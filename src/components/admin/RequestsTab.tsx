@@ -7,6 +7,7 @@ import { logError } from '@/lib/logger'
 import { createClient } from '@/utils/supabase/client'
 import { useAdminPanel } from '@/components/admin-panel/AdminPanelContext'
 import type { AdminUser } from '@/types/admin'
+import { avisarSolicitacoesMudaram } from '@/lib/admin/solicitacoesEvent'
 
 interface AccessRequest {
     id: string
@@ -132,6 +133,9 @@ export default function RequestsTab() {
                 ].filter(Boolean).join('\n\n')
                 await alert(msg)
                 setRequests(prev => prev.filter(r => r.id !== req.id))
+                // O badge da barra inferior conta pendentes por conta própria;
+                // sem este aviso ele só recontaria na próxima navegação.
+                avisarSolicitacoesMudaram()
 
                 // After successful accept, inject the approved user into the students list
                 // so they appear immediately in the ALUNOS tab without needing a reload.
