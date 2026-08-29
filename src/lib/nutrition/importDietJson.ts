@@ -155,11 +155,15 @@ export function diaDaSemana(v: unknown): number | undefined {
  * que a pessoa registra depois falam a mesma língua. E é local: não custa nada,
  * que é a premissa deste caminho.
  */
-export function macrosDaBase(nome: string): { kcal: number; p: number; c: number; f: number } | null {
-    const chave = chaveDaBase(nome)
+export type TabelaDeAlimentos = Record<string, { kcal: number; p: number; c: number; f: number }>
+
+export function macrosDaBase(nome: string, extra?: TabelaDeAlimentos): { kcal: number; p: number; c: number; f: number } | null {
+    const chave = chaveDaBase(nome, extra)
     if (!chave) return null
-    const f = foodDatabase[chave]
-    return { kcal: f.kcal, p: f.p, c: f.c, f: f.f }
+    // Local PRIMEIRO, também na leitura: escolher a chave pela ordem certa e
+    // depois ler do `extra` faria a TACO vencer do mesmo jeito.
+    const f = (foodDatabase[chave] ?? extra?.[chave]) as { kcal: number; p: number; c: number; f: number } | undefined
+    return f ? { kcal: f.kcal, p: f.p, c: f.c, f: f.f } : null
 }
 
 /** Palavras que não distinguem alimento nenhum. */
@@ -196,10 +200,13 @@ function semPlural(t: string): string {
  * 'arroz cozido' (2) ganha de 'arroz' (1), e nada casa por acidente de uma
  * palavra só quando existe opção melhor.
  */
-export function chaveDaBase(nome: string): string | null {
+export function chaveDaBase(nome: string, extra?: TabelaDeAlimentos): string | null {
     const alvo = semAcento(nome)
     if (!alvo) return null
-    const chaves = Object.keys(foodDatabase)
+    // A base local (curada, ~200) vem PRIMEIRO; a TACO (590 no banco) entra
+    // como complemento. A ordem importa: a local tem nomes do jeito que o
+    // brasileiro escreve e `approx` para unidades, que a TACO não tem.
+    const chaves = [...Object.keys(foodDatabase), ...Object.keys(extra ?? {})]
 
     const exata = chaves.find((k) => semAcento(k) === alvo)
     if (exata) return exata
@@ -231,13 +238,15 @@ export function chaveDaBase(nome: string): string | null {
 
 /** Equivalência de unidade → gramas, da própria base ('unidade', 'fatia'…). */
 function gramasPorUnidade(nome: string): number | null {
+    // Só a base LOCAL tem `approx` — a TACO é macro por 100 g, sem equivalência
+    // de unidade. Buscar unidade na TACO devolveria sempre nulo.
     const chave = chaveDaBase(nome)
-    const aprox = chave ? foodDatabase[chave].approx : undefined
+    const aprox = chave ? foodDatabase[chave]?.approx : undefined
     const porUnidade = aprox?.unidade ?? aprox?.fatia ?? aprox?.dose ?? aprox?.scoop
     return typeof porUnidade === 'number' && porUnidade > 0 ? porUnidade : null
 }
 
-function lerItem(raw: unknown): ItemImportado | null {
+function lerItem(raw: unknown, extra?: TabelaDeAlimentos): ItemImportado | null {
     if (typeof raw === 'string') {
         // Item só com o nome ("100g de arroz"): entra com macros zerados em vez
         // de derrubar a refeição. O usuário completa depois na tela.
@@ -268,7 +277,7 @@ function lerItem(raw: unknown): ItemImportado | null {
     // zero de proteína, e sobrescrever isso seria inventar sobre o que o
     // nutricionista escreveu.
     if (!calories && !protein && !carbs && !fat && grams > 0) {
-        const base = macrosDaBase(food)
+        const base = macrosDaBase(food, extra)
         if (base) {
             const fator = grams / 100
             calories = base.kcal * fator
@@ -288,11 +297,11 @@ function lerItem(raw: unknown): ItemImportado | null {
     }
 }
 
-function lerRefeicao(raw: unknown, avisos: string[]): RefeicaoImportada | null {
+function lerRefeicao(raw: unknown, avisos: string[], extra?: TabelaDeAlimentos): RefeicaoImportada | null {
     if (!ehObjeto(raw)) return null
     const itensCrus = campo(raw, 'items', 'itens', 'alimentos', 'foods', 'comidas')
     const lista = Array.isArray(itensCrus) ? itensCrus : []
-    let items = lista.map(lerItem).filter((i): i is ItemImportado => i !== null)
+    let items = lista.map((i) => lerItem(i, extra)).filter((i): i is ItemImportado => i !== null)
     if (!items.length) return null
     if (items.length > LIMITES.itensPorRefeicao) {
         avisos.push(`Uma refeição tinha ${items.length} alimentos; ficaram os ${LIMITES.itensPorRefeicao} primeiros.`)
@@ -303,9 +312,9 @@ function lerRefeicao(raw: unknown, avisos: string[]): RefeicaoImportada | null {
     return { name, ...(time ? { time } : {}), items }
 }
 
-function lerRefeicoes(raw: unknown, avisos: string[]): RefeicaoImportada[] {
+function lerRefeicoes(raw: unknown, avisos: string[], extra?: TabelaDeAlimentos): RefeicaoImportada[] {
     const lista = Array.isArray(raw) ? raw : []
-    let meals = lista.map((m) => lerRefeicao(m, avisos)).filter((m): m is RefeicaoImportada => m !== null)
+    let meals = lista.map((m) => lerRefeicao(m, avisos, extra)).filter((m): m is RefeicaoImportada => m !== null)
     if (meals.length > LIMITES.refeicoesPorDia) {
         avisos.push(`O plano tinha ${meals.length} refeições num dia; ficaram as ${LIMITES.refeicoesPorDia} primeiras.`)
         meals = meals.slice(0, LIMITES.refeicoesPorDia)
@@ -319,7 +328,7 @@ function lerRefeicoes(raw: unknown, avisos: string[]): RefeicaoImportada[] {
  * Aceita as três formas que os modelos costumam produzir: `{ meals: [...] }`,
  * `{ days: [...] }`, ou o array de refeições solto.
  */
-export function importarDietaDeJson(textoCru: string): ResultadoDeImport {
+export function importarDietaDeJson(textoCru: string, extra?: TabelaDeAlimentos): ResultadoDeImport {
     const bruto = textoCru.trim()
     if (!bruto) return { ok: false, erro: 'Cole o JSON da dieta para continuar.' }
 
@@ -359,7 +368,7 @@ export function importarDietaDeJson(textoCru: string): ResultadoDeImport {
         let days = listaDeDias
             .map((d) => {
                 if (!ehObjeto(d)) return null
-                const meals = lerRefeicoes(campo(d, 'meals', 'refeicoes', 'refeicao'), avisos)
+                const meals = lerRefeicoes(campo(d, 'meals', 'refeicoes', 'refeicao'), avisos, extra)
                 if (!meals.length) return null
                 const weekday = diaDaSemana(campo(d, 'weekday', 'dia', 'diadasemana', 'day'))
                     ?? diaDaSemana(d.__diaDaChave)
@@ -376,7 +385,7 @@ export function importarDietaDeJson(textoCru: string): ResultadoDeImport {
         return { ok: true, avisos, payload: { ...(planName ? { planName } : {}), ...(notes ? { notes } : {}), days } }
     }
 
-    const meals = lerRefeicoes(campo(raiz, 'meals', 'refeicoes', 'refeicao', 'cardapio'), avisos)
+    const meals = lerRefeicoes(campo(raiz, 'meals', 'refeicoes', 'refeicao', 'cardapio'), avisos, extra)
     if (!meals.length) {
         return {
             ok: false,
