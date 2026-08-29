@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 import { logError, logWarn } from '@/lib/logger'
 import { getWeeklyResetStart } from './weekReset'
 
@@ -349,7 +350,7 @@ export async function checkVipFeatureAccess(
     const ceiling = source === 'role' ? undefined : BOOLEAN_DAILY_CEILING[feature]
     if (!ceiling) return { allowed: true, currentUsage: 0, limit: 1, tier }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = brtDateKey()
     if (opts?.meter) {
       // Consumo real: incrementa atômico (mesmo RPC do M-1) e bloqueia se passar do teto.
       const { data: newCount } = await supabase.rpc('increment_vip_usage_daily', {
@@ -377,7 +378,7 @@ export async function checkVipFeatureAccess(
 
   // Numeric limits (chat_daily, wizard_weekly)
   if (feature === 'chat_daily') {
-    const today = new Date().toISOString().split('T')[0]
+    const today = brtDateKey()
 
     // Consumo atômico ANTES de chamar o modelo (opts.meter): incrementa 'chat' via RPC e
     // bloqueia se passar do limite. Fecha a janela TOCTOU do check-then-act — sem isso, N
@@ -445,12 +446,32 @@ export async function checkVipFeatureAccess(
   return { allowed: false, currentUsage: 0, limit: 0, tier }
 }
 
+/**
+ * ⚠️ O DIA DA COTA É BRT, não UTC.
+ *
+ * Até 28/08/2026 estas quatro chamadas usavam
+ * `new Date().toISOString().split('T')[0]` — o dia UTC. A cota "diária" virava
+ * às 21h de Brasília: quem usasse a IA às 21h30 consumia a cota do dia
+ * seguinte, e quem estourasse às 20h50 esperava dez minutos para ter cota nova.
+ * Medido em produção: 12 de 186 usos (6,5%) caíam nessa janela.
+ *
+ * E havia um segundo efeito, pior porque silencioso: o REEMBOLSO
+ * (`refundVipUsage`) usava a mesma conta. Um consumo às 20h59 gravava no dia X
+ * e o reembolso às 21h01 procurava o dia X+1 — não achava a linha, e a cota não
+ * voltava para quem não recebeu resposta.
+ *
+ * O reset SEMANAL já era BRT desde sempre (`weekReset.ts`, segunda 03:00). Era
+ * o dia que estava fora de linha, no mesmo arquivo.
+ *
+ * Na virada, um usuário pode ganhar uma cota a mais uma única vez (as linhas
+ * antigas têm `day` em UTC). É a favor dele e acontece uma vez só.
+ */
 export async function incrementVipUsage(
   supabase: SupabaseClient,
   userId: string,
   feature: 'chat' | 'wizard' | 'insights'
 ) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = brtDateKey()
 
   // R2#M1: increment ATÔMICO via RPC (UPSERT com usage_count = usage_count + 1 no
   // próprio banco). Substitui o read-then-write anterior, onde o UPDATE com optimistic
@@ -479,7 +500,7 @@ export async function refundVipUsage(
   userId: string,
   feature: 'chat' | 'wizard' | 'insights'
 ) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = brtDateKey()
   const { error } = await supabase.rpc('decrement_vip_usage_daily', {
     p_user_id: userId,
     p_feature_key: feature,

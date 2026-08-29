@@ -83,7 +83,24 @@ export const calculateLeanMass = (weight: number, fatMass: number): number => {
 };
 
 /**
+ * Limites do IMC gravado e exibido.
+ *
+ * O clamp existe para ERRO DE DIGITAÇÃO, não para esconder caso real: altura em
+ * metros ("1,75") no campo de centímetros produz IMC 261 — impossível. O teto
+ * era 60, e isso mentia sobre gente que existe (obesidade grau III passa de 60);
+ * 80 cobre o extremo clínico registrado e continua barrando o absurdo.
+ */
+export const BMI_MIN = 10;
+export const BMI_MAX = 80;
+
+/**
  * Calcula o IMC (Índice de Massa Corporal)
+ *
+ * ⚠️ FONTE ÚNICA. Até 28/08/2026 o `useAssessment` calculava de novo, à mão, no
+ * caminho que PERSISTE — sem clamp e arredondando a 1 casa. O resultado é que o
+ * banco podia guardar 261 enquanto a tela mostrava 60: o número gravado e o
+ * exibido eram outros. Quem for exibir ou gravar IMC chama esta função.
+ *
  * @param weight - Peso em kg
  * @param height - Altura em cm
  * @returns IMC
@@ -96,7 +113,19 @@ export const calculateBMI = (weight: number, height: number): number => {
   const heightInMeters = height / 100;
   const bmi = weight / Math.pow(heightInMeters, 2);
 
-  return Math.max(10, Math.min(60, bmi)); // Limitar valores extremos
+  return Math.max(BMI_MIN, Math.min(BMI_MAX, bmi));
+};
+
+/**
+ * O IMC como ele deve ser GRAVADO: mesma regra da tela, uma casa decimal.
+ *
+ * Devolve `undefined` sem peso ou altura — não persistimos lixo, e é por isso
+ * que esta função não lança onde `calculateBMI` lança: o caminho de escrita
+ * precisa seguir sem o valor.
+ */
+export const bmiForStorage = (weight: number, height: number): number | undefined => {
+  if (!(weight > 0) || !(height > 0)) return undefined;
+  return Number(calculateBMI(weight, height).toFixed(1));
 };
 
 /**

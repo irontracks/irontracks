@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateBMI, classifyBMI, calculateBodyFatPercentage, calculateBodyDensity, combinedBodyFat } from '../bodyComposition'
+import { calculateBMI, bmiForStorage, BMI_MAX, classifyBMI, calculateBodyFatPercentage, calculateBodyDensity, combinedBodyFat } from '../bodyComposition'
 
 describe('Body Composition Calculations', () => {
   describe('calculateBMI', () => {
@@ -14,10 +14,18 @@ describe('Body Composition Calculations', () => {
       expect(() => calculateBMI(80, 0)).toThrow('Peso e altura devem ser maiores que zero')
     })
 
-    it('should cap extreme values', () => {
-      // 200kg / 1.5m^2 = 88.88 -> should be capped at 60
-      expect(calculateBMI(200, 150)).toBe(60)
-      
+    it('limita o ABSURDO, não o caso extremo real', () => {
+      // O teto era 60 até 28/08/2026 — e 60 apaga gente que existe: obesidade
+      // grau III passa disso. 200 kg / 1,70 m = 69,2 é uma pessoa, não um erro
+      // de digitação, e agora é gravado como tal.
+      expect(calculateBMI(200, 170)).toBeCloseTo(69.2, 1)
+
+      // 200 kg / 1,50 m = 88,9 já é fora da faixa registrada: fica no teto.
+      expect(calculateBMI(200, 150)).toBe(BMI_MAX)
+
+      // Altura em METROS no campo de centímetros — o erro clássico, IMC 261.
+      expect(calculateBMI(80, 1.75)).toBe(BMI_MAX)
+
       // 30kg / 2m^2 = 7.5 -> should be capped at 10
       expect(calculateBMI(30, 200)).toBe(10)
     })
@@ -90,5 +98,54 @@ describe('Body Composition Calculations', () => {
       expect(combinedBodyFat(null, 200)).toBeNull()
       expect(combinedBodyFat(1, 90)).toBeNull()
     })
+  })
+})
+
+/**
+ * O IMC GRAVADO tem que ser o mesmo que a tela mostra.
+ *
+ * `useAssessment` calculava duas vezes: `calculateBMI` para exibir (com clamp) e
+ * uma conta à mão para persistir (sem clamp). Altura digitada em metros —
+ * "1,75" no campo de centímetros — gravava IMC 261 no banco enquanto a tela
+ * exibia 60. Dois números para o mesmo corpo, e o errado era o que ficava.
+ */
+describe('bmiForStorage', () => {
+  it('grava o MESMO número que a tela exibe', () => {
+    const peso = 80, altura = 180
+    expect(bmiForStorage(peso, altura)).toBe(Number(calculateBMI(peso, altura).toFixed(1)))
+  })
+
+  it('barra o erro de digitação clássico: altura em METROS no campo de centímetros', () => {
+    // 80 kg com "1.75" lido como 1,75 cm daria IMC 261.224.
+    const absurdo = bmiForStorage(80, 1.75)
+    expect(absurdo).toBe(BMI_MAX)
+  })
+
+  it('NÃO mente sobre caso real — obesidade grau III passa de 60 e é gravada', () => {
+    // 200 kg / 1,70 m = 69,2. O teto antigo (60) apagaria isso.
+    expect(bmiForStorage(200, 170)).toBeCloseTo(69.2, 1)
+  })
+
+  it('sem peso ou sem altura devolve undefined — não persistimos lixo', () => {
+    expect(bmiForStorage(0, 180)).toBeUndefined()
+    expect(bmiForStorage(80, 0)).toBeUndefined()
+    expect(bmiForStorage(Number.NaN, 180)).toBeUndefined()
+  })
+
+  it('uma casa decimal, como o banco recebia antes', () => {
+    const v = bmiForStorage(80.4, 177) as number
+    expect(String(v)).toMatch(/^\d+(\.\d)?$/)
+  })
+})
+
+describe('fiação: o caminho que persiste usa a fonte única', () => {
+  it('useAssessment não recalcula IMC à mão', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const src = readFileSync(join(process.cwd(), 'src/hooks/useAssessment.ts'), 'utf8')
+    const semComentarios = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')
+    expect(semComentarios, 'IMC calculado à mão de novo — use bmiForStorage')
+      .not.toMatch(/Math\.pow\(\s*height\s*\/\s*100/)
+    expect(semComentarios).toMatch(/bmiForStorage\(/)
   })
 })
