@@ -1089,6 +1089,42 @@ em texto ("49" e "25 sem professor").
 e-mails distintos**. A UI já mostra 7 (o fetch deduplica), então não é bug de
 tela — mexer nas linhas é decisão do dono.
 
+**Sprint 3 (29/08/2026).** Três correções e uma investigação PARADA de
+propósito.
+
+**Um admin que também dá aula via "Coach" e nunca "Admin"** — o ternário testava
+`isCoach` primeiro (`HeaderActionsMenu`). No IronTracks o admin normalmente
+TAMBÉM atende alunos, então o papel de maior alcance ficava invisível justamente
+para quem o tem. Hoje `lib/user/rotuloDePapel.ts` devolve os dois ("Admin ·
+Coach"), com Admin primeiro — é ele que explica os itens a mais no menu.
+
+⚠️ **O guard disto nasceu FALSO e proibia a forma CORRETA:** o regex
+`isCoach\s*\?\s*'Coach'\s*:` casava com `isCoach ? 'Coach' : null`, que é o
+conserto. Virou função pura com teste de comportamento; o source-guard ficou só
+para travar a fiação. **Lógica de decisão não se guarda por regex.**
+
+**O banner `DIAGNOSTIC MODE` despejava a exceção crua** (`setDebugError("Erro
+Catch: " + msg)`), exibida com `break-all` no topo do painel. Mesma classe
+varrida no resto do app em 27/08 — esta superfície ficou de fora porque a busca
+mirou em `getErrorMessage`/`String(error)` e aqui a forma é outra. O detalhe
+continua indo para `logError`.
+
+**Os chips de sub-aba avisam que há mais.** Em "Mais" são oito e cabem três e
+meia; o corte do quarto chip era a única pista. O overflow é medido no efeito
+que já existia (`scrollWidth - clientWidth`), **sem `ResizeObserver`** — jsdom
+não o tem, e as duas coisas que mudam a largura do trilho já disparam aquele
+efeito.
+
+⚠️ **Os ~65pt de preto morto no topo continuam SEM causa isolada — e não tente
+adivinhar.** Duas hipóteses foram levantadas e as duas caíram na verificação:
+(1) `pt-header-safe` (`safe-area + 60px`) explicaria o valor, mas é **código
+morto** — está no `globals.css` e ninguém o usa; (2) `fixed` quebrado por
+ancestral com `transform` — o painel é `fixed inset-0` dentro de outro `fixed
+inset-0`, sem transform no caminho. A conta do header (`pt-safe` 59pt + `py-3`
+12pt = 71pt) não fecha com os ~138pt medidos na tela. **Isolar exige medir o DOM
+com o app logado**; mexer em safe-area por palpite quebra o topo em todo
+aparelho.
+
 **Aberto, do mesmo relatório** (`Relatorio/design-area-administrativa-2026-08-28.md`
 — a pasta `Relatorio/` é ignorada pelo git, então o arquivo é local; o que
 segue é o resumo que sobrevive):

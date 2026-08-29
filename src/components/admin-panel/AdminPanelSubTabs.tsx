@@ -15,7 +15,7 @@
  *   [Alunos] [Solicitações] [Professores]
  */
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import {
   ADMIN_CATEGORIES,
   TAB_META,
@@ -42,6 +42,8 @@ export const AdminPanelSubTabs = ({
   const def = ADMIN_CATEGORIES.find((c) => c.id === category)
   const tabsInCategory = (def?.tabKeys ?? []).filter((k) => availableTabs.has(k))
   const activeRef = useRef<HTMLButtonElement | null>(null)
+  const trilhoRef = useRef<HTMLDivElement | null>(null)
+  const [temMais, setTemMais] = useState(false)
 
   // Quando o tab ativo muda, scrolla pra mostrá-lo se estiver fora da viewport.
   useEffect(() => {
@@ -49,6 +51,20 @@ export const AdminPanelSubTabs = ({
       activeRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     }
   }, [currentTab])
+
+  // Há chip fora da tela? Em "Mais" são oito sub-abas e cabem três e meia: o
+  // quarto chip aparecia cortado pela borda, e esse corte era a ÚNICA pista de
+  // que existia um quinto. O degradê à direita é a pista explícita.
+  //
+  // Medido no efeito em vez de `ResizeObserver` de propósito: jsdom não o tem
+  // (já derrubou três testes de cardio aqui), e as duas coisas que mudam a
+  // largura do trilho — trocar de categoria e trocar de aba — já disparam este
+  // efeito.
+  useEffect(() => {
+    const el = trilhoRef.current
+    if (!el) return
+    setTemMais(el.scrollWidth - el.clientWidth > 4)
+  }, [currentTab, category, tabsInCategory.length])
 
   // Categorias com 0 ou 1 sub-tab não precisam de chips.
   if (tabsInCategory.length <= 1) return null
@@ -59,7 +75,9 @@ export const AdminPanelSubTabs = ({
       role="tablist"
       aria-label="Sub-navegação"
     >
+      <div className="relative">
       <div
+        ref={trilhoRef}
         className="flex items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabsInCategory.map((key) => {
@@ -88,6 +106,13 @@ export const AdminPanelSubTabs = ({
             </button>
           )
         })}
+      </div>
+      {temMais && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-neutral-950 to-transparent"
+        />
+      )}
       </div>
     </div>
   )
