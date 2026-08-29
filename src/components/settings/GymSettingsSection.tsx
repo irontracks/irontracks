@@ -6,6 +6,7 @@ import { haversineDistance } from '@/utils/geoUtils'
 import { logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { plainFieldProps } from '@/utils/ui/textFieldProps'
+import { useDialog } from '@/contexts/DialogContext'
 
 const GymQRCode = lazy(() => import('@/components/GymQRCode'))
 
@@ -40,6 +41,7 @@ interface GymSuggestion {
 }
 
 export default function GymSettingsSection({ userId, supabase }: GymSettingsSectionProps) {
+  const { confirm } = useDialog()
   const { getCurrentPosition, position, status: geoStatus, error: geoError } = useGeoLocation()
   // Preserve the legacy `loading` boolean semantics for the downstream UI —
   // the hook now exposes a richer `status` state machine, but this section
@@ -242,6 +244,16 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
 
   // Delete gym
   const deleteGym = useCallback(async (gymId: string) => {
+    // PERGUNTA ANTES. O 🗑 ficava a um toque de apagar a academia — e vai junto
+    // o QR de check-in dela. É ação destrutiva e irreversível pela tela; a
+    // avaliação física, na mesma área, já confirmava.
+    const alvo = gyms.find((g) => g.id === gymId)
+    const ok = await confirm(
+      `Remover ${alvo?.name ? `"${alvo.name}"` : 'esta academia'}? O check-in por QR dela para de funcionar.`,
+      'Remover academia',
+      { confirmText: 'Remover', cancelText: 'Manter', destructive: true },
+    )
+    if (!ok) return
     setActionError(null)
     // Guarda o estado atual pra reverter se a exclusão falhar no banco.
     const prevGyms = gyms
@@ -252,7 +264,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
       setGyms(prevGyms)
       setActionError('Não foi possível remover a academia. Tente novamente.')
     }
-  }, [gyms, supabase, userId])
+  }, [gyms, supabase, userId, confirm])
 
   // Set primary
   const setPrimary = useCallback(async (gymId: string) => {

@@ -94,3 +94,28 @@ export function countsAsWorkout(notes: unknown): boolean {
   if (!Number.isFinite(seconds) || seconds <= 0) return false
   return seconds >= MIN_MINUTES_SINGLE_SET * 60
 }
+
+/**
+ * O mesmo critério, decidido a partir do RESUMO da sessão.
+ *
+ * O histórico do próprio usuário recebe linha MAGRA (`slimHistoryRow`): sem
+ * `notes`, para a rota não servir centenas de KB. Sem esta porta, a tela teria
+ * duas opções ruins — contar linha crua (foi o bug: uma sessão de 44 s virava
+ * "treino" no resumo que o usuário lê) ou voltar a baixar a sessão inteira só
+ * para decidir um booleano.
+ *
+ * A REGRA é a mesma de `countsAsWorkout`, e é por isso que ela mora aqui: duas
+ * cópias divergem no dia em que o piso mudar, e aí o app volta a mostrar dois
+ * números para a mesma pergunta.
+ */
+export function countsAsWorkoutFromSummary(resumo: {
+  doneSets: unknown
+  totalTimeSeconds: unknown
+}): boolean {
+  const done = Number(resumo?.doneSets)
+  if (!Number.isFinite(done) || done < 1) return false
+  if (done >= MIN_DONE_SETS) return true
+  const seconds = Number(resumo?.totalTimeSeconds)
+  if (!Number.isFinite(seconds) || seconds <= 0) return false
+  return seconds >= MIN_MINUTES_SINGLE_SET * 60
+}

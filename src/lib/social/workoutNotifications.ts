@@ -7,6 +7,7 @@
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { currentWeekRangeBrt } from '@/utils/cron/weekRangeBrt'
 import {
   filterRecipientsByPreference,
   insertNotifications,
@@ -493,13 +494,11 @@ export async function notifyWorkoutFinished(
             : null
         const target = Math.max(0, Number(prefs?.trainingFrequencyPerWeek) || 0)
         if (target > 0) {
-          const now = new Date()
-          const dow = now.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
-          const daysSinceMonday = (dow + 6) % 7
-          const startOfWeek = new Date(now)
-          startOfWeek.setUTCDate(now.getUTCDate() - daysSinceMonday)
-          startOfWeek.setUTCHours(0, 0, 0, 0)
-          const startISO = startOfWeek.toISOString().slice(0, 10)
+          // A semana do usuário: domingo→sábado, BRT (fonte única). Antes
+          // começava na SEGUNDA e em UTC — dois desvios no mesmo cálculo, e
+          // esta é a conta que decide se o app anuncia "bateu a meta da
+          // semana" para os seguidores.
+          const startISO = currentWeekRangeBrt(new Date()).startDay
 
           const { count } = await admin
             .from('workouts')

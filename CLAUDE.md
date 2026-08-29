@@ -51,6 +51,44 @@ os três pelo resto da sessão, inclusive a única saída sem gravar. Guard:
 
 CRUD/organizar/editor-completo em `components/workout/hooks/useWorkoutExerciseCrud.ts`; editar mid-sessão remapeia os logs por índice (`helpers/reconcileEditedExercises.ts`).
 
+**Auditoria de ponta a ponta 28/08/2026 — sete correções.** O relatório
+completo e o que ficou varrido-e-sólido estão nos PRs; o que precisa sobreviver
+ao `/clear`:
+
+⚠️ **A semana começava na SEGUNDA em CINCO lugares** (`reportMetrics`,
+`useMuscleTrends`, `periodization`, `streakRisk`, `workoutNotifications`) — todos
+com a MESMA aritmética `(weekdayIndex + 6) % 7`, e nenhum pego pelo guard, que
+mirava em três outras formas. Hoje os cinco usam `weekRangeBrt` e o guard cobre
+a quarta forma. **A lição que fica: guard de FORMA não substitui teste de
+COMPORTAMENTO** — provado por mutação duas vezes na mesma sessão (trocar a
+função por "data − 1 dia" deixava o guard de forma verde). Daí
+`semanaDoRelatorio.test.ts` e `semanaDaTendencia.test.ts`, que testam a
+fronteira de verdade.
+
+**`countsAsWorkout` agora vale onde o usuário LÊ.** O piso (2 séries, ou 1 com
+15 min) existia só no cron do resumo semanal e no mapa muscular; o histórico
+contava LINHAS, então uma sessão de 44 s aparecia como treino e o app mostrava
+um número diferente do push. `countsAsWorkoutFromSummary` decide pelo resumo da
+linha magra (`done_sets` entrou no `slimHistoryRow` — decisão consciente
+registrada na allowlist do guard de payload). **A MÉDIA usa o mesmo conjunto do
+contador**: dividir o tempo de todas as linhas pelos treinos válidos inflava o
+número.
+
+**"Vou descansar" tem volta.** O card era informativo puro e prendia quem tocou
+por engano até a virada do dia — sem o atalho de treinar e com a meta rebaixada
+(−442 kcal medidos). A capacidade já existia (`setRestDayIntent` faz upsert e
+dispara o evento que o card escuta); faltava o botão.
+
+**Exclusão na tela pergunta antes** (`exclusaoPerguntaAntes.test.ts`). O 🗑 da
+academia apagava num toque, levando o QR de check-in junto. O guard varre só
+`src/components/**` de propósito: é onde o dedo dispara; em hook/lib o
+`.delete()` é a mecânica.
+
+⚠️ **O hook `sim:close` (Stop) encerra o app entre os turnos do agente.** Numa
+auditoria de tela isso PARECE crash: o app some sozinho. Custou uma
+investigação de crash report para descobrir que a causa era o próprio
+ferramental. Ao percorrer telas, relance o app a cada turno.
+
 **A tira de navegação do treino ativo (28/08/2026).** Treino de 10 exercícios só
 tinha rolagem — nenhum índice, nenhum salto. `WorkoutExerciseRail` é irmã do
 header (FORA do contêiner que rola), some sozinha abaixo de

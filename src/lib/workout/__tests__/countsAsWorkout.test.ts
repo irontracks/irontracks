@@ -5,9 +5,12 @@
  * contagem por LINHA parecia certa. Os casos abaixo usam os números medidos
  * naquela semana, para o critério ser conferível contra o que aconteceu.
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   countsAsWorkout,
+  countsAsWorkoutFromSummary,
   countDoneSets,
   parseSessionNotes,
   MIN_DONE_SETS,
@@ -82,5 +85,79 @@ describe('countsAsWorkout — as bordas', () => {
   it('countDoneSets ignora log preenchido sem `done`', () => {
     expect(countDoneSets(sessao(3, 30, 10))).toBe(3)
     expect(countDoneSets(null)).toBe(0)
+  })
+})
+
+/**
+ * O MESMO piso, decidido a partir do resumo (linha magra do histórico).
+ *
+ * Esta porta existe porque a lista do próprio usuário não recebe `notes` — e
+ * sem ela a tela contava LINHAS: uma sessão de 44 s aparecia como treino no
+ * número que o usuário lê, enquanto o push da semana usava o piso e mostrava
+ * outro. Se as duas regras divergirem, o defeito volta pela porta de trás.
+ */
+describe('countsAsWorkoutFromSummary', () => {
+  it('2 séries concluídas já contam, qualquer que seja a duração', () => {
+    expect(countsAsWorkoutFromSummary({ doneSets: 2, totalTimeSeconds: 30 })).toBe(true)
+  })
+
+  it('1 série só conta com 15 min ou mais — a porta do cardio', () => {
+    expect(countsAsWorkoutFromSummary({ doneSets: 1, totalTimeSeconds: 14 * 60 })).toBe(false)
+    expect(countsAsWorkoutFromSummary({ doneSets: 1, totalTimeSeconds: 15 * 60 })).toBe(true)
+  })
+
+  it('a sessão de 44 segundos que o dono viu no histórico NÃO conta', () => {
+    expect(countsAsWorkoutFromSummary({ doneSets: 1, totalTimeSeconds: 44 })).toBe(false)
+  })
+
+  it('zero série nunca conta, nem com o treino durando horas', () => {
+    expect(countsAsWorkoutFromSummary({ doneSets: 0, totalTimeSeconds: 3 * 3600 })).toBe(false)
+  })
+
+  it('lixo não vira treino', () => {
+    expect(countsAsWorkoutFromSummary({ doneSets: null, totalTimeSeconds: null })).toBe(false)
+    expect(countsAsWorkoutFromSummary({ doneSets: 'dois', totalTimeSeconds: '30' })).toBe(false)
+  })
+
+  it('concorda com `countsAsWorkout` nos mesmos casos — duas regras que divergem trazem o bug de volta', () => {
+    const casos = [
+      { done: 0, seconds: 600 },
+      { done: 1, seconds: 44 },
+      { done: 1, seconds: 20 * 60 },
+      { done: 2, seconds: 60 },
+      { done: 30, seconds: 3600 },
+    ]
+    for (const { done, seconds } of casos) {
+      const logs: Record<string, unknown> = {}
+      for (let i = 0; i < done; i++) logs[`0-${i}`] = { done: true }
+      const pelosNotes = countsAsWorkout({ logs, totalTime: seconds })
+      const peloResumo = countsAsWorkoutFromSummary({ doneSets: done, totalTimeSeconds: seconds })
+      expect(peloResumo, `divergiu em done=${done} seconds=${seconds}`).toBe(pelosNotes)
+    }
+  })
+})
+
+describe('o resumo do histórico usa o piso (fiação)', () => {
+  it('a MÉDIA usa o mesmo conjunto do contador — senão divide tudo por poucos', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/history/hooks/useHistoryData.ts'), 'utf8')
+    const at = src.indexOf('const summary = useMemo(')
+    const bloco = src.slice(at, at + 2500)
+    // Ancora no USO, não na existência da variável: declarar
+    // `segundosQueContam` e não usá-la no cálculo passaria despercebido — foi o
+    // que a primeira versão deste caso deixou escapar, e a mutação pegou.
+    const atribuicao = bloco.slice(bloco.indexOf('const avgMinutes'), bloco.indexOf(';', bloco.indexOf('const avgMinutes')))
+    expect(atribuicao, 'a média precisa dividir o tempo DOS TREINOS QUE CONTAM')
+      .toMatch(/segundosQueContam/)
+    expect(atribuicao, 'a média voltou a dividir o tempo de TODAS as linhas pelos treinos válidos')
+      .not.toMatch(/totalMinutes/)
+  })
+
+  it('TREINOS não conta linhas', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/history/hooks/useHistoryData.ts'), 'utf8')
+    const at = src.indexOf('const summary = useMemo(')
+    expect(at, 'o resumo do histórico sumiu').toBeGreaterThan(-1)
+    const bloco = src.slice(at, at + 2000)
+    expect(bloco).toMatch(/countsAsWorkoutFromSummary\(/)
+    expect(bloco, 'voltou a contar linhas em vez de treinos').not.toMatch(/const count = visibleHistory\.length/)
   })
 })

@@ -5,6 +5,7 @@ import { detectSessionDeload, isDeloadSession, type SessionDeload } from './sess
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { sessionKcalInputs, type KcalProfileLike } from '@/utils/calories/sessionKcalInputs'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
+import { currentWeekRangeBrt } from '@/utils/cron/weekRangeBrt'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -293,52 +294,23 @@ const buildPrevByExercise = (prevSession: UnknownRecord) => {
   return map
 }
 
-const toTzParts = (date: Date, timeZone: string) => {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = formatter.formatToParts(date)
-  const map = parts.reduce<Record<string, string>>((acc, part) => {
-    if (part.type !== 'literal') acc[part.type] = part.value
-    return acc
-  }, {})
-  const weekday = String(map.weekday || '').toLowerCase()
-  const weekdayIndex =
-    weekday === 'mon' ? 1 : weekday === 'tue' ? 2 : weekday === 'wed' ? 3 : weekday === 'thu' ? 4 : weekday === 'fri' ? 5 : weekday === 'sat' ? 6 : 0
-  return {
-    year: Number(map.year),
-    month: Number(map.month),
-    day: Number(map.day),
-    weekdayIndex,
-  }
-}
-
-const tzDateToUtc = (timeZone: string, year: number, month: number, day: number, hour: number, minute: number, second: number) => {
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
-  const tzDate = new Date(utcGuess.toLocaleString('en-US', { timeZone }))
-  const offset = utcGuess.getTime() - tzDate.getTime()
-  return new Date(utcGuess.getTime() + offset)
-}
-
-const getWeekStartSaoPaulo = (date: Date) => {
-  const timeZone = 'America/Sao_Paulo'
-  const parts = toTzParts(date, timeZone)
-  const daysSinceMonday = (parts.weekdayIndex + 6) % 7
-  const mondayDay = parts.day - daysSinceMonday
-  const weekStart = tzDateToUtc(timeZone, parts.year, parts.month, mondayDay, 3, 0, 0)
-  if (date.getTime() < weekStart.getTime()) {
-    return new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
-  }
-  return weekStart
-}
+/**
+ * O domingo que abre a semana da data — pela FONTE ÚNICA do app.
+ *
+ * Até 28/08/2026 esta função calculava `(weekdayIndex + 6) % 7`, ou seja,
+ * semana SEGUNDA→domingo, enquanto o app inteiro usa domingo→sábado desde
+ * 24/08. O treino de domingo caía na semana anterior aqui e na semana atual no
+ * resumo semanal, no push e no mapa muscular — o mesmo treino em duas semanas
+ * diferentes, dependendo da tela.
+ *
+ * O guard `semanaComecaNoDomingo` não pegava: ele mira em três FORMAS de
+ * calcular à mão (`setDate(...getDay())`, `getDate() - ...getDay()`,
+ * `weekdayIndex === 0 ?`), e esta era uma quarta. Guard de forma erra quando a
+ * forma muda — por isso a correção é adotar a fonte única, não inventar a
+ * quinta forma.
+ */
+const getWeekStartSaoPaulo = (date: Date) =>
+  new Date(currentWeekRangeBrt(date).startIso)
 
 const extractSessionDateMs = (session: UnknownRecord) => {
   const raw = session.date ?? session.created_at ?? session.completed_at ?? session.updated_at ?? null

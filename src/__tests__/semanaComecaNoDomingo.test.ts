@@ -52,8 +52,19 @@ const PODE_CALCULAR_SOZINHO: Record<string, string> = {
     'grade de mês do calendário: alinha as colunas da tabela, não define intervalo de contagem',
 }
 
-/** `x.getDay()` usado para ANDAR até o começo da semana. */
-const CALCULA_INICIO_DE_SEMANA = /setDate\([^)]*getDay\(\)|getDate\(\)\s*-\s*[^;]*getDay\(\)|weekdayIndex\s*===\s*0\s*\?/
+/**
+ * Formas de ANDAR até o começo da semana à mão.
+ *
+ * A quarta forma (`(algo + 6) % 7`) entrou em 28/08/2026, depois de ela ter
+ * escapado em DOIS arquivos ao mesmo tempo — `reportMetrics` e
+ * `useMuscleTrends` — por meses. É a aritmética clássica de "dias desde a
+ * segunda": some 6 e tire o resto por 7, e o domingo (0) vira 6.
+ *
+ * Guard de FORMA erra quando a forma muda. Cada vez que isto acontecer, a
+ * resposta é acrescentar o padrão aqui E migrar o culpado para
+ * `weekRangeBrt` — não inventar a quinta forma.
+ */
+const CALCULA_INICIO_DE_SEMANA = /setDate\([^)]*getDay\(\)|getDate\(\)\s*-\s*[^;]*getDay\(\)|weekdayIndex\s*===\s*0\s*\?|\+\s*6\s*\)\s*%\s*7/
 
 describe('guard: a semana do usuário tem fonte única', () => {
   it('ninguém novo calcula o início da semana à mão', () => {

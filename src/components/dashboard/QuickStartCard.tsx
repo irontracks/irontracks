@@ -6,6 +6,7 @@ import type { DashboardWorkout } from '@/types/dashboard'
 import { isWorkoutToday, pickQuickStartWorkoutIndex } from '@/utils/workout/workoutDay'
 import { estimateWorkoutMinutes } from '@/utils/workout/estimateDuration'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
+import { setRestDayIntent } from '@/lib/nutrition/restDayIntent'
 import { brtDateKey } from '@/utils/cron/dateBrt'
 import { useDayChangeTick } from '@/hooks/useDayChangeTick'
 
@@ -20,6 +21,8 @@ type QuickStartCardProps = {
     trainedToday?: boolean
     /** Respondeu "vou descansar" hoje. O convite para treinar some — ele já decidiu. */
     restingToday?: boolean
+    /** Necessário para DESFAZER o descanso — ver o bloco `restingToday`. */
+    userId?: string
 }
 
 /**
@@ -71,7 +74,7 @@ function Corpo({ onClick, ariaLabel, children }: { onClick?: () => void; ariaLab
  */
 const CHAVE_DISPENSA = 'it.trainedCard.dismissed'
 
-function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQuickView, trainedToday, restingToday }: QuickStartCardProps) {
+function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQuickView, trainedToday, restingToday, userId }: QuickStartCardProps) {
     // Vira a meia-noite ⇒ o treino de hoje muda. Sem isto, o app aberto desde
     // ontem seguiria mostrando (ou escondendo) o card pela resposta de ontem.
     const viradaDoDia = useDayChangeTick()
@@ -185,6 +188,21 @@ function QuickStartCardInner({ workouts, onStartSession, hasActiveSession, onQui
                         Sua meta de calorias de hoje já está ajustada.
                     </p>
                 </div>
+                {/* SAÍDA. Sem ela, um toque errado em "Vou descansar" prendia a
+                    pessoa até a virada do dia: sem o atalho de treinar e com a
+                    meta de calorias rebaixada (medido: −442 kcal). A capacidade
+                    já existia — `setRestDayIntent` faz upsert e dispara o evento
+                    que este card escuta, então a tela se corrige sozinha.
+                    Discreto de propósito: desfazer é exceção, não convite. */}
+                {userId ? (
+                    <button
+                        type="button"
+                        onClick={() => { void setRestDayIntent(String(userId), true) }}
+                        className="tap-44 shrink-0 rounded-xl border border-sky-500/30 px-3 py-1.5 text-[11px] font-bold text-sky-200 transition active:scale-95 hover:bg-sky-500/10"
+                    >
+                        Mudei de ideia
+                    </button>
+                ) : null}
             </div>
         )
     }
