@@ -6,6 +6,7 @@
  */
 
 import { AdminUser, AdminTeacher } from '@/types/admin';
+import { rotuloDeStatus, normalizarStatus } from '@/lib/admin/studentStatus';
 import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { apiAdmin } from '@/lib/api'
@@ -183,14 +184,10 @@ export function useAdminActions({
     };
 
     const handleUpdateStudentStatus = async (student: AdminUser, newStatus: string) => {
-        if (!newStatus || newStatus === (student.status || 'pendente')) return;
-        const statusLabels: Record<string, string> = {
-            pago: 'Pago ✅',
-            pendente: 'Pendente ⏳',
-            atrasado: 'Atrasado ⚠️',
-            cancelar: 'Cancelado ❌',
-        };
-        const label = statusLabels[newStatus] || newStatus;
+        if (!newStatus || newStatus === normalizarStatus(student.status)) return;
+        // O rótulo sai da fonte única — esta era a quarta lista de status do
+        // painel, e a única que conhecia emoji.
+        const label = rotuloDeStatus(newStatus);
         if (!(await confirm(`Mudar status de "${student.name || student.email}" para ${label}?`))) return;
         try {
             const authHeaders = await getAdminAuthHeaders();

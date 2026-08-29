@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+    opcoesDeStatus,
+    badgeDeStatus,
     resumirStatusDeAlunos,
     graficoDeStatus,
     rotuloDeStatus,
@@ -127,5 +129,59 @@ describe('rotuloDeStatus — a lista de alunos e o gráfico falam a mesma língu
     it('sem status não vira "pendente" também aqui', () => {
         expect(rotuloDeStatus(null)).toBe('Sem status')
         expect(rotuloDeStatus('')).toBe('Sem status')
+    })
+})
+
+
+describe('opcoesDeStatus — o `<select>` precisa conseguir exibir o aluno', () => {
+    it('oferece `ativo` — o status de 43% da base, que o select não tinha', () => {
+        // Um `<select>` cujo `value` não casa com nenhuma `<option>` não exibe o
+        // estado real: o navegador cai na primeira opção, e a tela passa a
+        // afirmar um status que o banco não tem.
+        expect(opcoesDeStatus().map((o) => o.value)).toContain('ativo')
+    })
+
+    it('o status ATUAL sempre tem opção, mesmo desconhecido', () => {
+        const opcoes = opcoesDeStatus('em_negociacao')
+        const atual = opcoes.find((o) => o.value === 'em_negociacao')
+        expect(atual, 'sem esta opção o select exibiria outro status').toBeTruthy()
+        expect(atual?.label).toBe('Em negociacao')
+    })
+
+    it('não duplica quando o status atual já é escolhível', () => {
+        const opcoes = opcoesDeStatus('pago')
+        expect(opcoes.filter((o) => o.value === 'pago')).toHaveLength(1)
+    })
+
+    it('"sem status" não vira opção escolhível — ninguém ESCOLHE não ter status', () => {
+        expect(opcoesDeStatus(null).map((o) => o.value)).not.toContain('sem_status')
+        expect(opcoesDeStatus('').map((o) => o.value)).not.toContain('')
+    })
+
+    it('grafia legada não é oferecida duas vezes', () => {
+        // `cancelar` (gravada) é escolhível; `cancelado` não — senão o dropdown
+        // mostraria "Cancelado" duas vezes.
+        const rotulos = opcoesDeStatus().map((o) => o.label)
+        expect(rotulos.filter((r) => r === 'Cancelado')).toHaveLength(1)
+    })
+})
+
+describe('badgeDeStatus — mesma tabela do rótulo e da cor', () => {
+    it('cada status conhecido tem classes próprias', () => {
+        expect(badgeDeStatus('pago')).toContain('green')
+        expect(badgeDeStatus('ativo')).toContain('blue')
+        expect(badgeDeStatus('atrasado')).toContain('red')
+    })
+
+    it('status desconhecido cai no neutro, sem quebrar', () => {
+        expect(badgeDeStatus('nunca_visto')).toContain('neutral')
+        expect(badgeDeStatus(null)).toContain('neutral')
+    })
+
+    it('o vermelho é do ATRASADO — não do desconhecido', () => {
+        // Vermelho neste app é erro/alarme. Pintar de vermelho quem só não tem
+        // status classificado seria alarme falso permanente.
+        expect(badgeDeStatus('nunca_visto')).not.toContain('red')
+        expect(badgeDeStatus(null)).not.toContain('red')
     })
 })

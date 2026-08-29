@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown, Gamepad2, Loader2 } from 'lucide-react';
-import { rotuloDeStatus } from '@/lib/admin/studentStatus';
+import { rotuloDeStatus, badgeDeStatus, opcoesDeStatus, normalizarStatus, resumirStatusDeAlunos } from '@/lib/admin/studentStatus';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
@@ -17,23 +17,11 @@ function openTeacherControl(userId: string, name: string) {
     window.dispatchEvent(new CustomEvent(OPEN_TEACHER_CONTROL_EVENT, { detail: { userId, name } }));
 }
 
-const STATUS_OPTIONS = [
-    { value: 'pago', label: 'Pago', color: 'text-green-400' },
-    { value: 'pendente', label: 'Pendente', color: 'text-yellow-400' },
-    { value: 'atrasado', label: 'Atrasado', color: 'text-red-400' },
-    { value: 'cancelar', label: 'Cancelado', color: 'text-neutral-400' },
-] as const;
-
-type StatusValue = typeof STATUS_OPTIONS[number]['value'];
-
-const statusBadgeClass = (status: string) => {
-    switch (status) {
-        case 'pago': return 'text-green-500  bg-green-500/10  border-green-500/20';
-        case 'atrasado': return 'text-red-500    bg-red-500/10    border-red-500/20';
-        case 'cancelar': return 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30';
-        default: return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-    }
-};
+// Vocabulário de status: opções, rótulos, cores e badge vêm todos de
+// `lib/admin/studentStatus.ts`. Esta tela mantinha duas listas próprias
+// (`STATUS_OPTIONS` e um `switch` de classes) que não conheciam `ativo` — o
+// status de 43% da base.
+type StatusValue = string;
 
 export const StudentsTab: React.FC = () => {
     const {
@@ -71,15 +59,16 @@ export const StudentsTab: React.FC = () => {
     // modal vivem no TeacherControlHost (shell) — aqui só disparamos o pedido/abertura.
     const [requestingControl, setRequestingControl] = useState<string | null>(null);
 
-    // Live counts for filter pills
-    const statusCounts = React.useMemo(() => {
-        const list = Array.isArray(usersList) ? usersList : [];
-        return list.reduce<Record<string, number>>((acc, s) => {
-            const key = String(s?.status || 'pendente').toLowerCase().trim();
-            acc[key] = (acc[key] || 0) + 1;
-            return acc;
-        }, {});
-    }, [usersList]);
+    // Chips de filtro: um por status que EXISTE na lista, com a contagem.
+    //
+    // A lista fixa anterior tinha um chip "Ativos" que filtrava por `pago` — e
+    // NENHUM chip para `ativo`, o status de 43% da base. Aqueles alunos não
+    // eram alcançáveis por filtro nenhum a não ser "Todos". Derivar dos dados
+    // faz o problema não poder voltar: categoria que existe, ganha chip.
+    const fatiasDeStatus = React.useMemo(
+        () => resumirStatusDeAlunos(Array.isArray(usersList) ? usersList : []),
+        [usersList],
+    );
 
     // VIP batch lookup — use user_id (profiles.id), NOT id (students table PK)
     const allStudentIds = useMemo(() => {
@@ -189,7 +178,7 @@ export const StudentsTab: React.FC = () => {
                         (`docs/DESIGN_HIERARCHY.md`). Para o professor, que não
                         recebe o select, ele continua sendo a única leitura. */}
                     {!isAdmin && (
-                        <span className={`${vipLabel ? '' : 'ml-auto'} flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(String(s.status || 'pendente'))}`}>
+                        <span className={`${vipLabel ? '' : 'ml-auto'} flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${badgeDeStatus(s.status)}`}>
                             {rotuloDeStatus(s.status)}
                         </span>
                     )}
@@ -204,9 +193,11 @@ export const StudentsTab: React.FC = () => {
                 >
                     {/* Status select — ALL transitions */}
                     {isAdmin && (
+                        <label className="flex-1 min-w-[120px] flex flex-col gap-0.5">
+                            <span className="t-meta text-[10px]">Pagamento</span>
                         <select
-                            className="flex-1 min-w-[120px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
-                            value={s.status || 'pendente'}
+                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                            value={normalizarStatus(s.status)}
                             onChange={(e) => {
                                 e.stopPropagation();
                                 handleUpdateStudentStatus(s, e.target.value as StatusValue);
@@ -214,16 +205,24 @@ export const StudentsTab: React.FC = () => {
                             title="Alterar status de pagamento"
                             aria-label="Status de pagamento"
                         >
-                            {STATUS_OPTIONS.map((opt) => (
+                            {opcoesDeStatus(s.status).map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                         </select>
+                        </label>
                     )}
 
-                    {/* Teacher select — value uses t.user_id (profiles.id) to match students.teacher_id FK */}
+                    {/* Teacher select — value uses t.user_id (profiles.id) to match students.teacher_id FK
+                        Os dois selects vinham SEM rótulo visível: só o
+                        `aria-label` dizia qual era qual, então o leitor de tela
+                        estava servido e o olho não — não havia como saber que o
+                        primeiro é pagamento e o segundo, professor, sem tocar e
+                        descobrir. */}
                     {isAdmin && (
+                        <label className="flex-1 min-w-[140px] flex flex-col gap-0.5">
+                            <span className="t-meta text-[10px]">Professor</span>
                         <select
-                            className="flex-1 min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
                             value={s.teacher_id || ''}
                             onChange={(e) => {
                                 e.stopPropagation();
@@ -253,6 +252,7 @@ export const StudentsTab: React.FC = () => {
                                 </option>
                             ))}
                         </select>
+                        </label>
                     )}
 
                     {/* Icon actions */}
@@ -337,15 +337,12 @@ export const StudentsTab: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
                     {([
-                        { key: 'all', label: 'Todos', color: 'text-neutral-300  bg-neutral-800   border-neutral-700   hover:border-neutral-600' },
-                        { key: 'pago', label: 'Ativos', color: 'text-green-400   bg-green-500/10   border-green-500/20  hover:border-green-500/40' },
-                        { key: 'pendente', label: 'Pendentes', color: 'text-yellow-400  bg-yellow-500/10  border-yellow-500/20 hover:border-yellow-500/40' },
-                        { key: 'atrasado', label: 'Atrasados', color: 'text-red-400     bg-red-500/10     border-red-500/20    hover:border-red-500/40' },
-                        { key: 'cancelar', label: 'Cancelados', color: 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30 hover:border-neutral-500/40' },
-                    ] as const).map(({ key, label, color }) => {
+                        { key: 'all', label: 'Todos', color: 'text-neutral-300 bg-neutral-800 border-neutral-700 hover:border-neutral-600' },
+                        ...fatiasDeStatus.map((f) => ({ key: f.chave, label: f.rotulo, color: badgeDeStatus(f.chave) })),
+                    ]).map(({ key, label, color }) => {
                         const count = key === 'all'
                             ? (Array.isArray(usersList) ? usersList.length : 0)
-                            : (statusCounts[key] || 0);
+                            : (fatiasDeStatus.find((f) => f.chave === key)?.quantidade ?? 0);
                         const active = studentStatusFilter === key;
                         return (
                             <button

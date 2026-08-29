@@ -127,9 +127,18 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, erro, onDone, on
                     </div>
                     <span className="text-white font-bold text-sm truncate">{item.student_name || '—'}</span>
                 </div>
-                <span className="text-[11px] text-neutral-400 whitespace-nowrap shrink-0 pt-0.5">
-                    {formatLastWorkout(item.last_workout_at)}
-                </span>
+                {/* O último treino só aparece quando ACRESCENTA.
+                    Em `churn_risk` o `reason` da API já é "12 dias sem treinar"
+                    (ou "Sem treinos registrados"), e esta coluna dizia "12 dias
+                    atrás" (ou "Sem treinos") logo ao lado: a mesma informação,
+                    duas vezes, no mesmo cartão — mais o badge, que a classifica.
+                    Em `volume_drop` e `load_spike` o motivo fala de carga, e aí
+                    saber quando ele treinou pela última vez é dado novo. */}
+                {item.kind !== 'churn_risk' && (
+                    <span className="text-[11px] text-neutral-400 whitespace-nowrap shrink-0 pt-0.5">
+                        {formatLastWorkout(item.last_workout_at)}
+                    </span>
+                )}
             </div>
 
             {/* Reason */}
