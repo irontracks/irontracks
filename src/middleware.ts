@@ -49,6 +49,7 @@ import { updateSession } from '@/utils/supabase/middleware'
 import { NextRequest, NextResponse } from 'next/server'
 import { applySecurityHeaders, buildCspHeader, cspEnforcedFrom } from '@/utils/security/headers'
 import { evaluateOriginGuard, originGuardEnforced } from '@/utils/security/originGuard'
+import { registrarMismatch } from '@/utils/security/originReport'
 
 /** Bloqueante por padrão; `CSP_ENFORCE=false` é o freio. Regra em `headers.ts`. */
 const cspEnforced = () => cspEnforcedFrom(process.env.CSP_ENFORCE)
@@ -58,9 +59,15 @@ export async function middleware(request: NextRequest) {
   // Branch próprio e BARATO: comparação de headers, zero rede — o motivo de
   // /api/ ficar fora do resto do middleware era o getUser() do updateSession,
   // e ele CONTINUA fora deste caminho. Nasce em modo RELATÓRIO (mesma doutrina
-  // do CSP): mismatch vira console.error (retido nos runtime logs da Vercel) e
-  // a requisição segue; bloquear exige ORIGIN_GUARD_ENFORCE=true na Vercel,
-  // depois de uma janela limpa. Guard: utils/security/__tests__/originGuard.test.ts
+  // do CSP): mismatch é REGISTRADO e a requisição segue; bloquear exige
+  // ORIGIN_GUARD_ENFORCE=true na Vercel, depois de uma janela limpa.
+  //
+  // ⚠️ Essa janela NÃO EXISTIA até 29/08/2026: o registro era só
+  // `console.error`, que vive ~1 dia nos runtime logs da Vercel — buscar 7 dias
+  // responde que excede a retenção, e 24 h volta vazio. Hoje o mismatch também
+  // vai para `audit_events` (`registrarMismatch`), que é consultável por SQL e
+  // não expira; o console.error fica como pista imediata.
+  // Guard: utils/security/__tests__/originGuard.test.ts
   if (request.nextUrl.pathname.startsWith('/api/')) {
     try {
       const verdict = evaluateOriginGuard({
@@ -82,6 +89,14 @@ export async function middleware(request: NextRequest) {
             enforced: originGuardEnforced(),
           })
         )
+        registrarMismatch({
+          kind: verdict.kind,
+          originHost: verdict.originHost ?? '',
+          host: request.nextUrl.host,
+          method: request.method,
+          path: request.nextUrl.pathname,
+          enforced: originGuardEnforced(),
+        })
         if (originGuardEnforced()) {
           return NextResponse.json({ ok: false, error: 'origin_mismatch' }, { status: 403 })
         }
