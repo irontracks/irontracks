@@ -28,6 +28,9 @@ import { QuickStartCard } from './QuickStartCard'
 import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { useTrainedToday } from '@/hooks/useTrainedToday'
 import { useRestDayIntent } from '@/hooks/useRestDayIntent'
+import { useLastPerformed } from '@/hooks/useLastPerformed'
+import { formatarUltimaVez } from '@/lib/workout/lastPerformed'
+import { resolveWorkoutKey } from '@/lib/workout/workoutKey'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
@@ -367,6 +370,9 @@ export default function StudentDashboard(props: Props) {
   // "Vou descansar" no card de intenção apaga o convite para treinar. Os dois
   // são irmãos aqui — a resposta chega por evento, não por estado compartilhado.
   const restDayIntent = useRestDayIntent(props.currentUserId)
+  // "há 3 dias" no card: com cinco treinos na lista, é o que diz qual está
+  // atrasado sem abrir o histórico. Consulta leve e tolerante a falha.
+  const ultimaExecucao = useLastPerformed(props.currentUserId)
 
   const showVipTab = props.vipEnabled !== false
   const vipLocked = !!props.vipLocked
@@ -393,6 +399,7 @@ export default function StudentDashboard(props: Props) {
           onQuickView={props.onQuickView}
           trainedToday={trainedToday === true}
           restingToday={restDayIntent?.willTrain === false}
+          userId={props.currentUserId}
         />
       )}
 
@@ -808,6 +815,7 @@ export default function StudentDashboard(props: Props) {
                     isPeriodized={workoutsTab === 'periodized'}
                     isToday={workoutsTab !== 'periodized' && isWorkoutToday(w?.title)}
                     emphasizeCta={idx === emphasizedCtaIdx}
+                    ultimaVez={formatarUltimaVez(ultimaExecucao.get(resolveWorkoutKey({ name: w?.title })))}
                     isInProgress={Boolean(
                       props.activeWorkoutId && String(w?.id ?? '') === props.activeWorkoutId,
                     )}

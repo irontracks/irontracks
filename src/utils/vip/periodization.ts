@@ -1,4 +1,5 @@
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { weekStartDayBrt } from '@/utils/cron/weekRangeBrt'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
 import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
 import { vipPeriodizationExerciseSeed, VipExerciseSeed } from '@/data/vipPeriodizationExercises'
@@ -350,14 +351,17 @@ export const parseSessionFromNotes = (notes: unknown): Record<string, unknown> |
 export const computeWeeklyStatsFromSessions = (sessions: Array<{ created_at: string; notes: unknown }>) => {
   const byWeek = new Map<string, { weekStart: string; volume: number; best1rm: number }>()
 
+  /**
+   * O domingo que abre a semana — fonte única (`weekRangeBrt`).
+   *
+   * Calculava a SEGUNDA, em UTC. O app agrupa semana domingo→sábado em BRT
+   * desde 24/08/2026, então o volume semanal da periodização discordava do
+   * resumo, do push e do mapa muscular para todo treino de domingo.
+   */
   const getWeekStartIso = (iso: string) => {
     const d = new Date(iso)
     if (Number.isNaN(d.getTime())) return ''
-    const day = d.getUTCDay()
-    const diff = (day + 6) % 7
-    const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-    start.setUTCDate(start.getUTCDate() - diff)
-    return start.toISOString().slice(0, 10)
+    return weekStartDayBrt(d)
   }
 
   for (const row of sessions) {

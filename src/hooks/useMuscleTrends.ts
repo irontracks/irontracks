@@ -12,6 +12,7 @@
  */
 'use client'
 import { useState, useEffect } from 'react'
+import { weekStartDayBrt } from '@/utils/cron/weekRangeBrt'
 import { getMuscleMapWeek } from '@/actions/workout-actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
@@ -24,26 +25,18 @@ type AnyObj = Record<string, unknown>
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
-const getWeekStartIso = (date: Date): string => {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
-  })
-  const parts = formatter.formatToParts(date)
-  const map = parts.reduce<Record<string, string>>((acc, part) => {
-    if (part.type !== 'literal') acc[part.type] = part.value
-    return acc
-  }, {})
-  const weekday = String(map.weekday || '').toLowerCase()
-  const weekdayIndex =
-    weekday === 'mon' ? 1 : weekday === 'tue' ? 2 : weekday === 'wed' ? 3
-    : weekday === 'thu' ? 4 : weekday === 'fri' ? 5 : weekday === 'sat' ? 6 : 0
-  const y = Number(map.year)
-  const m = Number(map.month)
-  const d = Number(map.day) - ((weekdayIndex + 6) % 7)
-  const base = new Date(Date.UTC(y, m - 1, d, 3, 0, 0))
-  return base.toISOString().slice(0, 10)
-}
+/**
+ * O domingo que abre a semana da sessão — pela FONTE ÚNICA do app.
+ *
+ * Antes calculava `(weekdayIndex + 6) % 7`, ou seja, a SEGUNDA. Na maior parte
+ * dos dias isso passava despercebido porque a rota (`muscle-map-week`)
+ * normaliza a data recebida com `weekStartDayBrt` — a janela saía certa por
+ * acidente. Mas para uma sessão de DOMINGO o cálculo apontava para a segunda
+ * ANTERIOR, e a rota então devolvia a semana anterior inteira: a tendência do
+ * treino de domingo mostrava a semana errada, justamente o dia que a mudança
+ * de 24/08 moveu.
+ */
+export const getWeekStartIso = (date: Date): string => weekStartDayBrt(date)
 
 const getMuscles = (res: unknown): Record<string, unknown> => {
   const r = res && typeof res === 'object' ? (res as AnyObj) : null

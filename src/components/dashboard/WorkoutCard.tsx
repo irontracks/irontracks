@@ -25,6 +25,14 @@ interface WorkoutCardProps {
   /** Card com o CTA em destaque (sólido dourado). Os demais ficam outline. */
   emphasizeCta?: boolean
   /**
+   * Quando este treino foi feito pela última vez ("há 3 dias").
+   *
+   * Vazio quando nunca foi feito — treino recém-criado não nasce com carimbo de
+   * cobrança. Com cinco treinos na lista, era isto que faltava para saber qual
+   * está atrasado sem abrir o histórico.
+   */
+  ultimaVez?: string
+  /**
    * Este é o treino que está rodando agora.
    *
    * Sem isto o card dizia "INICIAR TREINO" mesmo com a sessão em andamento e o
@@ -66,6 +74,7 @@ function WorkoutCardInner({
   isPeriodized,
   isToday = false,
   emphasizeCta = false,
+  ultimaVez = '',
   isInProgress = false,
   onQuickView,
   onStartSession,
@@ -207,15 +216,19 @@ function WorkoutCardInner({
             treino — o dado que o olho procura ao varrer a lista. */}
         <h3 className="font-black text-white text-base mb-0.5 pr-16 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
-        {/* Sem `pr-40` aqui: esta linha fica ABAIXO do bloco de ações, então os
-            160px reservados só serviam para estrangular o texto — a meta
-            quebrava em duas linhas e deixava o separador "·" órfão no fim da
-            primeira. O padding é necessário no título (que corre ao lado dos
-            botões), não aqui. */}
-        <p className="text-[11px] text-neutral-400 font-mono mb-3 flex flex-wrap items-center gap-x-1.5">
+        {/* `pr-16`, o mesmo do título — e NÃO os 160px de `pr-40` que já
+            estrangularam esta linha (deixavam o separador "·" órfão no fim da
+            primeira linha).
+            O padding voltou em 28/08/2026, quando a meta ganhou o "há 1 semana":
+            com quatro itens ela alcança a altura do botão "…" e passava POR
+            BAIXO dele — no aparelho, "há 1 seman" com o "a" comido pela borda.
+            O `flex-wrap` não resolvia sozinho porque o botão flutua acima do
+            texto: para o layout a linha "cabia". */}
+        <p className="text-[11px] text-neutral-400 font-mono mb-3 pr-16 flex flex-wrap items-center gap-x-1.5">
           <span>{pluralize(exercisesCount, 'exercício')}</span>
           {estMinutes > 0 && (<><span className="text-neutral-400" aria-hidden>·</span><span>~{estMinutes} min</span></>)}
           {totalSets > 0 && (<><span className="text-neutral-400" aria-hidden>·</span><span>{pluralize(totalSets, 'série', 'séries')}</span></>)}
+          {ultimaVez ? (<><span className="text-neutral-400" aria-hidden>·</span><span>{ultimaVez}</span></>) : null}
         </p>
         {w?.archived_at ? (
           <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">

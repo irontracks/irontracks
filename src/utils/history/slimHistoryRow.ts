@@ -13,6 +13,7 @@
  * Guard: `slimHistoryRow.test.ts` (inclui a prova de que `notes` não vaza).
  */
 import { sessionVolumeKg } from '@/utils/report/setVolume'
+import { countDoneSets } from '@/lib/workout/countsAsWorkout'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -47,6 +48,17 @@ export interface SlimHistoryRow {
     session_date: string | null
     /** Sessão já tem insights de IA gravados (VipInsightsPanel). */
     has_ai: boolean
+    /**
+     * Séries efetivamente concluídas.
+     *
+     * Existe para a lista decidir o que CONTA como treino sem baixar o `notes`
+     * inteiro (`countsAsWorkoutFromSummary`). Sem este número, o resumo contava
+     * linhas — e uma sessão de 44 s entrava como treino no número que o usuário
+     * lê, enquanto o push da semana usava o piso e mostrava outro.
+     *
+     * Custo: um inteiro por linha. O teto de payload continua valendo.
+     */
+    done_sets: number
 }
 
 export function buildSlimHistoryRow(row: UnknownRecord): SlimHistoryRow {
@@ -71,5 +83,6 @@ export function buildSlimHistoryRow(row: UnknownRecord): SlimHistoryRow {
         ex_count: Array.isArray(raw?.exercises) ? raw.exercises.length : 0,
         session_date: typeof raw?.date === 'string' ? raw.date : null,
         has_ai: isRecord(raw?.ai),
+        done_sets: countDoneSets(raw as Parameters<typeof countDoneSets>[0]),
     }
 }

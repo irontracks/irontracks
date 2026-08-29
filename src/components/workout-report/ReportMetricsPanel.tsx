@@ -1,6 +1,7 @@
 'use client'
 
 import { formatMinutesLabel } from '@/utils/report/formatters'
+import { legendaDaDuracao, rotuloDaVariacaoSemanal } from '@/utils/report/reportLabels'
 
 type ReportMetricsPanelProps = {
   reportTotals: Record<string, unknown> | null
@@ -39,6 +40,16 @@ export const ReportMetricsPanel = ({
               return formatMinutesLabel(v * 60)
             })()}
           </div>
+          {/* Fecha a conta: Duração − (Execução + Descanso) sobrava sem nome, e
+              três números lado a lado convidam à soma. */}
+          {(() => {
+            const legenda = legendaDaDuracao(
+              reportTotals?.durationMinutes,
+              reportTotals?.executionMinutes,
+              reportTotals?.restMinutes,
+            )
+            return legenda ? <div className="text-[10px] text-neutral-400 mt-1 leading-snug">{legenda}</div> : null
+          })()}
         </div>
         <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
           <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Execução</div>
@@ -120,7 +131,11 @@ export const ReportMetricsPanel = ({
             })()}
           </div>
           <div className="text-[10px] text-neutral-400 mt-1">
-            {reportWeekly?.isHeavyWeek ? 'semana pesada' : 'semana normal'}
+            {rotuloDaVariacaoSemanal({
+              deltaPct: reportWeekly?.deltaPct,
+              isHeavyWeek: reportWeekly?.isHeavyWeek,
+              previousWeekKg: reportWeekly?.previousWeekKg,
+            })}
           </div>
         </div>
         <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">

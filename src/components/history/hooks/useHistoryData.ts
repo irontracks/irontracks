@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
-import { logError } from '@/lib/logger';
+import { logError } from '@/lib/logger'
+import { countDoneSets, countsAsWorkoutFromSummary } from '@/lib/workout/countsAsWorkout';
 import { sessionVolumeKg } from '@/utils/report/setVolume';
 import {
     WorkoutLog, WorkoutSummary, WorkoutTemplate, ManualExercise,
@@ -166,6 +167,12 @@ export function useHistoryData({
                         isTemplate: w.is_template === true,
                         volumeKg: Number(w.volume_kg) || 0,
                         exCount: Number(w.ex_count) || 0,
+                        // Séries concluídas: decide o que CONTA como treino no
+                        // resumo, sem baixar o `notes` (a linha é magra).
+                        // Admin ainda manda o notes completo — daí o fallback.
+                        doneSets: raw?.logs
+                            ? countDoneSets(raw as Parameters<typeof countDoneSets>[0])
+                            : Number(w.done_sets) || 0,
                     };
                 });
 
@@ -434,8 +441,37 @@ export function useHistoryData({
     const summary = useMemo(() => {
         const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
         const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
-        const count = visibleHistory.length;
-        const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
+        /**
+         * TREINOS conta pelo mesmo piso do resto do app (`countsAsWorkout`).
+         *
+         * Antes era `visibleHistory.length` — linhas, não treinos. Uma sessão de
+         * 44 s com 1 série entrava aqui como treino, enquanto o resumo semanal
+         * (push) e o mapa muscular já aplicavam o piso: o mesmo usuário via dois
+         * números para a mesma pergunta, e o do app era o errado.
+         *
+         * O tempo e o volume seguem somando TUDO, de propósito: uma série feita é
+         * tempo real e volume real. O que ganhou critério é a CONTAGEM.
+         */
+        const queContam = visibleHistory.filter((s) =>
+            countsAsWorkoutFromSummary({ doneSets: s?.doneSets, totalTimeSeconds: s?.totalTime }),
+        );
+        const count = queContam.length;
+        /**
+         * A média fala do MESMO conjunto que o contador.
+         *
+         * Dividir o tempo de todas as linhas pelos treinos que contam inflava o
+         * número: na conta de teste, 691 min ÷ 9 dava 77 min de "média" com uma
+         * sessão de 44 s no numerador e fora do denominador. Ou o conjunto é o
+         * mesmo dos dois lados, ou a média não é média de nada.
+         *
+         * TEMPO e VOLUME seguem somando tudo — mesma regra do mapa muscular
+         * (CLAUDE.md): uma série feita é tempo real e volume real. Quem ganha
+         * critério é o CONTADOR e a média que sai dele.
+         */
+        const segundosQueContam = queContam.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
+        const avgMinutes = count > 0
+            ? Math.max(0, Math.round(segundosQueContam / 60 / count))
+            : 0;
         let totalVolume = 0;
         visibleHistory.forEach((s) => {
             const raw = parseRawSession(s?.rawSession ?? s?.notes);

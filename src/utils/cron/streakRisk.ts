@@ -31,19 +31,26 @@ export function addDaysToKey(key: string, delta: number): string {
   return new Date(Date.UTC(y, m - 1, d) + delta * DAY_MS).toISOString().slice(0, 10)
 }
 
-/** Índice do dia da semana com SEGUNDA = 0 (mesma convenção da meta semanal). */
-export function weekdayIndexMondayFirst(key: string): number {
+/**
+ * Índice do dia da semana com DOMINGO = 0 — a semana do app.
+ *
+ * Era segunda=0, "mesma convenção da meta semanal". A meta semanal virou
+ * domingo→sábado em 24/08/2026 e esta função não acompanhou: o cálculo de
+ * "dias restantes" ficava deslocado em um dia, e é ele que decide se o app
+ * cobra o treino de hoje ("só alerta quando hoje é indispensável").
+ */
+export function weekdayIndexSundayFirst(key: string): number {
   const [y, m, d] = String(key).split('-').map(Number)
   if (!y || !m || !d) return -1
-  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
 }
 
-/** As 7 chaves da semana (segunda → domingo) que contém `key`. */
+/** As 7 chaves da semana (domingo → sábado) que contém `key`. */
 export function weekKeysFor(key: string): string[] {
-  const idx = weekdayIndexMondayFirst(key)
+  const idx = weekdayIndexSundayFirst(key)
   if (idx < 0) return []
-  const monday = addDaysToKey(key, -idx)
-  return Array.from({ length: 7 }, (_, i) => addDaysToKey(monday, i))
+  const domingo = addDaysToKey(key, -idx)
+  return Array.from({ length: 7 }, (_, i) => addDaysToKey(domingo, i))
 }
 
 /** Semanas completas anteriores usadas para inferir a cadência real. */
@@ -99,7 +106,7 @@ export function shouldNotifyStreakAtRisk({ trainedDates, todayKey, weeklyTarget 
 
     const missing = target - done
     // Dias restantes na semana, hoje incluído.
-    const remaining = 7 - weekdayIndexMondayFirst(todayKey)
+    const remaining = 7 - weekdayIndexSundayFirst(todayKey)
     // Só alerta quando hoje é indispensável para ainda bater a meta.
     // `missing > remaining` = semana já perdida; cobrar não ajuda ninguém.
     return missing === remaining

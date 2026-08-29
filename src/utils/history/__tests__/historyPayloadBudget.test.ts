@@ -71,10 +71,20 @@ vi.mock('@/utils/api/dbError', () => ({
 const BYTES_POR_TREINO = 450
 const N_SESSOES = 50
 
-/** Chaves que uma linha de TREINO pode ter (espelha `SlimHistoryRow`). */
+/**
+ * Chaves que uma linha de TREINO pode ter (espelha `SlimHistoryRow`).
+ *
+ * `done_sets` entrou em 28/08/2026 por decisão consciente — que é exatamente o
+ * que este guard existe para forçar. Motivo: sem ele, a lista contava LINHAS, e
+ * uma sessão de 44 s aparecia como treino no resumo que o usuário lê enquanto o
+ * push da semana usava o piso de `countsAsWorkout` e mostrava outro número. A
+ * alternativa era rebaixar o resumo ou rebaixar o payload (voltar a trazer o
+ * `notes`); um inteiro por linha é a conta mais barata das três.
+ */
 const CHAVES_TREINO = new Set([
     'id', 'name', 'user_id', 'date', 'created_at', 'completed_at', 'is_template',
     'workout_title', 'total_time', 'volume_kg', 'ex_count', 'session_date', 'has_ai',
+    'done_sets',
 ])
 
 /** Chaves que uma linha de CARDIO pode ter (shape montado na própria rota). */
