@@ -87,6 +87,38 @@ export default function AssessmentHistory(props: AssessmentHistoryProps) {
   );
 }
 
+/**
+ * Atalho para o Diário de Progresso (fotos before/after).
+ *
+ * Fica em componente próprio porque precisa aparecer nos DOIS ramos desta tela:
+ * com avaliações e sem. A primeira versão (30/08/2026) o pôs só no bloco de
+ * gráficos, que roda depois do early return do estado vazio — e como apenas 2
+ * dos 59 usuários têm avaliação, o card saiu de um lugar escondido
+ * (Configurações) para outro. Visto no aparelho, não em teste.
+ */
+function DiarioDeProgressoCard({ aoAbrir }: { aoAbrir: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={aoAbrir}
+      className="w-full rounded-2xl border border-white/[0.06] bg-depth-2 p-5 text-left transition-all hover:border-yellow-500/30 active:scale-[0.99]"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10">
+            <Images size={18} className="text-yellow-500" aria-hidden="true" />
+          </span>
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80">Diário de Progresso</h3>
+            <p className="mt-0.5 text-xs text-neutral-400">Fotos lado a lado, com comparador deslizável.</p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="shrink-0 text-neutral-500" aria-hidden="true" />
+      </div>
+    </button>
+  );
+}
+
 function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
@@ -215,6 +247,10 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
           </p>
         </div>
 
+        {/* Sem avaliação ainda, a foto é o registro mais fácil de começar —
+            não exige fita métrica nem balança de bioimpedância. */}
+        <DiarioDeProgressoCard aoAbrir={() => setShowProgressPhotos(true)} />
+
         {/* Exames Laboratoriais — acessível mesmo sem avaliação física prévia */}
         <LabExamsSection studentUserId={studentId ?? null} />
 
@@ -276,35 +312,7 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
           {/* Tendência de Peso (avaliações + check-ins de treino) */}
           <WeightTrendCard studentId={studentId ?? null} />
 
-          {/* Diário de Progresso — fotos before/after.
-              Ele existe, funciona e tinha ZERO uso: morava em Configurações ›
-              Ferramentas, ao lado de "Novidades". Medido em 30/08/2026: a
-              tabela `photos` estava vazia, enquanto 15 pessoas registravam peso
-              no check-in (805 vezes). O interesse por acompanhar evolução
-              existe — o lugar é que estava errado, e evolução corporal se
-              procura AQUI, ao lado do peso e da gordura. */}
-          <button
-            type="button"
-            onClick={() => setShowProgressPhotos(true)}
-            // Sem gradiente inline: o guard `ctaDouradoFormas` congela por
-            // teto POR ARQUIVO os gradientes escritos à mão, e ele só desce.
-            // Um card novo não pode gastar essa cota — `bg-depth-2` é o token
-            // da superfície e diz a mesma coisa.
-            className="w-full rounded-2xl border border-white/[0.06] bg-depth-2 p-5 text-left transition-all hover:border-yellow-500/30 active:scale-[0.99]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10">
-                  <Images size={18} className="text-yellow-500" aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80">Diário de Progresso</h3>
-                  <p className="mt-0.5 text-xs text-neutral-400">Fotos lado a lado, com comparador deslizável.</p>
-                </div>
-              </div>
-              <ChevronRight size={18} className="shrink-0 text-neutral-500" aria-hidden="true" />
-            </div>
-          </button>
+          <DiarioDeProgressoCard aoAbrir={() => setShowProgressPhotos(true)} />
 
           {/* Body Fat % */}
           <div
