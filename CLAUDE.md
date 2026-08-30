@@ -3111,6 +3111,15 @@ sustentam** — não gaste sessão com elas antes de reler:
    sem template, só 1 tem sessões — 6 sessões, ~6,8 kB de `notes` cada. O
    ratchet continua valendo como defesa futura; a correção não é urgente.
 
+**O Diário de Progresso estava enterrado (30/08/2026).** Fotos before/after com
+comparador deslizável, pronto e funcional — e a tabela `photos` **vazia**:
+nunca foi usado por ninguém. Morava em *Configurações › Ferramentas*, ao lado
+de "Novidades". Enquanto isso, **15 pessoas registram peso no check-in, 805
+vezes**: o interesse por acompanhar evolução existe, o lugar é que estava
+errado. Hoje aparece na aba Avaliações, entre a tendência de peso e a gordura
+corporal — e continua alcançável por Configurações, porque mover não é
+esconder.
+
 ## Telemetria: onde ler, e os nomes que enganam (30/08/2026)
 
 `user_activity_events` tem **58 mil linhas desde maio** e responde perguntas de
