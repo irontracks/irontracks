@@ -3096,6 +3096,32 @@ sustentam** — não gaste sessão com elas antes de reler:
    sem template, só 1 tem sessões — 6 sessões, ~6,8 kB de `notes` cada. O
    ratchet continua valendo como defesa futura; a correção não é urgente.
 
+## Telemetria: onde ler, e os nomes que enganam (30/08/2026)
+
+`user_activity_events` tem **58 mil linhas desde maio** e responde perguntas de
+produto que o resto do banco não responde — foi ela que mostrou onde o funil
+trava (dos que nunca criaram treino, **13 chegam ao `/dashboard` e 4 abrem o
+editor**). O painel admin já a consome (`funnel-summary`, `user-activity`).
+
+⚠️ **Os nomes de campo enganam, e eu caí neles duas vezes numa sessão:** o
+tempo de tela é `metadata.dwellMs` (não `ms`), e o passo do wizard é
+`metadata.deepestStep` (não `step`). Query com o nome errado devolve `null` e
+parece dado ausente — foi o que me fez quase "consertar" instrumentação que
+funcionava. **Confira o nome no emissor antes de concluir que o dado não existe.**
+
+**Duas correções de instrumentação cega:**
+
+- **`nav_loop` não dizia entre quais telas.** Detectava até 76 voltas e gravava
+  só a tela e a contagem; o problema voltou quatro vezes em três meses e o
+  diagnóstico recomeçava do zero. Hoje grava `ciclo` (paths distintos na ordem,
+  teto de 8). **E ele PAROU**: picos de 33–37 por semana até 10/08, nada desde
+  então — a correção do boot bounce funcionou.
+- **`wizard_abandoned` ignorava a etapa 0**, que é o caso mais comum: 53
+  aberturas, 12 treinos criados e **3 abandonos registrados**. As 38 saídas
+  restantes eram descartadas por uma guarda. Hoje todas contam, e `interagiu`
+  separa quem mexeu em alguma resposta de quem só viu a tela — o ruído fica
+  identificável em vez de ausente.
+
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 

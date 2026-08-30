@@ -313,11 +313,24 @@ export default function WorkoutWizardModal(props: Props) {
   useEffect(() => {
     if (isOpen) return
     if (outcomeRef.current !== 'pending') return
-    if (!deepestStepRef.current && !hasStartedRef.current) return
+    // ⚠️ Abrir e fechar na etapa 0 TAMBÉM conta — a guarda que descartava esse
+    // caso escondia justamente o mais comum. Medido em 30/08/2026: 53 aberturas
+    // do wizard, 12 treinos criados e apenas **3 abandonos registrados**. As
+    // outras 38 saídas não deixavam rastro nenhum, e sem elas não dá para
+    // separar "abriu sem querer" de "olhou a primeira tela e desistiu" — que
+    // pedem respostas opostas.
+    //
+    // O ruído não some: ele fica IDENTIFICÁVEL. `interagiu` separa quem mexeu
+    // em alguma resposta de quem só viu a tela; filtrar por ele devolve o
+    // número antigo, e ignorá-lo devolve o total.
     try {
       trackUserEvent('wizard_abandoned', {
         type: 'wizard', screen: 'create_workout',
-        metadata: { deepestStep: deepestStepRef.current, hadError: lastErrorRef.current || null },
+        metadata: {
+          deepestStep: deepestStepRef.current,
+          hadError: lastErrorRef.current || null,
+          interagiu: hasStartedRef.current,
+        },
       })
     } catch { }
   }, [isOpen])

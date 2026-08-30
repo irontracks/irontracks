@@ -120,10 +120,26 @@ export default function PerformanceReporter() {
         while (recentPaths.length && recentPaths[0].ts < cutoff) recentPaths.shift();
         const count = recentPaths.filter((p) => p.path === path).length;
         if (count >= 4) {
+          // O CICLO — entre quais telas o loop acontece — é o que faltava.
+          // Até 30/08/2026 o evento gravava só a tela e a contagem, e o
+          // diagnóstico recomeçava do zero a cada volta do problema: em
+          // ago/2026 um caso chegou a 76 voltas e a investigação teve de
+          // reconstruir o caminho por dedução (o ricochete `/` ⇄ `/dashboard`
+          // do boot bounce, documentado no CLAUDE.md).
+          //
+          // Ele sai do histórico que a detecção JÁ mantém: os últimos paths
+          // distintos, na ordem em que apareceram.
+          const ciclo: string[] = [];
+          for (const p of recentPaths) {
+            if (ciclo[ciclo.length - 1] !== p.path) ciclo.push(p.path);
+          }
           trackUserEvent("nav_loop", {
             type: "ux",
             screen: path,
-            metadata: { path, count, windowMs: 60000 },
+            // Teto de 8: a janela é de 60 s e um loop apertado enche a lista
+            // sem acrescentar informação — as primeiras alternâncias já dizem
+            // o par que ricocheteia.
+            metadata: { path, count, windowMs: 60000, ciclo: ciclo.slice(-8) },
           });
         }
       };
