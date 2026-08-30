@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, MoreHorizontal, Pause, Play, Plus, Satellite, UserPlus, X } from 'lucide-react';
+import { Clock, GripVertical, Home, MoreHorizontal, Pause, Play, Plus, Satellite, UserPlus, X } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Carregado sob demanda: só quem toca em "Treinar em casa" paga por ele.
+const AdaptarAmbienteModal = dynamic(() => import('./AdaptarAmbienteModal'), { ssr: false });
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
@@ -15,6 +19,7 @@ export default function WorkoutHeader() {
   const {
     workout,
     exercises,
+    swapExerciseName,
     inviteOpen,
     setInviteOpen,
     openFullEditor,
@@ -29,6 +34,11 @@ export default function WorkoutHeader() {
     confirm,
     cancelWorkout,
   } = useWorkoutContext();
+
+  // "Hoje treino em casa": adapta o treino inteiro pelo grafo de substituição
+  // (ver `lib/workout/adaptarAmbiente.ts`). Mora no menu "…" porque é ação de
+  // sessão, não de exercício — a troca de UM exercício continua no card dele.
+  const [adaptarAberto, setAdaptarAberto] = React.useState(false);
   const { elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
 
   // Pausa em equipe transmite ao parceiro; sozinho congela o cronômetro local.
@@ -164,6 +174,20 @@ export default function WorkoutHeader() {
                         Cardio com GPS
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => { setAdaptarAberto(true); setOverflowOpen(false); }}
+                      disabled={exercises.length === 0}
+                      className={[
+                        'w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left transition-colors border-t border-neutral-800',
+                        exercises.length === 0
+                          ? 'text-neutral-700 cursor-not-allowed'
+                          : 'text-yellow-400 hover:bg-neutral-800',
+                      ].join(' ')}
+                    >
+                      <Home size={15} />
+                      Treinar em casa
+                    </button>
                     <div className="h-px bg-neutral-800" />
                     <button
                       type="button"
@@ -286,6 +310,14 @@ export default function WorkoutHeader() {
           }
         }}
       />
+      {adaptarAberto && (
+        <AdaptarAmbienteModal
+          open={adaptarAberto}
+          onClose={() => setAdaptarAberto(false)}
+          exercicios={(exercises ?? []).map((e) => String((e as { name?: unknown })?.name ?? '').trim()).filter(Boolean)}
+          aoTrocar={(indice, nome) => swapExerciseName(indice, nome)}
+        />
+      )}
     </>
   );
 }

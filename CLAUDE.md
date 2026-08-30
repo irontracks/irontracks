@@ -168,6 +168,21 @@ candidato apareça no nome — sem isso, digitar "halteres" devolveria "Elevaç�
 lateral com halteres". Empate desempata pelo nome mais CURTO, que é o mais
 genérico e o palpite mais seguro.
 
+**"Treinar em casa" — o treino inteiro adaptado num toque (30/08/2026).**
+`exercise_library.environments` classifica **160 exercícios como `gym` e 83
+como `home`**, e o grafo tem 8.262 arestas. **Nada ligava as duas coisas**: a
+troca era exercício por exercício, e quem viaja não troca dez — pula o dia.
+
+`lib/workout/adaptarAmbiente.ts` monta o plano (função pura sobre duas
+consultas) e o modal MOSTRA antes de aplicar. Três decisões:
+
+- **escolhe a maior similaridade que SERVE no ambiente**, não a maior absoluta —
+  a aresta mais parecida costuma ser outra máquina de academia;
+- **exercício sem alternativa FICA, e é declarado** — silenciar faria alguém
+  aplicar achando que o treino virou caseiro e encontrar uma polia no meio;
+- **aplica pelo mesmo `swapExerciseName` da troca individual**, não por um
+  segundo caminho que divergiria (o padrão que custou 14 renderers aqui).
+
 ⚠️ **A similaridade do grafo é 0–1; a UI e a IA falam 0–100.** A coluna
 `exercise_substitutions.similarity` guarda fração, mas `AIExerciseSwap` escreve
 `{similarity}%` e a rota de IA sempre devolveu percentual. Enquanto o grafo
