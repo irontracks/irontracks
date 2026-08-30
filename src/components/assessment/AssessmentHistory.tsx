@@ -13,7 +13,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Calendar, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronRight, Images, TrendingUp } from 'lucide-react';
+import { useModalStore } from '@/lib/state/modalStore';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import QuickBIAModal from '@/components/assessment/QuickBIAModal';
@@ -91,6 +92,9 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
   const [photoModalOpen, setPhotoModalOpen] = React.useState(false);
+  // O Diário de Progresso é montado no shell do dashboard (`DashboardModals`);
+  // daqui só se pede a abertura, pelo mesmo store que o menu já usa.
+  const setShowProgressPhotos = useModalStore((st) => st.setShowProgressPhotos);
   // Histórico dos laudos por foto — o laudo fica salvo no banco; sem esta tela
   // ele só existia enquanto o modal de captura estava aberto.
   const [photoHistoryOpen, setPhotoHistoryOpen] = React.useState(false);
@@ -271,6 +275,36 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
 
           {/* Tendência de Peso (avaliações + check-ins de treino) */}
           <WeightTrendCard studentId={studentId ?? null} />
+
+          {/* Diário de Progresso — fotos before/after.
+              Ele existe, funciona e tinha ZERO uso: morava em Configurações ›
+              Ferramentas, ao lado de "Novidades". Medido em 30/08/2026: a
+              tabela `photos` estava vazia, enquanto 15 pessoas registravam peso
+              no check-in (805 vezes). O interesse por acompanhar evolução
+              existe — o lugar é que estava errado, e evolução corporal se
+              procura AQUI, ao lado do peso e da gordura. */}
+          <button
+            type="button"
+            onClick={() => setShowProgressPhotos(true)}
+            // Sem gradiente inline: o guard `ctaDouradoFormas` congela por
+            // teto POR ARQUIVO os gradientes escritos à mão, e ele só desce.
+            // Um card novo não pode gastar essa cota — `bg-depth-2` é o token
+            // da superfície e diz a mesma coisa.
+            className="w-full rounded-2xl border border-white/[0.06] bg-depth-2 p-5 text-left transition-all hover:border-yellow-500/30 active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10">
+                  <Images size={18} className="text-yellow-500" aria-hidden="true" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80">Diário de Progresso</h3>
+                  <p className="mt-0.5 text-xs text-neutral-400">Fotos lado a lado, com comparador deslizável.</p>
+                </div>
+              </div>
+              <ChevronRight size={18} className="shrink-0 text-neutral-500" aria-hidden="true" />
+            </div>
+          </button>
 
           {/* Body Fat % */}
           <div
