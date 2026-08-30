@@ -67,8 +67,47 @@ export function WorkoutTimerProvider({
   // pauseStart: timestamp when the current pause began (null = not paused)
   // Inicializador roda 1x no mount (quando a sessão já existe). Se recuperada
   // após um gap longo, semeia o pausedMs com esse gap (tempo fora do app).
-  const [pausedMs, setPausedMs] = useState(() => computeRecoveryPauseMs(lastActiveAtMs, startedAtMs, Date.now(), LONG_GAP_MS))
+  const [pausedMs, setPausedMs] = useState(0)
+
+  /**
+   * Gap do app morto/suspenso — descontado uma vez por sessão.
+   *
+   * ⚠️ O carimbo pode chegar DEPOIS do mount. `useLocalPersistence` faz
+   * `setView('active')` de forma SÍNCRONA (só consulta o portão de
+   * restauração), então o `ActiveWorkout` renderiza com `session = null` e este
+   * provider monta com `lastActiveAtMs = 0`; quem hidrata é o `useSessionSync`,
+   * um tique depois. Enquanto isso só existia no inicializador do `useState`
+   * — que roda uma vez —, o gap nunca era descontado nesse caminho: visto no
+   * aparelho em 30/08/2026, uma sessão de 17 h esquecida mostrava **1038:28**
+   * logo após o app avisar que "o tempo parado não entra na conta".
+   *
+   * `visibilitychange` não cobre o caso: o app foi RELANÇADO, não voltou de
+   * background — não há transição hidden→visible para medir.
+   *
+   * É ajuste de estado DURANTE O RENDER (padrão documentado do React), não
+   * efeito: `setState` em efeito dispara render em cascata, e ler `ref` ou
+   * chamar `Date.now()` no corpo do componente quebra as regras de pureza —
+   * o ESLint reprova os três, e reprovou cada tentativa antes desta.
+   *
+   * Semeia só na PRIMEIRA vez que o carimbo aparece. O `_savedAt` é reescrito a
+   * cada persistência; recalcular somaria gaps até zerar o cronômetro de quem
+   * está treinando normalmente.
+   */
+  const [recuperacaoMs, setRecuperacaoMs] = useState(() =>
+    computeRecoveryPauseMs(lastActiveAtMs, startedAtMs, Date.now(), LONG_GAP_MS),
+  )
+  const [carimboVisto, setCarimboVisto] = useState(lastActiveAtMs)
+  if (lastActiveAtMs !== carimboVisto) {
+    setCarimboVisto(lastActiveAtMs)
+    // Só quando o carimbo NASCE (0 → válido). Atualização de carimbo já
+    // conhecido é persistência normal e não descontaria nada de novo.
+    if (carimboVisto <= 0 && lastActiveAtMs > 0 && startedAtMs > 0) {
+      setRecuperacaoMs(computeRecoveryPauseMs(lastActiveAtMs, startedAtMs, ticker, LONG_GAP_MS))
+    }
+  }
+
   const [pauseStart, setPauseStart] = useState<number | null>(null)
+
   const isPaused = pauseStart !== null
 
   const togglePause = useCallback(() => {
@@ -110,8 +149,10 @@ export function WorkoutTimerProvider({
     if (startedAtMs <= 0) return 0
     // While paused, freeze display at the moment pause began
     const effectiveTicker = isPaused ? (pauseStart ?? ticker) : ticker
-    return Math.max(0, Math.floor((effectiveTicker - startedAtMs - pausedMs) / 1000))
-  }, [startedAtMs, ticker, pausedMs, pauseStart, isPaused])
+    // `pausaDeRecuperacaoMs` entra aqui, e não no `pausedMs`: sendo derivado,
+    // o mesmo gap não pode ser somado duas vezes ao estado.
+    return Math.max(0, Math.floor((effectiveTicker - startedAtMs - pausedMs - recuperacaoMs) / 1000))
+  }, [startedAtMs, ticker, pausedMs, recuperacaoMs, pauseStart, isPaused])
 
   // A ilha dinâmica e a tela bloqueada contam tempo de PAREDE (o sistema desenha
   // o relógio sozinho). Sem espelhar a pausa daqui, o app marcava "PAUSADO 56:07"

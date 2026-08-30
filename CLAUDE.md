@@ -3146,6 +3146,41 @@ funcionava. **Confira o nome no emissor antes de concluir que o dado não existe
   separa quem mexeu em alguma resposta de quem só viu a tela — o ruído fica
   identificável em vez de ausente.
 
+## ⚠️ O cronômetro INFLAVA ao retomar — e a causa era de ORDEM (30/08/2026)
+
+Sessão aberta 17 h antes: o app avisou "o tempo parado não entra na conta" e o
+contador marcava **1038:28** — a idade total da sessão, sem desconto nenhum.
+Visto no aparelho; nenhum dos 7.170 testes pegava.
+
+`computeRecoveryPauseMs` sempre esteve certo. O que falhava era QUANDO ele
+rodava:
+
+1. `useLocalPersistence` faz `setView('active')` de forma **síncrona** — ele só
+   consulta o portão de restauração, não hidrata nada;
+2. o `ActiveWorkout` renderiza com `session = null`, logo `lastActiveAtMs = 0`;
+3. o `WorkoutTimerProvider` monta e o inicializador do `useState` calcula 0;
+4. `useSessionSync` hidrata **depois**, já com o carimbo antigo;
+5. nada recalculava — inicializador de `useState` roda uma vez só.
+
+O `visibilitychange` não cobre: o app foi RELANÇADO, não voltou de background.
+
+**A duração não é cosmética** — alimenta `getEpocFactor` na estimativa de
+calorias, que vai para o relatório, o PDF e a Nutrição.
+
+⚠️ **Três tentativas de correção foram reprovadas antes da que ficou**, cada uma
+por uma regra diferente — vale saber antes de "melhorar" isto:
+
+- **`setState` dentro de `useEffect`** → ESLint: render em cascata;
+- **`useRef` lido durante o render** → "Cannot access refs during render";
+- **`Date.now()` no corpo do componente** → "Cannot call impure function during
+  render" (use o `ticker`, que o provider já mantém).
+
+A que passou é **ajuste de estado durante o render**, o padrão documentado do
+React: compara o carimbo atual com o visto e semeia só quando ele NASCE
+(`0 → válido`). E a primeira versão descontava **duas vezes** quando o carimbo
+já estava presente no mount — o cronômetro ia a zero. Quem pegou foi
+`workoutElapsedPause`, teste que já existia.
+
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 
