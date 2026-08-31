@@ -469,97 +469,18 @@ chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo
 
 **O gerador de cardápio tinha o MESMO defeito de fonte — e ninguém percebeu porque o consertado foi o outro caminho.** O motor de TROCA migrou para `nutrition_meal_entries.items` em 03/08; o de GERAÇÃO (`food-profile.ts` → prompt do `dietGenerate`) ficou lendo o cru até 04/08/2026. Duas fontes erradas: (1) `nutrition_meal_entries.food_name` é o nome da REFEIÇÃO, então o prompt mandava "os alimentos que este usuário já come: Almoço (36×), Pós treino (21×), Janta (19×), Café da manhã (18×)…" — 13 dos 20 eram rótulo; (2) `nutrition_learned_foods` sem crivo. O modelo improvisava em cima disso e o dono recebeu um "Plano Cardioprotetor" com **whey 30 g e aveia 40 g secos** no café da manhã e pão francês no almoço. Hoje o repertório sai dos ITENS, passa pelo mesmo `foodItemSanity` da troca e vai ao prompt **agrupado por refeição** (`foodProfileToPromptSections`: "- Almoço: arroz, feijão, patinho") — é o agrupamento, não uma lista fixa, que impede pão com doce de leite de cair no almoço. **Ao tocar em qualquer coisa que alimente prompt de nutrição, cheque as DUAS pontas: o que a troca lê e o que a geração lê.**
 
-**Importar dieta por JSON — a porta GRÁTIS (29/08/2026).** A nutrição não tinha
-nenhuma forma de trazer uma dieta pronta: `diet-generate` GERA, `export-pdf`
-EXPORTA, e `CustomFoodScanner`/`BarcodeScanner` leem **um produto**, não um
-cardápio. Quem chegava com o PDF do nutricionista digitava tudo.
+**Importar dieta: JSON é grátis, foto/PDF é VIP — `docs/IMPORT_DIETA.md`.**
+A nutrição não tinha como trazer dieta pronta (`diet-generate` GERA,
+`export-pdf` EXPORTA, os scanners leem UM produto). Hoje o caminho é
+`lib/nutrition/importDietJson.ts` → `POST /api/nutrition/diet-plan`.
 
-O caminho é `lib/nutrition/importDietJson.ts` → `POST /api/nutrition/diet-plan`
-(a rota que já salvava o plano próprio: valida com Zod, arquiva o anterior,
-grava `created_by = user_id`). **Nenhuma rota de IA no meio — é por isso que é
-grátis**, e o guard reprova se `/api/ai/` aparecer no modal. Decisão do dono:
-"importar com ferramenta que não gasta nada como json pode ser free". Ler o PDF
-pelo NOSSO Gemini seria outra conversa, com gate.
+⚠️ **O JSON não passa por rota de IA — é isso que o torna grátis**, e há guard
+que reprova se `/api/ai/` aparecer no fluxo do texto. A rota de foto/PDF
+(`diet-photo-extract`) devolve o JSON CRU: quem normaliza é o mesmo parser, para
+não nascer um segundo normalizador. O detalhe — tolerância de chaves, a regra
+dos três dígitos em `"1.200"`, os tetos e a resolução de macros pela base local
++ TACO — está em **`docs/IMPORT_DIETA.md`**.
 
-**A tolerância é o produto.** O JSON vem de um modelo que ninguém controla, e um
-parser que só aceitasse as chaves exatas reprovaria a maioria dos casos reais:
-aceita `refeicoes`/`meals`, `carboidratos`/`carbs`, `Proteína` com acento e
-maiúscula, `"120g"`, `"1.200"`, `"35,5"`, item que é só uma string, array de
-refeições solto, e nome de dia (`"terça"`, `"seg"`) virando índice.
-
-⚠️ **`"1.200"` é AMBÍGUO** — mil e duzentos em pt-BR, um vírgula dois em inglês.
-A régua é a contagem de casas: exatamente três dígitos depois do ponto é
-milhar. Escolhida pelo erro na outra direção — ler "1.200 kcal" como 1,2 apaga
-uma refeição, enquanto o contrário dá um número que o usuário vê e corrige na
-prévia.
-
-Os tetos (10 refeições, 20 itens, 7 dias, 5.000 g) são os do `BodySchema` da
-rota, espelhados no parser **de propósito**: estourar lá devolve 400 "Invalid
-input", mensagem que não ensina nada a quem colou o JSON. Aqui corta e avisa.
-
-**O prompt de conversão é parte da feature, não enfeite.** Quem abre o modal tem
-o PDF, não o JSON — sem o texto pronto para levar ao ChatGPT, a feature só serve
-a quem já sabe o formato.
-
-⚠️ **O guard `overlayPrecisaDePortal` pegou este modal** antes do aparelho: a
-Nutrição é um overlay `fixed z-[25]`, e quem nasce lá dentro herda o stacking
-context (o `z-[1600]` vale 25) e o containing block (o `fixed` rola junto e o
-topo sai da tela). `FullscreenPortal` é obrigatório aqui.
-
-**Dieta por FOTO/PDF (29/08/2026) — o caminho pago, ao lado do grátis.**
-`POST /api/ai/diet-photo-extract` recebe a foto ou o PDF do nutricionista
-(multipart, 15 MB, sem bucket — o padrão do `scan-nutrition-label`; o import de
-TREINO usa bucket porque guarda o arquivo para reprocessar, aqui ele é lido e
-descartado) e devolve **o mesmo JSON que o import por texto já lê**.
-
-⚠️ **A rota NÃO normaliza nada.** Devolve o JSON cru, e quem normaliza é
-`importarDietaDeJson` no cliente — assim a tolerância, os tetos e a resolução de
-macros valem de graça, e não nasce um segundo normalizador para divergir do
-primeiro (o padrão que este repo já pagou caro em 14 renderers, 5 listas de
-status e 3 cálculos de semana).
-
-**O gate mora AQUI e só aqui** (`utils/vip/dietImportAccess.ts`): VIP, com a
-primeira por nossa conta — mesma tese da ficha de treino. **O import por JSON
-continua livre e sem limite**, porque não gasta IA nenhuma; há guard que reprova
-se o caminho do texto passar a chamar `/api/ai/`.
-
-Três decisões que o guard trava: o gate roda **antes** de ler o arquivo (travar
-depois gastaria a banda do usuário para negar em seguida); o registro em
-`audit_events` acontece **depois** da extração (leitura falha não queima a
-demonstração gratuita); e falha ao CONTAR não vira acesso liberado, que seria
-bypass por indisponibilidade do banco. A contagem sai de `audit_events`
-(`action = 'diet_photo_import'`) para não exigir migration de um contador.
-
-**O resultado cai no CAMPO DE TEXTO, não no salvamento.** A IA leu o papel da
-pessoa; ela precisa conferir antes de aquilo substituir o plano dela.
-
-**A primeira dieta REAL importada (29/08/2026) mostrou o que faltava.** O JSON
-veio no formato que os assistentes de fato produzem, e nada nele funcionava:
-**34 itens sem macro e ~700 kcal/dia abaixo das metas declaradas**. Três
-correções, e os sete dias passaram a bater dentro de 1–5%:
-
-1. **`semana` como OBJETO com o dia na CHAVE** (`{"segunda": {...}}`), não array.
-2. **`quantidade_g` / `quantidade_ml` / `quantidade_unidades`** — as unidades
-   viram gramas pela equivalência da PRÓPRIA base (`approx.unidade`), então
-   "2 ovos" deixa de entrar com 0 g.
-3. **Macros derivados da base local** quando o JSON não os traz — que é o caso
-   comum: dieta de nutricionista dá "200 g de arroz" e a meta do dia, não macro
-   por alimento. Sem isso o plano entra zerado, o que é pior que não entrar:
-   parece importado e não soma nada. ⚠️ **Só quando NENHUM macro veio** — um
-   plano que traz kcal e omite proteína está declarando zero, e completar seria
-   inventar sobre o que o nutricionista escreveu.
-
-⚠️ **O casamento é por TOKENS, não por substring** (`chaveDaBase`). O
-`includes` falhava em "arroz **branco** cozido" (palavra no meio), "ovo**s**"
-(plural) e "Doce de leite Tirol" (que casava com 'leite desnatado'). Exige que
-TODOS os tokens da chave estejam no nome, vence a mais específica, e o empate
-desempata pelo que aparece mais cedo — "feijão **preto** cozido" casa com
-'feijao preto' e 'feijao cozido' com dois tokens cada, e é 'preto' que descreve
-o feijão.
-
-A base ganhou 9 entradas que essa dieta pediu (`legumes`, `legumes e salada`,
-`kefir`, `doce de leite`, `coxa`, `sobrecoxa`, as duas de frango e a grafia
-`muçarela`/`mucarela` — a base só tinha "mussarela").
 
 **Bater o macro não é entregar comida — `lib/nutrition/mealCoherence.ts`.** Guard determinístico sobre o cardápio gerado, em duas classes: veículo faltando (pó sem líquido) é objetivo e **repara** (acrescenta Água 0 kcal para whey/creatina, Leite desnatado para aveia/sucrilhos); incoerência de composição (dois doces na mesma refeição, doce dominando as kcal) só REPORTA, e o motor devolve o problema ao modelo numa única retentativa. Nunca ampute o prato num reparo mecânico: remover comida derruba o plano abaixo da meta. Armadilha do módulo: `/leite/` casa com "doce de leite" e "leite condensado" — sem `NOT_A_LIQUID` o guard declara que o café da manhã do caso real já tinha líquido, ou seja, passa verde exatamente na refeição que existe para pegar. Fiação provada em `__tests__/dietGenerateCoherence.test.ts` (Gemini mockado devolvendo o cardápio real reprovado).
 
@@ -1162,134 +1083,25 @@ voltar o `uppercase` do título), edite o arquivo e apague o guard correspondent
 em `dashboardTopoTreinos.test.ts` — ele foi escrito para falhar exatamente nesse
 caso, e é assim que ele avisa que a decisão está sendo revertida de propósito.
 
-## Área administrativa — a sala que não tinha passado pela régua (28/08/2026)
+## Área administrativa — leia `docs/PAINEL_ADMIN.md` antes de mexer
 
 Painel de Controle: **15 abas em 4 categorias** (`admin-panel/adminPanelTabs.ts`);
-Área do Professor: **7 seções** que reusam os MESMOS componentes de aba numa
-casca própria (`teacher-area/teacherAreaSections.ts`). A navegação é boa e a
-decisão está documentada no próprio arquivo — o que faltava régua era o
-conteúdo.
+Área do Professor: **7 seções** que reusam os MESMOS componentes de aba. A
+navegação é boa e a decisão está documentada no próprio arquivo — o que faltava
+régua era o conteúdo, varrido em três sprints (28–29/08/2026).
 
-⚠️ **Lista fixa de categorias apodrece contra o banco.** O gráfico "Status dos
-Alunos" tinha cinco colunas — Pago · Pendente · Atrasado · Cancelar · Outros — e
-a tabela `students` tem **dois** status: `pago` (32) e `ativo` (24). Três colunas
-permanentemente vazias, e **43% da base rotulada como "Outros"**, porque `ativo`
-não estava na lista. Ninguém olhou o gráfico depois de escrevê-lo. Hoje as
-categorias saem de `lib/admin/studentStatus.ts`, que agrupa pelos status que
-APARECEM — status novo no banco ganha nome sozinho, e a tabela de conhecidos só
-dá rótulo e cor melhores, **nunca filtra o que pode ser exibido** (senão o
-próximo status volta a cair em "Outros").
+O detalhe todo está em **`docs/PAINEL_ADMIN.md`**. As duas armadilhas que valem
+saber sem abrir:
 
-Dois defeitos de vocabulário no mesmo lugar: **"Cancelar" é verbo** (rótulo de
-botão, não de estado) e **aluno sem status virava "Pendente"**
-(`String(raw || 'pendente')`), inventando categoria que o banco não tem — hoje é
-"Sem status", que é a verdade e é acionável.
+⚠️ **Lista fixa de categorias apodrece contra o banco.** O gráfico de status
+tinha cinco colunas e a tabela `students` tem dois valores — três colunas
+permanentemente vazias e 43% da base em "Outros". Hoje as categorias saem de
+`lib/admin/studentStatus.ts`, que é a fonte única de rótulo, cor e badge (a
+mesma decisão estava escrita em CINCO lugares).
 
-⚠️ **ABERTO — card e gráfico ainda contam "pendente" por regras diferentes.** O
-card do dashboard exige `status === 'pendente'` e ignora vazio
-(`DashboardTab.tsx:87`); o módulo novo trata vazio como "Sem status". Enquanto a
-base estiver limpa os dois concordam; no dia em que entrar aluno sem status, o
-painel se contradiz na mesma tela. A fonte única é trabalho de Sprint 2.
+⚠️ **Padding no topo de um container que hospeda bloco `sticky` vira FRESTA** —
+o conteúdo desliza à vista entre o cabeçalho e os chips.
 
-**Padding no topo de um container que hospeda bloco `sticky` vira FRESTA.** Os
-chips de sub-aba são `sticky top-0` dentro do container de rolagem, e o `pt-2`
-dele ficava ACIMA da zona de grude: na aba Alunos aparecia uma faixa com "Pago",
-"MK" e dois ícones cortados ao meio, presa entre o cabeçalho e os chips, o tempo
-todo em que se rolava. Parecia defeito de renderização. O respiro do conteúdo
-mora no filho, que rola junto.
-
-**O badge de pendentes só recontava ao NAVEGAR** (o efeito dependia de
-`currentTab`) — e o caminho natural é abrir Solicitações e despachar várias sem
-sair da aba. Hoje há `lib/admin/solicitacoesEvent.ts`. Badge que mente é pior
-que badge nenhum: ele é a única razão de o admin abrir aquela aba.
-
-**Jargão de métrica não é vocabulário de usuário.** A fila do coach abria com
-"Coach Inbox" e quinze cartões "RISCO DE CHURN" em vermelho, com botões
-"Enviar mensagem / Soneca / Feito" logo abaixo. Hoje "Sua fila" e **"Sumido"** —
-que cobre os dois casos reais (parou de vir e nunca veio), o que "Parou de
-treinar" não cobriria. `churnDays` continua sendo chave de API.
-
-**O que está CERTO e não deve ser "corrigido":** a exclusão de aluno e de
-professor pergunta antes, lista o que se perde e tem a polaridade correta
-(`cancelText: 'Manter'`); o `overflow-x-hidden` do container é obrigatório (ver
-o comentário no arquivo — a página inteira deslizava); e o `TabErrorBoundary`
-por aba impede que uma aba quebrada derrube o painel.
-
-**Sprint 2 — o vocabulário de status tinha CINCO donos (29/08/2026).** A mesma
-decisão estava escrita em cinco lugares, com conteúdos diferentes: as opções do
-`<select>` (`STATUS_OPTIONS`), o `switch` das classes do badge, os rótulos com
-emoji do diálogo de confirmação, as labels do gráfico, e os chips de filtro.
-Hoje tudo sai de `lib/admin/studentStatus.ts`.
-
-⚠️ **O `<select>` de status não oferecia `ativo` — o status de 24 alunos (43%).**
-Um `<select>` cujo `value` não casa com nenhuma `<option>` não consegue exibir o
-estado real: o navegador cai na primeira opção. Hoje `opcoesDeStatus(atual)`
-sempre inclui o status atual, mesmo desconhecido — a classe do problema, não o
-caso. Pelo mesmo motivo os chips de filtro passaram a sair dos DADOS: havia um
-chip "Ativos" que filtrava `pago` e nenhum para `ativo`, então aqueles 24 alunos
-não eram alcançáveis por filtro nenhum.
-
-⚠️ **"Ativos" significava duas coisas na mesma tela.** O card do topo contava
-`status = 'pago'` (28) e o gráfico, uma rolagem abaixo, mostrava `Ativo` (20).
-O card virou **PAGANTES**. Guard de CLASSE: nenhuma contagem de status no
-`DashboardTab` pode normalizar à mão — mirar em `|| 'pendente'` deixava passar
-`String(u?.status || '').toLowerCase()`, que é a mesma decisão reescrita
-(provado por mutação).
-
-**Correção de um achado meu que estava ERRADO:** o relatório dizia que o
-`Doughnut` "Status Geral" e o `Bar` "Status dos Alunos" desenhavam o mesmo dado
-na MESMA tela. Não desenham — o Doughnut está sob `{isTeacher &&}` e as barras
-sob `{isAdmin &&}`. O que era real e foi removido é o **"Distribuição por
-Professor"**: 210px de gráfico para dois números que o card TOTAL ALUNOS já diz
-em texto ("49" e "25 sem professor").
-
-**Dado sujo conhecido, NÃO corrigido:** `teachers` tem **41 linhas para 7
-e-mails distintos**. A UI já mostra 7 (o fetch deduplica), então não é bug de
-tela — mexer nas linhas é decisão do dono.
-
-**Sprint 3 (29/08/2026).** Três correções e uma investigação PARADA de
-propósito.
-
-**Um admin que também dá aula via "Coach" e nunca "Admin"** — o ternário testava
-`isCoach` primeiro (`HeaderActionsMenu`). No IronTracks o admin normalmente
-TAMBÉM atende alunos, então o papel de maior alcance ficava invisível justamente
-para quem o tem. Hoje `lib/user/rotuloDePapel.ts` devolve os dois ("Admin ·
-Coach"), com Admin primeiro — é ele que explica os itens a mais no menu.
-
-⚠️ **O guard disto nasceu FALSO e proibia a forma CORRETA:** o regex
-`isCoach\s*\?\s*'Coach'\s*:` casava com `isCoach ? 'Coach' : null`, que é o
-conserto. Virou função pura com teste de comportamento; o source-guard ficou só
-para travar a fiação. **Lógica de decisão não se guarda por regex.**
-
-**O banner `DIAGNOSTIC MODE` despejava a exceção crua** (`setDebugError("Erro
-Catch: " + msg)`), exibida com `break-all` no topo do painel. Mesma classe
-varrida no resto do app em 27/08 — esta superfície ficou de fora porque a busca
-mirou em `getErrorMessage`/`String(error)` e aqui a forma é outra. O detalhe
-continua indo para `logError`.
-
-**Os chips de sub-aba avisam que há mais.** Em "Mais" são oito e cabem três e
-meia; o corte do quarto chip era a única pista. O overflow é medido no efeito
-que já existia (`scrollWidth - clientWidth`), **sem `ResizeObserver`** — jsdom
-não o tem, e as duas coisas que mudam a largura do trilho já disparam aquele
-efeito.
-
-⚠️ **Os ~65pt de preto morto no topo continuam SEM causa isolada — e não tente
-adivinhar.** Duas hipóteses foram levantadas e as duas caíram na verificação:
-(1) `pt-header-safe` (`safe-area + 60px`) explicaria o valor, mas é **código
-morto** — está no `globals.css` e ninguém o usa; (2) `fixed` quebrado por
-ancestral com `transform` — o painel é `fixed inset-0` dentro de outro `fixed
-inset-0`, sem transform no caminho. A conta do header (`pt-safe` 59pt + `py-3`
-12pt = 71pt) não fecha com os ~138pt medidos na tela. **Isolar exige medir o DOM
-com o app logado**; mexer em safe-area por palpite quebra o topo em todo
-aparelho.
-
-**Aberto, do mesmo relatório** (`Relatorio/design-area-administrativa-2026-08-28.md`
-— a pasta `Relatorio/` é ignorada pelo git, então o arquivo é local; o que
-segue é o resumo que sobrevive):
-os quinze cartões da fila continuam sem mostrar há quanto tempo o aluno sumiu
-quando ele NUNCA treinou (a API não manda o dado — o que saiu foi a repetição
-tripla); e há ~65pt de preto morto acima do cabeçalho — **medido na
-tela, causa NÃO isolada** (o `pt-safe` do header sozinho não explica o valor).
 
 ## Débito ABERTO em design/a11y (atualizado 12/08/2026, pós-varredura)
 
@@ -3056,17 +2868,6 @@ ficava zerado o domingo inteiro.
 
 ## ⚠️ O FUNIL — medido em 29/08/2026, e é o maior problema do produto
 
-**O que já foi feito com isso:** o estado vazio parou de oferecer ESPERAR como
-alternativa a criar, e ganhou **"Já tenho a ficha — importar foto ou PDF"**. O
-import por foto existia desde ago/2026, mas só depois de abrir o wizard e ler
-quatro opções: **13 pessoas chegam ao dashboard e 4 abrem o editor**, então
-quem chega com o papel do personal na mão não descobria que ele cabe ali. O
-atalho é SECUNDÁRIO de propósito (criar segue sendo a ação primária no
-onboarding — regra do PR #749), e a intenção é limpa ao fechar o wizard, senão
-quem a usou uma vez cairia no import em toda abertura seguinte. Guard em
-`dashboard/__tests__/atalhoDaFichaNoVazio.test.ts`.
-
-
 Três em cada quatro pessoas que entram no app nunca criam um treino. Números do
 banco de produção, não estimativa:
 
@@ -3088,10 +2889,17 @@ Das **25** pessoas que foram aprovadas, logaram e nunca criaram um treino:
 média até o último login é de **1,7 dia**, e **22 das 25 não têm professor**
 (ou seja, não estavam esperando ninguém).
 
-O que já foi feito com isso: o estado vazio da lista de treinos parou de
-oferecer ESPERAR como alternativa a criar (a frase dizia "ou espere o treino do
-seu professor", inútil para 88% delas). Guard em
-`dashboard/__tests__/onboardingNaoConvidaAEsperar.test.ts`.
+**Duas mudanças já saíram disso, as duas no estado VAZIO da lista de treinos:**
+ele parou de oferecer ESPERAR como alternativa a criar (a frase dizia "ou espere
+o treino do seu professor", inútil para 88% dessas pessoas) e ganhou **"Já tenho
+a ficha — importar foto ou PDF"**. O import existia desde ago/2026, mas só
+depois de abrir o wizard e ler quatro opções: **13 pessoas chegam ao dashboard e
+4 abrem o editor**, então quem chega com o papel do personal na mão não
+descobria que ele cabe ali. O atalho é SECUNDÁRIO de propósito (criar segue
+sendo a ação primária no onboarding — regra do PR #749), e a intenção é limpa ao
+fechar o wizard, senão quem a usou uma vez cairia no import em toda abertura
+seguinte. Guards em `dashboard/__tests__/onboardingNaoConvidaAEsperar.test.ts` e
+`atalhoDaFichaNoVazio.test.ts`.
 
 **O que falta é decisão de produto e depende do dono**, que é o coach dessas
 pessoas: o banco não sabe o que elas viram nem por que saíram. Instrumentar a
@@ -3119,6 +2927,41 @@ vezes**: o interesse por acompanhar evolução existe, o lugar é que estava
 errado. Hoje aparece na aba Avaliações, entre a tendência de peso e a gordura
 corporal — e continua alcançável por Configurações, porque mover não é
 esconder.
+
+## Hipóteses que já foram MEDIDAS e derrubadas (30/08/2026)
+
+Cada uma parecia um achado e custou consulta ao banco. **Não reabra sem dado
+novo** — e note o padrão: em três das quatro, o app já fazia certo e o erro
+estava na minha leitura.
+
+| suspeita | o que a medição disse |
+|---|---|
+| "o peso do perfil fica desatualizado enquanto há 805 check-ins" | **sincronizados** — diferença 0,0 em quase todos; `weightTrend.ts:57` lê `weight_kg ?? answers.body_weight_kg` |
+| "`workout_checkins.weight_kg` está 100% vazia — é lacuna" | coluna **redundante**: o app grava e lê `answers.body_weight_kg`, preenchido em **805 de 1.027** |
+| "a dor muscular é coletada e ninguém usa" | `suggestWeight.ts` **já usa** (≥7 corta 7% da carga). E a média é **0,3**, com 24 check-ins ≥7 em toda a base: não há sinal para cruzar com volume |
+| "o wizard abre sozinho e isso é agressivo" | decisão **consciente**, documentada no código com dado real, só na primeira execução e só sem treinos |
+
+**A varredura de tabelas órfãs não achou outro `exercise_substitutions`**:
+`sets_audit` (9,2 mil linhas) é trilha forense com cron de retenção, e
+`user_activity_monthly` alimenta o painel admin. O grafo era o caso excepcional.
+
+## ⚠️ O defeito que 7 mil testes verdes não pegam é o de CONTRATO
+
+Em 30/08/2026 a conferência no aparelho achou **três** defeitos numa suíte
+inteiramente verde, e os três têm a mesma forma: **duas partes corretas
+isoladamente, discordando na fronteira entre elas.**
+
+- **Escala**: o grafo devolvia similaridade 0–1 e a UI escrevia `{n}%` — uma
+  alternativa perfeita aparecia como **"1%"**. Os dois lados eram números
+  válidos.
+- **Ramo**: o card do Diário foi posto depois de um early return, então sumia
+  para os 57 de 59 usuários sem avaliação. O componente estava certo.
+- **Ordem**: o cronômetro inflava porque o carimbo chegava DEPOIS do mount do
+  provider. O cálculo estava certo (ver a seção própria).
+
+Teste de unidade não vê nenhum dos três, porque cada metade passa sozinha.
+**Depois de mexer em algo que aparece, abra a tela** — é a regra do dono, e
+estes três são a medição de por que ela existe.
 
 ## Telemetria: onde ler, e os nomes que enganam (30/08/2026)
 
@@ -3266,8 +3109,9 @@ toolchains — lockfile commitado nunca satisfaz o runner) e roda o
 `src/__tests__/xcodeCloudCiScript.test.ts`.
 
 **Pendências com dono definido:** FCM sem env vars na Vercel → push Android
-MUDO desde 24/07 (59 eventos; as 3 chaves não existem no repo — é service
-account do console do Firebase, só o dono gera). Restante da auditoria não
+mudo desde 24/07. ⚠️ **Medido em 29/08/2026: não é urgente** — não há usuário
+Android real (a conta da medição está na seção do funil). As 3 chaves seguem
+fora do repo: service account do Firebase, só o dono gera. Restante da auditoria não
 atacado: ATS iOS (SEC-09, exige build + aparelho físico), E2E/SAST no CI,
 sprint de performance (PERF-01…08), `pg_trgm` fora do schema public.
 
