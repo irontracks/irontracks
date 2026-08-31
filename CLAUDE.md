@@ -492,7 +492,37 @@ chegar nele, e um teste do valor passaria verde com o flash vivo. — usada pelo
 
 **Plano alimentar salvo + troca de alimento (ago/2026).** A dieta gerada era efêmera; agora salva em `student_diet_plans` — a MESMA tabela do plano prescrito pelo professor, separadas por `created_by`: `= user_id` é plano próprio (editável), `≠` é do coach (read-only). A rota `prescribed-plan` filtra por `.neq('created_by', userId)`; sem isso a dieta que o usuário gerou aparece como recomendação do coach, num card que trava a edição. Leitura SEMPRE por `planDays()` (`lib/nutrition/dietPlanShape`), que normaliza plano de um dia (`meals`) e de semana (`days`) numa lista só — e recomputa os totais dos itens, nunca lê total gravado.
 
+⚠️ **`planDays` RECONSTRÓI a refeição campo a campo — campo que ele não declara
+é descartado na leitura.** E a rota de swap REGRAVA o plano a partir do que ele
+devolveu: um campo novo não some só na tela, ele **é apagado do banco** na
+primeira troca de alimento, sem erro nenhum. Medido ao acrescentar a observação
+por refeição (31/08/2026); guard do ciclo inteiro (ler → regravar → ler, para
+dia e semana) em `lib/nutrition/__tests__/notaDaRefeicao.test.ts`.
+
+A mesma armadilha tem uma **segunda forma, por cópia de tipo**: o
+`PrescribedDietPlan` declarava `PlanMeal`/`PlanItem`/`Totals` localmente em vez
+de importar de `dietPlanShape`, e a cópia estava atrasada — o campo CHEGAVA no
+componente e nunca era exibido, então o professor podia escrever uma orientação
+que o aluno jamais veria. Hoje ele importa da fonte única. **Campo novo no plano
+= conferir os DOIS: quem normaliza (`parseMeal`) e quem tipa.**
+
+**Observação por refeição** (`meals[].note`, teto de 300 caracteres, gravada no
+blur por `POST /api/nutrition/diet-plan/note`): segue a fronteira do `created_by`
+acima — editável no próprio, só leitura no prescrito. Não confundir com
+`student_diet_plans.notes`, que é do plano INTEIRO: os dois convivem no mesmo
+componente, e trocá-los mostra o recado errado no lugar errado.
+
 **O motor de troca de alimento não usa IA — e o repertório "aprendido" É LIXO.** `nutrition_learned_foods` guarda o que o usuário DIGITOU no lançamento, e ele digita refeição inteira: dos 42 "alimentos" da conta do dono, **1** servia de substituto (37 compostos, 14 com densidade fisicamente impossível — 1070/1285/1650 kcal/100 g, que é o TOTAL da refeição gravado no campo `per_100g` —, 17 com a quantidade no nome). **A fonte certa é `nutrition_meal_entries.items`**, que o parser já quebrou em alimentos individuais com gramas e macros absolutos (`{"label": "150g arroz", "grams": 150, …}`) — e **desde 25/08/2026 a estimativa por IA também separa** (antes ela somava tudo num item só; ver "Histórico de REFEIÇÕES") — daí sai nome limpo e macros/100 g derivados de gramas reais (`lib/nutrition/mealItemFoods`). Todo candidato passa por `foodItemSanity` (sem composto, sem densidade impossível, sem quantidade no nome).
+
+⚠️ **Não confunda com `nutrition_custom_foods`, que é a BIBLIOTECA e é dado
+BOM** — o botão BIBLIOTECA da aba Nutrição (`useCustomFoods.ts`). Ali o usuário
+cadastrou o rótulo à mão ou pelo scanner de código de barras, então os macros
+são por 100 g e confiáveis: na conta do dono são **23 itens, 7 com barcode**,
+todos com densidade plausível (máx. 512 kcal/100 g). É o oposto de
+`nutrition_learned_foods`, cujo nome parecido já rendeu confusão. Vale para
+clonar entre contas (feito em 31/08/2026, do dono para uma aluna) — mas ela
+aceita duplicata: a mesma conta tinha "Biscoito de arroz" e "Leite Italac" duas
+vezes, com macros diferentes.
 
 **Classificar alimento por macro dominante SOZINHO produz sugestão absurda.** Auditoria de 132 trocas reais (04/08/2026) pegou: bife virando ovo (gordura dominava), leite desnatado virando substituto de mamão e feijão (caía em fruta/verdura), maionese virando bolo, arroz virando "orange chicken". As cinco regras que consertaram, todas em `foodSwap`: (1) proteína ≥ 10 g/100 g e ≥ 25% das kcal manda, mesmo com gordura maior; (2) `produce` exige proteína < 35% das kcal — o corte fica ENTRE leite desnatado (39%) e alface/brócolis (26–29%), e apertar demais joga alface em `carb`; (3) `mixed` NÃO troca (sem saber o papel, é chute); (4) dentro de `fat`, candidato com > 25% das kcal em carbo sai (separa requeijão de brigadeiro); (5) porção que encosta no clamp (10 g/1000 g) é recusada. Além disso, a adequação à refeição vem do HISTÓRICO (`mealContext`: em que refeições ele já comeu aquele alimento), não de lista fixa — e alimento sem histórico não é bloqueado, só não ganha preferência. **Ao mexer aqui, audite contra dados reais e LEIA as sugestões: os filtros mecânicos diziam "0 problemas" enquanto o motor sugeria trocas que ninguém faria.**
 
@@ -2157,6 +2187,7 @@ outra". O que foi copiado de `djmkapple` → `djmkbrasil`:
 | Sessões concluídas | **12 mais recentes** | o bastante para autoload/deload lerem histórico de verdade |
 | Meta de nutrição | **sim** (2676 kcal) | |
 | Perfil / objetivo / fase | **sim** | antropometria, `fitnessGoal`, `nutritionPhase`, `autoLoad`, `plateInventory` |
+| Plano alimentar | **sim**, desde 31/08/2026 | "Dieta Semanal MK", 7 dias / 41 refeições, clonada como plano PRÓPRIO (editável) |
 | Avaliações corporais + fotos | **não** | dado corporal e arquivos no storage; o ganho não paga |
 | Resto do histórico (117 sessões) | **não** | 1,5 MB de JSON, e faria a conta de teste aparecer no **ranking e na comunidade** com 2,4 M kg falsos |
 | Telefone, cidade, academia, notificações, feature flags | **não** | na época, `featureTeamworkV2` ligaria uma feature sem tabelas; hoje nem a flag existe (#436) nem a feature está desligada (#859) |
@@ -2186,6 +2217,7 @@ reduz a frequência do problema.
 | Templates ativos | 5 (SEG/TER/QUA/QUI/SEX) + 6 arquivados | 5 (SEG/TER/QUA/QUI/SEX) |
 | Sessões concluídas | **13** (12 clonadas + 1 vazia antiga) | **129** |
 | Meta em `nutrition_goals` | 2676 kcal | 2676 kcal · P208 C295 G74 |
+| Plano alimentar ativo | Dieta Semanal MK (clone, 31/08) | Dieta Semanal MK (original) |
 | Fase / perfil | CUT, perfil preenchido | CUT, perfil completo |
 
 **Como identificar rápido, agora que as telas são parecidas:** a de teste tem o
