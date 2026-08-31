@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Salad, Plus, RefreshCw } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
-import { MAX_NOTA_DA_REFEICAO, type MacroTotals, type PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape';
+import { CampoDeNotaDaRefeicao } from '@/components/dashboard/nutrition/CampoDeNotaDaRefeicao';
+import type { MacroTotals, PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape';
 
 const PrescribeDietModal = dynamic(
     () => import('./PrescribeDietModal').then(m => ({ default: m.PrescribeDietModal })),
@@ -36,11 +37,10 @@ export const StudentNutritionTab: React.FC = () => {
     const [plan, setPlan] = useState<Plan | null>(null);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
-    /** Rascunho da orientação por refeição — sem ele, o plano que volta do
-     *  servidor sobrescreveria o que o professor está digitando. */
-    const [notaDraft, setNotaDraft] = useState<Record<number, string>>({});
     const [salvandoNota, setSalvandoNota] = useState<number | null>(null);
-    const [erroNota, setErroNota] = useState<string | null>(null);
+    /** Falha presa à refeição que falhou: no topo da lista ela nasceria a
+     *  centenas de px do campo — possivelmente fora da tela. */
+    const [erroNota, setErroNota] = useState<{ idx: number; msg: string } | null>(null);
 
     const studentId = String(selectedStudent?.user_id || '').trim();
 
@@ -64,14 +64,8 @@ export const StudentNutritionTab: React.FC = () => {
 
     useEffect(() => { void load(); }, [load]);
 
-    /** Grava a orientação no BLUR — uma requisição por tecla seria absurda. */
-    const salvarNota = useCallback(async (mealIndex: number, atual: string) => {
-        const rascunho = notaDraft[mealIndex];
-        // Sem rascunho o campo mostra o que já está salvo: sair dele não é edição.
-        // Tratar `undefined` como '' aqui apagaria a nota de quem só passou o dedo.
-        if (rascunho === undefined) return;
-        const texto = rascunho.trim();
-        if (texto === (atual ?? '').trim()) return;
+    /** Grava a orientação. O componente já resolveu "mudou?" e aparou o texto. */
+    const salvarNota = useCallback(async (mealIndex: number, texto: string): Promise<boolean> => {
         setSalvandoNota(mealIndex); setErroNota(null);
         try {
             const authHeaders = await getAdminAuthHeaders();
@@ -83,19 +77,23 @@ export const StudentNutritionTab: React.FC = () => {
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json?.ok) {
-                setErroNota(String(json?.error || '') === 'plan_is_students_own'
-                    ? 'O plano ativo deste aluno foi montado por ele. Prescreva um plano para poder orientar.'
-                    : 'Não consegui salvar a orientação. O texto continua aí — tente de novo.');
-                return;
+                setErroNota({
+                    idx: mealIndex,
+                    msg: String(json?.error || '') === 'plan_is_students_own'
+                        ? 'Este plano foi montado pelo aluno. Prescreva um para poder orientar.'
+                        : 'Não consegui salvar. Tente de novo.',
+                });
+                return false;
             }
             setPlan((prev) => (prev ? { ...prev, meals: json.meals as PlanMeal[] } : prev));
-            setNotaDraft((prev) => { const p = { ...prev }; delete p[mealIndex]; return p; });
+            return true;
         } catch {
-            setErroNota('Falha ao salvar a orientação.');
+            setErroNota({ idx: mealIndex, msg: 'Falha ao salvar a orientação.' });
+            return false;
         } finally {
             setSalvandoNota(null);
         }
-    }, [notaDraft, studentId, getAdminAuthHeaders]);
+    }, [studentId, getAdminAuthHeaders]);
 
     if (!selectedStudent) return null;
 
@@ -157,10 +155,6 @@ export const StudentNutritionTab: React.FC = () => {
                         <span className="shrink-0 text-[11px] tabular-nums text-yellow-300/90">{Math.round(grand.calories)} kcal · {Math.round(grand.protein)}g P</span>
                     </div>
 
-                    {erroNota && (
-                        <p className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-300">{erroNota}</p>
-                    )}
-
                     {plan.notes ? (
                         <p className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-neutral-300 whitespace-pre-wrap break-words">{plan.notes}</p>
                     ) : null}
@@ -177,22 +171,15 @@ export const StudentNutritionTab: React.FC = () => {
                                     <div className="mt-1 text-[11px] text-neutral-400 truncate">
                                         {(Array.isArray(meal.items) ? meal.items : []).map((it) => it.food).join(' · ')}
                                     </div>
-                                    {/*
-                                      A orientação que o ALUNO vê nesta refeição. Texto
-                                      livre, então a autocorreção fica ligada.
-                                    */}
-                                    <textarea
-                                        aria-label={`Orientação sobre ${meal.name}`}
-                                        value={notaDraft[idx] ?? meal.note ?? ''}
-                                        onChange={(e) => setNotaDraft((prev) => ({ ...prev, [idx]: e.target.value.slice(0, MAX_NOTA_DA_REFEICAO) }))}
-                                        onBlur={() => void salvarNota(idx, meal.note ?? '')}
-                                        rows={2}
-                                        maxLength={MAX_NOTA_DA_REFEICAO}
-                                        disabled={salvandoNota === idx}
-                                        placeholder="Orientação pro aluno nesta refeição (ex.: mastigar devagar, trocar por atum)"
-                                        className="mt-2 w-full resize-none rounded-lg border border-white/[0.06] bg-black/20 px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-neutral-400 outline-none transition focus:border-yellow-500/30 disabled:opacity-60"
+                                    <CampoDeNotaDaRefeicao
+                                        nota={meal.note ?? ''}
+                                        nomeDaRefeicao={meal.name}
+                                        rotulo="Orientação pro aluno"
+                                        placeholder="Ex.: mastigar devagar"
+                                        salvando={salvandoNota === idx}
+                                        erro={erroNota?.idx === idx ? erroNota.msg : null}
+                                        onSalvar={(texto) => salvarNota(idx, texto)}
                                     />
-                                    {salvandoNota === idx && <span className="mt-1 block text-[10px] text-neutral-400">salvando…</span>}
                                 </div>
                             );
                         })}

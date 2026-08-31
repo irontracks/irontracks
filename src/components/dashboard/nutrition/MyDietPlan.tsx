@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useDialog } from '@/contexts/DialogContext'
-import { MAX_NOTA_DA_REFEICAO, planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
+import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
 
 /**
  * A dieta que o PRÓPRIO usuário salvou — o lugar onde ela vira algo pra seguir, e
@@ -45,13 +46,10 @@ export default function MyDietPlan({
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null)
   const [swappingKey, setSwappingKey] = useState<string | null>(null)
   const [rejected, setRejected] = useState<Record<string, string[]>>({})
-  /**
-   * Rascunho da observação, por refeição do dia aberto. Estado LOCAL porque o
-   * campo é controlado e o plano volta do servidor a cada gravação: sem
-   * rascunho, a resposta da rede sobrescreveria o que a pessoa está digitando.
-   */
-  const [notaDraft, setNotaDraft] = useState<Record<number, string>>({})
   const [salvandoNota, setSalvandoNota] = useState<number | null>(null)
+  /** Falha da gravação, presa à refeição que falhou — no topo da lista ela
+   *  nasceria longe (ou fora) do campo que o usuário acabou de usar. */
+  const [erroNota, setErroNota] = useState<{ idx: number; msg: string } | null>(null)
   const { confirm } = useDialog()
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -166,21 +164,9 @@ export default function MyDietPlan({
     }
   }, [swappingKey, dayIndex, rejected])
 
-  /**
-   * Grava a observação da refeição. Chamado no BLUR, não a cada tecla — uma
-   * requisição por caractere digitado seria absurda, e o texto não é dado
-   * crítico que justifique salvar em voo.
-   */
-  const salvarNota = useCallback(async (mealIdx: number, atual: string) => {
-    const rascunho = notaDraft[mealIdx]
-    // ⚠️ Sem rascunho, o campo está mostrando a nota SALVA — abrir a refeição e
-    // sair do campo não é edição. Tratar `undefined` como string vazia aqui
-    // apagava a observação de quem só passou o dedo pelo campo (pego por teste
-    // antes de ir ao ar).
-    if (rascunho === undefined) return
-    const texto = rascunho.trim()
-    if (texto === (atual ?? '').trim()) return // nada mudou → não gasta request
-    setSalvandoNota(mealIdx); setError(null)
+  /** Grava a observação. O componente já resolveu "mudou?" e aparou o texto. */
+  const salvarNota = useCallback(async (mealIdx: number, texto: string): Promise<boolean> => {
+    setSalvandoNota(mealIdx); setErroNota(null)
     try {
       const res = await fetch('/api/nutrition/diet-plan/note', {
         method: 'POST',
@@ -190,19 +176,20 @@ export default function MyDietPlan({
       })
       const json = await res.json().catch((): null => null)
       if (!res.ok || !json?.ok) {
-        setError('Não consegui salvar a observação. O texto continua aí — tente de novo.')
-        return
+        setErroNota({ idx: mealIdx, msg: 'Não consegui salvar. Tente de novo.' })
+        return false
       }
       // Usa o plano que voltou gravado, como faz a troca de alimento: remontar
       // no cliente deixaria tela e banco livres para divergir.
       setRow((json.plan ?? null) as DietPlanRow | null)
-      setNotaDraft((prev) => { const p = { ...prev }; delete p[mealIdx]; return p })
+      return true
     } catch (e: unknown) {
-      setError(getErrorMessage(e) || 'Falha ao salvar a observação.')
+      setErroNota({ idx: mealIdx, msg: getErrorMessage(e) || 'Falha ao salvar.' })
+      return false
     } finally {
       setSalvandoNota(null)
     }
-  }, [notaDraft, dayIndex])
+  }, [dayIndex])
 
   const removePlan = useCallback(async () => {
     if (removing) return
@@ -354,30 +341,15 @@ export default function MyDietPlan({
                     ))}
                   </div>
 
-                  {/*
-                    Observação da refeição. Texto LIVRE, então a autocorreção
-                    fica LIGADA de propósito — a regra do repo desliga em
-                    identificador (nome de exercício, código), e aqui ela ajuda.
-                  */}
-                  <div className="mt-2">
-                    <textarea
-                      // Nomeia a refeição: com vários campos iguais na tela, um
-                      // rótulo genérico faria o leitor de tela anunciar quatro
-                      // "observação" indistinguíveis.
-                      aria-label={`Observação sobre ${meal.name}`}
-                      value={notaDraft[idx] ?? meal.note ?? ''}
-                      onChange={(e) => setNotaDraft((prev) => ({ ...prev, [idx]: e.target.value.slice(0, MAX_NOTA_DA_REFEICAO) }))}
-                      onBlur={() => salvarNota(idx, meal.note ?? '')}
-                      rows={2}
-                      maxLength={MAX_NOTA_DA_REFEICAO}
-                      disabled={salvandoNota === idx}
-                      placeholder="Observação ou dica (ex.: bater no liquidificador, trocar por atum)"
-                      className="w-full resize-none rounded-lg border border-white/[0.06] bg-black/20 px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-neutral-400 outline-none transition focus:border-yellow-500/30 disabled:opacity-60"
-                    />
-                    {salvandoNota === idx && (
-                      <span className="mt-1 block text-[10px] text-neutral-400">salvando…</span>
-                    )}
-                  </div>
+                  <CampoDeNotaDaRefeicao
+                    nota={meal.note ?? ''}
+                    nomeDaRefeicao={meal.name}
+                    rotulo="Observação"
+                    placeholder="Ex.: bater no liquidificador"
+                    salvando={salvandoNota === idx}
+                    erro={erroNota?.idx === idx ? erroNota.msg : null}
+                    onSalvar={(texto) => salvarNota(idx, texto)}
+                  />
 
                   {canApply && (
                     <button
