@@ -325,7 +325,21 @@ com a leitura dentro de um `catch {}` vazio. Medido no dia da correção: 0 cont
 **644 kcal** da sessão real. Hoje as duas passam por
 `lib/nutrition/kcalDeTreinoDoDia.ts` — **e a QUERY mora lá também**, não só a
 soma: unificar só a aritmética deixaria as telas filtrando sessões de formas
-diferentes, que era metade do defeito. O próprio arquivo da página já sabia —
+diferentes, que era metade do defeito.
+
+⚠️ **E a janela daquela query estava em UTC — o defeito que sobreviveu à
+primeira correção.** `completed_at` é `timestamptz`, e o Postgrest resolve
+string sem offset (`${dateKey}T00:00:00`) no fuso da SESSÃO, que é **UTC**: o
+"hoje" ia das **21:00 do dia anterior** às **20:59**. Medido: **37 de 658
+sessões (5,6%), em 29 dias distintos**, a última em 28/08/2026 — mesma classe e
+quase a mesma proporção do streak (36 de 633). **Não era só o card**: o overlay
+decide `trainedToday` por essa query, então quem marcava "vou descansar" e
+treinava às 21h30 ficava com a META rebaixada no dia em que treinou. Hoje a
+janela sai de `brtDayStartUtc` (que o repo já tinha) e o fim é EXCLUSIVO — o
+`lte ...T23:59:59` perdia a sessão terminada em 23:59:59.5. **Ao unificar duas
+telas, audite a fronteira em vez de copiar a query da que parecia certa**: foi
+exatamente assim que este defeito passou da primeira correção para a fonte
+única. O próprio arquivo da página já sabia —
 40 linhas abaixo, o bloco do dia de descanso lê `workouts.notes` e diz em
 comentário que a tabela não é populada. Guard de classe + fiação em
 `lib/nutrition/__tests__/kcalDeTreinoDoDia.test.ts`.
