@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { somarKcalDasSessoes } from '../kcalDeTreinoDoDia'
+import { somarKcalDasSessoes, selecionarSessoesDoDia } from '../kcalDeTreinoDoDia'
 
 /**
  * As duas superfícies de nutrição contam as calorias de treino do MESMO jeito.
@@ -56,6 +56,61 @@ describe('somarKcalDasSessoes', () => {
         const magro = somarKcalDasSessoes([{ notes: semCheckin() }], { bodyWeightKg: 60 })
         const pesado = somarKcalDasSessoes([{ notes: semCheckin() }], { bodyWeightKg: 110 })
         expect(pesado).toBeGreaterThan(magro)
+    })
+})
+
+/**
+ * A fronteira do dia é a de BRASÍLIA, não a de Londres.
+ *
+ * `completed_at` é `timestamptz` e o Postgrest resolve string sem offset no
+ * fuso da SESSÃO (UTC). Mandar `2026-08-31T00:00:00` fazia o "hoje" ir das
+ * 21:00 do dia anterior às 20:59 — 37 de 658 sessões em produção (5,6%) caíam
+ * no dia errado.
+ */
+describe('selecionarSessoesDoDia — fronteira BRT', () => {
+    /** Espiona a janela que a query pede, sem ir à rede. */
+    const janelaPedida = (dateKey: string) => {
+        const capturado: Record<string, string> = {}
+        const cadeia = {
+            select: () => cadeia,
+            eq: () => cadeia,
+            gte: (coluna: string, valor: string) => { capturado[`gte:${coluna}`] = valor; return cadeia },
+            lt: (coluna: string, valor: string) => { capturado[`lt:${coluna}`] = valor; return cadeia },
+            lte: (coluna: string, valor: string) => { capturado[`lte:${coluna}`] = valor; return cadeia },
+        }
+        selecionarSessoesDoDia({ from: () => cadeia } as never, 'u1', dateKey)
+        return capturado
+    }
+
+    it('começa à meia-noite de Brasília — 03:00 UTC, não 00:00 UTC', () => {
+        const j = janelaPedida('2026-08-31')
+        expect(
+            j['gte:completed_at'],
+            'com 00:00Z o dia começaria às 21h do dia anterior em São Paulo',
+        ).toBe('2026-08-31T03:00:00.000Z')
+    })
+
+    it('termina na meia-noite BRT seguinte, e o fim é EXCLUSIVO', () => {
+        const j = janelaPedida('2026-08-31')
+        expect(j['lt:completed_at']).toBe('2026-09-01T03:00:00.000Z')
+        // `lte ...T23:59:59` perdia a sessão terminada em 23:59:59.5.
+        expect(j['lte:completed_at'], 'o teto inclusivo perde o último meio segundo').toBeUndefined()
+    })
+
+    it('o treino das 21h30 BRT pertence ao dia em que a pessoa treinou', () => {
+        // 2026-08-31 21:30 BRT === 2026-09-01T00:30:00Z — o caso real medido.
+        const instante = new Date('2026-09-01T00:30:00.000Z').toISOString()
+        const j = janelaPedida('2026-08-31')
+        expect(instante >= j['gte:completed_at'] && instante < j['lt:completed_at']).toBe(true)
+
+        // ...e NÃO ao dia seguinte, onde o app o mostrava antes.
+        const amanha = janelaPedida('2026-09-01')
+        expect(instante >= amanha['gte:completed_at']).toBe(false)
+    })
+
+    it('a virada do mês não escapa', () => {
+        const j = janelaPedida('2026-08-31')
+        expect(j['lt:completed_at']).toBe('2026-09-01T03:00:00.000Z')
     })
 })
 
