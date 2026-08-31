@@ -507,8 +507,15 @@ que o aluno jamais veria. Hoje ele importa da fonte única. **Campo novo no plan
 = conferir os DOIS: quem normaliza (`parseMeal`) e quem tipa.**
 
 **Observação por refeição** (`meals[].note`, teto de 300 caracteres, gravada no
-blur por `POST /api/nutrition/diet-plan/note`): segue a fronteira do `created_by`
-acima — editável no próprio, só leitura no prescrito. Não confundir com
+blur): **duas rotas espelhadas, cada uma com a sua metade da fronteira do
+`created_by`**. O aluno usa `POST /api/nutrition/diet-plan/note`, que exige
+plano PRÓPRIO; o professor usa `POST /api/teacher/diet/note` (Painel → aluno →
+aba Nutrição, um campo por refeição), que exige o contrário — plano dele — e
+responde **409 `plan_is_students_own`** quando o plano ativo do aluno é o que o
+próprio aluno montou. Sem esse 409, o coach escreveria dentro da dieta
+particular do aluno. A rota do professor lê `meals` CRU e altera por spread, sem
+`planDays`: numa escrita cirúrgica isso PRESERVA campo que o parser
+descartaria. Não confundir com
 `student_diet_plans.notes`, que é do plano INTEIRO: os dois convivem no mesmo
 componente, e trocá-los mostra o recado errado no lugar errado.
 
