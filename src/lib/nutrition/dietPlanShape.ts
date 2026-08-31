@@ -28,6 +28,12 @@ export interface PlanMeal {
   time?: string
   items: PlanItem[]
   totals: MacroTotals
+  /**
+   * Observação livre do dono do plano sobre ESTA refeição ("bater no
+   * liquidificador", "se não tiver frango, atum"). Some quando vazia — nota em
+   * branco não precisa ocupar o JSON de 42 refeições de uma semana.
+   */
+  note?: string
 }
 
 export interface PlanDay {
@@ -50,6 +56,13 @@ export interface DietPlanRow {
   created_by?: string | null
   updated_at?: string | null
 }
+
+/**
+ * Teto da observação por refeição. Uma semana tem ~42 refeições, e o plano
+ * inteiro viaja em toda leitura — o limite é o que impede a nota de virar o
+ * maior campo do payload.
+ */
+export const MAX_NOTA_DA_REFEICAO = 300
 
 export const WEEKDAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'] as const
 
@@ -96,9 +109,15 @@ const parseMeal = (raw: unknown): PlanMeal | null => {
   const name = String(raw.name ?? '').trim()
   if (!name && !items.length) return null
   const time = String(raw.time ?? '').trim()
+  // ⚠️ Este parser reconstrói a refeição campo a campo, então tudo que não for
+  // declarado aqui é DESCARTADO na leitura — e a troca de alimento regrava o
+  // plano a partir do que `planDays` devolveu. Sem esta linha, trocar um
+  // alimento apagaria a observação da refeição, em silêncio.
+  const note = String(raw.note ?? '').trim()
   return {
     name: (name || 'Refeição').slice(0, 60),
     ...(time ? { time } : {}),
+    ...(note ? { note: note.slice(0, MAX_NOTA_DA_REFEICAO) } : {}),
     items,
     // Totais SEMPRE recomputados dos itens: trocar um alimento muda o item, e um
     // total gravado junto viraria mentira silenciosa na próxima leitura.

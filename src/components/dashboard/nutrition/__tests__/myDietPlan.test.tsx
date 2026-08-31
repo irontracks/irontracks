@@ -350,3 +350,97 @@ describe('source-guard: uma tela só, servindo as duas superfícies de nutriçã
     expect(card).not.toMatch(/row\.days\s*\?\s*row\.days\s*:/)
   })
 })
+
+/**
+ * Observação por refeição — o espaço pra dica ("bater no liquidificador",
+ * "se não tiver frango, atum").
+ *
+ * Mora DENTRO do JSON da refeição (`days[].meals[].note`), não numa coluna: a
+ * tabela guarda o plano em JSONB, então o campo não custou migration.
+ */
+describe('MyDietPlan — observação da refeição', () => {
+    afterEach(() => { vi.unstubAllGlobals() })
+
+    const abrirPrimeiraRefeicao = async () => {
+        fireEvent.click(await screen.findByText('Café da Manhã'))
+        return screen.findByPlaceholderText(/Observação ou dica/i)
+    }
+
+    it('cada refeição tem seu próprio campo, e ele nasce com o que já estava salvo', async () => {
+        mockFetch({
+            ...dayPlan,
+            meals: [{ ...DAY_MEALS[0], note: 'bater no liquidificador' }, DAY_MEALS[1]],
+        })
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+
+        const campo = await abrirPrimeiraRefeicao()
+        expect((campo as HTMLTextAreaElement).value).toBe('bater no liquidificador')
+    })
+
+    it('grava no BLUR, mandando o dia e a refeição certos — não a cada tecla', async () => {
+        const fn = mockFetch(dayPlan)
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        const campo = await abrirPrimeiraRefeicao()
+
+        fireEvent.change(campo, { target: { value: 'trocar por atum' } })
+        // Digitar não pode gerar requisição: seria uma por caractere.
+        expect(fn.mock.calls.filter(([u]) => String(u).includes('/note'))).toHaveLength(0)
+
+        fireEvent.blur(campo)
+        await waitFor(() => {
+            const chamada = fn.mock.calls.find(([u]) => String(u).includes('/diet-plan/note'))
+            expect(chamada, 'o blur tinha que gravar').toBeTruthy()
+            const body = JSON.parse(String((chamada?.[1] as RequestInit)?.body))
+            expect(body).toMatchObject({ dayIndex: 0, mealIndex: 0, note: 'trocar por atum' })
+        })
+    })
+
+    it('sair do campo sem mudar nada NÃO gasta requisição', async () => {
+        const fn = mockFetch({ ...dayPlan, meals: [{ ...DAY_MEALS[0], note: 'já escrita' }, DAY_MEALS[1]] })
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        const campo = await abrirPrimeiraRefeicao()
+
+        fireEvent.blur(campo)
+        await waitFor(() => expect(screen.queryByText('salvando…')).toBeNull())
+        expect(fn.mock.calls.filter(([u]) => String(u).includes('/note'))).toHaveLength(0)
+    })
+
+    it('texto some ao apagar — é assim que o usuário desfaz', async () => {
+        const fn = mockFetch({ ...dayPlan, meals: [{ ...DAY_MEALS[0], note: 'apagar isto' }, DAY_MEALS[1]] })
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        const campo = await abrirPrimeiraRefeicao()
+
+        fireEvent.change(campo, { target: { value: '' } })
+        fireEvent.blur(campo)
+        await waitFor(() => {
+            const chamada = fn.mock.calls.find(([u]) => String(u).includes('/diet-plan/note'))
+            expect(JSON.parse(String((chamada?.[1] as RequestInit)?.body)).note).toBe('')
+        })
+    })
+
+    it('falha ao salvar avisa E preserva o que a pessoa escreveu', async () => {
+        // Perder o texto digitado por causa de uma falha de rede é o pior
+        // desfecho possível aqui — ele não está em lugar nenhum além da tela.
+        mockFetch(dayPlan, (url) =>
+            String(url).includes('/diet-plan/note')
+                ? { ok: false, status: 500, json: async () => ({ ok: false }) }
+                : undefined,
+        )
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        const campo = await abrirPrimeiraRefeicao()
+
+        fireEvent.change(campo, { target: { value: 'não me perca' } })
+        fireEvent.blur(campo)
+
+        expect(await screen.findByText(/Não consegui salvar a observação/i)).toBeTruthy()
+        expect((campo as HTMLTextAreaElement).value).toBe('não me perca')
+    })
+
+    it('a autocorreção fica LIGADA — é texto livre, não identificador', async () => {
+        mockFetch(dayPlan)
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        const campo = await abrirPrimeiraRefeicao()
+        expect(campo.getAttribute('autocorrect')).not.toBe('off')
+        expect(campo.getAttribute('autocapitalize')).not.toBe('none')
+    })
+})
