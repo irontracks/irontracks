@@ -2031,6 +2031,34 @@ o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
   compare as janelas dos steps de E2E com
   `gh api repos/.../actions/runs/<id>/attempts/1/jobs`.
 
+### ⚠️ E2E pendurado é MUDO — e nada no CI pode herdar as 6 h (31/08/2026)
+
+Segunda ocorrência da mesma classe: em 18/08 o step do E2E logado ficou 46 min
+sem imprimir nada (causa: `fetch` sem timeout, corrigida) e em 31/08 ficou
+**6 horas** — o teto padrão do GitHub —, queimando o runner e travando TODO o
+repositório, porque enquanto o step pendura nenhum PR fecha. O rerun do mesmo
+commit passou em 9,3 min: é intermitente.
+
+**Silêncio total NÃO significa "travou logo no começo" por acaso — ele
+LOCALIZA o defeito.** Com `--reporter=github` o reporter do GitHub não escreve
+em stdio (`printsToStdio() → false`); o "Running N tests" que aparece no CI vem
+do reporter `dot` que o Playwright acrescenta quando nenhum outro imprime, e
+ele fala no `onBegin`. A ordem das tasks do runner é **globalSetup → load →
+onBegin**. Zero output ⇒ não passou do globalSetup.
+
+⚠️ **O `actionTimeout` do Playwright é `0` — sem limite.** Dentro de um teste
+quem segura isso é o `timeout` do teste; o **globalSetup não tem teste nenhum**,
+então `page.fill`/`page.click` esperavam para sempre (um botão de submit que
+nunca fica acionável basta). `chromium.launch()` **não** era o problema: já tem
+30 s de default. E `browser.close()` não aceita `timeout`, só `reason`.
+
+Hoje há três defesas, e a ORDEM é o que dá diagnóstico: `globalTimeout`
+(8 min, playwright.config — o ÚNICO teto que alcança o globalSetup, porque o
+deadline do run é calculado antes da primeira task) **<** `timeout-minutes` do
+step (10) **<** do job (30). Quem dispara primeiro é o único que explica o
+motivo; o teto do GitHub só mata. Guard em `__tests__/e2eTetoDeTempo.test.ts`,
+que cobra job/step sem teto e a ordem entre os três.
+
 ### Armadilhas de ambiente (custaram mais que o spec)
 
 - **A porta 3000 pode ter OUTRO projeto.** Com `reuseExistingServer`, o

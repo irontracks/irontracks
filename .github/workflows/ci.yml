@@ -30,6 +30,17 @@ concurrency:
 jobs:
   quality-check:
     runs-on: ubuntu-latest
+    # ⚠️ Sem `timeout-minutes` o job herda o teto PADRÃO do GitHub: **6 horas**.
+    #
+    # Em 31/08/2026 (run 33365701785, PR #1009) o step do E2E logado pendurou
+    # sem imprimir uma linha sequer e só morreu nesse limite: 6 h de runner
+    # queimadas por uma falha que se resolve em minutos — e, enquanto ele
+    # pendura, NENHUM PR do repositório consegue ficar verde. O rerun do mesmo
+    # commit passou em 9,3 min, ou seja, é intermitente e vai voltar.
+    #
+    # O job leva ~10 min; 30 cobre com folga o pior caso legítimo (espera do
+    # preview da Vercel, até 10 min, + build + suíte).
+    timeout-minutes: 30
     env:
       # O contexto `secrets` não está disponível em `if:` de step — usar ali faz
       # o workflow inteiro falhar antes de rodar ("workflow file issue"), como
@@ -147,6 +158,17 @@ jobs:
         echo "Preview não ficou pronto em 10 min — o passo seguinte será pulado."
 
     - name: E2E — jornada logada (Playwright)
+      # Teto próprio, mais apertado que o do job: este step já pendurou DUAS
+      # vezes (46 min em 18/08/2026, 6 h em 31/08/2026) e, com
+      # `--reporter=github`, pendurado é indistinguível de rodando — o reporter
+      # do GitHub não escreve em stdio, e a linha "Running N tests" que aparece
+      # no CI vem do reporter `dot` que o Playwright acrescenta no `onBegin`,
+      # DEPOIS do globalSetup. Silêncio total só prova que não passou dali.
+      #
+      # A ordem das defesas importa: o `globalTimeout` do playwright.config
+      # (8 min) aborta primeiro e DIZ o motivo; este teto é o que sobra quando o
+      # processo está travado demais para se abortar sozinho.
+      timeout-minutes: 10
       if: steps.preview.outputs.url != ''
       run: npx playwright test --project=authenticated e2e/authenticated-workout-journey.spec.ts --reporter=github
       env:
@@ -158,6 +180,10 @@ jobs:
         E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
 
     - name: E2E — public pages (Playwright)
+      # Mesmo teto do irmão logado, por CLASSE e não por sintoma: o que pendura
+      # calado é `npx playwright test`, e este step roda o mesmo binário. Ele
+      # leva ~5 s (29 testes medidos); 10 min é folga, não expectativa.
+      timeout-minutes: 10
       run: npx playwright test --project=chromium e2e/pages-smoke.spec.ts e2e/pages-smoke-protected.spec.ts e2e/accessibility.spec.ts --reporter=github
       env:
         PLAYWRIGHT_CI_SERVER: "1"

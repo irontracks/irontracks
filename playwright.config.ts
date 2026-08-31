@@ -11,6 +11,26 @@ const hasAuthCredentials = !!(process.env.E2E_USER_EMAIL && process.env.E2E_USER
  */
 const PORT = process.env.PLAYWRIGHT_PORT ?? '3000'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`
+/**
+ * Teto do RUN INTEIRO — e ele é a única coisa que alcança o `globalSetup`.
+ *
+ * ⚠️ O `timeout: 30_000` abaixo é POR TESTE e não vale no setup. Quem bounda o
+ * setup é este `globalTimeout`: o runner calcula o deadline antes da primeira
+ * task e o globalSetup é a primeira delas. O default é `0` — sem teto nenhum.
+ *
+ * O que isso custou: em 18/08/2026 o step do E2E logado ficou 46 min mudo e em
+ * 31/08/2026 (run 33365701785) ficou **6 horas**, até o limite do runner, sem
+ * imprimir uma linha. Silêncio, e não erro, porque o `--reporter=github` não
+ * escreve em stdio: o "Running N tests" que aparece no CI vem do reporter `dot`
+ * que o Playwright acrescenta quando nenhum outro imprime — e ele fala no
+ * `onBegin`, que roda DEPOIS do globalSetup.
+ *
+ * Precisa ficar MENOR que o `timeout-minutes` do step no ci.yml (10 min):
+ * quem dispara primeiro é o único que explica o motivo; o teto do GitHub só
+ * mata. Guard da ordem em `src/__tests__/e2eTetoDeTempo.test.ts`.
+ */
+const GLOBAL_TIMEOUT_MS = 8 * 60_000
+
 const authStatePath = 'e2e/.auth/user.json'
 const hasAuthState = fs.existsSync(authStatePath) && fs.statSync(authStatePath).size > 50
 
@@ -26,6 +46,8 @@ export default defineConfig({
     workers: process.env.CI ? 2 : undefined,
     reporter: process.env.CI ? 'github' : 'html',
     timeout: 30_000,
+    // Só no CI: local, quem pendura tem um humano com Ctrl+C na frente.
+    ...(process.env.CI ? { globalTimeout: GLOBAL_TIMEOUT_MS } : {}),
 
     // Run global-setup only when credentials are provided
     ...(hasAuthCredentials ? { globalSetup: './e2e/global-setup.ts' } : {}),
