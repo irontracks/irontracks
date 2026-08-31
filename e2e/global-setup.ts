@@ -60,7 +60,10 @@ export default async function globalSetup(_config: FullConfig) {
         }
     }
 
-    const browser = await chromium.launch()
+    // O teto do launch já é 30 s por default (playwright-core 1.62) — explícito
+    // aqui só para ninguém reabrir a suspeita: NÃO foi por aqui que o job de
+    // 31/08/2026 pendurou.
+    const browser = await chromium.launch({ timeout: 30_000 })
     const context = await browser.newContext({
         extraHTTPHeaders: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
             ? {
@@ -69,6 +72,14 @@ export default async function globalSetup(_config: FullConfig) {
             }
             : {},
     })
+    // ⚠️ AQUI estavam as chamadas sem teto. O default do Playwright para AÇÃO
+    // (`actionTimeout`) é **0 — sem limite**, e dentro de um teste quem segura
+    // isso é o `timeout` do teste. O globalSetup não tem teste nenhum: um
+    // `page.click` num botão que nunca fica acionável (coberto, desabilitado,
+    // animando) espera para sempre, sem imprimir nada. Um default de contexto
+    // cobre a CLASSE — inclusive a próxima ação que alguém acrescentar aqui.
+    context.setDefaultTimeout(15_000)
+
     const page = await context.newPage()
 
     try {
@@ -106,6 +117,30 @@ export default async function globalSetup(_config: FullConfig) {
         // uma cascata enganosa de ENOENT em todos os specs autenticados.
         throw err
     } finally {
-        await browser.close()
+        // `browser.close()` não aceita timeout (conferido nos tipos do
+        // playwright-core 1.62: só `reason`). Se o chromium não morrer, este
+        // await fica pendente para sempre — depois de o trabalho já estar
+        // feito. Melhor-esforço: espera, avisa e segue.
+        await comTeto(
+            browser.close(),
+            15_000,
+            '[E2E] browser.close() não retornou em 15s — seguindo assim mesmo',
+        )
+    }
+}
+
+/** Espera `promessa` por no máximo `ms`; estourando, avisa e devolve o controle. */
+async function comTeto<T>(promessa: Promise<T>, ms: number, aviso: string): Promise<T | undefined> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const teto = new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => {
+            console.warn(aviso)
+            resolve(undefined)
+        }, ms)
+    })
+    try {
+        return await Promise.race([promessa, teto])
+    } finally {
+        if (timer) clearTimeout(timer)
     }
 }
