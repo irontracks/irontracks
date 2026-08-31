@@ -357,33 +357,62 @@ describe('source-guard: uma tela só, servindo as duas superfícies de nutriçã
  *
  * Mora DENTRO do JSON da refeição (`days[].meals[].note`), não numa coluna: a
  * tabela guarda o plano em JSONB, então o campo não custou migration.
+ *
+ * ⚠️ **O estado VAZIO é o que este bloco protege.** Na primeira versão o
+ * `<textarea>` era renderizado sempre, e no painel do professor — que lista as
+ * refeições todas abertas — isso somava ~310px de caixas vazias num plano de 6
+ * refeições, para um campo que quase nunca é preenchido. Hoje, sem nota, o
+ * campo é um convite de uma linha.
  */
 describe('MyDietPlan — observação da refeição', () => {
     afterEach(() => { vi.unstubAllGlobals() })
 
     const abrirPrimeiraRefeicao = async () => {
         fireEvent.click(await screen.findByText('Café da Manhã'))
-        return screen.findByPlaceholderText(/Observação ou dica/i)
     }
 
-    it('cada refeição tem seu próprio campo, e ele nasce com o que já estava salvo', async () => {
+    it('sem nota NÃO mostra caixa de texto — só o convite de uma linha', async () => {
+        mockFetch(dayPlan)
+        const { container } = render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        await abrirPrimeiraRefeicao()
+
+        expect(await screen.findByRole('button', { name: /Observação/i })).toBeTruthy()
+        expect(
+            container.querySelector('textarea'),
+            'caixa vazia empilhada é o ruído que esta mudança removeu',
+        ).toBeNull()
+    })
+
+    it('tocar no convite abre o campo JÁ FOCADO — senão são dois toques', async () => {
+        mockFetch(dayPlan)
+        render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        await abrirPrimeiraRefeicao()
+        fireEvent.click(await screen.findByRole('button', { name: /Observação/i }))
+
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
+        await waitFor(() => expect(document.activeElement).toBe(campo))
+    })
+
+    it('com nota salva, o campo já vem aberto e preenchido', async () => {
         mockFetch({
             ...dayPlan,
             meals: [{ ...DAY_MEALS[0], note: 'bater no liquidificador' }, DAY_MEALS[1]],
         })
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
+        await abrirPrimeiraRefeicao()
 
-        const campo = await abrirPrimeiraRefeicao()
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
         expect((campo as HTMLTextAreaElement).value).toBe('bater no liquidificador')
     })
 
-    it('grava no BLUR, mandando o dia e a refeição certos — não a cada tecla', async () => {
+    it('grava no BLUR, com o dia e a refeição certos — não a cada tecla', async () => {
         const fn = mockFetch(dayPlan)
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
-        const campo = await abrirPrimeiraRefeicao()
+        await abrirPrimeiraRefeicao()
+        fireEvent.click(await screen.findByRole('button', { name: /Observação/i }))
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
 
         fireEvent.change(campo, { target: { value: 'trocar por atum' } })
-        // Digitar não pode gerar requisição: seria uma por caractere.
         expect(fn.mock.calls.filter(([u]) => String(u).includes('/note'))).toHaveLength(0)
 
         fireEvent.blur(campo)
@@ -398,17 +427,19 @@ describe('MyDietPlan — observação da refeição', () => {
     it('sair do campo sem mudar nada NÃO gasta requisição', async () => {
         const fn = mockFetch({ ...dayPlan, meals: [{ ...DAY_MEALS[0], note: 'já escrita' }, DAY_MEALS[1]] })
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
-        const campo = await abrirPrimeiraRefeicao()
+        await abrirPrimeiraRefeicao()
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
 
         fireEvent.blur(campo)
         await waitFor(() => expect(screen.queryByText('salvando…')).toBeNull())
         expect(fn.mock.calls.filter(([u]) => String(u).includes('/note'))).toHaveLength(0)
     })
 
-    it('texto some ao apagar — é assim que o usuário desfaz', async () => {
+    it('texto apagado vira nota vazia — é assim que o usuário desfaz', async () => {
         const fn = mockFetch({ ...dayPlan, meals: [{ ...DAY_MEALS[0], note: 'apagar isto' }, DAY_MEALS[1]] })
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
-        const campo = await abrirPrimeiraRefeicao()
+        await abrirPrimeiraRefeicao()
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
 
         fireEvent.change(campo, { target: { value: '' } })
         fireEvent.blur(campo)
@@ -418,28 +449,34 @@ describe('MyDietPlan — observação da refeição', () => {
         })
     })
 
-    it('falha ao salvar avisa E preserva o que a pessoa escreveu', async () => {
-        // Perder o texto digitado por causa de uma falha de rede é o pior
-        // desfecho possível aqui — ele não está em lugar nenhum além da tela.
+    it('falha ao salvar avisa JUNTO do campo e preserva o texto', async () => {
+        // O aviso ficava no topo da lista: a 6ª refeição falhava e a mensagem
+        // nascia fora da tela. Perder o texto digitado seria o pior desfecho —
+        // ele não está em nenhum outro lugar.
         mockFetch(dayPlan, (url) =>
             String(url).includes('/diet-plan/note')
                 ? { ok: false, status: 500, json: async () => ({ ok: false }) }
                 : undefined,
         )
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
-        const campo = await abrirPrimeiraRefeicao()
+        await abrirPrimeiraRefeicao()
+        fireEvent.click(await screen.findByRole('button', { name: /Observação/i }))
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
 
         fireEvent.change(campo, { target: { value: 'não me perca' } })
         fireEvent.blur(campo)
 
-        expect(await screen.findByText(/Não consegui salvar a observação/i)).toBeTruthy()
+        const erro = await screen.findByText(/Não consegui salvar/i)
         expect((campo as HTMLTextAreaElement).value).toBe('não me perca')
+        // "junto do campo" = dentro do mesmo bloco, não no topo da lista.
+        expect(erro.closest('div')?.contains(campo)).toBe(true)
     })
 
     it('a autocorreção fica LIGADA — é texto livre, não identificador', async () => {
-        mockFetch(dayPlan)
+        mockFetch({ ...dayPlan, meals: [{ ...DAY_MEALS[0], note: 'x' }, DAY_MEALS[1]] })
         render(<MyDietPlan dateKey="2026-08-03" canApply />)
-        const campo = await abrirPrimeiraRefeicao()
+        await abrirPrimeiraRefeicao()
+        const campo = await screen.findByPlaceholderText(/bater no liquidificador/i)
         expect(campo.getAttribute('autocorrect')).not.toBe('off')
         expect(campo.getAttribute('autocapitalize')).not.toBe('none')
     })
