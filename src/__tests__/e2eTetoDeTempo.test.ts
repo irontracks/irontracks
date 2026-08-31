@@ -118,6 +118,22 @@ describe('globalSetup — as ações não podem esperar para sempre', () => {
             .toMatch(/context\.setDefaultTimeout\(\s*\d[\d_]*\s*\)/)
     })
 
+    it('o storageState tem teto (a chamada não aceita timeout)', () => {
+        // Foi ele que pendurou em 31/08/2026: lê o localStorage dentro da
+        // página e, se ela navegar no meio, refaz — para sempre, num app que
+        // ainda está redirecionando. Os tipos só oferecem path/indexedDB.
+        const chamada = /context\.storageState\(/.exec(setup)
+        expect(chamada, 'o storageState sumiu — o guard ficou sem alvo').not.toBeNull()
+        expect(setup, 'storageState solto pendura o setup inteiro sem imprimir nada')
+            .toMatch(/comTeto\(\s*leitura/)
+    })
+
+    it('espera a URL PARAR antes de ler o estado', () => {
+        // O `waitForURL` do login casa com `/`, a URL de antes do login, e
+        // volta na hora — ele não prova que o redirecionamento terminou.
+        expect(setup).toMatch(/await esperarUrlParada\(page,/)
+    })
+
     it('o browser.close() do finally é limitado', () => {
         // `close()` não aceita `timeout` (só `reason`): cru, ele pendura o
         // processo DEPOIS de o trabalho estar feito.
