@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { selecionarSessoesDoDia, somarKcalDasSessoes } from '@/lib/nutrition/kcalDeTreinoDoDia'
 import { sessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
@@ -122,7 +123,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros, ope
         const [totalsRes, snapshot, sessionsRes, intentRes, recentRes] = await Promise.all([
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
           buildUserSnapshot(supabase, uid, ['profile', 'nutrition']),
-          supabase.from('workouts').select('id, notes').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
+          selecionarSessoesDoDia(supabase, uid, dateKey),
           supabase.from('rest_day_intents').select('will_train').eq('user_id', uid).eq('date_key', dateKey).maybeSingle(),
           supabase.from('workouts').select('notes').eq('user_id', uid).eq('is_template', false).order('date', { ascending: false }).limit(30),
         ])
@@ -140,20 +141,14 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros, ope
         let goals: Totals = display.goals
         const goalsSource = display.source
 
-        // Real per-session kcal from the saved session JSON (`notes`), using the
-        // SAME MET model as the workout report — so this matches the "~X kcal" the
-        // report shows, instead of a flat 300/session estimate.
-        // Ingredientes pelo leitor único: o RPE do pós-treino está DENTRO do
-        // JSON da sessão, então esta tela chega no mesmo número do relatório sem
-        // ir ao banco atrás do check-in (era a divergência de 744 × 698 kcal).
+        // Calorias de treino de hoje pela fonte única (`kcalDeTreinoDoDia`),
+        // que a página `/dashboard/nutrition` também consome — modelo MET sobre
+        // o JSON da sessão, com os ingredientes do leitor único. O RPE do
+        // pós-treino está DENTRO desse JSON, então esta tela chega ao mesmo
+        // número do relatório sem ir ao banco atrás do check-in (era a
+        // divergência de 744 × 698 kcal).
         const kcalProfile = snapshot.profile ?? null
-        let workoutCalories = 0
-        for (const w of Array.isArray(sessionsRes.data) ? sessionsRes.data : []) {
-          try {
-            const notes = JSON.parse(String((w as { notes?: unknown }).notes ?? ''))
-            workoutCalories += estimateSessionKcal(notes, sessionKcalInputs(notes, kcalProfile))
-          } catch { /* sem JSON de sessão → ignora este treino */ }
-        }
+        const workoutCalories = somarKcalDasSessoes(sessionsRes.data, kcalProfile)
 
         // Modo dia de descanso: se respondeu "vou descansar" hoje e não treinou,
         // desconta ~1 treino da meta (proteína intacta). Rede de segurança: se

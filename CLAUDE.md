@@ -315,6 +315,21 @@ Duas armadilhas medidas ao construir, as duas fora do alcance de teste unitário
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
+⚠️ **A página `/dashboard/nutrition` somava a kcal de treino de uma tabela
+MORTA até 31/08/2026.** Ela lia `workout_session_logs` — **1 linha em toda a
+produção**, a última de 02/04/2026, e **nenhum escritor no código** — e
+estimava `minutos × 7`, enquanto o overlay lia `workouts.notes` com o modelo
+MET. As duas alimentam o MESMO card ("Treino hoje: ~X kcal"), então a página
+simplesmente nunca o mostrava: a soma dava 0 e o card só aparece acima de zero,
+com a leitura dentro de um `catch {}` vazio. Medido no dia da correção: 0 contra
+**644 kcal** da sessão real. Hoje as duas passam por
+`lib/nutrition/kcalDeTreinoDoDia.ts` — **e a QUERY mora lá também**, não só a
+soma: unificar só a aritmética deixaria as telas filtrando sessões de formas
+diferentes, que era metade do defeito. O próprio arquivo da página já sabia —
+40 linhas abaixo, o bloco do dia de descanso lê `workouts.notes` e diz em
+comentário que a tabela não é populada. Guard de classe + fiação em
+`lib/nutrition/__tests__/kcalDeTreinoDoDia.test.ts`.
+
 **Os INGREDIENTES da kcal têm fonte única: `utils/calories/sessionKcalInputs.ts`**
 (corrigido em 12/08/2026). O modelo MET sempre foi um só — o que divergia eram os
 ARGUMENTOS: o relatório passava peso do check-in **e RPE**, a nutrição passava só
