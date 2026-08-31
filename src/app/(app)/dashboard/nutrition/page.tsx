@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { buildUserSnapshot } from '@/lib/user/snapshot'
 import { DEFAULT_GOALS, resolveDisplayGoals } from '@/lib/nutrition/displayGoals'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
+import { selecionarSessoesDoDia, somarKcalDasSessoes } from '@/lib/nutrition/kcalDeTreinoDoDia'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { sessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 
@@ -103,38 +104,16 @@ export default async function NutritionPage() {
   const profileStats = snapshot.profile?.stats ?? null
   const currentPhase = snapshot.profile?.nutritionPhase ?? 'MAINTAIN'
 
-  // Fetch today's workout calories from completed sessions.
-  // Schema: workout_session_logs.finished_at + duration_seconds. A tabela
-  // legada `workout_sessions` não existe — Postgrest devolvia 404. Estimamos
-  // calorias quando metadata.calories ausente: ~7 kcal/min de treino de força.
+  // Calorias de treino de hoje — pela MESMA conta do overlay (modelo MET sobre
+  // `workouts.notes`). Até 31/08/2026 esta página lia `workout_session_logs`,
+  // que tem UMA linha em toda a produção (a última de 02/04/2026) e nenhum
+  // escritor no código: o card "Treino hoje" simplesmente nunca aparecia aqui,
+  // e o `catch {}` vazio garantia que ninguém percebesse.
   let workoutCaloriesToday = 0
   try {
-    const todayStart = `${dateKey}T00:00:00`
-    const todayEnd = `${dateKey}T23:59:59`
-    const { data: sessions } = await supabase
-      .from('workout_session_logs')
-      .select('duration_seconds, metadata')
-      .eq('user_id', authUserId)
-      .gte('finished_at', todayStart)
-      .lte('finished_at', todayEnd)
-    if (Array.isArray(sessions)) {
-      for (const s of sessions) {
-        const row = s as Record<string, unknown>
-        const meta = (row.metadata && typeof row.metadata === 'object'
-          ? (row.metadata as Record<string, unknown>)
-          : {})
-        const kcalMeta = Number(meta.calories ?? meta.calories_estimate)
-        if (Number.isFinite(kcalMeta) && kcalMeta > 0) {
-          workoutCaloriesToday += kcalMeta
-          continue
-        }
-        const seconds = Number(row.duration_seconds)
-        if (Number.isFinite(seconds) && seconds > 0) {
-          workoutCaloriesToday += Math.round((seconds / 60) * 7)
-        }
-      }
-    }
-  } catch { /* silent — table may not exist or have no data */ }
+    const { data: sessoesDeHoje } = await selecionarSessoesDoDia(supabase, authUserId, dateKey)
+    workoutCaloriesToday = somarKcalDasSessoes(sessoesDeHoje, snapshot.profile ?? null)
+  } catch { /* sem sessão hoje → o card não aparece, que é o certo */ }
 
   // ── Modo dia de descanso ──────────────────────────────────────────────────
   // Guiado pela RESPOSTA à pergunta matinal "vai treinar hoje?": se o usuário
