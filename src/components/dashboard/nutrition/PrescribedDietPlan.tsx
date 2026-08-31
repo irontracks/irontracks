@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
-import type { MacroTotals, PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape'
+import { planDays, type MacroTotals, type PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape'
 
 // Tipos da FONTE ÚNICA (`dietPlanShape`). Estavam copiados aqui, e a cópia já
 // estava atrasada: não tinha o `note` da refeição, então a orientação escrita
@@ -15,6 +15,8 @@ type PrescribedPlan = {
   id: string
   plan_name: string
   meals: PlanMeal[]
+  days?: unknown
+  plan_kind?: string | null
   notes: string | null
   created_at: string
 }
@@ -69,8 +71,11 @@ export default function PrescribedDietPlan({
         const res = await fetch('/api/nutrition/prescribed-plan', { cache: 'no-store' })
         const json = await res.json().catch((): null => null)
         if (!alive) return
-        if (json?.ok && json.plan && Array.isArray(json.plan.meals) && json.plan.meals.length > 0) {
-          setPlan(json.plan as PrescribedPlan)
+        const days = planDays(json?.plan)
+        if (json?.ok && json.plan && days.length > 0) {
+          const weekday = new Date(`${dateKey}T12:00:00`).getDay()
+          const selectedDay = days.find((day) => day.weekday === weekday) ?? days[0]
+          setPlan({ ...json.plan, meals: selectedDay.meals } as PrescribedPlan)
         } else {
           setPlan(null)
         }
@@ -81,7 +86,7 @@ export default function PrescribedDietPlan({
       }
     })()
     return () => { alive = false }
-  }, [])
+  }, [dateKey])
 
   // "Lançado" é estado por-dia: ao navegar pra outro dia, zera os badges (o componente não
   // remonta na troca de data, então sem isso o ✓ vazaria pro dia seguinte).
