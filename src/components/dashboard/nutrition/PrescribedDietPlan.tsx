@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import type { MacroTotals, PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape'
 
-type Totals = { calories: number; protein: number; carbs: number; fat: number }
-type PlanItem = { food: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
-type PlanMeal = { name: string; time?: string; items: PlanItem[]; totals: Totals }
+// Tipos da FONTE ÚNICA (`dietPlanShape`). Estavam copiados aqui, e a cópia já
+// estava atrasada: não tinha o `note` da refeição, então a orientação escrita
+// pelo professor era invisível para o aluno.
+type Totals = MacroTotals
+type PlanMeal = PlanMealShape
 type PrescribedPlan = {
   id: string
   plan_name: string
@@ -187,6 +190,19 @@ export default function PrescribedDietPlan({
                       <span className="font-semibold text-white">Total da refeição</span>
                       <span className="text-neutral-300">{Math.round(t.calories)} kcal · P{Math.round(t.protein)} C{Math.round(t.carbs)} G{Math.round(t.fat)}</span>
                     </div>
+
+                    {/*
+                      Orientação escrita pelo PROFESSOR nesta refeição. Read-only:
+                      o plano prescrito é de outra pessoa, e editar aqui seria
+                      alterar a prescrição — a mesma fronteira que impede a troca
+                      de alimento neste card.
+                    */}
+                    {meal.note ? (
+                      <div className="mt-2 rounded-lg border-l-2 border-white/15 bg-white/[0.03] px-2.5 py-2">
+                        <span className="t-meta-inherit block text-neutral-400">Orientação do professor</span>
+                        <p className="mt-1 whitespace-pre-line text-[11px] leading-relaxed text-neutral-200">{meal.note}</p>
+                      </div>
+                    ) : null}
 
                     {canApply && (
                       <button
