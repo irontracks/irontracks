@@ -57,3 +57,35 @@ describe('barra de ações fixa no rodapé (mobile)', () => {
         }
     })
 })
+
+/**
+ * ⚠️ A ordem dos blocos é a correção de 01/09/2026, medida no aparelho.
+ *
+ * Com a legenda ANTES dos controles, o seletor de estilo caía por baixo da
+ * barra de ações (medido no usuário: barra de 749 a 852 numa tela de 852) —
+ * ele conseguia postar e salvar e não conseguia trocar cor nem layout. Voltar
+ * a legenda para cima reintroduz exatamente esse defeito, e o teste de render
+ * não pegaria: em jsdom nada tem altura.
+ */
+describe('ordem dos blocos: controles antes da legenda', () => {
+    it.each(COMPOSERS.map(([c]) => c))('%s põe o painel de controle ANTES da legenda', (composer) => {
+        const código = ler(composer)
+        const painel = Math.min(
+            ...['<StoryControlPanel', '<NutritionStoryControlPanel']
+                .map((t) => código.indexOf(t))
+                .filter((i) => i >= 0),
+        )
+        const legenda = código.indexOf('<CustomTextPanel')
+        expect(painel).toBeGreaterThan(0)
+        expect(legenda, 'a legenda existe').toBeGreaterThan(0)
+        expect(painel, 'estilo e layout vêm primeiro — são a razão de existir do composer').toBeLessThan(legenda)
+    })
+
+    it('a folga do rodapé é maior que a barra medida (103px)', () => {
+        for (const [composer] of COMPOSERS) {
+            // pb-32 = 128px > 103px. Com pb-24 (96px) a barra cobria o fim do
+            // painel — o layout ficava atrás dela.
+            expect(ler(composer), composer).toMatch(/max-lg:pb-32/)
+        }
+    })
+})

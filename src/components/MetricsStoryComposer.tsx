@@ -181,7 +181,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
               <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Voltar" title="Voltar"><ArrowLeft size={18} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-24">
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-32">
               <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
 
                 <div className="flex-none flex flex-col items-center gap-6">
@@ -320,25 +320,6 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                       )}
                     </div>
 
-                    <div>
-                      <label htmlFor="metrics-story-title" className="block text-[10px] t-meta-inherit text-neutral-400 mb-2">Título</label>
-                      <input
-                        id="metrics-story-title"
-                        {...properNameFieldProps}
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        maxLength={40}
-                        className="w-full h-11 px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-sm font-bold focus:border-yellow-500/50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <CustomTextPanel
-                    value={customText}
-                    onChange={setCustomText}
-                    overflowing={customTextOverflowing}
-                  />
-                </div>
 
                 <NutritionStoryControlPanel
                   templates={NUTRITION_STORY_TEMPLATES}
@@ -360,6 +341,33 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />
+
+                {/* A LEGENDA fica DEPOIS dos controles (01/09/2026).
+                    Medido no aparelho do usuário (393×852): a barra de ações
+                    ocupa de 749 a 852, e com a legenda antes do painel o
+                    seletor de estilo caía por baixo dela — ele conseguia
+                    postar e salvar, mas não trocar cor nem layout. Estilo e
+                    layout são a razão de existir do composer; a legenda é
+                    opcional e quem quer escrever rola atrás dela. */}
+                    <div>
+                      <label htmlFor="metrics-story-title" className="block text-[10px] t-meta-inherit text-neutral-400 mb-2">Título</label>
+                      <input
+                        id="metrics-story-title"
+                        {...properNameFieldProps}
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        maxLength={40}
+                        className="w-full h-11 px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-sm font-bold focus:border-yellow-500/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <CustomTextPanel
+                    value={customText}
+                    onChange={setCustomText}
+                    overflowing={customTextOverflowing}
+                  />
+                </div>
               </div>
             </div>
           </motion.div>

@@ -35,7 +35,7 @@ export function NutritionStoryControlPanel({
   showTrimmer, isVideo, videoDuration, trimRange, setTrimRange, previewTime, videoRef,
   busy, busyAction, busySubAction, uploadProgress, error, info, onPost, onShare,
 }: NutritionStoryControlPanelProps) {
-  const acoesRef = useMedirPosicaoDasAcoes('nutricao')
+  const { acoes: acoesRef, estilo: estiloRef } = useMedirPosicaoDasAcoes('nutricao')
   return (
     <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
 
@@ -72,7 +72,7 @@ export function NutritionStoryControlPanel({
       </AnimatePresence>
 
       {/* Seletor de estilo */}
-      <div className="space-y-3">
+      <div ref={estiloRef} className="space-y-3">
         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80 mb-2">
           <Palette size={14} />
           ESCOLHA O ESTILO
