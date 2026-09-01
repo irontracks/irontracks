@@ -23,6 +23,14 @@ export const foodDatabase: Record<string, FoodItem> = {
   'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
   'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 } },
   'patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { bife: 120, posta: 120 } },
+  // Patinho MOÍDO e "carne moída magra" são o mesmo corte da linha acima — e é o que
+  // o dono come. Sem estas chaves, "200g de carne moída magra" casava a 'carne moida'
+  // comum (212 kcal, 11 g de gordura) e cobrava 79 kcal a mais por 100 g. Elas também
+  // sustentam a segunda opção de proteína do card: a moída GORDA estoura o teto de
+  // desvio calórico do motor contra um peito de frango, a magra passa.
+  'patinho moido': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
+  'carne moida magra': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
+  'carne moida de patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
   'alcatra': { kcal: 177, p: 26, c: 0, f: 8, approx: { bife: 120, posta: 120 } },
   'file mignon': { kcal: 143, p: 28, c: 0, f: 3.5, approx: { bife: 120, medalhao: 100 } },
   'contrafile': { kcal: 195, p: 25, c: 0, f: 10, approx: { bife: 120, posta: 120 } },

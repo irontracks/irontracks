@@ -212,6 +212,27 @@ export interface SwapOptions {
  * prato continua com cara de prato.
  */
 export function swapFood(item: SwappableItem, candidates: SwapCandidate[], options: SwapOptions = {}): SwapResult | null {
+  return rankSwapOptions(item, candidates, options)[0] ?? null
+}
+
+/**
+ * A MESMA escolha do `swapFood`, mas devolvendo a lista inteira em ordem.
+ *
+ * Existe porque o card do plano passou a OFERECER a alternativa em vez de sortear
+ * uma (01/09/2026): "Peito de frango 180 g" mostra embaixo "opção: 200 g de carne
+ * moída", e para isso alguém precisa ver mais que o primeiro colocado — a segunda
+ * fonte de proteína pode estar no 4º lugar do ranking, atrás de três formas de
+ * frango.
+ *
+ * `swapFood` é o topo desta lista, não um segundo motor: um ranking paralelo
+ * divergiria do botão de trocar na primeira regra nova (é a armadilha que já custou
+ * 14 renderers de série neste repo).
+ */
+export function rankSwapOptions(
+  item: SwappableItem,
+  candidates: SwapCandidate[],
+  options: SwapOptions = {},
+): SwapResult[] {
   const per100 = macrosPer100g(item)
   const cls = classifyFood(per100)
 
@@ -219,7 +240,7 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
   // chute: na auditoria de 04/08/2026, "arroz" com macros mal parseados (16 P e 11 G
   // em 150 g) caiu em mixed e foi trocado por "orange chicken". Recusar é melhor —
   // o usuário mantém o que tem e a feature não perde a credibilidade.
-  if (cls === 'mixed') return null
+  if (cls === 'mixed') return []
 
   const anchor = anchorMacroOf(cls)
 
@@ -250,7 +271,7 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
     // prato do jantar — mesmo com o macro batendo.
     .filter((c) => isRoleCompatible(item.food, c.name, mealGroup === 'main'))
 
-  if (!pool.length) return null
+  if (!pool.length) return []
 
   const targetAmount = anchor === 'kcal' ? num(item.calories) : num(item[anchor])
   const originalKcal = num(item.calories)
@@ -299,19 +320,18 @@ export function swapFood(item: SwappableItem, candidates: SwapCandidate[], optio
       return a.c.name.localeCompare(b.c.name)
     })
 
-  const best = ranked[0]
-  if (!best) return null
-
-  const factor = best.portion / 100
   const round1 = (n: number) => Math.round(n * 10) / 10
-  return {
-    food: best.c.name,
-    grams: best.portion,
-    calories: Math.round(num(best.c.kcal) * factor),
-    protein: round1(num(best.c.protein) * factor),
-    carbs: round1(num(best.c.carbs) * factor),
-    fat: round1(num(best.c.fat) * factor),
-    foodClass: cls,
-    source: best.c.source,
-  }
+  return ranked.map(({ c, portion }) => {
+    const factor = portion / 100
+    return {
+      food: c.name,
+      grams: portion,
+      calories: Math.round(num(c.kcal) * factor),
+      protein: round1(num(c.protein) * factor),
+      carbs: round1(num(c.carbs) * factor),
+      fat: round1(num(c.fat) * factor),
+      foodClass: cls,
+      source: c.source,
+    }
+  })
 }

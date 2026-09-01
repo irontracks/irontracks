@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useDialog } from '@/contexts/DialogContext'
-import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
+import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
+import { refeicaoComEscolhas } from '@/lib/nutrition/escolhaDaProteina'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
 
@@ -45,6 +46,15 @@ export default function MyDietPlan({
   const [appliedIdx, setAppliedIdx] = useState<Set<number>>(new Set())
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null)
   const [swappingKey, setSwappingKey] = useState<string | null>(null)
+  /**
+   * A segunda opção de proteína de cada item, vinda do servidor (mesma leitura de
+   * candidatos do ↻, sem gravar nada). Chave `mealIdx-itemIdx` DENTRO do dia — o
+   * mapa é recarregado a cada troca de dia, então o índice do dia não entra nela.
+   */
+  const [alternativas, setAlternativas] = useState<Record<string, PlanItem>>({})
+  /** Quais dessas opções o usuário marcou para ESTE lançamento. Efêmero: o plano
+   *  não muda, e a marca morre ao trocar de dia ou de data. */
+  const [escolhidos, setEscolhidos] = useState<Set<string>>(new Set())
   const [rejected, setRejected] = useState<Record<string, string[]>>({})
   const [salvandoNota, setSalvandoNota] = useState<number | null>(null)
   /** Falha da gravação, presa à refeição que falhou — no topo da lista ela
@@ -112,9 +122,73 @@ export default function MyDietPlan({
   useEffect(() => {
     setAppliedIdx(new Set())
     setOpenMeal(null)
+    // A escolha da proteína é do lançamento de UM dia. Sem zerar, marcar carne na
+    // terça faria a quarta lançar carne sem a opção nem estar na tela.
+    setEscolhidos(new Set())
   }, [dateKey, dayIndex])
 
-  const applyMeal = useCallback(async (meal: PlanMeal, idx: number) => {
+  /*
+   * Busca as opções do dia visível. Uma consulta por dia, não por item: o servidor
+   * lê o repertório uma vez e responde o dia inteiro — item a item seriam seis
+   * chamadas para abrir um card.
+   *
+   * `row` na dependência de propósito: trocar um alimento pelo ↻ muda o prato, e a
+   * opção oferecida embaixo dele precisa mudar junto, senão o card sugere alternativa
+   * para uma comida que não está mais ali.
+   */
+  useEffect(() => {
+    if (!row) return
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/nutrition/diet-plan/alternatives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ dayIndex }),
+        })
+        const json = await res.json().catch((): null => null)
+        if (!alive || !json?.ok) return
+        const mapa: Record<string, PlanItem> = {}
+        for (const a of Array.isArray(json.alternatives) ? json.alternatives : []) {
+          const alt = a?.alternative
+          if (!alt?.food) continue
+          mapa[`${a.mealIndex}-${a.itemIndex}`] = {
+            food: String(alt.food),
+            grams: num(alt.grams),
+            calories: num(alt.calories),
+            protein: num(alt.protein),
+            carbs: num(alt.carbs),
+            fat: num(alt.fat),
+          }
+        }
+        setAlternativas(mapa)
+      } catch {
+        // Silencioso de propósito: a opção é um EXTRA. Um aviso de erro aqui
+        // assustaria o usuário sobre um plano que está inteiro na tela e funciona.
+        if (alive) setAlternativas({})
+      }
+    })()
+    return () => { alive = false }
+  }, [row, dayIndex])
+
+  /** Os substitutos marcados nesta refeição, por índice do item. */
+  const escolhasDaRefeicao = useCallback((mealIdx: number): Map<number, PlanItem> => {
+    const mapa = new Map<number, PlanItem>()
+    for (const chave of escolhidos) {
+      const [m, i] = chave.split('-').map((n) => Number(n))
+      if (m !== mealIdx) continue
+      const alt = alternativas[chave]
+      if (alt && Number.isFinite(i)) mapa.set(i as number, alt)
+    }
+    return mapa
+  }, [escolhidos, alternativas])
+
+  const applyMeal = useCallback(async (mealOriginal: PlanMeal, idx: number) => {
+    // Lança o que está NA TELA: se o usuário marcou a carne, o diário recebe a
+    // carne. Os totais saem do `refeicaoComEscolhas`, o mesmo que o cabeçalho da
+    // refeição exibe — card e diário não podem discordar em dois toques.
+    const meal = refeicaoComEscolhas(mealOriginal, escolhasDaRefeicao(idx))
     if (applyingIdx !== null) return
     setApplyingIdx(idx); setError(null)
     try {
@@ -130,7 +204,7 @@ export default function MyDietPlan({
     } finally {
       setApplyingIdx(null)
     }
-  }, [applyingIdx, dateKey, onApplied])
+  }, [applyingIdx, dateKey, onApplied, escolhasDaRefeicao])
 
   const swapItem = useCallback(async (mealIdx: number, itemIdx: number) => {
     if (swappingKey) return
@@ -287,6 +361,10 @@ export default function MyDietPlan({
         {day.meals.map((meal, idx) => {
           const applied = appliedIdx.has(idx)
           const isOpen = openMeal === idx
+          // O cabeçalho mostra o que vai ser lançado. Deixá-lo no total do plano
+          // enquanto a carne trocada muda os macros faria a mesma tela dizer dois
+          // números para o mesmo prato.
+          const exibida = refeicaoComEscolhas(meal, escolhasDaRefeicao(idx))
           return (
             <div key={`${meal.name}-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
               <button
@@ -302,7 +380,7 @@ export default function MyDietPlan({
                 <span className="flex shrink-0 items-center gap-2">
                   {applied && <span className="text-[10px] font-bold text-emerald-400">✓</span>}
                   <span className="text-[10px] tabular-nums text-yellow-300/90">
-                    {Math.round(meal.totals.calories)} kcal · {Math.round(meal.totals.protein)}g P
+                    {Math.round(exibida.totals.calories)} kcal · {Math.round(exibida.totals.protein)}g P
                   </span>
                   <svg className={`size-3.5 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
@@ -313,10 +391,17 @@ export default function MyDietPlan({
               {isOpen && (
                 <div className="px-3 pb-3">
                   <div className="overflow-hidden rounded-lg bg-black/20 divide-y divide-white/[0.04]">
-                    {meal.items.map((it, j) => (
+                    {meal.items.map((it, j) => {
+                      const chaveOpcao = `${idx}-${j}`
+                      const opcao = alternativas[chaveOpcao]
+                      const trocado = escolhidos.has(chaveOpcao)
+                      return (
                       <div key={`${it.food}-${j}`} className="px-2.5 py-2">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-xs text-white">{it.food}</span>
+                          {/* Riscado, não apagado: o piso de contraste do app vale para o estado
+                              desativado também — quem escolheu a carne ainda precisa LER o que
+                              deixou de lado. */}
+                          <span className={`truncate text-xs ${trocado ? 'text-neutral-400 line-through' : 'text-white'}`}>{it.food}</span>
                           <span className="flex shrink-0 items-center gap-1.5">
                             <span className="text-xs font-semibold tabular-nums text-neutral-200">{Math.round(num(it.grams))}g</span>
                             <button
@@ -331,14 +416,53 @@ export default function MyDietPlan({
                             </button>
                           </span>
                         </div>
-                        <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
+                        <div className={`mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400 ${trocado ? 'line-through' : ''}`}>
                           <span>{Math.round(num(it.calories))} kcal</span>
-                          <span className={MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
-                          <span className={MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
-                          <span className={MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
+                          <span className={trocado ? '' : MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
+                          <span className={trocado ? '' : MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
+                          <span className={trocado ? '' : MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
                         </div>
+
+                        {/* A segunda fonte de proteína, oferecida em vez de escondida
+                            atrás de um toque: a decisão "hoje é frango ou carne?" se
+                            toma olhando as duas. Escolher aqui vale para o LANÇAMENTO;
+                            o plano só muda pelo ↻. */}
+                        {opcao && (
+                          <button
+                            type="button"
+                            onClick={() => setEscolhidos((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(chaveOpcao)) next.delete(chaveOpcao)
+                              else next.add(chaveOpcao)
+                              return next
+                            })}
+                            aria-pressed={trocado}
+                            aria-label={`Trocar por ${Math.round(num(opcao.grams))}g de ${opcao.food} neste lançamento`}
+                            className={`mt-1.5 w-full rounded-lg border px-2 py-1.5 text-left transition ${
+                              trocado
+                                ? 'border-emerald-500/40 bg-emerald-500/10'
+                                : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05]'
+                            }`}
+                          >
+                            <span className="flex items-baseline justify-between gap-2">
+                              <span className={`truncate text-[11px] ${trocado ? 'font-semibold text-emerald-200' : 'text-neutral-300'}`}>
+                                {trocado ? '✓ ' : 'Opção: '}{opcao.food}
+                              </span>
+                              <span className={`shrink-0 text-[11px] font-semibold tabular-nums ${trocado ? 'text-emerald-200' : 'text-neutral-300'}`}>
+                                {Math.round(num(opcao.grams))}g
+                              </span>
+                            </span>
+                            <span className="mt-0.5 flex gap-3 text-[10px] tabular-nums text-neutral-400">
+                              <span>{Math.round(num(opcao.calories))} kcal</span>
+                              <span className={MACRO_SURFACES.protein.label}>P {Math.round(num(opcao.protein))}g</span>
+                              <span className={MACRO_SURFACES.carbs.label}>C {Math.round(num(opcao.carbs))}g</span>
+                              <span className={MACRO_SURFACES.fat.label}>G {Math.round(num(opcao.fat))}g</span>
+                            </span>
+                          </button>
+                        )}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   <CampoDeNotaDaRefeicao
