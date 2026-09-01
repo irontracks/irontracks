@@ -28,6 +28,7 @@ import {
   nextPendingExercise,
   pendingDeferred,
 } from '@/lib/workout/deferredExercises';
+import { focoAposSerieConcluida } from '@/lib/workout/focoAposSerie';
 import { scrollToExercise } from './helpers/scrollToExercise';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
@@ -188,6 +189,31 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const sIdx = parseInt(sIdxStr, 10);
 
       /**
+       * Concluir série move o exercício da VEZ — ver `lib/workout/focoAposSerie`.
+       *
+       * Roda DEPOIS das escritas (o cálculo lê `logsRef.current`, que só tem a
+       * série recém-concluída quando a gravação já passou) e nos DOIS caminhos
+       * de saída: o de pesos vinculados retorna cedo, e deixá-lo de fora faria o
+       * foco parar de andar só em quem usa o cadeado de peso.
+       *
+       * Não expande nem rola nada: isto responde "onde o usuário está", não
+       * "para onde levá-lo". Arrastar a tela sozinho no meio da série seguinte
+       * sequestraria o gesto de quem já está lendo o próximo card.
+       */
+      const moverFocoSeConcluiu = () => {
+        if (patchObj.done !== true) return;
+        const alvo = focoAposSerieConcluida(
+          {
+            exercises: exercises as unknown[],
+            logs: logsRef.current as Record<string, unknown>,
+            deferred: deferredExercises,
+          },
+          exIdx,
+        );
+        if (alvo !== null) setCurrentExerciseIdx(alvo);
+      };
+
+      /**
        * Retorno tátil ao concluir a série.
        *
        * Este bloco existia desde antes, mas era MUDO no iPhone: `navigator.vibrate`
@@ -265,6 +291,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
             const w = String(patchObj.weight ?? '')
             if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
           } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
+          moverFocoSeConcluiu();
           return;
         }
       }
@@ -289,8 +316,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
         }
       } catch (e) { logError('hook:useActiveWorkoutController.broadcastLog', e) }
+
+      moverFocoSeConcluiu();
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
-  }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
+  }, [exercises, linkedWeightExercises, broadcastMyLog, getLog, deferredExercises, setCurrentExerciseIdx]);
 
   // ── Set type (working / warmup / feeler) ─────────────────────────────────
   // Writes to the active log so the change is part of the session payload on
