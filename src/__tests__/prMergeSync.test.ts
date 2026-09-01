@@ -107,7 +107,12 @@ describe('guardas do script', () => {
       .replace(/function ghOuDiagnostique[\s\S]*?\n\}\n/, '')
     const chamadasCruas = semHelper.match(/sh\('gh'/g) || []
     expect(chamadasCruas, "use ghOuMorra/ghOuDiagnostique — `sh('gh', …)` cru vira stack trace").toHaveLength(0)
-    expect(codigo).toMatch(/ghOuMorra\(\['pr', 'checks'/)
+    // A leitura dos checks passa por um dos dois helpers — qual deles é
+    // decisão do script (mudou em 01/09/2026: o `gh pr checks` sai com código
+    // != 0 quando há check PENDENTE e ainda assim imprime a tabela, então
+    // morrer ali abortava merge de PR verde). Ancorar no nome de um helper
+    // específico seria ancorar no que a próxima correção faz desaparecer.
+    expect(codigo).toMatch(/gh(OuMorra|OuDiagnostique)\(\['pr', 'checks'/)
     // O merge pode falhar POR CIMA de um merge feito, então ele é o único que
     // diagnostica em vez de morrer — e o resultado tem que passar pela função
     // pura que separa "não mergeou" de "mergeou e a limpeza local falhou".
@@ -159,5 +164,38 @@ describe('decidirPosFalhaDeMerge', () => {
     for (const estadoPr of [undefined, null, '', 'merged', 'QUALQUER']) {
       expect(decidirPosFalhaDeMerge({ estadoPr }).acao).toBe('abortar')
     }
+  })
+})
+
+/**
+ * O estado dos checks é lido da SAÍDA, não do código de saída do `gh`.
+ *
+ * ⚠️ Custou um merge que não aconteceu (PR #1024, 01/09/2026): com o deploy de
+ * preview da Vercel ainda "pending", o `gh pr checks` sai com código != 0 — e o
+ * script tratava isso como "não consegui ler", abortando um PR cujo
+ * `quality-check` estava VERDE. Pior: eu já tinha anunciado o merge.
+ */
+describe('checks pendentes não impedem a leitura', () => {
+  const TABELA_COM_PENDENTE = [
+    'Vercel Preview Comments\tpass\t0\thttps://vercel.com/github\t',
+    'quality-check\tpass\t16m26s\thttps://github.com/x/y/actions/runs/1/job/2\t',
+    'Vercel\tpending\t0\thttps://vercel.com/z\tVercel is deploying your app',
+  ].join('\n')
+
+  it('lê "pass" do quality-check mesmo com outro check pendente', () => {
+    expect(extrairEstado(TABELA_COM_PENDENTE)).toBe('pass')
+  })
+
+  it('o script confere a SAÍDA antes de desistir, não só o código de saída', () => {
+    // Sem isto, qualquer check pendente na lista volta a abortar o merge.
+    const fonte = require('node:fs').readFileSync(
+      require('node:path').join(process.cwd(), 'scripts/pr-merge.mjs'),
+      'utf8',
+    )
+    expect(fonte).toMatch(/if \(!r\.ok && !saida\.includes\('quality-check'\)\)/)
+  })
+
+  it('e continua abortando quando a saída não traz o quality-check', () => {
+    expect(extrairEstado('Vercel\tpending\t0\turl\t')).toBe('ausente')
   })
 })
