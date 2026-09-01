@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 /**
@@ -111,6 +112,7 @@ export function buildTeacherExercisesPayload(exercises: unknown): TeacherExercis
                     is_warmup: setType === 'warmup',
                     set_type: setType,
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
+                    ...perSetMethodField(sObj),
                 })
             }
             return {

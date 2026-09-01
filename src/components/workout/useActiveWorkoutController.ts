@@ -509,7 +509,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
   // ── Exercise CRUD + organize (extracted to useWorkoutExerciseCrud) ─────────
   const exerciseCrud = useWorkoutExerciseCrud({
-    workout, exercises, logs, getLog,
+    workout, exercises, logs, getLog, updateLog,
     collapsed, setCollapsed,
     setDeferredExercises,
     linkedWeightExercises, setLinkedWeightExercises,
@@ -552,7 +552,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   });
   const {
     toggleCollapse, toggleLinkWeights,
-    addExtraSetToExercise, removeExtraSetFromExercise, removeSetAtIndex,
+    addExtraSetToExercise, changeSetMethod, removeExtraSetFromExercise, removeSetAtIndex,
     openEditExercise, saveEditExercise,
     addExtraExerciseToWorkout, swapExerciseName,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
@@ -883,6 +883,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getPlannedSet,
     toggleCollapse,
     addExtraSetToExercise,
+    changeSetMethod,
     removeExtraSetFromExercise,
     removeSetAtIndex,
     openEditExercise,
@@ -978,7 +979,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getLog, updateLog, updateSetType,
     // getPlanConfig, getPlannedSet, HELP_TERMS são imports — referência estável,
     // não precisam estar nas deps. Listados no return acima como conveniência da API.
-    toggleCollapse, addExtraSetToExercise, removeExtraSetFromExercise, removeSetAtIndex,
+    toggleCollapse, addExtraSetToExercise, changeSetMethod, removeExtraSetFromExercise, removeSetAtIndex,
     openEditExercise, saveEditExercise, swapExerciseName, addExtraExerciseToWorkout,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
     openDeleteConfirm, closeDeleteConfirm, removeExerciseFromWorkout, deleteConfirmIdx,

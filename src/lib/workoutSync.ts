@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/utils/supabase/admin'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { logError } from '@/lib/logger'
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 
@@ -284,6 +285,7 @@ const replaceExercisesAndSets = async ({
           set_number: set?.set_number ?? 1,
           is_warmup: !!set?.is_warmup,
           advanced_config: set?.advanced_config ?? null,
+          ...perSetMethodField(set),
           completed: false,
         }
       }),

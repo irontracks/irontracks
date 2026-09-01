@@ -29,7 +29,7 @@ import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
 import { SetMethodPicker } from './set-renderers/SetMethodPicker';
-import { resolveSetMethodLabel, podeTrocarMetodoRapido, precisaCongelarMetodo, metodoParaCongelar } from './helpers/resolveSetMethod';
+import { resolveSetMethodLabel, podeTrocarMetodoRapido, precisaCongelarMetodo, metodoParaCongelar, explicitSetMethod, plannedSetMethod } from './helpers/resolveSetMethod';
 import { PlankSetInput } from './PlankSetInput';
 import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
@@ -70,6 +70,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     autoLoadEnabled,
     openEditExercise,
     addExtraSetToExercise,
+    changeSetMethod,
     getPlannedSet,
     getPlanConfig,
     getLog,
@@ -259,8 +260,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
       return <CardioSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
     }
 
-    // Per-set method override — takes precedence over all automatic detection
-    const perSetMethod = String(log.per_set_method || '').trim();
+    // Per-set method override — takes precedence over all automatic detection.
+    // Lê o log (escolha de hoje) e o PLANO (escolha salva), nessa ordem.
+    const perSetMethod = explicitSetMethod(log, plannedSet);
     if (perSetMethod === 'Normal') {
       return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
     }
@@ -387,6 +389,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
       log: getLog(`${exIdx}-${setIdx}`),
       plannedConfig: plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null,
       sstFromNotes: Boolean(parsedSSTConfig && setIdx === parsedSSTConfig.targetSetIdx),
+      plannedMethod: plannedSetMethod(plannedSet),
       isClusterConfig: isClusterConfig(cfg),
       isRestPauseConfig: isRestPauseConfig(cfg),
     });
@@ -444,7 +447,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
         <SetMethodPicker
           current={label}
           disabled={done}
-          onSelect={(m) => updateLog(key, { per_set_method: m })}
+          onSelect={(m) => { void changeSetMethod(exIdx, setIdx, m); }}
         />
       </div>
     );

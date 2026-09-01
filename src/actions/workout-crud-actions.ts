@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/client'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import type { ActionResult } from '@/types/actions'
@@ -67,6 +68,7 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
                     is_warmup: setType === 'warmup',
                     set_type: setType,
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
+                    ...perSetMethodField(sObj),
                 })
             }
             return {

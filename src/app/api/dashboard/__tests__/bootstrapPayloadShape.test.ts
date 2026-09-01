@@ -77,11 +77,21 @@ const CHAVES_EXERCICIO = new Set([
     'id', 'workout_id', 'name', 'muscle_group', 'notes', 'video_url', 'rest_time',
     'cadence', 'method', 'order', 'is_unilateral', 'side_rest_time',
     'transition_time', 'sets',
+    // ⚠️ `is_alternating` JÁ estava na RPC viva e nunca esteve aqui: o guard lia
+    // a migration de 20260703, que ficou atrás do banco. Só apareceu em
+    // 01/09/2026, quando a RPC foi reescrita a partir da definição real.
+    'is_alternating',
 ])
 
 const CHAVES_SERIE = new Set([
     'id', 'exercise_id', 'set_number', 'reps', 'rpe', 'weight', 'completed',
     'is_warmup', 'advanced_config', 'exercises',
+    // Método salvo para ESTA série ("Salvar no plano" do seletor, 01/09/2026).
+    // Decisão consciente de campo novo em rota quente — e ele não custa bytes na
+    // série comum: a RPC só o emite quando NÃO é nulo (concatenação condicional,
+    // ver a migration), então o payload de quem nunca usou o seletor é byte a
+    // byte o de antes.
+    'per_set_method',
 ])
 
 /** Marcadores de sessão logada — o bootstrap serve plano, não histórico. */
@@ -307,7 +317,7 @@ describe('source-guard: SELECTs da rota são conjuntos fechados', () => {
     it('sets: só as colunas conhecidas (+ embed de workout_id)', () => {
         expect(colunasDe('advanced_config')).toEqual([
             'advanced_config', 'exercise_id', 'exercises!inner(workout_id)', 'id',
-            'is_warmup', 'reps', 'rpe', 'set_number', 'weight',
+            'is_warmup', 'per_set_method', 'reps', 'rpe', 'set_number', 'weight',
         ])
     })
 

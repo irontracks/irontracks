@@ -79,3 +79,48 @@ describe('SetMethodPicker', () => {
     expect(screen.queryByRole('button', { name: /Método da série/ })).toBeNull()
   })
 })
+
+/**
+ * Guard de CLASSE: escolher método PERGUNTA se vale só hoje ou também no plano.
+ *
+ * Os dois seletores (o do card, para série avançada, e o do rodapé da série
+ * normal) escreviam direto em `logs[...].per_set_method` — ou seja, só na
+ * sessão, e sem dizer isso a ninguém. Quem ajustava o treino de verdade refazia
+ * a troca toda semana.
+ *
+ * A checagem mira em QUEM ESCREVE, não no nome do handler: um `updateLog` com
+ * `per_set_method` em qualquer componente do treino é a forma exata do defeito,
+ * inclusive num seletor novo que ninguém previu aqui. Quem pergunta e persiste
+ * é `changeSetMethod`, no `useWorkoutExerciseCrud` (guard próprio de
+ * comportamento em `hooks/__tests__/changeSetMethod.test.tsx`).
+ */
+describe('trocar método pergunta sobre o plano', () => {
+  const COMPONENTES = join(process.cwd(), 'src/components/workout')
+
+  const arquivosDeComponente = (dir: string): string[] => {
+    const out: string[] = []
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__tests__') continue
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) out.push(...arquivosDeComponente(full))
+      else if (/\.tsx$/.test(entry.name)) out.push(full)
+    }
+    return out
+  }
+
+  it('os dois seletores chamam changeSetMethod', () => {
+    const NORMAL = readFileSync(join(RENDERERS_DIR, 'normalSet.tsx'), 'utf8')
+    expect(CARD).toMatch(/changeSetMethod\(exIdx, setIdx,/)
+    expect(NORMAL).toMatch(/changeSetMethod\(exIdx, setIdx,/)
+  })
+
+  it('nenhum componente do treino grava per_set_method direto no log', () => {
+    const offenders: string[] = []
+    for (const file of arquivosDeComponente(COMPONENTES)) {
+      const code = readFileSync(file, 'utf8')
+      // `updateLog(<algo>, { … per_set_method … })` — a escrita que pula a pergunta.
+      if (/updateLog\([^)]*per_set_method/s.test(code)) offenders.push(file.replace(process.cwd() + '/', ''))
+    }
+    expect(offenders, 'use changeSetMethod — ele pergunta e persiste').toEqual([])
+  })
+})

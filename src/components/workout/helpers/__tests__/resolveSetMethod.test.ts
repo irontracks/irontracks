@@ -26,6 +26,7 @@ import {
   precisaCongelarMetodo,
   metodoParaCongelar,
   METODO_NORMAL_EXPLICITO,
+  explicitSetMethod,
 } from '../resolveSetMethod'
 
 /** Como `getPlannedSet` devolve o drop injetado pela nota. */
@@ -117,4 +118,54 @@ describe('congelar o método antes de remover uma série', () => {
     const semCongelar = { log: {}, plannedConfig: dropInjetadoPelaNota }
     expect(resolveSetMethodLabel(semCongelar)).toBe('Drop-Set')
   })
+})
+
+/**
+ * Método salvo NO PLANO (`sets.per_set_method`, 01/09/2026).
+ *
+ * A escrita e a leitura são pontas diferentes: o "Salvar no plano" pode gravar
+ * certo no banco e a série continuar desenhando Normal na sessão seguinte — foi
+ * o risco desta entrega, porque quem roteia os 14 renderers lia SÓ o log.
+ */
+describe('método salvo no plano', () => {
+    it('vale quando a sessão não tem escolha própria', () => {
+        expect(resolveSetMethodLabel({ plannedMethod: 'Drop-Set' })).toBe('Drop-Set')
+    })
+
+    it('o log VENCE o plano — a escolha de hoje é mais recente que a permanente', () => {
+        expect(resolveSetMethodLabel({
+            log: { per_set_method: 'Normal' },
+            plannedMethod: 'Drop-Set',
+        })).toBe('Normal')
+    })
+
+    it('vence a inferência por config e por método do exercício', () => {
+        expect(resolveSetMethodLabel({
+            exerciseMethod: 'Drop-set',
+            plannedMethod: 'Normal',
+        })).toBe('Normal')
+        expect(resolveSetMethodLabel({
+            plannedConfig: [{ weight: 40 }],
+            plannedMethod: 'Normal',
+        })).toBe('Normal')
+    })
+
+    it('plano vazio não atrapalha a inferência de sempre', () => {
+        expect(resolveSetMethodLabel({ exerciseMethod: 'FST-7', plannedMethod: '   ' })).toBe('FST-7')
+    })
+})
+
+describe('congelar método antes de remover série', () => {
+    it('série com método salvo no plano NÃO precisa congelar — a marca anda com ela', () => {
+        expect(precisaCongelarMetodo({ plannedMethod: 'Normal' })).toBe(false)
+    })
+})
+
+describe('explicitSetMethod', () => {
+    it('log primeiro, plano depois', () => {
+        expect(explicitSetMethod({ per_set_method: 'Cluster' }, { per_set_method: 'Drop-Set' })).toBe('Cluster')
+        expect(explicitSetMethod({}, { per_set_method: 'Drop-Set' })).toBe('Drop-Set')
+        expect(explicitSetMethod({}, { perSetMethod: 'Onda' })).toBe('Onda')
+        expect(explicitSetMethod(null, null)).toBe('')
+    })
 })

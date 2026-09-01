@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/utils/supabase/admin'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { requireRole } from '@/utils/auth/route'
 import { logError } from '@/lib/logger'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
@@ -427,7 +428,8 @@ export async function assignWorkoutToStudent(
                             set_number: s?.set_number ?? 1,
                             completed: false,
                             is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                            advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
+                            advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                            ...perSetMethodField(s)
                         });
                     }
                 }
