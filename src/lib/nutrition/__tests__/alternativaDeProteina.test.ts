@@ -3,6 +3,8 @@ import { alternativaDeProteina, familiaDaProteina } from '../alternativaDeProtei
 import { refeicaoComEscolhas } from '../escolhaDaProteina'
 import { swapFood, rankSwapOptions, type SwapCandidate } from '../foodSwap'
 import { sumTotals, type PlanItem, type PlanMeal } from '../dietPlanShape'
+import { databaseCandidates, nomeExibidoDaBase } from '../swapCandidates'
+import { foodDatabase } from '../food-database'
 
 /**
  * A segunda opção de proteína (01/09/2026) — o card oferece "opção: 200 g de carne
@@ -150,5 +152,30 @@ describe('o que vai ser lançado quando a opção é escolhida', () => {
         refeicaoComEscolhas(meal, new Map([[1, carne]]))
         expect(meal.items[1]?.food).toBe('Peito de frango')
         expect(meal.totals.calories).toBe(622)
+    })
+})
+
+/**
+ * O nome que o usuário LÊ. As chaves da base curada são normalizadas para casar
+ * texto digitado, e isso vazou para a tela no dia em que o card passou a exibir o
+ * candidato: a opção aparecia como "file mignon" (visto no aparelho, 01/09/2026).
+ */
+describe('nome do alimento da base na tela', () => {
+    it('a grafia certa vem do label, não da chave', () => {
+        expect(nomeExibidoDaBase('file mignon', foodDatabase['file mignon'])).toBe('Filé mignon')
+        expect(nomeExibidoDaBase('carne moida', foodDatabase['carne moida'])).toBe('Carne moída')
+        expect(nomeExibidoDaBase('tilapia', foodDatabase['tilapia'])).toBe('Tilápia')
+    })
+
+    it('sem label, ao menos começa com maiúscula', () => {
+        expect(nomeExibidoDaBase('patinho', foodDatabase['patinho'])).toBe('Patinho')
+        expect(nomeExibidoDaBase('alcatra')).toBe('Alcatra')
+    })
+
+    it('nenhum candidato da base chega ao card em minúscula', () => {
+        const minusculos = databaseCandidates()
+            .map((c) => c.name)
+            .filter((n) => n && n[0] === n[0]?.toLowerCase())
+        expect(minusculos).toEqual([])
     })
 })
