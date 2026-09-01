@@ -110,6 +110,12 @@ export const UserSettingsSchema = z
     notifyStudentWorkoutStart: z.boolean().default(true),
     // Aluno: avisar quando o professor envia/monta um treino novo pra ele.
     notifyWorkoutAssigned: z.boolean().default(true),
+    // Aluno: avisar quando o professor MEXE num treino que ele já tem. Separado
+    // do "treino novo" de propósito: quem recebe treino toda semana pode querer
+    // só o novo, e quem tem um treino fixo quer justamente saber do ajuste.
+    notifyWorkoutUpdated: z.boolean().default(true),
+    // Aluno: avisar quando o professor prescreve ou ajusta o plano alimentar.
+    notifyDietPlan: z.boolean().default(true),
     notifyStoryReactions: z.boolean().default(true),
     notifyStoryComments: z.boolean().default(true),
     notifyMentions: z.boolean().default(true),

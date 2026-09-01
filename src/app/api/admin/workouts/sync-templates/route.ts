@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
+import { notifyCoachChange } from '@/lib/notifications/coachChangeNotice'
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
@@ -505,6 +507,17 @@ export async function POST(req: Request) {
         .filter(Boolean)
         .slice(0, 10),
       picked_names: (syncMode === 'all' ? sourceRows : teacherTemplatesList).map((t) => String(t?.name ?? '')).filter(Boolean),
+    }
+
+    // O sync é o coach empurrando os treinos dele para o aluno — e chegava
+    // calado. Um aviso só para a rodada inteira (a janela de agrupamento do
+    // módulo já garante isso), e apenas quando algo de fato mudou: sync que não
+    // alterou nada não é notícia para ninguém.
+    if (created + updated > 0) {
+      waitUntil(
+        notifyCoachChange({ studentUserId: targetUserId, kind: 'workout_updated', origem: 'workout_edit' })
+          .catch(() => { }),
+      )
     }
 
     return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], ...(process.env.NODE_ENV === 'development' ? { debug } : {}) })

@@ -34,6 +34,9 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   student_workout_start: 'notifyStudentWorkoutStart',
   // Aluno: push "seu professor te enviou um treino novo".
   workout_assigned: 'notifyWorkoutAssigned',
+  // Aluno: o professor mexeu no treino/dieta que ele já tem (coachChangeNotice).
+  workout_updated: 'notifyWorkoutUpdated',
+  diet_updated: 'notifyDietPlan',
   friend_comeback: 'notifyFriendComeback',
   friend_achievement: 'notifyAchievements',
   friend_weekly_goal: 'notifyFriendWeeklyGoal',

@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
 import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
-import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient';
+import { notifyStudentWorkoutAssigned, notifyStudentWorkoutUpdated } from '@/lib/notifications/workoutAssignedClient';
 import dynamic from 'next/dynamic';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -484,6 +484,10 @@ export const StudentDetailPanel: React.FC = () => {
                                             if (!targetUserId) { await alert('Este aluno ainda não possui acesso ao app.'); return; }
                                             if (editingStudentWorkout.id) {
                                                 await updateWorkout(String(editingStudentWorkout.id || ''), data);
+                                                // Editar treino que o aluno JÁ tem chegava calado: ele só
+                                                // descobria abrindo o app. O aviso de "treino novo" só cobria
+                                                // o outro branch (pedido do dono, 01/09/2026).
+                                                void notifyStudentWorkoutUpdated(targetUserId, data.title || undefined);
                                             } else {
                                                 // Grava via RPC save_workout_atomic (mesma do editor do aluno):
                                                 // exercícios viram linhas na tabela `sets`. Insert direto em

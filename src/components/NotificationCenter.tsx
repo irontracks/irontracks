@@ -139,6 +139,19 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     // Dinheiro: o caso para o qual o vermelho existe.
     billing_issue: tipo(<CreditCard size={15} />, 'Cobrança', 'aviso'),
 
+    // ── O trabalho do COACH chegando ao aluno ────────────────────────────────
+    // LEMBRETE, não ação: ninguém espera RESPOSTA do aluno — o que se pede é
+    // que ele abra antes de treinar/comer. Ação é para quem tem alguém do outro
+    // lado aguardando (convite, pedido de acesso, mensagem), e gastar o dourado
+    // aqui esvaziaria justamente esses. Critério em `notificacaoPorFuncao`.
+    //
+    // ⚠️ `workout_assigned` JÁ era emitido pelo servidor e não estava nesta
+    // tabela: caía no `default` — sino cinza, rótulo "Info". Mesmo defeito dos
+    // 14 tipos corrigidos em 27/08/2026, num tipo que nasceu depois.
+    workout_assigned: tipo(<Dumbbell size={15} />, 'Treino novo', 'lembrete'),
+    workout_updated: tipo(<Dumbbell size={15} />, 'Treino', 'lembrete'),
+    diet_updated: tipo(<Utensils size={15} />, 'Dieta', 'lembrete'),
+
     default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
 
@@ -236,6 +249,10 @@ const DESTINO_POR_TIPO: Record<string, string> = {
     // Cutucões sobre o próprio treino: o destino é a lista de treinos, de onde
     // se começa um.
     workout_reminder: '/dashboard',
+    // O coach mexeu: treino leva à lista (de onde se inicia), dieta à nutrição.
+    workout_assigned: '/dashboard',
+    workout_updated: '/dashboard',
+    diet_updated: '/dashboard/nutrition',
     streak_at_risk: '/dashboard',
     inactivity: '/dashboard',
     pr_close: '/dashboard',

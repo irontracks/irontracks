@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
+import { notifyCoachChange } from '@/lib/notifications/coachChangeNotice'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { requireRole } from '@/utils/auth/route'
@@ -113,6 +115,17 @@ export async function POST(req: Request) {
     }
 
     await incrementVipUsage(auth.supabase, teacherId, 'insights')
+
+    // Aviso ao aluno: o plano já está gravado e ativo. Best-effort — o coach
+    // não pode receber erro porque o push falhou.
+    waitUntil(
+      notifyCoachChange({
+        studentUserId: studentId,
+        kind: 'diet_updated',
+        nome: planName,
+        origem: 'diet_prescribe',
+      }).catch(() => { }),
+    )
 
     return NextResponse.json({
       ok: true,
