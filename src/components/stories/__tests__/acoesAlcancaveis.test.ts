@@ -89,3 +89,35 @@ describe('ordem dos blocos: controles antes da legenda', () => {
         }
     })
 })
+
+/**
+ * A barra fixa não pode cobrir o campo da legenda enquanto se escreve.
+ *
+ * Relato do dono (01/09/2026, com print): metade do campo ficava por baixo da
+ * barra POSTAR/SALVAR. São duas defesas, e as duas precisam existir — a barra
+ * sai da frente durante o foco (CSS) e o campo sobe para o meio da tela ao ser
+ * tocado (o teclado do iPhone ainda vai comer metade do espaço).
+ */
+describe('escrever a legenda com a barra fixa na tela', () => {
+    const css = ler('src/app/globals.css')
+
+    it('a barra some enquanto o campo está focado', () => {
+        expect(css).toMatch(/body:has\(\.story-caption-field:focus\)\s*\.story-actions-bar/)
+        // Só no mobile: no desktop a barra nem é fixa.
+        const bloco = css.slice(css.indexOf('.story-caption-field:focus') - 400, css.indexOf('.story-caption-field:focus'))
+        expect(bloco).toMatch(/@media \(max-width: 1023px\)/)
+    })
+
+    it.each(PAINEIS)('%s marca a barra com a classe que o CSS procura', (painel) => {
+        expect(ler(painel)).toContain('story-actions-bar')
+    })
+
+    it('o campo tem a classe e sobe ao receber foco', () => {
+        const campo = ler('src/components/stories/CustomTextPanel.tsx')
+        expect(campo).toContain('story-caption-field')
+        expect(campo).toMatch(/onFocus=\{subirAcimaDaBarra\}/)
+        // `center`, não `nearest`: com o teclado aberto, `nearest` deixa o campo
+        // colado na barra de novo.
+        expect(campo).toMatch(/block:\s*'center'/)
+    })
+})

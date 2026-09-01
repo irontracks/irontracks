@@ -690,3 +690,23 @@ select {
   height: max(100%, 44px);
   transform: translate(-50%, -50%);
 }
+
+/* ── Story: a barra de ações sai da frente enquanto se escreve a legenda ─────
+ *
+ * A barra POSTAR/SALVAR é fixa no rodapé (01/09/2026) e ocupa ~103px. Enquanto
+ * o usuário não rolou até o fim, ela passa por cima da metade de baixo do campo
+ * de legenda — justamente o que ele precisa ler enquanto digita (relato do dono,
+ * com print). No iPhone piora: o teclado sobe e o espaço livre encolhe.
+ *
+ * `:has()` em vez de estado em React de propósito — a barra e o campo vivem em
+ * componentes diferentes (dois painéis servindo quatro composers), e passar
+ * "estou digitando" entre eles seria fiação nova em quatro telas para um efeito
+ * puramente visual. Onde `:has` não existir, degrada para o comportamento de
+ * hoje mais o scroll automático do campo: ninguém fica pior.
+ *
+ * Só no mobile: no desktop a barra nem é fixa. */
+@media (max-width: 1023px) {
+  body:has(.story-caption-field:focus) .story-actions-bar {
+    display: none;
+  }
+}
