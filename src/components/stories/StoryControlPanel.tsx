@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { LayoutThumb } from './LayoutThumb'
 import { STORY_LAYOUTS, LivePositions } from '../storyComposerUtils'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import type { StoryTemplate } from './storyTemplates'
 
 interface StoryControlPanelProps {
@@ -41,6 +42,56 @@ export function StoryControlPanel({
     previewTime, videoRef, busy, busyAction, busySubAction, uploadProgress,
     error, info, onPost, onShare,
 }: StoryControlPanelProps) {
+    const acoesRef = React.useRef<HTMLDivElement | null>(null)
+
+    /**
+     * ⚠️ INSTRUMENTAÇÃO — não é enfeite, é o que substitui o chute.
+     *
+     * Relato de usuário (Diogo, 01/09/2026): "não consigo mudar o template nem
+     * salvar". A barra de ações passou a ser FIXA no rodapé em 01/09 e, no
+     * simulador de 390×844, ela aparece. Ele carregou o app DEPOIS do deploy
+     * (medido em `user_activity_events`: TTFB às 10:08 UTC) e continua sem ver
+     * os botões — ou seja, a correção não alcança o aparelho dele e eu não
+     * reproduzo aqui.
+     *
+     * Mede o que a tela dele de fato faz: onde a barra caiu em relação à
+     * viewport. `fixed` dentro de um ancestral com `transform` (framer-motion
+     * anima `y`/`scale` no painel do composer) deixa de ser fixo à viewport e
+     * passa a ser relativo ao ancestral — é a suspeita nº 1, e este número a
+     * confirma ou derruba sem depender de mais um vídeo.
+     *
+     * Sem PII: só geometria e viewport. Uma vez por abertura (o dedupe do
+     * `trackUserEvent` cuida do resto).
+     */
+    React.useEffect(() => {
+        try {
+            const el = acoesRef.current
+            if (!el || typeof window === 'undefined') return
+            // Espera o layout assentar: medir no mesmo frame da montagem pega a
+            // animação de entrada no meio e reporta uma posição que não existe.
+            const t = window.setTimeout(() => {
+                try {
+                    const r = el.getBoundingClientRect()
+                    const vh = window.innerHeight || 0
+                    trackUserEvent('story_actions_position', {
+                        type: 'ui',
+                        metadata: {
+                            // Barra visível na tela? É a pergunta inteira.
+                            visivel: r.top < vh && r.bottom > 0,
+                            topo: Math.round(r.top),
+                            fundo: Math.round(r.bottom),
+                            alturaViewport: Math.round(vh),
+                            larguraViewport: Math.round(window.innerWidth || 0),
+                            posicao: window.getComputedStyle(el).position,
+                            versao: String(process.env.NEXT_PUBLIC_APP_VERSION || 'dev'),
+                        },
+                    })
+                } catch { /* telemetria nunca derruba a tela */ }
+            }, 900)
+            return () => window.clearTimeout(t)
+        } catch { /* idem */ }
+    }, [])
+
     return (
         <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
 
@@ -211,7 +262,7 @@ export function StoryControlPanel({
                 inteira e captura o arraste para mover o card) não deixa rolar
                 a página. Sticky não resolveria: ele só segura o que JÁ está na
                 viewport. No desktop segue empilhado dentro do painel. */}
-            <div className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
+            <div ref={acoesRef} className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
                 {/* Primary: Post */}
                 <div className="relative group max-lg:flex-1">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
