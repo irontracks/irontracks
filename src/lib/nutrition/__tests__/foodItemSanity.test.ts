@@ -219,9 +219,11 @@ describe('source-guard: o crivo está ligado onde importa', () => {
       cand('Hambúrguer Reforçado (Pão brioche)', 1650, 110, 70, 100, 'learned'),
     ]
     expect(mergeCandidates(sujos)).toEqual([])
-    // E o alimento bom no meio do lixo sobrevive.
+    // E o alimento bom no meio do lixo sobrevive — com a inicial maiúscula, que o
+    // merge aplica desde 01/09/2026 (o nome do repertório é o texto digitado pelo
+    // usuário e passou a ser EXIBIDO no card do plano).
     expect(mergeCandidates([...sujos, cand('frango grelhado', 165, 31, 0, 4, 'learned')]).map((c) => c.name))
-      .toEqual(['frango grelhado'])
+      .toEqual(['Frango grelhado'])
   })
 
   it('o repertório vem dos ITENS de refeição, com precedência sobre os "aprendidos"', () => {
