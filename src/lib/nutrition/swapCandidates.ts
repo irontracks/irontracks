@@ -48,8 +48,24 @@ const usable = (c: SwapCandidate): boolean => isUsableAsSwapCandidate(c)
 export function nomeExibidoDaBase(chave: string, item?: { label?: string }): string {
   const label = String(item?.label ?? '').trim()
   if (label) return label
-  const nome = String(chave ?? '').trim()
-  return nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : nome
+  return comInicialMaiuscula(chave)
+}
+
+/**
+ * Inicial maiúscula, e só isso.
+ *
+ * Vale para TODAS as fontes, não só a base: o nome vindo do repertório é o texto que
+ * o usuário digitou no lançamento — "250g patinho bovino picado" vira "patinho
+ * bovino picado" depois de limpa a quantidade —, e ele aparece no card do plano ao
+ * lado de itens escritos com maiúscula. Ninguém digita pensando em como aquilo vai
+ * ser exibido semanas depois.
+ *
+ * O RESTO do nome fica intocado de propósito: title case quebraria "Pão de queijo"
+ * em "Pão De Queijo", e nomes de marca ("Whey Growth") já vêm como a pessoa escreveu.
+ */
+export function comInicialMaiuscula(nome: string): string {
+  const limpo = String(nome ?? '').trim()
+  return limpo ? limpo.charAt(0).toUpperCase() + limpo.slice(1) : limpo
 }
 
 /** A base curada como candidatos. Pura — dá pra testar sem banco. */
@@ -78,7 +94,10 @@ export function mergeCandidates(...groups: SwapCandidate[][]): SwapCandidate[] {
       if (!key || key.length < 2) continue
       if (byKey.has(key)) continue
       if (!usable(c)) continue
-      byKey.set(key, c)
+      // A grafia de exibição entra AQUI, o ponto por onde as quatro fontes passam:
+      // fazer isso em cada uma seria repetir a decisão quatro vezes, e a quinta fonte
+      // que alguém acrescentar nasceria sem ela.
+      byKey.set(key, { ...c, name: comInicialMaiuscula(c.name) })
     }
   }
   return [...byKey.values()]

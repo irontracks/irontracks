@@ -3,7 +3,7 @@ import { alternativaDeProteina, familiaDaProteina } from '../alternativaDeProtei
 import { refeicaoComEscolhas } from '../escolhaDaProteina'
 import { swapFood, rankSwapOptions, type SwapCandidate } from '../foodSwap'
 import { sumTotals, type PlanItem, type PlanMeal } from '../dietPlanShape'
-import { databaseCandidates, nomeExibidoDaBase } from '../swapCandidates'
+import { databaseCandidates, mergeCandidates, nomeExibidoDaBase } from '../swapCandidates'
 import { foodDatabase } from '../food-database'
 
 /**
@@ -177,5 +177,33 @@ describe('nome do alimento da base na tela', () => {
             .map((c) => c.name)
             .filter((n) => n && n[0] === n[0]?.toLowerCase())
         expect(minusculos).toEqual([])
+    })
+})
+
+/**
+ * O nome do repertório também é lido pelo usuário. Ele veio do texto que a pessoa
+ * digitou no lançamento ("250g patinho bovino picado", que o parser limpa para
+ * "patinho bovino picado") e aparece no card ao lado de itens com maiúscula.
+ */
+describe('grafia dos nomes vindos do repertório', () => {
+    it('a inicial sobe, em qualquer fonte', () => {
+        const [item] = mergeCandidates([
+            { name: 'patinho bovino picado', kcal: 133, protein: 27, carbs: 0, fat: 3, source: 'learned' },
+        ])
+        expect(item?.name).toBe('Patinho bovino picado')
+    })
+
+    it('e SÓ a inicial — title case estragaria o resto', () => {
+        const [item] = mergeCandidates([
+            { name: 'pão de queijo assado', kcal: 300, protein: 11, carbs: 40, fat: 12, source: 'custom' },
+        ])
+        expect(item?.name, '"Pão De Queijo" não é como ninguém escreve').toBe('Pão de queijo assado')
+    })
+
+    it('nome já capitalizado não é mexido', () => {
+        const [item] = mergeCandidates([
+            { name: 'Whey Growth', kcal: 380, protein: 75, carbs: 8, fat: 4, source: 'custom' },
+        ])
+        expect(item?.name).toBe('Whey Growth')
     })
 })
