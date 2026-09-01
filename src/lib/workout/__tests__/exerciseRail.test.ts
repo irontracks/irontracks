@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRailItems, rotuloDoItem, MINIMO_PARA_MOSTRAR_TIRA } from '../exerciseRail'
+import { buildRailItems, rotuloDoItem, aparenciaDoItem, MINIMO_PARA_MOSTRAR_TIRA } from '../exerciseRail'
 
 /**
  * A tira de navegação do treino ativo.
@@ -89,5 +89,22 @@ describe('quando a tira aparece', () => {
     it('o piso existe para não gastar o topo da tela com rolagem curta', () => {
         expect(MINIMO_PARA_MOSTRAR_TIRA).toBeGreaterThanOrEqual(3)
         expect(MINIMO_PARA_MOSTRAR_TIRA).toBeLessThanOrEqual(5)
+    })
+})
+
+describe('aparenciaDoItem', () => {
+    it('o exercício da vez NÃO veste o verde — verde é só concluído', () => {
+        expect(aparenciaDoItem({ estado: 'pendente', atual: true })).toBe('atual')
+        expect(aparenciaDoItem({ estado: 'pendente', atual: false })).toBe('pendente')
+    })
+
+    it('concluído vence o foco — esconder a conclusão do card na tela seria mentir', () => {
+        expect(aparenciaDoItem({ estado: 'feito', atual: true })).toBe('feito')
+        expect(aparenciaDoItem({ estado: 'feito', atual: false })).toBe('feito')
+    })
+
+    it('guardado só aparece como guardado quando NÃO é o da vez', () => {
+        expect(aparenciaDoItem({ estado: 'guardado', atual: true })).toBe('atual')
+        expect(aparenciaDoItem({ estado: 'guardado', atual: false })).toBe('guardado')
     })
 })

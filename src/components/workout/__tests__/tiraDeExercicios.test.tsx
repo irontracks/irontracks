@@ -77,6 +77,20 @@ describe('WorkoutExerciseRail', () => {
         expect(atual.getAttribute('aria-current')).toBe('true')
     })
 
+    it('o chip da vez é DOURADO enquanto não está concluído — e vira verde depois', () => {
+        currentExerciseIdx = 1
+        render(<WorkoutExerciseRail />)
+        const daVez = screen.getByRole('button', { name: /Ir para Exercício 2/i })
+        expect(daVez.className).toMatch(/yellow-500\/15/)
+        expect(daVez.className, 'verde é só para concluído').not.toMatch(/emerald/)
+        cleanup()
+
+        logs = { '1-0': { done: true }, '1-1': { done: true }, '1-2': { done: true } }
+        render(<WorkoutExerciseRail />)
+        const concluido = screen.getByRole('button', { name: /Ir para Exercício 2/i })
+        expect(concluido.className).toMatch(/emerald/)
+    })
+
     it('o alvo tem 44px REAIS — `.tap-44` numa fileira roubaria o toque do card de baixo', () => {
         render(<WorkoutExerciseRail />)
         for (const b of screen.getAllByRole('button')) {
