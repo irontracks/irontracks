@@ -167,7 +167,7 @@ export default function VipPeriodizationPanel({
               cadence,
               method,
               "order",
-              sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config )
+              sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config, per_set_method )
             )
           `,
           )
