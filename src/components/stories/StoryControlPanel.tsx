@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { LayoutThumb } from './LayoutThumb'
 import { STORY_LAYOUTS, LivePositions } from '../storyComposerUtils'
+import { useMedirPosicaoDasAcoes } from './useMedirPosicaoDasAcoes'
 import type { StoryTemplate } from './storyTemplates'
 
 interface StoryControlPanelProps {
@@ -41,6 +42,8 @@ export function StoryControlPanel({
     previewTime, videoRef, busy, busyAction, busySubAction, uploadProgress,
     error, info, onPost, onShare,
 }: StoryControlPanelProps) {
+    const acoesRef = useMedirPosicaoDasAcoes('treino')
+
     return (
         <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
 
@@ -211,7 +214,7 @@ export function StoryControlPanel({
                 inteira e captura o arraste para mover o card) não deixa rolar
                 a página. Sticky não resolveria: ele só segura o que JÁ está na
                 viewport. No desktop segue empilhado dentro do painel. */}
-            <div className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
+            <div ref={acoesRef} className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
                 {/* Primary: Post */}
                 <div className="relative group max-lg:flex-1">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />

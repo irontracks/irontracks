@@ -5,6 +5,7 @@ import { Palette, Crown, Download, Loader2, CheckCircle2, AlertCircle } from 'lu
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import type { StoryTemplate } from './storyTemplates'
+import { useMedirPosicaoDasAcoes } from './useMedirPosicaoDasAcoes'
 
 interface NutritionStoryControlPanelProps {
   templates: StoryTemplate[]
@@ -34,6 +35,7 @@ export function NutritionStoryControlPanel({
   showTrimmer, isVideo, videoDuration, trimRange, setTrimRange, previewTime, videoRef,
   busy, busyAction, busySubAction, uploadProgress, error, info, onPost, onShare,
 }: NutritionStoryControlPanelProps) {
+  const acoesRef = useMedirPosicaoDasAcoes('nutricao')
   return (
     <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
 
@@ -136,9 +138,14 @@ export function NutritionStoryControlPanel({
         )}
       </AnimatePresence>
 
-      {/* Ações */}
-      <div className="space-y-3 pt-2">
-        <div className="relative group">
+      {/* Ações — barra FIXA no rodapé em mobile, igual ao painel de treino.
+          ⚠️ A correção de 01/09 (relato do Diogo) só alcançou o
+          `StoryControlPanel`; nutrição, cardio e métricas usam ESTE painel e
+          ficaram com as ações no fim de uma coluna que o usuário só alcança
+          rolando por cima da prévia — que captura o arraste. Ou seja: o mesmo
+          defeito, em três dos quatro caminhos. */}
+      <div ref={acoesRef} className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="relative group max-lg:flex-1">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
           <button
             onClick={onPost} disabled={busy}
@@ -154,7 +161,7 @@ export function NutritionStoryControlPanel({
         </div>
 
         {busyAction === 'post' && busySubAction === 'uploading' && (
-          <div className="space-y-1.5" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
+          <div className="space-y-1.5 max-lg:hidden" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
             <div className="w-full bg-neutral-800/80 rounded-full h-2 overflow-hidden border border-neutral-700/50">
               <div className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
             </div>
@@ -164,7 +171,8 @@ export function NutritionStoryControlPanel({
 
         <button
           onClick={onShare} disabled={busy}
-          className="relative h-12 w-full rounded-xl bg-neutral-900/80 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700/50 hover:border-yellow-500/30 transition-all active:scale-[0.97] overflow-hidden"
+          aria-label="Baixar ou compartilhar a imagem do story"
+          className="relative h-12 w-full max-lg:h-14 max-lg:w-auto max-lg:shrink-0 max-lg:px-4 rounded-xl bg-neutral-900/80 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700/50 hover:border-yellow-500/30 transition-all active:scale-[0.97] overflow-hidden"
         >
           {busyAction === 'share' ? (
             <>
@@ -172,7 +180,11 @@ export function NutritionStoryControlPanel({
               <div className="relative flex items-center gap-2"><Loader2 className="animate-spin text-yellow-500" size={16} /><span className="text-yellow-500">{busySubAction === 'processing' ? 'PROCESSANDO...' : 'SALVANDO...'}</span></div>
             </>
           ) : (
-            <><Download size={15} className="text-yellow-500/70" /><span>BAIXAR / COMPARTILHAR</span></>
+            <>
+              <Download size={15} className="text-yellow-500/70" />
+              <span className="max-lg:hidden">BAIXAR / COMPARTILHAR</span>
+              <span className="lg:hidden">SALVAR</span>
+            </>
           )}
         </button>
       </div>
