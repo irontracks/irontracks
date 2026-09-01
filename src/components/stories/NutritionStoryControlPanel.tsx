@@ -144,7 +144,7 @@ export function NutritionStoryControlPanel({
           ficaram com as ações no fim de uma coluna que o usuário só alcança
           rolando por cima da prévia — que captura o arraste. Ou seja: o mesmo
           defeito, em três dos quatro caminhos. */}
-      <div ref={acoesRef} className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
+      <div ref={acoesRef} className="story-actions-bar space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
         <div className="relative group max-lg:flex-1">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
           <button
