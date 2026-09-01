@@ -137,8 +137,12 @@ do "fazer depois".
 
 Ela não guarda estado: cor e progresso saem de `lib/workout/exerciseRail.ts`
 sobre logs + adiados. **`atual` é independente do estado** (dá para estar num
-card concluído), então a COR diz o estado e o ANEL diz onde você está —
-colapsar os dois num campo faria a tira mentir sobre um deles. E concluído
+card concluído), e os dois canais convivem: o ANEL diz ONDE você está, a COR diz
+o ESTADO. **Verde é concluído e só ele** — desde 01/09/2026 o exercício da vez
+veste o dourado da ação primária enquanto não termina (pedido do dono: o anel
+sozinho é um traço de 2px numa faixa de 44px, invisível de relance na academia).
+Quem traduz é `aparenciaDoItem`, e nela **feito vence atual**: esconder a
+conclusão do card que está na tela seria a tira mentindo. E concluído
 vence guardado, o mesmo critério do aviso de finalizar; se divergirem, a tira
 cobra um exercício que o diálogo já não cobra.
 
@@ -190,6 +194,35 @@ repassava a fração crua, **uma alternativa perfeita aparecia como "1%"** na
 tela. Nenhum teste pegaria: os dois lados são números válidos isoladamente, e o
 defeito só existe no CONTRATO entre eles — foi a conferência no aparelho que
 mostrou. Guard em `similaridadeEmPorcento.test.ts`.
+
+**Trocar o método de UMA série pergunta se vale só hoje ou também no plano
+(01/09/2026).** O seletor sempre gravou `per_set_method` no LOG — ou seja, só na
+sessão, e sem dizer isso a ninguém: quem ajustava o treino de verdade refazia a
+troca toda semana. Hoje `changeSetMethod` (no `useWorkoutExerciseCrud`) aplica na
+sessão SEMPRE e só então pergunta; "Só neste treino" é o destaque, como em
+`askPersistSetChange`. O plano ganhou a coluna `sets.per_set_method`, e
+`lib/workout/plannedSetMethod.ts` grava nela. Leitura: `explicitSetMethod` —
+log (a escolha de hoje) vence plano (a permanente).
+
+⚠️ **Campo por série tem DUAS pontas, e cada uma some sozinha e em silêncio.**
+(1) **Escrita**: `save_workout_atomic` APAGA e reinsere as séries, então builder
+que não copia o campo não deixa de gravar — ele APAGA o que já estava lá. São
+**oito** (rota de update, ações de servidor, editor completo, sync
+professor→aluno, clone de admin, periodização, payload do professor, backup);
+fonte única em `lib/workout/perSetMethodField.ts`, com guard de classe — é a
+mesma armadilha do `unilateralPersistFields` e do `planDays`. (2) **Leitura**:
+quatro SELECTs listam colunas de `sets` uma a uma, e eu esqueci deles: o campo
+gravava certo no banco e a série voltava a desenhar Normal na sessão seguinte.
+O guard da escrita não olhava a leitura; hoje há um para cada.
+
+⚠️ **A migration da RPC do bootstrap no repo estava ATRÁS do banco.** O arquivo
+de `20260703213937` não tem `is_alternating`, que a função VIVA tem há tempos —
+reaplicá-lo teria regredido a RPC em silêncio. **Ao alterar uma RPC, gere a
+migration da definição viva** (`pg_get_functiondef`), nunca do último arquivo do
+repo. O guard de payload não pegava: ele lê o arquivo, não o banco. E campo novo
+na RPC entra por concatenação condicional
+(`|| CASE WHEN x IS NULL THEN '{}'::jsonb ELSE jsonb_build_object(...) END`) —
+`"campo": null` em toda série custaria ~25 B × 24 séries do teto por template.
 
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
 
@@ -596,7 +629,28 @@ aparecia na prévia e SUMIA no arquivo salvo. Hoje `exportLeTudoPorRef.test.ts`
 COMPARA as duas chamadas em vez de listar campos — o próximo esquecido reprova
 sozinho.
 
-`StoryComposer`/`NutritionStoryComposer`/`CardioStoryComposer` compartilham `useStoryComposer` + os mesmos sub-componentes. **Mexeu num, confira os três** — o padrão aqui é componente único (`BrandDragHandle`, `AlignmentGuides`, `CustomTextDragHandle`, `CustomTextPanel`) justamente para não replicar 3× e divergir.
+São **QUATRO** composers (`StoryComposer` de treino, `NutritionStoryComposer`,
+`CardioStoryComposer`, `MetricsStoryComposer`) sobre `useStoryComposer` + os mesmos
+sub-componentes (`BrandDragHandle`, `AlignmentGuides`, `CustomTextDragHandle`,
+`CustomTextPanel`) — e **DOIS painéis de controle**: `StoryControlPanel` (só
+treino) e `NutritionStoryControlPanel` (os outros três).
+
+⚠️ **Mexeu num, confira os quatro E os dois painéis.** Em 01/09/2026 corrigi as
+ações só no `StoryControlPanel` e três de quatro telas ficaram com o defeito —
+com o PR dizendo "os quatro composers", porque a outra metade da mudança (a
+largura da prévia) tinha mesmo alcançado os quatro. Guard em
+`stories/__tests__/acoesAlcancaveis.test.ts`.
+
+⚠️ **`h-full` no conteúdo de um contêiner que rola TRAVA a rolagem.** Foi a causa
+raiz do relato que sobreviveu a TRÊS correções ("a caixa da legenda está cortada
+pela barra dos botões"). Medido no navegador com a estrutura do composer
+(contêiner 400px, conteúdo 680px): com `h-full` o `scrollHeight` é **432** — 32px
+de rolagem, e o fim é inalcançável; com `min-h-full`, **840**. Com `height:100%`
+o contêiner não enxerga a altura real do conteúdo, e **nenhum `padding-bottom`
+resolve**: o usuário chega ao "fim" com o último bloco ainda por baixo da barra
+fixa. `min-h-full` preserva o motivo do `h-full` (o `items-center` centraliza
+conteúdo curto). As ações são barra FIXA no rodapé em mobile — `sticky` não
+serviria, ele só segura o que já está na viewport.
 
 Três elementos independentes sobre a foto/vídeo: a **marca** (IRONTRACKS), a **legenda** do usuário (`customText.ts`) e o **bloco** (título + cards, movido por `workoutTransform`).
 
@@ -1304,7 +1358,8 @@ e admin precisam ver o e-mail do aluno.
 
 - **Notificações por FUNÇÃO** (#792): 23 tipos em 5 funções (ação · conquista ·
   aviso · lembrete · social). `tipo(icone, rótulo, função)` não deixa escolher
-  matiz. Guard limita "ação" a 4 tipos — **se tudo vira ação, nada é ação**.
+  matiz. Guard limita "ação" a 6 RÓTULOS distintos (subiu de 4 em 27/08, quando
+  os pedidos de acesso/cadastro entraram) — **se tudo vira ação, nada é ação**.
 - **Degustação** (#797): o histórico diz o que está VALENDO, não o que foi dado.
   Calcular por `created_at + days` seria inventar fato — um usuário tem 3
   entitlements simultâneos. A verdade é `user_entitlements.valid_until`, e quem
@@ -1440,18 +1495,35 @@ nota é que estava desatualizada, não o código.
 O segundo é convenção universal e o app já o segue. Não confundir com vermelho
 decorativo, que é o que a tela de Configurações fazia e foi corrigido.
 
-### Central de Notificações: 23 tipos, 7 famílias, zero critério
+### Central de Notificações — a cor sai da FUNÇÃO
 
-Diagnóstico de 13/08/2026, **não corrigido — exige decisão de taxonomia**:
-`emerald` cobre Meta/Online/Marco/Refeição e `green` cobre Treino/Aceito/Aceito.
-São cores distinguíveis (Δ=69), mas a distinção não codifica nada: não há regra
-que explique por que "Meta" é de um verde e "Treino" de outro. É ruído com
-aparência de sistema — pior que cores iguais, porque promete significado.
+O diagnóstico de 13/08/2026 ("7 famílias de cor, zero critério") foi **corrigido
+no #792**: hoje `tipo(icone, rótulo, função)` decide, e a função é uma de cinco
+(ação · conquista · aviso · lembrete · social). Esta seção dizia "não corrigido"
+e sobreviveu duas semanas à própria correção.
 
-Ninguém memoriza 7 códigos de cor numa lista aberta uma vez por dia, e o
-**rótulo textual já está no card** (PR, Streak, Meta, Treino…) fazendo o
-trabalho. Se for mexer, agrupe por FUNÇÃO (conquista · atividade · social ·
-aviso · neutro), não por tipo de evento.
+⚠️ **Tipo que o servidor emite e a tabela não conhece cai no `default`** — sino
+cinza, rótulo "Info", e sem destino ao toque. Aconteceu com 14 tipos (27/08) e
+de novo com `workout_assigned` (01/09), que era emitido desde ago/2026. Tipo novo
+entra em `TYPE_CONFIG` **e** em `DESTINO_POR_TIPO`.
+
+### O coach mexeu no treino/dieta: o aluno é avisado (01/09/2026)
+
+`lib/notifications/coachChangeNotice.ts` emite `workout_updated` e `diet_updated`
+a partir de QUATRO superfícies (edição de treino no painel, sync de templates,
+prescrição de dieta, orientação por refeição). Antes só existia `workout_assigned`
+— "treino novo" —, e todo o resto do trabalho do coach chegava calado.
+
+**Janela de agrupamento de 30 min, olhando o DESTINATÁRIO** (decisão do dono):
+coach não ajusta uma coisa, ele mexe em cinco exercícios em dois minutos. Olhar o
+REMETENTE não serviria — o que incomoda é receber cinco avisos, e isso não muda
+se dois coaches editarem o mesmo aluno. Falha ao LER a janela deixa o aviso
+passar: perder notificação é pior que repetir.
+
+O módulo não decide preferência nem horário de silêncio — isso é de
+`insertNotifications` e do sender. Os avisos do coach são **lembrete**, não ação:
+ninguém espera resposta do aluno, e gastar o dourado ali esvazia convite,
+mensagem e pedido de acesso.
 
 ## Paleta: a cor quase-gêmea é a que corrói em silêncio (12/08/2026)
 
@@ -2373,6 +2445,12 @@ para conferir o MODELO de IA, chame a API direto. (Campos de identificador do
 app já desligam a autocorreção — ver `utils/ui/textFieldProps.ts`; o que sobra
 são os de texto livre, onde ela ajuda no aparelho real.)
 
+⚠️ **Copiar o container de dados entre simuladores NÃO leva a sessão logada**
+(testado nas duas direções em 01/09/2026): o cookie do WKWebView não mora no
+container do app. Deslogou o simulador, a conferência visual PARA — o agente não
+digita senha, e só o dono entra de novo. E o toque cego no menu do avatar é como
+isso acontece: "Sair" fica poucos pixels abaixo de "Configurações".
+
 **Acesso ao device é concedido pelo dono**, uma vez por aparelho, no link
 "Let Claude use it" do painel. Se `attach`/`launch` responder que falta permissão,
 peça — não fique tentando em loop.
@@ -2399,6 +2477,42 @@ e finalize quando o que você precisa ver está do outro lado. **A conta oficial
 continua sem escrita, sempre.**
 
 **Limitação conhecida:** com `CODE_SIGNING_ALLOWED=NO` a extensão do widget não registra as `ActivityConfiguration` — o log mostra `activitykit … Fetched descriptors for content states: []` e **a Live Activity não renderiza no simulador**. Isso é do build, NÃO é regressão. Não tire conclusão sobre a Ilha Dinâmica a partir do simulador.
+
+## "Não funciona pra mim": medir antes de corrigir (01/09/2026)
+
+Relato de usuário sobre o composer de story. Fiz TRÊS correções de layout por
+suposição — nenhuma fechou o caso, e a terceira só mudou o defeito de lugar. O
+que fechou foi medir, em três níveis, e cada um respondeu o que o anterior não
+respondia:
+
+1. **O usuário está com o código novo?** `user_activity_events` guarda
+   `perf_metric` com `name IN ('TTFB','FCP','LCP')`, e cada uma dessas linhas é
+   um CARREGAMENTO de página. Havia TTFB depois do deploy → ele tinha o bundle
+   novo, e minha hipótese de cache morreu ali.
+
+   ```sql
+   select created_at, metadata->>'name' as m, metadata->>'path' as path
+   from user_activity_events
+   where user_id = '<uid>' and event_name = 'perf_metric'
+     and metadata->>'name' in ('TTFB','FCP','LCP')
+   order by created_at desc limit 10;
+   ```
+
+   ⚠️ **Ausência de `sw_update_*` NÃO prova bundle velho** — aquele evento existe
+   (9 usuários), e o usuário do caso nunca teve nenhum estando atualizado.
+
+2. **Instrumente a GEOMETRIA, não o palpite.**
+   `stories/useMedirPosicaoDasAcoes.ts` grava `story_actions_position` com
+   posição da barra, viewport e versão do bundle (sem PII). Uma abertura dele
+   respondeu o que três rodadas de teoria não responderam: barra `fixed`,
+   visível, topo 749 de 852 — logo o problema era outro. **A medição espera
+   ~900ms**: no frame da montagem ela pega a animação de entrada e reporta uma
+   posição que não existe.
+
+3. **Reproduza a ESTRUTURA no navegador.** Um HTML de 15 linhas com o mesmo
+   flex+overflow, lendo `scrollHeight`, achou a causa raiz (`h-full`) em 30
+   segundos — depois de três PRs de layout. Quando o suspeito é CSS de layout,
+   este passo vem ANTES de editar componente.
 
 ## Descanso do treino — ações nativas chegam ATRASADAS
 
