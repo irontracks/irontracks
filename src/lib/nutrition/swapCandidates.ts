@@ -37,11 +37,26 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  */
 const usable = (c: SwapCandidate): boolean => isUsableAsSwapCandidate(c)
 
+/**
+ * Como o alimento da base curada é ESCRITO na tela.
+ *
+ * As chaves são normalizadas para casar o texto digitado (`file mignon`), e isso
+ * chegou à interface no dia em que o card do plano passou a exibir o nome do
+ * candidato: a opção saía "file mignon", em minúsculas e sem acento. O `label`
+ * cobre onde a chave mente sobre a grafia; para o resto basta a maiúscula.
+ */
+export function nomeExibidoDaBase(chave: string, item?: { label?: string }): string {
+  const label = String(item?.label ?? '').trim()
+  if (label) return label
+  const nome = String(chave ?? '').trim()
+  return nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : nome
+}
+
 /** A base curada como candidatos. Pura — dá pra testar sem banco. */
 export function databaseCandidates(): SwapCandidate[] {
   return Object.entries(foodDatabase)
     .map(([name, item]) => ({
-      name,
+      name: nomeExibidoDaBase(name, item),
       kcal: num(item?.kcal),
       protein: num(item?.p),
       carbs: num(item?.c),

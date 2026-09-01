@@ -4,6 +4,18 @@ export type FoodItem = {
   c: number
   f: number
   approx?: Record<string, number>
+  /**
+   * Como o alimento é ESCRITO para o usuário, quando a chave não serve.
+   *
+   * As chaves são normalizadas (minúsculas, sem acento) porque existem para CASAR
+   * o texto que a pessoa digita — "300g de filé mignon" precisa achar `file mignon`.
+   * Isso nunca importou enquanto a base só resolvia macros, e passou a importar
+   * quando o card do plano começou a EXIBIR o nome do candidato: a opção de proteína
+   * saía na tela como "file mignon" (01/09/2026, visto no aparelho).
+   *
+   * Só onde a chave mente sobre a grafia — capitalizar dá conta do resto.
+   */
+  label?: string
 }
 
 /**
@@ -13,45 +25,45 @@ export type FoodItem = {
 export const foodDatabase: Record<string, FoodItem> = {
   // ── Proteínas ──────────────────────────────────────────────────────────────
   'frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120, colher: 30 } },
-  'frango grelhado': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120, colher: 30 } },
-  'peito de frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120 } },
-  'frango desfiado': { kcal: 165, p: 31, c: 0, f: 4, approx: { colher: 25, concha: 80 } },
-  'carne moida': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
+  'frango grelhado': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120, colher: 30 }, label: 'Frango grelhado' },
+  'peito de frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120 }, label: 'Peito de frango' },
+  'frango desfiado': { kcal: 165, p: 31, c: 0, f: 4, approx: { colher: 25, concha: 80 }, label: 'Frango desfiado' },
+  'carne moida': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 }, label: 'Carne moída' },
   // Sinônimo de 'carne moida' (PT-PT, e usado no Brasil). Sem esta chave, "300g carne
   // picada com molho" não casava a base curada e caía na estimativa da IA, que devolvia
   // 76 g de gordura em 300 g — mais que o DOBRO dos 33 g corretos — e 938 kcal em vez de 636.
-  'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
-  'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 } },
+  'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 }, label: 'Carne picada' },
+  'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 }, label: 'Carne bovina' },
   'patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { bife: 120, posta: 120 } },
   // Patinho MOÍDO e "carne moída magra" são o mesmo corte da linha acima — e é o que
   // o dono come. Sem estas chaves, "200g de carne moída magra" casava a 'carne moida'
   // comum (212 kcal, 11 g de gordura) e cobrava 79 kcal a mais por 100 g. Elas também
   // sustentam a segunda opção de proteína do card: a moída GORDA estoura o teto de
   // desvio calórico do motor contra um peito de frango, a magra passa.
-  'patinho moido': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
-  'carne moida magra': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
-  'carne moida de patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 } },
+  'patinho moido': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Patinho moído' },
+  'carne moida magra': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Carne moída magra' },
+  'carne moida de patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Carne moída de patinho' },
   'alcatra': { kcal: 177, p: 26, c: 0, f: 8, approx: { bife: 120, posta: 120 } },
-  'file mignon': { kcal: 143, p: 28, c: 0, f: 3.5, approx: { bife: 120, medalhao: 100 } },
-  'contrafile': { kcal: 195, p: 25, c: 0, f: 10, approx: { bife: 120, posta: 120 } },
-  'coxao mole': { kcal: 169, p: 26, c: 0, f: 7, approx: { bife: 120 } },
+  'file mignon': { kcal: 143, p: 28, c: 0, f: 3.5, approx: { bife: 120, medalhao: 100 }, label: 'Filé mignon' },
+  'contrafile': { kcal: 195, p: 25, c: 0, f: 10, approx: { bife: 120, posta: 120 }, label: 'Contrafilé' },
+  'coxao mole': { kcal: 169, p: 26, c: 0, f: 7, approx: { bife: 120 }, label: 'Coxão mole' },
   'picanha': { kcal: 242, p: 22, c: 0, f: 17, approx: { fatia: 80, espetinho: 100 } },
-  'costela bovina': { kcal: 292, p: 20, c: 0, f: 23, approx: { pedaco: 100 } },
-  'carne de porco': { kcal: 242, p: 27, c: 0, f: 14, approx: { bife: 120, posta: 120 } },
-  'lombo de porco': { kcal: 171, p: 29, c: 0, f: 6, approx: { fatia: 80, bife: 120 } },
-  'linguica': { kcal: 296, p: 16, c: 2, f: 25, approx: { unidade: 60, rodela: 15 } },
+  'costela bovina': { kcal: 292, p: 20, c: 0, f: 23, approx: { pedaco: 100 }, label: 'Costela bovina' },
+  'carne de porco': { kcal: 242, p: 27, c: 0, f: 14, approx: { bife: 120, posta: 120 }, label: 'Carne de porco' },
+  'lombo de porco': { kcal: 171, p: 29, c: 0, f: 6, approx: { fatia: 80, bife: 120 }, label: 'Lombo de porco' },
+  'linguica': { kcal: 296, p: 16, c: 2, f: 25, approx: { unidade: 60, rodela: 15 }, label: 'Linguiça' },
   'bacon': { kcal: 541, p: 37, c: 1, f: 42, approx: { fatia: 15 } },
   'ovo': { kcal: 155, p: 13, c: 1.1, f: 11, approx: { unidade: 50 } },
-  'clara de ovo': { kcal: 52, p: 11, c: 0.7, f: 0.2, approx: { unidade: 33 } },
-  'ovo cozido': { kcal: 155, p: 13, c: 1.1, f: 11, approx: { unidade: 50 } },
+  'clara de ovo': { kcal: 52, p: 11, c: 0.7, f: 0.2, approx: { unidade: 33 }, label: 'Clara de ovo' },
+  'ovo cozido': { kcal: 155, p: 13, c: 1.1, f: 11, approx: { unidade: 50 }, label: 'Ovo cozido' },
   'omelete': { kcal: 154, p: 11, c: 0.6, f: 12, approx: { unidade: 120 } },
   'sardinha': { kcal: 208, p: 25, c: 0, f: 11, approx: { lata: 84, unidade: 30 } },
   'atum': { kcal: 116, p: 26, c: 0, f: 1, approx: { lata: 120 } },
-  'atum em lata': { kcal: 116, p: 26, c: 0, f: 1, approx: { lata: 120 } },
-  'salmao': { kcal: 208, p: 20, c: 0, f: 13, approx: { posta: 120, fatia: 80 } },
-  'tilapia': { kcal: 96, p: 20, c: 0, f: 1.7, approx: { posta: 120 } },
-  'peixe grelhado': { kcal: 96, p: 20, c: 0, f: 1.7, approx: { posta: 120 } },
-  'camarao': { kcal: 99, p: 24, c: 0.2, f: 0.3, approx: { unidade: 8, colher: 30 } },
+  'atum em lata': { kcal: 116, p: 26, c: 0, f: 1, approx: { lata: 120 }, label: 'Atum em lata' },
+  'salmao': { kcal: 208, p: 20, c: 0, f: 13, approx: { posta: 120, fatia: 80 }, label: 'Salmão' },
+  'tilapia': { kcal: 96, p: 20, c: 0, f: 1.7, approx: { posta: 120 }, label: 'Tilápia' },
+  'peixe grelhado': { kcal: 96, p: 20, c: 0, f: 1.7, approx: { posta: 120 }, label: 'Peixe grelhado' },
+  'camarao': { kcal: 99, p: 24, c: 0.2, f: 0.3, approx: { unidade: 8, colher: 30 }, label: 'Camarão' },
 
   // ── Laticínios ─────────────────────────────────────────────────────────────
   'leite integral': { kcal: 61, p: 3.2, c: 4.7, f: 3.3, approx: { copo: 250, xicara: 240 } },
@@ -182,8 +194,8 @@ export const foodDatabase: Record<string, FoodItem> = {
   'legumes e salada': { kcal: 33, p: 1.8, c: 6, f: 0.4, approx: { prato: 200 } },
   'kefir': { kcal: 60, p: 3.3, c: 4.5, f: 3.3, approx: { copo: 200, xicara: 240 } },
   'doce de leite': { kcal: 315, p: 6.5, c: 55, f: 7, approx: { colher: 20 } },
-  'coxa de frango': { kcal: 160, p: 25, c: 0, f: 6, approx: { unidade: 100 } },
-  'sobrecoxa de frango': { kcal: 165, p: 24, c: 0, f: 7, approx: { unidade: 110 } },
+  'coxa de frango': { kcal: 160, p: 25, c: 0, f: 6, approx: { unidade: 100 }, label: 'Coxa de frango' },
+  'sobrecoxa de frango': { kcal: 165, p: 24, c: 0, f: 7, approx: { unidade: 110 }, label: 'Sobrecoxa de frango' },
   // Formas curtas: "coxa ou sobrecoxa sem pele" não traz a palavra "frango", e
   // o casamento por tokens exige que TODOS os tokens da chave apareçam.
   // Não conflita com 'coxao mole' (carne bovina) — token diferente.
