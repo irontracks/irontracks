@@ -203,10 +203,17 @@ export function StoryControlPanel({
                 )}
             </AnimatePresence>
 
-            {/* Actions */}
-            <div className="space-y-3 pt-2">
+            {/* Actions
+                ⚠️ Em MOBILE isto é uma barra FIXA no rodapé, não o fim de uma
+                coluna que rola. Relato do Diogo (01/09/2026): "não consigo
+                mudar os templates nem salvar a foto" — em 390×844 pt as ações
+                ficavam abaixo da dobra, e a prévia (que ocupa quase a tela
+                inteira e captura o arraste para mover o card) não deixa rolar
+                a página. Sticky não resolveria: ele só segura o que JÁ está na
+                viewport. No desktop segue empilhado dentro do painel. */}
+            <div className="space-y-3 pt-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[2600] max-lg:flex max-lg:items-center max-lg:gap-2 max-lg:space-y-0 max-lg:border-t max-lg:border-white/10 max-lg:bg-black/95 max-lg:backdrop-blur max-lg:px-4 max-lg:pt-3 max-lg:pb-[max(12px,env(safe-area-inset-bottom))]">
                 {/* Primary: Post */}
-                <div className="relative group">
+                <div className="relative group max-lg:flex-1">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
                     <button
                         onClick={onPost} disabled={busy}
@@ -223,7 +230,7 @@ export function StoryControlPanel({
 
                 {/* Upload progress */}
                 {busyAction === 'post' && busySubAction === 'uploading' && (
-                    <div className="space-y-1.5" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
+                    <div className="space-y-1.5 max-lg:hidden" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
                         <div className="w-full bg-neutral-800/80 rounded-full h-2 overflow-hidden border border-neutral-700/50">
                             <div className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
                         </div>
@@ -234,7 +241,8 @@ export function StoryControlPanel({
                 {/* Secondary: Download / Share */}
                 <button
                     onClick={onShare} disabled={busy}
-                    className="relative h-12 w-full rounded-xl bg-neutral-900/80 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700/50 hover:border-yellow-500/30 transition-all active:scale-[0.97] overflow-hidden"
+                    aria-label="Baixar ou compartilhar a imagem do story"
+                    className="relative h-12 w-full max-lg:h-14 max-lg:w-auto max-lg:shrink-0 max-lg:px-4 rounded-xl bg-neutral-900/80 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700/50 hover:border-yellow-500/30 transition-all active:scale-[0.97] overflow-hidden"
                 >
                     {busyAction === 'share' ? (
                         <>
@@ -242,7 +250,15 @@ export function StoryControlPanel({
                             <div className="relative flex items-center gap-2"><Loader2 className="animate-spin text-yellow-500" size={16} /><span className="text-yellow-500">{busySubAction === 'processing' ? 'PROCESSANDO...' : 'SALVANDO...'}</span></div>
                         </>
                     ) : (
-                        <><Download size={15} className="text-yellow-500/70" /><span>BAIXAR / COMPARTILHAR</span></>
+                        <>
+                            <Download size={15} className="text-yellow-500/70" />
+                            {/* Na barra fixa não cabe o rótulo inteiro ao lado do
+                                POSTAR — e o gesto é o mesmo: no iOS o "baixar"
+                                abre o share sheet. O nome completo fica no
+                                aria-label e na versão desktop. */}
+                            <span className="max-lg:hidden">BAIXAR / COMPARTILHAR</span>
+                            <span className="lg:hidden">SALVAR</span>
+                        </>
                     )}
                 </button>
             </div>

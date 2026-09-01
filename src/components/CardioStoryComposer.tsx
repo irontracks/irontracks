@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
+import { STORY_PREVIEW_BOX, STORY_PREVIEW_ROW } from '@/lib/design/storyPreviewBox'
 import { ArrowLeft, Upload } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
@@ -134,14 +135,14 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
               <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Voltar" title="Voltar"><ArrowLeft size={18} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-24">
               <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
 
                 {/* Preview */}
                 <div className="flex-none flex flex-col items-center gap-6">
                   <div
                     ref={previewRef}
-                    className="relative w-full max-w-[300px] sm:max-w-[340px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0"
+                    className={`relative ${STORY_PREVIEW_BOX} aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0`}
                   >
                     {isVideo && (
                       <video
@@ -205,7 +206,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}
-                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
+                  <div className={`${STORY_PREVIEW_ROW} flex items-center gap-2`}>
                       <button
                         type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
                         aria-label="Diminuir zoom"
@@ -226,7 +227,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                   </div>
 
                   {/* Upload de foto de fundo (opcional) */}
-                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
+                  <div className={`${STORY_PREVIEW_ROW} flex items-center gap-3`}>
                     <label className={['flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
                       <Upload size={16} className="text-yellow-500" />
                       {backgroundImage ? 'TROCAR FOTO' : 'ADICIONAR FOTO DE FUNDO'}
