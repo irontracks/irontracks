@@ -91,3 +91,45 @@ describe('guard de classe — quem monta linha de SÉRIE passa pela fonte única
         expect(faltando, 'use perSetMethodField — a RPC recria as séries e apaga o que não vier no payload').toEqual([])
     })
 })
+
+/**
+ * ⚠️ Guard de LEITURA — o que o guard de escrita acima NÃO olha.
+ *
+ * Medido no aparelho em 01/09/2026, com a coluna já gravada corretamente no
+ * banco: a série voltava a aparecer como Normal. A gravação estava certa; quem
+ * perdia o campo era o SELECT de `sets` da hidratação da lista
+ * (`useWorkoutFetch`), que lista colunas uma a uma e não conhecia a nova.
+ *
+ * Um campo por série tem DUAS pontas, e cada uma some sozinha em silêncio:
+ * o builder que grava e o select que lê. Este caso cobre a segunda.
+ */
+describe('guard de classe — todo SELECT de série que lê advanced_config lê o método', () => {
+    const selects = walk(SRC).flatMap((f) => {
+        const src = stripComments(readFileSync(f, 'utf8'))
+        // Só o argumento de `.select(...)` — o payload de ESCRITA também cita
+        // `advanced_config` e não é assunto deste caso (tem o guard acima).
+        return [...src.matchAll(/\.select\(\s*(['"`])([\s\S]*?)\1/g)]
+            .map((m) => ({ file: path.relative(SRC, f), trecho: m[2] }))
+            // A série INTEIRA, que vai virar card: cita `advanced_config`,
+            // `set_number` e `weight`. `sets(*)` fica de fora por construção (já
+            // traz a coluna nova), e leitura parcial também — a rota de
+            // progressão pede 3 colunas para dar um `.update()` num campo só, e
+            // exigir o método dela seria guard largo demais (jeito nº 8).
+            .filter((s) => /\badvanced_config\b/.test(s.trecho)
+                && /\bset_number\b/.test(s.trecho)
+                && /\bweight\b/.test(s.trecho))
+    })
+
+    it('a varredura encontra os leitores conhecidos (autoteste do detector)', () => {
+        const nomes = selects.map((s) => s.file)
+        expect(nomes).toEqual(expect.arrayContaining([
+            'hooks/useWorkoutFetch.ts',
+            'app/api/dashboard/bootstrap/route.ts',
+        ]))
+    })
+
+    it('select de série sem per_set_method reprova', () => {
+        const faltando = selects.filter((s) => !/\bper_set_method\b/.test(s.trecho)).map((s) => s.file)
+        expect(faltando, 'o campo existe no banco e some na leitura — a série volta a aparecer como Normal').toEqual([])
+    })
+})

@@ -273,7 +273,7 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         id, user_id, created_by, name, notes, archived_at, sort_order, created_at,
         exercises (
           id, name, notes, video_url, rest_time, cadence, method, "order",
-          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config )
+          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config, per_set_method )
         )
       `)
       .eq('id', id)
