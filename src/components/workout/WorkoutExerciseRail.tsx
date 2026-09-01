@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
-import { buildRailItems, rotuloDoItem, MINIMO_PARA_MOSTRAR_TIRA } from '@/lib/workout/exerciseRail';
+import { buildRailItems, rotuloDoItem, aparenciaDoItem, MINIMO_PARA_MOSTRAR_TIRA } from '@/lib/workout/exerciseRail';
 
 /**
  * Tira de navegação do treino ativo.
@@ -66,7 +66,9 @@ export default function WorkoutExerciseRail() {
                 // faixa de 44px — não há altura para ela e para o número.
                 style={{ scrollbarWidth: 'none' }}
             >
-                {itens.map((item) => (
+                {itens.map((item) => {
+                    const aparencia = aparenciaDoItem(item);
+                    return (
                     <button
                         key={item.idx}
                         type="button"
@@ -79,19 +81,23 @@ export default function WorkoutExerciseRail() {
                             // estendida do ::after invadiria o card de baixo e
                             // roubaria o toque da primeira série.
                             'h-11 min-w-11 flex-shrink-0 rounded-xl border px-2 font-black tabular-nums text-[13px] transition active:scale-95',
-                            item.estado === 'feito'
+                            aparencia === 'feito'
                                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                                : item.estado === 'guardado'
-                                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
-                                    : 'border-white/[0.08] bg-white/[0.03] text-neutral-300',
-                            // O anel diz ONDE VOCÊ ESTÁ; a cor diz o estado. São
-                            // duas perguntas diferentes e cada uma tem seu canal.
+                                : aparencia === 'atual'
+                                    ? 'border-yellow-500/60 bg-yellow-500/15 text-yellow-300'
+                                    : aparencia === 'guardado'
+                                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                                        : 'border-white/[0.08] bg-white/[0.03] text-neutral-300',
+                            // O anel continua dizendo ONDE VOCÊ ESTÁ — ele é o
+                            // único canal quando o exercício em foco já está
+                            // concluído (aí a cor é o verde, e tem que ser).
                             item.atual ? 'ring-2 ring-yellow-500/70' : '',
                         ].join(' ')}
                     >
                         {item.numero}
                     </button>
-                ))}
+                    );
+                })}
             </div>
         </nav>
     );

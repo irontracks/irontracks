@@ -95,3 +95,26 @@ export function rotuloDoItem(item: ItemDaTira): string {
                 : ''
     return `Ir para ${item.nome}${progresso}${estado}`
 }
+
+/** O que o chip VESTE — não é o mesmo que o estado. */
+export type AparenciaDaTira = 'feito' | 'atual' | 'guardado' | 'pendente'
+
+/**
+ * Traduz estado + foco na aparência do chip.
+ *
+ * O verde é reservado ao CONCLUÍDO: enquanto o exercício está em andamento ele
+ * veste o dourado da ação primária, mesmo sendo o exercício em foco. Foi o
+ * pedido do dono (31/08/2026), e o motivo é legibilidade: o anel sozinho
+ * distinguia "onde estou" com um traço de 2px numa faixa de 44px — na academia,
+ * de relance, o chip da vez precisa ter COR.
+ *
+ * `feito` vence `atual` de propósito: concluir é irreversível na leitura da
+ * tira, e se o exercício em foco já está pronto o usuário precisa saber disso
+ * (o anel continua dizendo que é ali que ele está). Colapsar os dois no
+ * dourado faria a tira esconder a conclusão do card que está na tela.
+ */
+export function aparenciaDoItem(item: Pick<ItemDaTira, 'estado' | 'atual'>): AparenciaDaTira {
+    if (item.estado === 'feito') return 'feito'
+    if (item.atual) return 'atual'
+    return item.estado
+}
