@@ -23,3 +23,33 @@ export async function notifyStudentWorkoutAssigned(
         /* best-effort: o treino já foi salvo; o aviso não é crítico */
     }
 }
+
+/**
+ * Avisa o ALUNO que o professor AJUSTOU um treino que ele já tinha.
+ *
+ * Irmão do `notifyStudentWorkoutAssigned`, e separado dele de propósito: são
+ * dois avisos diferentes para o aluno ("montei um treino novo" × "mexi no seu")
+ * e dois toggles diferentes nas Configurações. Fire-and-forget pelo mesmo
+ * motivo: o treino já foi salvo quando isto roda.
+ *
+ * A janela de agrupamento fica no SERVIDOR (`coachChangeNotice`): o coach que
+ * salva cinco vezes seguidas gera um push, não cinco — e a decisão não pode
+ * depender do cliente, que é justamente quem repete a chamada.
+ */
+export async function notifyStudentWorkoutUpdated(
+    studentUserId: string | null | undefined,
+    workoutName?: string,
+): Promise<void> {
+    const target = String(studentUserId || '').trim()
+    if (!target) return
+    try {
+        await fetch('/api/notifications/coach-change', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ studentUserId: target, kind: 'workout_updated', nome: workoutName || undefined }),
+        })
+    } catch {
+        /* best-effort: o treino já foi salvo; o aviso não é crítico */
+    }
+}

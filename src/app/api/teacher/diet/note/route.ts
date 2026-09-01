@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
+import { notifyCoachChange } from '@/lib/notifications/coachChangeNotice'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { requireRole } from '@/utils/auth/route'
@@ -100,6 +102,15 @@ export async function POST(req: Request) {
       .eq('id', row.id)
       .eq('user_id', studentId)
     if (updateError) { logError('teacher-diet-note:update', updateError); return NextResponse.json({ ok: false, error: 'database_error' }, { status: 500 }) }
+
+    // Aviso ao aluno — depois da escrita CONFIRMADA, e best-effort: a orientação
+    // já está gravada, e falhar o push não pode devolver erro ao professor.
+    // A janela de agrupamento do módulo é o que impede seis refeições anotadas
+    // em sequência virarem seis pushes.
+    waitUntil(
+      notifyCoachChange({ studentUserId: studentId, kind: 'diet_updated', origem: 'diet_note' })
+        .catch(() => { }),
+    )
 
     return NextResponse.json({ ok: true, meals: nextMeals })
   } catch (e: unknown) {
