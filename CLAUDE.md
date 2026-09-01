@@ -519,6 +519,18 @@ descartaria. Não confundir com
 `student_diet_plans.notes`, que é do plano INTEIRO: os dois convivem no mesmo
 componente, e trocá-los mostra o recado errado no lugar errado.
 
+O campo é **um componente só** para as duas superfícies de edição
+(`CampoDeNotaDaRefeicao`) — elas já tinham divergido uma vez, e a diferença era
+justamente o estado vazio.
+
+⚠️ **O card do aluno saiu ANTES de existir caminho para o professor escrever.**
+Eu entreguei o lado que EXIBE (#1015) sem conferir o outro: o modal de
+prescrição coleta meta e **quantidade** de refeições (o cardápio é gerado), e o
+campo "Observações pro aluno" dele é do plano INTEIRO. Por dois PRs a
+orientação por refeição só era gravável por SQL. **Campo que alguém LÊ precisa
+de quem ESCREVE — procure o caminho do autor antes de dar a feature por
+concluída.**
+
 **O motor de troca de alimento não usa IA — e o repertório "aprendido" É LIXO.** `nutrition_learned_foods` guarda o que o usuário DIGITOU no lançamento, e ele digita refeição inteira: dos 42 "alimentos" da conta do dono, **1** servia de substituto (37 compostos, 14 com densidade fisicamente impossível — 1070/1285/1650 kcal/100 g, que é o TOTAL da refeição gravado no campo `per_100g` —, 17 com a quantidade no nome). **A fonte certa é `nutrition_meal_entries.items`**, que o parser já quebrou em alimentos individuais com gramas e macros absolutos (`{"label": "150g arroz", "grams": 150, …}`) — e **desde 25/08/2026 a estimativa por IA também separa** (antes ela somava tudo num item só; ver "Histórico de REFEIÇÕES") — daí sai nome limpo e macros/100 g derivados de gramas reais (`lib/nutrition/mealItemFoods`). Todo candidato passa por `foodItemSanity` (sem composto, sem densidade impossível, sem quantidade no nome).
 
 ⚠️ **Não confunda com `nutrition_custom_foods`, que é a BIBLIOTECA e é dado
@@ -1504,6 +1516,45 @@ usuário digitou; em cinza, viraria texto secundário que ninguém lê. Guard va
 `components/` e tem `NAO_E_A_COR_DA_MAQUINA` com o motivo de cada exceção
 (paleta categórica de gráfico, anel de story, paleta oferecida ao usuário, tier
 admin em tela administrativa).
+
+## Campo de entrada é MAIS CLARO que o card — e some quando vazio (31/08/2026)
+
+Duas regras que saíram de uma revisão do campo de observação da refeição, as
+duas medidas no próprio app:
+
+**1. Input escuro demais perde a affordance.** O campo nasceu com `bg-black/20`
+sobre um card `bg-white/[0.02]` — ou seja, MAIS ESCURO que o entorno. Em dark
+mode isso é o vocabulário de buraco/desabilitado, não de superfície onde se
+escreve. Contado nos **28 `<textarea>` do app**: o padrão dominante é
+`bg-neutral-900` (6×), `bg-neutral-800` (5×) e `bg-neutral-950` (2×) — mais
+CLAROS que o card —, e o input irmão da mesma tela usa
+`bg-neutral-800/60 border-neutral-700/50`. Use esse.
+
+⚠️ **Não é unânime, e a primeira versão desta nota mentiu dizendo que era:**
+`bg-black/30` aparece 4× e `bg-black/40` 1×. Escrevi "nenhum usa preto com
+alpha" a partir de um `grep` que contava OCORRÊNCIAS DE CLASSE numa janela de 6
+linhas, não textareas — e o número saiu 13 em vez de 28. Se for usar fundo
+preto, saiba que está na minoria e confira contra o card que o hospeda.
+
+**2. A regra do estado vazio (ver "Topo da aba TREINOS") vale para FORMULÁRIO,
+e é onde ela mais rende** — o campo passa a maior parte da vida vazio. O
+`<textarea>` era renderizado sempre: no painel do professor, que lista as
+refeições todas abertas, isso somava **~310px de caixas vazias** num plano de 6
+refeições, com um placeholder de 71 caracteres que enchia as duas linhas e fazia
+o campo vazio PARECER preenchido. Hoje, sem conteúdo, um convite de uma linha.
+
+O que denunciou a falta da decisão foi a **divergência**: o card que só LÊ
+escondia o bloco vazio, as duas telas que EDITAM mostravam sempre. Nenhuma
+errada sozinha — juntas, prova de que ninguém perguntou "e quando está vazio?".
+
+⚠️ **Campo que grava no blur não pode COLAPSAR na falha.** A primeira versão
+fechava o editor ao sair e, quando a rede falhava, levava junto o texto
+recém-digitado — que não existe em nenhum outro lugar. Hoje o `onSalvar`
+devolve `false` e o campo fica aberto. Pego por teste antes de ir ao ar.
+
+E o foco ao abrir é **programático por ref**, não `autoFocus`: a regra do
+`jsx-a11y` mira em foco na MONTAGEM, e aqui ele é consequência de um toque
+deliberado — sem ele, escrever custa dois toques.
 
 ## Piso tipográfico: 9px (12/08/2026)
 
