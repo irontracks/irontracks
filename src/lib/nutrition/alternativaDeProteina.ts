@@ -102,12 +102,28 @@ export interface AlternativaDeProteina extends SwapResult {
  * Quando a família do ITEM é desconhecida não há como exigir contraste, e aí vale a
  * primeira do ranking: o motor já bloqueia o mesmo alimento base.
  */
+/**
+ * Proteína mínima do item para valer uma opção.
+ *
+ * O card oferece a alternativa da CARNE — a decisão "hoje é frango ou patinho?".
+ * Sem um piso, ele oferecia também nos coadjuvantes: 20 g de muçarela no café
+ * (4,4 g de proteína) viravam "crepioca de frango", e os 7 g de proteína de soja
+ * que fecham a meta da ceia viravam "30 g de tilápia grelhada". São trocas válidas
+ * pelo macro e ninguém faz nenhuma delas — e cada linha dessas empurra a comida de
+ * verdade para baixo na tela.
+ *
+ * 20 g fica ENTRE o coadjuvante e a fonte principal: 150 g de ovos (19,5 g) ficam
+ * de fora, 180 g de frango (56 g) e 40 g de whey (32 g) entram.
+ */
+const MIN_PROTEINA_DO_PRATO = 20
+
 export function alternativaDeProteina(
     item: SwappableItem,
     candidates: SwapCandidate[],
     options: SwapOptions = {},
 ): AlternativaDeProteina | null {
     if (classifyFood(macrosPer100g(item)) !== 'protein') return null
+    if (!(Number(item.protein) >= MIN_PROTEINA_DO_PRATO)) return null
 
     const opcoes = rankSwapOptions(item, candidates, options)
     if (!opcoes.length) return null

@@ -101,6 +101,37 @@ describe('a opção oferecida embaixo do item', () => {
         expect(alternativaDeProteina(PEITO_DE_FRANGO, [cand('Patinho', 133, 27, 0, 3)])?.food).toBe('Patinho')
     })
 
+    it('coadjuvante não ganha opção — 20g de muçarela não é a decisão do prato', () => {
+        // Medido contra o plano real do dono (01/09/2026): sem o piso, o card
+        // oferecia "crepioca de frango" no lugar de 20 g de muçarela do café e
+        // "30 g de tilápia" no lugar dos 7 g de proteína de soja que fecham a meta
+        // da ceia. Trocas válidas pelo macro que ninguém executa — e cada linha
+        // dessas empurra a comida de verdade para baixo na tela.
+        const mucarela: PlanItem = { food: 'Muçarela', grams: 20, calories: 60, protein: 4.4, carbs: 0.6, fat: 4.4 }
+        expect(alternativaDeProteina(mucarela, [cand('Queijo parmesão', 431, 35, 0, 29)])).toBeNull()
+
+        const sojaDeAjuste: PlanItem = { food: 'Proteína de soja', grams: 7, calories: 24.5, protein: 6.3, carbs: 0.2, fat: 0 }
+        expect(alternativaDeProteina(sojaDeAjuste, [cand('Tilápia grelhada', 96, 20, 0, 1.7)])).toBeNull()
+    })
+
+    it('a fonte principal continua ganhando', () => {
+        // O piso separa coadjuvante de prato: 180 g de frango (56 g de proteína)
+        // e 40 g de whey (32 g) entram; os dois casos acima ficam fora.
+        expect(alternativaDeProteina(PEITO_DE_FRANGO, [cand('Patinho', 133, 27, 0, 3)])?.food).toBe('Patinho')
+    })
+
+    it('pó só troca por pó — em QUALQUER refeição, não só no almoço', () => {
+        // O card oferecia 120 g de patinho no lugar do whey do lanche, que é batido
+        // com aveia e leite. Impecável pelo macro; ninguém põe carne no
+        // liquidificador. A regra antiga só olhava a refeição principal.
+        const whey: PlanItem = { food: 'Whey protein', grams: 40, calories: 160, protein: 32, carbs: 4, fat: 2.8 }
+        expect(alternativaDeProteina(whey, [cand('Patinho bovino picado', 133, 27, 0, 3)], { mealGroup: 'snack' }))
+            .toBeNull()
+        // E pó por pó segue valendo — é a troca que o dono faz de verdade.
+        expect(alternativaDeProteina(whey, [cand('Proteína de soja', 350, 90, 3, 0)], { mealGroup: 'snack' })?.food)
+            .toBe('Proteína de soja')
+    })
+
     it('item que NÃO é proteína não ganha opção — o card não é catálogo', () => {
         expect(alternativaDeProteina(ARROZ, [cand('Batata doce', 86, 1.3, 20, 0.1)])).toBeNull()
     })

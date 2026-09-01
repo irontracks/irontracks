@@ -44,7 +44,10 @@ type DryFood = { id: string; pattern: RegExp; vehicle: VehicleKind }
 
 /** Alimentos em pó/secos que NÃO se comem sozinhos. */
 const DRY_FOODS: readonly DryFood[] = [
-  { id: 'whey', pattern: /\bwhey\b|proteina em po|prote[ií]na isolada|albumina|caseina|colageno em po/, vehicle: 'any' },
+  // "proteína de soja" entrou em 01/09/2026: é o pó que o dono bate com leite todo
+  // dia, e sem ele a regra "pó sai, pó entra" tratava a soja como comida de prato —
+  // liberando trocar o whey do lanche por 120 g de patinho.
+  { id: 'whey', pattern: /\bwhey\b|proteina em po|prote[ií]na isolada|prote[ií]na de soja|prote[ií]na de ervilha|albumina|caseina|colageno em po/, vehicle: 'any' },
   { id: 'creatina', pattern: /\bcreatina\b/, vehicle: 'any' },
   { id: 'pre-treino', pattern: /pre.?treino em po|beta.?alanina|cafeina em po|glutamina/, vehicle: 'any' },
   { id: 'aveia', pattern: /\baveia\b|farelo de aveia|granola|sucrilhos|cereal matinal|\bmingau\b|flocos de milho/, vehicle: 'creamy' },
@@ -135,6 +138,13 @@ export function isRoleCompatible(originalFood: unknown, candidateFood: unknown, 
   // 2. Suplemento em pó não vira o prato do almoço/jantar. Se o alimento que sai já
   //    era um pó, a troca segue liberada (whey → proteína de soja).
   if (isMainMeal && requiredVehicle(candidateFood) !== null && requiredVehicle(originalFood) === null) return false
+
+  // 3. E o contrário também, em QUALQUER refeição: pó sai, pó entra. Medido em
+  //    01/09/2026 contra o plano real do dono — o card oferecia "120 g de patinho"
+  //    no lugar do whey do lanche batido com aveia e leite. Pelo macro é impecável;
+  //    ninguém põe carne no liquidificador. A regra 2 não pegava porque só olha a
+  //    refeição principal, e o lanche não é uma.
+  if (requiredVehicle(originalFood) !== null && requiredVehicle(candidateFood) === null) return false
 
   return true
 }
