@@ -97,10 +97,15 @@ function ghOuMorra(args, oQueTentava) {
  */
 function ghOuDiagnostique(args) {
   try {
-    return { ok: true, detalhe: sh('gh', args, { stdio: ['ignore', 'pipe', 'pipe'] }) }
+    const saida = sh('gh', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    return { ok: true, detalhe: saida, saida }
   } catch (e) {
-    const detalhe = String(e?.stderr || e?.stdout || e?.message || '').trim().split('\n')[0]
-    return { ok: false, detalhe: detalhe || 'o gh falhou sem dizer o motivo' }
+    // A saída INTEIRA vai junto: o `gh pr checks` imprime a tabela e sai com
+    // código != 0 quando há check pendente, e é nessa tabela que está o estado
+    // do quality-check. Cortar na primeira linha jogaria fora a resposta.
+    const saida = String(e?.stdout || '') + String(e?.stderr || '')
+    const detalhe = (saida || String(e?.message || '')).trim().split('\n')[0]
+    return { ok: false, detalhe: detalhe || 'o gh falhou sem dizer o motivo', saida }
   }
 }
 
@@ -123,8 +128,24 @@ export function extrairEstado(saidaDoGh) {
   return (alvo.split('\t')[1] || '').trim() || 'desconhecido'
 }
 
+/**
+ * ⚠️ `gh pr checks` sai com código != 0 quando QUALQUER check está pendente ou
+ * vermelho — e ainda assim imprime a tabela. Tratar isso como "não consegui
+ * ler" abortava o merge de PR com o `quality-check` VERDE só porque o deploy de
+ * preview da Vercel ainda estava rodando (aconteceu no PR #1024, 01/09/2026:
+ * o script disse ABORTADO e eu anunciei que havia mergeado).
+ *
+ * Quem decide continua sendo `extrairEstado`, e ele só libera com "pass" —
+ * saída vazia vira 'ausente' e aborta, como antes.
+ */
 function statusDoCheck(pr) {
-  return extrairEstado(ghOuMorra(['pr', 'checks', String(pr)], `não consegui ler os checks do PR #${pr}`))
+  const r = ghOuDiagnostique(['pr', 'checks', String(pr)])
+  const saida = String(r.saida ?? r.detalhe ?? '')
+  if (!r.ok && !saida.includes('quality-check')) {
+    process.stderr.write(`ABORTADO: não consegui ler os checks do PR #${pr} — ${saida || 'sem detalhe'}\n`)
+    process.exit(1)
+  }
+  return extrairEstado(saida)
 }
 
 function main() {
