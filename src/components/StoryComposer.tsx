@@ -181,7 +181,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-32">
-              <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
+              <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 min-h-full max-w-5xl mx-auto items-center lg:items-start">
 
                 {/* Preview Column */}
                 <div className="flex-none flex flex-col items-center gap-6">

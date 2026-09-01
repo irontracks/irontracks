@@ -121,3 +121,33 @@ describe('escrever a legenda com a barra fixa na tela', () => {
         expect(campo).toMatch(/block:\s*'center'/)
     })
 })
+
+/**
+ * ⚠️ `h-full` no conteúdo TRAVA a rolagem — foi a causa raiz.
+ *
+ * Medido no navegador com a estrutura do composer (contêiner de 400px,
+ * conteúdo de 680px):
+ *
+ *   h-full      → scrollHeight 432  (só 32px de rolagem: o fim é inalcançável)
+ *   min-h-full  → scrollHeight 840  (rola tudo)
+ *   sem altura  → scrollHeight 840
+ *
+ * Com `height: 100%` o contêiner de rolagem não enxerga a altura real do
+ * conteúdo, e nenhum padding-bottom resolve: o usuário chega ao "fim" da
+ * rolagem com o último bloco ainda por baixo da barra fixa. Foi por isso que a
+ * caixa da legenda continuou cortada depois de duas correções — e por que a
+ * mudança de ordem só pareceu resolver (o estilo entrou na área alcançável, a
+ * legenda saiu dela).
+ *
+ * `min-h-full` preserva o motivo de existir do `h-full` (o `items-center`
+ * centraliza quando o conteúdo é curto) e deixa crescer quando é longo.
+ */
+describe('a rolagem alcança o fim do painel', () => {
+    it.each(COMPOSERS.map(([c]) => c))('%s não trava o scroll com h-full', (composer) => {
+        const código = ler(composer)
+        const conteúdo = código.match(/className="p-4 sm:p-8 flex flex-col[^"]*"/)?.[0] ?? ''
+        expect(conteúdo, 'o conteúdo do scroll existe').toBeTruthy()
+        expect(conteúdo, 'h-full trava a rolagem — use min-h-full').not.toMatch(/(^|\s)h-full(\s|")/)
+        expect(conteúdo).toMatch(/min-h-full/)
+    })
+})
