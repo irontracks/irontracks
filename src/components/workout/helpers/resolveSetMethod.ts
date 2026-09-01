@@ -37,6 +37,14 @@ export type ResolveSetMethodInput = {
   log?: unknown
   /** `advanced_config` resolvido do plano (já com a inferência por nota). */
   plannedConfig?: unknown
+  /**
+   * Método gravado NO PLANO para esta série (`sets.per_set_method`).
+   *
+   * Perde para o log: o log é a escolha "só neste treino", feita agora; o plano
+   * é a escolha permanente, feita antes. Inverter faria o plano desfazer, no
+   * meio da sessão, o que o usuário acabou de escolher para hoje.
+   */
+  plannedMethod?: unknown
   /** `true` quando a nota do exercício injeta SST nesta série. */
   sstFromNotes?: boolean
   /** `true`/`false` de `isClusterConfig`/`isRestPauseConfig` sobre o plano. */
@@ -55,9 +63,11 @@ export function resolveSetMethodLabel(input: ResolveSetMethodInput): string {
   const log = isObject(input.log) ? (input.log as UnknownRecord) : {}
   const method = String(input.exerciseMethod || '').trim()
 
-  // 1. Escolha explícita do usuário vence tudo.
+  // 1. Escolha explícita do usuário vence tudo — a desta sessão antes da do plano.
   const perSet = String(log.per_set_method || '').trim()
   if (perSet) return perSet
+  const planned = String(input.plannedMethod || '').trim()
+  if (planned) return planned
 
   if (method.toLowerCase() === 'cardio') return 'Cardio'
 
@@ -118,10 +128,37 @@ export const METODO_NORMAL_EXPLICITO = 'Normal'
  */
 export function precisaCongelarMetodo(input: ResolveSetMethodInput): boolean {
   const log = isObject(input.log) ? (input.log as UnknownRecord) : {}
-  return !String(log.per_set_method || '').trim()
+  if (String(log.per_set_method || '').trim()) return false
+  // Método salvo no PLANO também é marcação explícita: ele acompanha a série
+  // no `setDetails`, então remover a vizinha não o faz escorregar.
+  return !String(input.plannedMethod || '').trim()
 }
 
 /** O que gravar ao congelar: o rótulo efetivo, ou `Normal` quando não há método. */
 export function metodoParaCongelar(input: ResolveSetMethodInput): string {
   return resolveSetMethodLabel(input) || METODO_NORMAL_EXPLICITO
+}
+
+/**
+ * O método EXPLÍCITO da série: a escolha desta sessão, senão a salva no plano.
+ *
+ * Fonte única para quem só precisa da string (o roteador de renderers do card e
+ * os dois renderers que leem o override direto). Os dois lugares nasceram lendo
+ * `log.per_set_method` à mão, e com o plano guardando método também, ler só o
+ * log faria a série salva como Drop-Set voltar a desenhar Normal na sessão
+ * seguinte — o "Salvar no plano" gravaria certo e não apareceria.
+ */
+export function explicitSetMethod(log: unknown, plannedSet: unknown): string {
+  const l = isObject(log) ? (log as UnknownRecord) : {}
+  const p = isObject(plannedSet) ? (plannedSet as UnknownRecord) : {}
+  return (
+    String(l.per_set_method || '').trim()
+    || String(p.per_set_method ?? p.perSetMethod ?? '').trim()
+  )
+}
+
+/** O método salvo no PLANO desta série (`setDetails[i].per_set_method`). */
+export function plannedSetMethod(plannedSet: unknown): string {
+  const p = isObject(plannedSet) ? (plannedSet as UnknownRecord) : {}
+  return String(p.per_set_method ?? p.perSetMethod ?? '').trim()
 }

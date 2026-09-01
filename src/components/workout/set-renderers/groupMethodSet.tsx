@@ -1,5 +1,7 @@
 'use client';
 
+import { explicitSetMethod } from '../helpers/resolveSetMethod';
+import { getPlannedSet } from '../helpers/setPlanningHelpers';
 import React, { useMemo } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
@@ -48,7 +50,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const cfg = getPlanConfig(ex, setIdx);
   const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const method = String(ex?.method || '').trim();
-  const perSetMethod = String(log.per_set_method || '').trim();
+  const perSetMethod = explicitSetMethod(log, getPlannedSet(ex, setIdx));
   const effectiveMethod = perSetMethod || method;
   const prevNote = (() => {
     const entry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];

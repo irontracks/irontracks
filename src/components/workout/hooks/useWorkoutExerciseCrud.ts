@@ -7,6 +7,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { editedSetDetails, stripMethodBlobs } from '../helpers/editedSetDetails';
 import { canonicalEditorMethod } from '../helpers/editorMethod';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
+import { applyPlannedSetMethod } from '@/lib/workout/plannedSetMethod';
 import { persistWorkoutPlan } from '@/utils/workout/persistWorkoutPlan';
 import {
   tagExercisesForEdit,
@@ -25,6 +26,7 @@ interface ExerciseCrudDeps {
   exercises: WorkoutExercise[];
   logs: Record<string, unknown>;
   getLog: (key: string) => UnknownRecord;
+  updateLog: (key: string, patch: unknown) => void;
   collapsed: Set<number>;
   setCollapsed: React.Dispatch<React.SetStateAction<Set<number>>>;
   /**
@@ -73,6 +75,7 @@ interface ExerciseCrudDeps {
 export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   const {
     workout, exercises, logs,
+    updateLog,
     setCollapsed,
     setDeferredExercises,
     setLinkedWeightExercises,
@@ -138,6 +141,44 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       );
       if (!onlyToday) onPersistWorkoutTemplate(nextWorkout);
     } catch { /* diálogo indisponível → mantém só na sessão (o padrão seguro) */ }
+  };
+
+  /**
+   * Troca o método de UMA série — e pergunta se vale só hoje ou também no plano.
+   *
+   * A escolha entra na SESSÃO sempre, antes de perguntar: quem tocou no seletor
+   * quer treinar aquela série assim agora, e a pergunta é sobre o plano. Se ela
+   * dependesse da resposta, fechar o diálogo por fora deixaria o toque sem
+   * efeito nenhum.
+   *
+   * "Só neste treino" é o botão em DESTAQUE, como em `askPersistSetChange`:
+   * mexer no plano pela tela do treino ativo é irreversível ali e exige escolha
+   * consciente. Sem persistidor (treino que não é template do usuário), nem
+   * pergunta — oferecer o que não dá para cumprir é pior que não oferecer.
+   */
+  const changeSetMethod = async (exIdxRaw: unknown, setIdxRaw: unknown, method: unknown, patch?: UnknownRecord) => {
+    const exIdx = Number(exIdxRaw);
+    const setIdx = Number(setIdxRaw);
+    const escolhido = String(method ?? '').trim();
+    if (!Number.isInteger(exIdx) || !Number.isInteger(setIdx) || !escolhido) return;
+    if (typeof updateLog !== 'function') return;
+
+    updateLog(`${exIdx}-${setIdx}`, { ...(isObject(patch) ? patch : {}), per_set_method: escolhido });
+
+    if (typeof onPersistWorkoutTemplate !== 'function' || !workout) return;
+    try {
+      const onlyToday = await confirm(
+        `Usar ${escolhido} nesta série só neste treino, ou também no plano (vale para os próximos)?`,
+        'Método da série',
+        { confirmText: 'Só neste treino', cancelText: 'Salvar no plano' },
+      );
+      if (onlyToday) return;
+      const nextExercises = applyPlannedSetMethod(exercises, exIdx, setIdx, escolhido);
+      if (!nextExercises) return;
+      const nextWorkout = { ...workout, exercises: nextExercises };
+      onUpdateSession?.({ workout: nextWorkout });
+      onPersistWorkoutTemplate(nextWorkout);
+    } catch { /* diálogo indisponível → a troca fica só na sessão (o padrão seguro) */ }
   };
 
   const addExtraSetToExercise = async (exIdx: unknown) => {
@@ -683,6 +724,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     toggleCollapse,
     toggleLinkWeights,
     addExtraSetToExercise,
+    changeSetMethod,
     removeExtraSetFromExercise,
     removeSetAtIndex,
     openEditExercise,

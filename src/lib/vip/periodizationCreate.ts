@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseJsonWithSchema } from '@/utils/zod';
@@ -224,6 +225,7 @@ export async function createPeriodizationProgram(
                 weight: s.weight ?? null, reps: s.reps ?? null, rpe: s.rpe ?? null,
                 set_number: s.set_number, completed: false, is_warmup: !!s.is_warmup,
                 advanced_config: s.advanced_config ?? null,
+                ...perSetMethodField(s),
             })),
         }));
 

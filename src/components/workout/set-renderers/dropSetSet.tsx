@@ -1,5 +1,6 @@
 'use client';
 
+import { explicitSetMethod } from '../helpers/resolveSetMethod';
 import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from '../WorkoutContext';
@@ -52,7 +53,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   // havia o que desenhar.
   const DROP_METHOD_RE = /^drop-?set$/i;
   const isDropMethod = DROP_METHOD_RE.test(String((ex as UnknownRecord)?.method ?? '').trim())
-    || DROP_METHOD_RE.test(String(log.per_set_method ?? '').trim());
+    || DROP_METHOD_RE.test(explicitSetMethod(log, plannedSet));
   const stagesCount = rawStagesCount || (isDropMethod ? 2 : 0);
 
   if (!stagesCount) {

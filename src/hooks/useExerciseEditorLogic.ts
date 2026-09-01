@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
 import { useDialog } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
@@ -237,7 +238,7 @@ export function useExerciseEditorLogic({
                     const sets: unknown[] = []
                     for (let i = 0; i < numSets; i += 1) {
                         const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
-                        sets.push({ weight: s?.weight ?? null, reps: s?.reps ?? ex?.reps ?? null, rpe: s?.rpe ?? ex?.rpe ?? null, set_number: s?.set_number ?? (i + 1), completed: false, is_warmup: !!(s?.is_warmup ?? s?.isWarmup), advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null })
+                        sets.push({ weight: s?.weight ?? null, reps: s?.reps ?? ex?.reps ?? null, rpe: s?.rpe ?? ex?.rpe ?? null, set_number: s?.set_number ?? (i + 1), completed: false, is_warmup: !!(s?.is_warmup ?? s?.isWarmup), advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null, ...perSetMethodField(s) })
                     }
                     return { name: ex?.name || '', notes: ex?.notes || '', video_url: ex?.videoUrl || null, rest_time: ex?.restTime ?? null, cadence: ex?.cadence ?? null, method: ex?.method ?? null, order: idx, ...unilateralPersistFields(ex as unknown as Record<string, unknown>), sets }
                 })

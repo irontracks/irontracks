@@ -175,6 +175,7 @@ const NormalSetInner = ({
   const {
     getLog,
     updateLog,
+    changeSetMethod,
     updateSetType,
     getPlanConfig,
     getPlannedSet,
@@ -878,7 +879,7 @@ const NormalSetInner = ({
               {!done && (
                 <SetMethodPicker
                   current={String(log.per_set_method || '').trim() || 'Normal'}
-                  onSelect={(m) => updateLog(key, { per_set_method: m, advanced_config: cfg ?? log.advanced_config ?? null })}
+                  onSelect={(m) => { void changeSetMethod(exIdx, setIdx, m, { advanced_config: cfg ?? log.advanced_config ?? null }); }}
                 />
               )}
               {failureToggle}

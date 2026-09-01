@@ -49,6 +49,11 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                             is_warmup: setType === 'warmup',
                             set_type: setType,
                             advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                            // Método salvo NO PLANO (o "Salvar no plano" do seletor).
+                            // Sem repassar aqui, a coluna existiria no banco e nada
+                            // chegaria à tela: a hidratação é o único caminho entre
+                            // `sets` e o card.
+                            per_set_method: s?.per_set_method ?? s?.perSetMethod ?? null,
                         }
                     }
                 )

@@ -20,6 +20,8 @@
  * transformar o conserto em perda de dado.
  */
 
+import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+
 export const WORKOUT_BACKUP_VERSION = 2
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -38,6 +40,8 @@ export type BackupSet = {
   set_type: string
   is_warmup: boolean
   advanced_config: unknown
+  /** Método escolhido para esta série; `null` = infere pelo exercício/nota. */
+  per_set_method: string | null
 }
 
 export type BackupExercise = {
@@ -91,6 +95,7 @@ const toBackupSet = (raw: unknown, idx: number, ex: Record<string, unknown>): Ba
     set_type,
     is_warmup: set_type === 'warmup',
     advanced_config: (s.advanced_config ?? s.advancedConfig) ?? null,
+    ...perSetMethodField(s),
   }
 }
 

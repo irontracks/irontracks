@@ -299,3 +299,30 @@ describe('arquivamento — a lista lê `archived_at`, não `archivedAt`', () => 
     expect(visiveis[0]!.title).toBe('Ativo')
   })
 })
+
+/**
+ * Método por série salvo NO PLANO (`sets.per_set_method`, 01/09/2026).
+ *
+ * A hidratação é o único caminho entre a coluna e o card: sem repassar aqui, o
+ * "Salvar no plano" gravaria certo no banco e a série voltaria a desenhar
+ * Normal na sessão seguinte — escrita correta, efeito nenhum.
+ */
+describe('mapWorkoutRow — método por série', () => {
+  const linhaCom = (s: Record<string, unknown>) => ({
+    id: 'w9', name: 'Treino M', is_template: true, user_id: 'u1',
+    exercises: [{ id: 'e9', name: 'Supino', order: 0, sets: [{ set_number: 1, reps: '10', ...s }] }],
+  })
+  const primeiraSerie = (row: Record<string, unknown>) => {
+    const w = mapWorkoutRow(row) as unknown as { exercises: Array<{ setDetails: Array<Record<string, unknown>> }> }
+    return w.exercises[0].setDetails[0]
+  }
+
+  it('leva o método salvo até o setDetails', () => {
+    expect(primeiraSerie(linhaCom({ per_set_method: 'Drop-Set' })).per_set_method).toBe('Drop-Set')
+  })
+
+  it('aceita as duas grafias e devolve null quando não há escolha', () => {
+    expect(primeiraSerie(linhaCom({ perSetMethod: 'Cluster' })).per_set_method).toBe('Cluster')
+    expect(primeiraSerie(linhaCom({})).per_set_method).toBeNull()
+  })
+})

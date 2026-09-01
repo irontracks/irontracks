@@ -42,7 +42,12 @@ describe('add/remover série — prompt de persistir no plano', () => {
 
   it('falha do diálogo mantém a mudança só na sessão (padrão seguro)', () => {
     // O catch NÃO pode persistir — senão um erro de UI mudaria o plano sozinho.
-    const fn = SRC.slice(SRC.indexOf('const askPersistSetChange'), SRC.indexOf('const addExtraSetToExercise'))
+    // Fatia pelo PRÓXIMO `const` de topo do hook, não pelo nome de uma função
+    // vizinha: ancorar num vizinho quebra na primeira vez que alguém escreve
+    // outra função entre as duas (aconteceu em 01/09/2026, com changeSetMethod).
+    const inicio = SRC.indexOf('const askPersistSetChange')
+    const resto = SRC.slice(inicio + 1)
+    const fn = SRC.slice(inicio, inicio + 1 + resto.indexOf('\n  const '))
     const catchBlock = fn.slice(fn.indexOf('} catch'))
     expect(catchBlock).not.toContain('onPersistWorkoutTemplate(')
   })
