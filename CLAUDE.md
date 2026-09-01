@@ -2514,6 +2514,29 @@ respondia:
    segundos — depois de três PRs de layout. Quando o suspeito é CSS de layout,
    este passo vem ANTES de editar componente.
 
+## O alarme do descanso NÃO toca com o iPhone no silencioso — e isso NÃO é bug (01/09/2026)
+
+Relato do dono: "com fone e a tela desligada, o descanso acaba e não apita;
+apita só com a tela ligada". **Medido e fechado, não reabrir sem fato novo.**
+
+Com a tela bloqueada o app está SUSPENSO: nenhum JS roda, e o único caminho de
+som é a **notificação local** — cujo som o iOS suprime no modo Silencioso
+(`interruptionLevel = .timeSensitive` fura o Focus, **não** fura o interruptor
+de silencioso). Com a tela ligada apita porque aí quem toca é o áudio do APP
+(`playAlarmSound`, AVAudioPlayer em sessão `.playback`), que ignora o
+silencioso. Os dois prints do relato mostravam o 🔕 na barra de status.
+
+O que está CERTO e não precisa de conserto: `rest_alarm.wav` existe, está em
+*Copy Bundle Resources* do `pbxproj`, tem 8 s / 44,1 kHz, e a notificação é
+agendada com ele (`scheduleRestTimer`).
+
+⚠️ **Falta `audio` em `UIBackgroundModes`** — é por isso que o app não consegue
+tocar sozinho enquanto bloqueado. Foi avaliado e **o dono decidiu não mexer**:
+sairia caro (build nativa, bateria, review) e a nota do `AppDelegate` registra
+que manter a sessão de áudio ativa já roubou o foco do Spotify uma vez. A outra
+saída, *critical alert*, exige entitlement especial da Apple. **A solução em
+vigor é o usuário desligar o silencioso durante o treino.**
+
 ## Descanso do treino — ações nativas chegam ATRASADAS
 
 `REST_DONE` ("Iniciar Serie") e `SKIP_REST` ("Pular Descanso") são botões da notificação de tela bloqueada e ENCERRAM o descanso. **O iOS enfileira essas ações quando o app está suspenso** e as entrega quando ele acorda — depois de o usuário já ter concluído a série seguinte. Resultado relatado em treino: "aperto concluir e vai direto pro tempo de treino", intermitente e sempre na 1ª série do exercício (a que vem logo após o descanso anterior).
