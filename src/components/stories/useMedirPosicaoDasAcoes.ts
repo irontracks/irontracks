@@ -24,8 +24,12 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
  *
  * Sem PII: geometria e viewport, uma vez por abertura.
  */
-export function useMedirPosicaoDasAcoes(origem: string): React.RefObject<HTMLDivElement | null> {
+export function useMedirPosicaoDasAcoes(origem: string): {
+    acoes: React.RefObject<HTMLDivElement | null>
+    estilo: React.RefObject<HTMLDivElement | null>
+} {
     const ref = React.useRef<HTMLDivElement | null>(null)
+    const estiloRef = React.useRef<HTMLDivElement | null>(null)
 
     React.useEffect(() => {
         try {
@@ -37,6 +41,10 @@ export function useMedirPosicaoDasAcoes(origem: string): React.RefObject<HTMLDiv
                 try {
                     const r = el.getBoundingClientRect()
                     const vh = window.innerHeight || 0
+                    // O seletor de ESTILO é a segunda metade da pergunta: a
+                    // barra de ações pode estar visível (medido: topo 749 no
+                    // aparelho do usuário) e o estilo cair POR BAIXO dela.
+                    const e = estiloRef.current?.getBoundingClientRect() ?? null
                     trackUserEvent('story_actions_position', {
                         type: 'ui',
                         metadata: {
@@ -48,6 +56,11 @@ export function useMedirPosicaoDasAcoes(origem: string): React.RefObject<HTMLDiv
                             alturaViewport: Math.round(vh),
                             larguraViewport: Math.round(window.innerWidth || 0),
                             posicao: window.getComputedStyle(el).position,
+                            estiloTopo: e ? Math.round(e.top) : null,
+                            estiloFundo: e ? Math.round(e.bottom) : null,
+                            // Estilo alcançável SEM rolar: inteiro na tela e
+                            // acima do topo da barra de ações.
+                            estiloAlcancavel: e ? (e.top >= 0 && e.bottom <= r.top) : null,
                             versao: String(process.env.NEXT_PUBLIC_APP_VERSION || 'dev'),
                         },
                     })
@@ -57,5 +70,5 @@ export function useMedirPosicaoDasAcoes(origem: string): React.RefObject<HTMLDiv
         } catch { /* idem */ }
     }, [origem])
 
-    return ref
+    return { acoes: ref, estilo: estiloRef }
 }

@@ -135,7 +135,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
               <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Voltar" title="Voltar"><ArrowLeft size={18} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-24">
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent max-lg:pb-32">
               <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
 
                 {/* Preview */}
@@ -244,14 +244,6 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                 </div>
 
                 {/* Painel de controle (reusa o de nutrição — templates + post/share) */}
-                {/* Legenda livre — sai na fonte do template escolhido. */}
-                <div className="w-full max-w-[340px] lg:max-w-none">
-                  <CustomTextPanel
-                    value={customText}
-                    onChange={setCustomText}
-                    overflowing={customTextOverflowing}
-                  />
-                </div>
 
                 <NutritionStoryControlPanel
                   templates={NUTRITION_STORY_TEMPLATES}
@@ -273,6 +265,21 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />
+
+                {/* A LEGENDA fica DEPOIS dos controles (01/09/2026).
+                    Medido no aparelho do usuário (393×852): a barra de ações
+                    ocupa de 749 a 852, e com a legenda antes do painel o
+                    seletor de estilo caía por baixo dela — ele conseguia
+                    postar e salvar, mas não trocar cor nem layout. Estilo e
+                    layout são a razão de existir do composer; a legenda é
+                    opcional e quem quer escrever rola atrás dela. */}
+                <div className="w-full max-w-[340px] lg:max-w-none">
+                  <CustomTextPanel
+                    value={customText}
+                    onChange={setCustomText}
+                    overflowing={customTextOverflowing}
+                  />
+                </div>
               </div>
             </div>
           </motion.div>
