@@ -5,7 +5,9 @@ import { X } from 'lucide-react'
 import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
 import { MACRO_COLORS, MACRO_SEGMENT_GAP_PX, MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
-import { horaBrt } from '@/lib/nutrition/dayMeals'
+import { horaBrt, rotuloItem } from '@/lib/nutrition/dayMeals'
+import { NumericInput } from '@/components/ui/NumericInput'
+import { quantidadeEditavel, reescalarItem } from '@/lib/nutrition/mealItemQuantity'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -24,6 +26,15 @@ type MealEntry = {
 type EditDraft = {
   food_name: string
   items: MealItemView[]
+  /**
+   * Os itens como estavam ao ABRIR o editor, antes de qualquer reescala de
+   * quantidade. `reescalarItem` sempre parte daqui — nunca do item já
+   * reescalado —, senão 250 → 150 → 250 não volta ao original (arredondamento
+   * acumula a cada passo). Opcional por compatibilidade: sem isto, cai no
+   * fallback de reescalar a partir do próprio `items` (round-trip não é
+   * garantido nesse caso, mas nada quebra).
+   */
+  itensOriginais?: MealItemView[]
 }
 
 type AddFoodResult =
@@ -97,6 +108,9 @@ function NutritionEntryCard({
   const [addError, setAddError] = useState('')
 
   const draftItems = Array.isArray(editDraft?.items) ? editDraft.items : []
+  // Base para reescalar quantidade — ver comentário do campo no tipo EditDraft.
+  // Sem `itensOriginais` (compatibilidade), cai nos próprios `items` atuais.
+  const itensOriginaisArr = Array.isArray(editDraft?.itensOriginais) ? editDraft.itensOriginais : draftItems
   const draftTotals = draftItems.reduce(
     (a, it) => ({
       calories: a.calories + (Number(it?.calories) || 0),
@@ -114,7 +128,17 @@ function NutritionEntryCard({
     try {
       const res = await onAddFood(text)
       if (res.ok) {
-        onEditDraftChange((d) => ({ ...d, items: [...(Array.isArray(d.items) ? d.items : []), ...res.items] }))
+        onEditDraftChange((d) => {
+          const baseItems = Array.isArray(d.items) ? d.items : []
+          // Item RECÉM-adicionado: sua própria base é ele mesmo (não há
+          // "quantidade anterior" — ele nasce como está agora).
+          const baseOriginais = Array.isArray(d.itensOriginais) ? d.itensOriginais : baseItems
+          return {
+            ...d,
+            items: [...baseItems, ...res.items],
+            itensOriginais: [...baseOriginais, ...res.items],
+          }
+        })
         setAddText('')
       } else {
         setAddError(res.error || 'Não reconheci esse alimento.')
@@ -124,6 +148,31 @@ function NutritionEntryCard({
     } finally {
       setAdding(false)
     }
+  }
+
+  /**
+   * Quantidade de um item editada — reescala SEMPRE a partir do original.
+   *
+   * A leitura de `itensOriginais` acontece DENTRO do updater (a partir de `d`,
+   * o estado mais fresco), não do `itensOriginaisArr` capturado no render: o
+   * `onEditDraftChange` de NutritionMixer é um `setState` funcional, e usar um
+   * valor de fora do closure aqui seria o mesmo risco de sempre com estado
+   * assíncrono — só que, como o array de originais nunca muda depois de aberto
+   * o editor, a leitura de dentro do updater é a forma mais direta de garantir
+   * isso, sem depender de quando o React decide re-renderizar.
+   */
+  const handleQuantityChange = (i: number, novoValor: number | null) => {
+    if (novoValor === null || !(novoValor > 0)) return
+    onEditDraftChange((d) => {
+      const itensOriginais = Array.isArray(d.itensOriginais) ? d.itensOriginais : (Array.isArray(d.items) ? d.items : [])
+      const original = itensOriginais[i]
+      if (!original) return d
+      const reescalado = reescalarItem(original, novoValor)
+      return {
+        ...d,
+        items: (Array.isArray(d.items) ? d.items : []).map((it, idx) => (idx === i ? reescalado : it)),
+      }
+    })
   }
 
   return (
@@ -174,16 +223,50 @@ function NutritionEntryCard({
                   <div className="text-xs text-neutral-400 py-1.5">Nenhum alimento — adicione abaixo.</div>
                 ) : (
                   <ul className="space-y-1.5">
-                    {draftItems.map((food, i) => (
-                      <li key={`${food.label}-${i}`} className="flex items-center justify-between gap-2 rounded-lg bg-neutral-800/40 border border-neutral-700/40 px-2.5 py-1.5">
-                        <div className="min-w-0">
-                          <div className="text-xs text-neutral-100 truncate">{food.label}</div>
+                    {draftItems.map((food, i) => {
+                      const original = itensOriginaisArr[i] ?? food
+                      // A EDITABILIDADE é propriedade do item ORIGINAL (densidade
+                      // não muda ao reescalar); o VALOR mostrado no campo é o
+                      // ATUAL (food), que já reflete uma reescala anterior.
+                      const editavel = quantidadeEditavel(original)
+                      const valorAtual = editavel ? (quantidadeEditavel(food)?.valor ?? editavel.valor) : null
+                      return (
+                      <li key={`${food.label}-${i}`} className="flex items-center gap-2 rounded-lg bg-neutral-800/40 border border-neutral-700/40 px-2.5 py-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-neutral-100 truncate">{rotuloItem(food) || food.label}</div>
                           <div className="text-[10px] text-neutral-400">{Math.round(food.calories)} kcal · P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</div>
                         </div>
+                        {editavel && valorAtual !== null ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <NumericInput
+                              aria-label={`Quantidade de ${food.label}`}
+                              decimal
+                              value={valorAtual}
+                              onValueChange={(novo) => handleQuantityChange(i, novo)}
+                              className="w-14 h-11 rounded-lg bg-neutral-900 border border-neutral-700/50 px-1.5 text-xs text-white text-center outline-none focus:border-yellow-500/40"
+                            />
+                            <span className="text-[10px] text-neutral-400 w-4 shrink-0">{editavel.unidade.trim() || 'g'}</span>
+                          </div>
+                        ) : (
+                          // Item de memo/legado: sem `grams`, não há base pra
+                          // reescalar — inventar 100g seria afirmar uma medição
+                          // que ninguém fez. Remove e relança em vez de editar.
+                          <span className="text-[10px] text-neutral-400 italic shrink-0 max-w-[112px] text-right leading-tight">
+                            quantidade não registrada
+                          </span>
+                        )}
                         <button
                           type="button"
                           aria-label={`Remover ${food.label}`}
-                          onClick={() => onEditDraftChange((d) => ({ ...d, items: (Array.isArray(d.items) ? d.items : []).filter((_, idx) => idx !== i) }))}
+                          onClick={() => onEditDraftChange((d) => {
+                            const baseItems = Array.isArray(d.items) ? d.items : []
+                            const baseOriginais = Array.isArray(d.itensOriginais) ? d.itensOriginais : baseItems
+                            return {
+                              ...d,
+                              items: baseItems.filter((_, idx) => idx !== i),
+                              itensOriginais: baseOriginais.filter((_, idx) => idx !== i),
+                            }
+                          })}
                           /* `before:-inset-2` leva a área de toque a ~44px sem
                              engordar a linha da lista — mesmo recurso do botão
                              METAS. O alvo visível continua discreto; o dedo, não. */
@@ -192,7 +275,8 @@ function NutritionEntryCard({
                           <X size={13} strokeWidth={2.5} aria-hidden="true" />
                         </button>
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 )}
               </div>

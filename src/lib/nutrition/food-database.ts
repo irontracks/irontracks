@@ -16,6 +16,24 @@ export type FoodItem = {
    * Só onde a chave mente sobre a grafia — capitalizar dá conta do resto.
    */
   label?: string
+  /**
+   * A chave é uma PALAVRA GENÉRICA (arroz, carne, batata…), não um prato
+   * específico. O parser só a alcança quando a linha inteira (depois de tirar
+   * quantidade) é EXATAMENTE essa palavra — nunca por casamento de CABEÇA.
+   *
+   * Sem isto, "100g leite condensado" casava em 'leite' e saía com 1/5 da
+   * caloria real; "150g batata doce" casava em 'batata' (inglesa) e perdia a
+   * batata doce de verdade; "150g de arroz com frango" virava arroz puro e o
+   * frango sumia. Medido em 02/09/2026: chave genérica de UM ou DOIS tokens
+   * "sequestrava" qualquer frase que começasse com ela, porque o casamento por
+   * cabeça (`matchesAtHead`) foi desenhado para pratos ("esfirra de frango" é
+   * uma esfirra), não para substituir uma palavra solta por um prato inteiro.
+   *
+   * Fora do flag, o comportamento de sempre continua: "arroz cozido",
+   * "frango grelhado" etc. seguem casando pela cabeça, com o resto da frase
+   * (preparo, qualificador) ignorado.
+   */
+  generic?: boolean
 }
 
 /**
@@ -199,9 +217,38 @@ export const foodDatabase: Record<string, FoodItem> = {
   // Formas curtas: "coxa ou sobrecoxa sem pele" não traz a palavra "frango", e
   // o casamento por tokens exige que TODOS os tokens da chave apareçam.
   // Não conflita com 'coxao mole' (carne bovina) — token diferente.
-  'coxa': { kcal: 160, p: 25, c: 0, f: 6, approx: { unidade: 100 } },
-  'sobrecoxa': { kcal: 165, p: 24, c: 0, f: 7, approx: { unidade: 110 } },
+  //
+  // Valores CORRIGIDOS contra a TACO em 02/09/2026 (decisão D1 do dono — eram
+  // 160/25/0/6 e 165/24/0/7, ~30% abaixo do real): 'Frango, coxa, sem pele,
+  // cozida' e 'Frango, sobrecoxa, sem pele, assada'. Muda a conta de quem já
+  // lança "coxa"/"sobrecoxa" — só para refeições FUTURAS, as gravadas não mudam.
+  'coxa': { kcal: 167, p: 26.9, c: 0, f: 5.9, approx: { unidade: 100 } },
+  'sobrecoxa': { kcal: 233, p: 29.2, c: 0, f: 12.0, approx: { unidade: 110 } },
   'salada': { kcal: 20, p: 1.5, c: 3, f: 0.3, approx: { prato: 150 } },
+
+  // ── "Coxa e sobrecoxa" — o corte composto, UM item (02/09/2026) ──────────
+  // Antes o parser separava "coxa e sobrecoxa" em DOIS alimentos pelo split
+  // cego de " e " (ver `separarPorConectorE` em parser.ts) — o comentário que
+  // dizia "nenhum alimento da base contém ' e '" já era falso antes desta
+  // entrega (`legumes e salada` era código morto por causa disso). O corte é
+  // UM pedaço de frango vendido/servido assim, não dois pratos.
+  //
+  // Macro = MÉDIA das duas chaves acima, já corrigidas contra a TACO — nunca
+  // a média direta da TACO "sem pele": duas chaves quase-sinônimas com
+  // números diferentes na mesma tela é a mesma classe de bug do "arroz" vs
+  // "arroz carreteiro", só que dentro desta própria base.
+  // approx.unidade: peça INTEIRA com osso (~210g); os "filé de" abaixo são o
+  // mesmo corte desossado (~90g) — sem isso "1 coxa e sobrecoxa" virava 50g
+  // cegos (default de `TYPICAL_GRAMS_PER_UNIT`).
+  'coxa e sobrecoxa': { kcal: 200, p: 28.0, c: 0, f: 8.9, approx: { unidade: 210 }, label: 'Coxa e sobrecoxa' },
+  'sobrecoxa e coxa': { kcal: 200, p: 28.0, c: 0, f: 8.9, approx: { unidade: 210 }, label: 'Coxa e sobrecoxa' },
+  'coxa e sobrecoxa de frango': { kcal: 200, p: 28.0, c: 0, f: 8.9, approx: { unidade: 210 }, label: 'Coxa e sobrecoxa' },
+  'file de coxa e sobrecoxa': { kcal: 200, p: 28.0, c: 0, f: 8.9, approx: { unidade: 90 }, label: 'Filé de coxa e sobrecoxa' },
+  'file de coxa e sobrecoxa de frango': { kcal: 200, p: 28.0, c: 0, f: 8.9, approx: { unidade: 90 }, label: 'Filé de coxa e sobrecoxa' },
+  // Peças SOZINHAS, desossadas — mesmos macros das chaves 'coxa'/'sobrecoxa'
+  // (por 100g o desossado não muda o macro, só o peso da porção).
+  'file de coxa': { kcal: 167, p: 26.9, c: 0, f: 5.9, approx: { unidade: 80 }, label: 'Filé de coxa' },
+  'file de sobrecoxa': { kcal: 233, p: 29.2, c: 0, f: 12.0, approx: { unidade: 90 }, label: 'Filé de sobrecoxa' },
 
   // ── Pratos que o usuário lança e NINGUÉM tinha ────────────────────────────
   // Sem eles, o parser caía num ingrediente citado na descrição ("1 sanduiche com
@@ -230,4 +277,106 @@ export const foodDatabase: Record<string, FoodItem> = {
   // 'torta' e 'sanduiche' soltos ficam FORA: são ambíguos ("torta de banana" é doce,
   // "torta de frango" é salgada; 200 kcal de diferença). Palavra ambígua é onde a IA
   // ganha da base — ela lê o resto da frase, a base não.
+
+  // ── Genéricos da TACO, curados (02/09/2026) ───────────────────────────────
+  // `taco-source.ts` passou a DESCARTAR todo alias que a TACO reivindica com
+  // macros diferentes ("carne" sozinho aponta pra 60 linhas, "arroz" pra 7) —
+  // sem isso "arroz" virava "Arroz carreteiro" (153,77 kcal) e "carne" virava
+  // "carne bovina seca crua" (312,75 kcal), os dois um número plausível e
+  // ERRADO. Descartar sem mais nada jogaria esses termos — de altíssimo
+  // volume — na IA (paga). As entradas abaixo fecham esse buraco: para cada
+  // palavra genérica, o representante escolhido é o preparo BÁSICO e mais
+  // comum em português brasileiro (cozido/cru/assado simples), nunca uma
+  // preparação composta — nunca "arroz carreteiro" para "arroz", nunca
+  // "carne seca" para "carne".
+  //
+  // Onde já existia uma chave curada vizinha (ex. 'arroz cozido', 'carne
+  // bovina', 'queijo branco', 'leite integral', 'feijao cozido', 'pao
+  // frances', 'batata cozida', 'carne de porco', 'iogurte natural'), o termo
+  // bare REUSA os mesmos quatro números — é a mesma lição do "coxa e
+  // sobrecoxa" (ver acima): duas chaves quase-sinônimas com números
+  // DIFERENTES é a próxima versão do mesmo bug, só que dentro desta base.
+  //
+  // Medido em 02/09/2026 contra `foods_taco` (Supabase, ver CLAUDE.md): 72
+  // aliases de UMA palavra ficam expostos pela política nova (não protegidos
+  // por já existir uma chave curada). Seis NÃO entram aqui, de propósito —
+  // são produtos DIFERENTES por trás da mesma palavra, sem "sentido genérico"
+  // nenhum que não seja chute: 'bebida' (isotônico × leite fermentado),
+  // 'cana' (cachaça × caldo de cana — ALCOÓLICO × não), 'caldo' (caldo de
+  // carne/galinha, um tablete salgado, × caldo de CANA, uma bebida doce — a
+  // mesma palavra "caldo" cobre as duas, e testado: dar-lhe o valor do
+  // tablete fazia "200ml caldo de cana" sair com sabor de galinha),
+  // 'cereais' (flocos de milho × papinha de bebê × mistura para vitamina),
+  // 'fermento' (biológico/levedura × químico/pó, produtos de categorias
+  // diferentes) e 'soja' (farinha × extrato/leite × tofu). Esses seis caem na
+  // IA, que lê o resto da frase para desambiguar — o comportamento SEGURO, só
+  // mais caro.
+  'arroz': { generic: true, kcal: 130, p: 3, c: 28, f: 0.3, approx: { colher: 25, concha: 100, prato: 180 } }, // = 'arroz cozido' (Arroz, tipo 1, cozido)
+  'arroz branco': { generic: true, kcal: 130, p: 3, c: 28, f: 0.3, approx: { colher: 25, concha: 100, prato: 180 }, label: 'Arroz branco' }, // idem — é o termo que o usuário digita
+  'carne': { generic: true, kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 } }, // = 'carne bovina'
+  'batata': { generic: true, kcal: 87, p: 2, c: 20, f: 0.1, approx: { unidade: 170 }, label: 'Batata' }, // = 'batata cozida' (batata inglesa é o sentido default de "batata" no PT-BR)
+  'pao': { generic: true, kcal: 300, p: 8, c: 59, f: 3, approx: { unidade: 50 } }, // = 'pao frances', o pão do dia a dia
+  'queijo': { generic: true, kcal: 264, p: 17, c: 3, f: 20, approx: { fatia: 30, pedaco: 30 } }, // = 'queijo branco'/'queijo minas'
+  'leite': { generic: true, kcal: 61, p: 3.2, c: 4.7, f: 3.3, approx: { copo: 250, xicara: 240 } }, // = 'leite integral'
+  'feijao': { generic: true, kcal: 77, p: 5, c: 14, f: 0.5, approx: { colher: 25, concha: 80 } }, // = 'feijao cozido'/'feijao preto'
+  'porco': { generic: true, kcal: 242, p: 27, c: 0, f: 14, approx: { bife: 120, posta: 120 } }, // = 'carne de porco'
+  'iogurte': { generic: true, kcal: 61, p: 3.5, c: 4.7, f: 3.3, approx: { unidade: 170, copo: 200 } }, // = 'iogurte natural'
+  'chocolate': { generic: true, kcal: 540, p: 7, c: 60, f: 30, approx: { unidade: 25 } }, // TACO 'Chocolate, ao leite' — o chocolate de prateleira
+  'farinha': { generic: true, kcal: 365, p: 1.2, c: 89, f: 0.3, approx: { colher: 15 } }, // TACO 'Farinha, de mandioca, torrada' — a farinha de mesa, não a de trigo
+  'bolo': { generic: true, kcal: 410, p: 6.2, c: 55, f: 18.5, approx: { fatia: 60 }, label: 'Bolo' }, // TACO 'Bolo, pronto, chocolate' — o sabor mais comum; 'mistura para' é só o PÓ, não o bolo
+  'biscoito': { generic: true, kcal: 443, p: 8.1, c: 75, f: 12, approx: { unidade: 8, pacote: 200 } }, // TACO 'Biscoito, doce, maisena' — a bolacha básica
+  'pastel': { generic: true, kcal: 388, p: 10, c: 44, f: 20, approx: { unidade: 90 }, label: 'Pastel' }, // TACO 'Pastel, de carne, frito' — sempre frito na prática, recheio de carne é o mais pedido
+  'presunto': { generic: true, kcal: 94, p: 14, c: 2, f: 2.7, approx: { fatia: 15 } }, // TACO 'Presunto, sem capa de gordura' — o presunto de sanduíche comum
+  'merluza': { generic: true, kcal: 122, p: 27, c: 0, f: 0.9, approx: { posta: 120, file: 100 }, label: 'Merluza' }, // TACO 'Merluza, filé, assado'
+  'pescada': { generic: true, kcal: 154, p: 29, c: 0, f: 3.6, approx: { posta: 120, file: 100 }, label: 'Pescada' }, // TACO 'Pescada, filé, frito' — peixe frito é como se come, na prática
+  'peru': { generic: true, kcal: 163, p: 26, c: 0, f: 5.7, approx: { fatia: 80, posta: 100 } }, // TACO 'Peru, congelado, assado'
+  'coco': { generic: true, kcal: 406, p: 3.7, c: 10.4, f: 42, approx: { pedaco: 40, xicara: 80 } }, // TACO 'Coco, cru' (a polpa — água de coco já tem chave própria)
+  'cha': { generic: true, kcal: 2, p: 0, c: 0.6, f: 0, approx: { xicara: 200, copo: 250 }, label: 'Chá' }, // TACO 'Chá, preto, infusão 5%' — mesma ordem de grandeza do 'cafe' já curado
+  'abadejo': { generic: true, kcal: 130, p: 27.6, c: 0, f: 1.3, approx: { posta: 120, file: 100 }, label: 'Abadejo' }, // TACO 'Abadejo, filé, congelado, grelhado'
+  'abobora': { generic: true, kcal: 48, p: 1.4, c: 10.8, f: 0.7, approx: { pedaco: 100, colher: 60 }, label: 'Abóbora' }, // TACO 'Abóbora, cabotiá, cozida' — quase sempre comida cozida no PT-BR
+  'acerola': { generic: true, kcal: 33.5, p: 0.9, c: 8, f: 0.2, approx: { unidade: 4, xicara: 100 } }, // TACO 'Acerola, crua'
+  'acucar': { generic: true, kcal: 387, p: 0.3, c: 99.5, f: 0, approx: { colher: 8 } }, // TACO 'Açúcar, refinado' — o açúcar de mesa padrão
+  'almeirao': { generic: true, kcal: 18, p: 1.8, c: 3.3, f: 0.2, approx: { prato: 50, xicara: 30 }, label: 'Almeirão' }, // TACO 'Almeirão, cru'
+  'ameixa': { generic: true, kcal: 52.5, p: 0.8, c: 13.8, f: 0, approx: { unidade: 66 } }, // TACO 'Ameixa, crua' — a fruta, não a de calda
+  'azeitona': { generic: true, kcal: 137, p: 0.9, c: 4.1, f: 14.2, approx: { unidade: 4 } }, // TACO 'Azeitona, verde, conserva'
+  'bacalhau': { generic: true, kcal: 136, p: 29, c: 0, f: 1.3, approx: { posta: 150 } }, // TACO 'Bacalhau, salgado, cru' — o produto vendido, antes de dessalgar/preparar
+  'cacao': { generic: true, kcal: 116, p: 25.6, c: 0, f: 0.8, approx: { posta: 120 }, label: 'Cação' }, // TACO 'Cação, posta, cozida' — peixe (não confundir com "cacau")
+  'caju': { generic: true, kcal: 43, p: 1, c: 10.3, f: 0.3, approx: { unidade: 80 } }, // TACO 'Caju, cru'
+  'canjica': { generic: true, kcal: 112.5, p: 2.4, c: 23.6, f: 1.2, approx: { prato: 150, copo: 200 } }, // TACO 'Canjica, com leite integral' — o doce pronto, não o grão cru
+  'cara': { generic: true, kcal: 78, p: 1.5, c: 18.9, f: 0.1, approx: { pedaco: 100 }, label: 'Cará' }, // TACO 'Cará, cozido' — tubérculo, quase sempre cozido
+  'catalonha': { generic: true, kcal: 24, p: 1.9, c: 4.8, f: 0.3, approx: { prato: 50 } }, // TACO 'Catalonha, crua'
+  'cereal': { generic: true, kcal: 365, p: 7.2, c: 83.8, f: 1, approx: { xicara: 30 } }, // TACO 'Cereal matinal, milho' — sem açúcar, o mais neutro dos dois
+  'chuchu': { generic: true, kcal: 18.5, p: 0.4, c: 4.8, f: 0, approx: { unidade: 180 } }, // TACO 'Chuchu, cozido' — quase nunca comido cru no Brasil
+  'corimbata': { generic: true, kcal: 239, p: 20.1, c: 0, f: 16.9, approx: { posta: 120 } }, // TACO 'Corimbatá, cozido'
+  'corvina': { generic: true, kcal: 100, p: 23.4, c: 0, f: 2.6, approx: { posta: 120, file: 100 } }, // TACO 'Corvina grande, cozida'
+  'creme': { generic: true, kcal: 222, p: 1.5, c: 4.5, f: 22.5, approx: { colher: 20 } }, // TACO 'Creme de Leite' — o "creme" de cozinha, não os pós de amido
+  'croquete': { generic: true, kcal: 347, p: 16.9, c: 18.1, f: 22.7, approx: { unidade: 25 } }, // TACO 'Croquete, de carne, frito'
+  'cupuacu': { generic: true, kcal: 49, p: 1.2, c: 10.4, f: 0.9, approx: { colher: 30, copo: 200 }, label: 'Cupuaçu' }, // TACO 'Cupuaçu, cru'
+  'curau': { generic: true, kcal: 78, p: 2.4, c: 13.9, f: 1.6, approx: { copo: 150 } }, // TACO 'Curau, milho verde' — o doce pronto, não a mistura em pó
+  'doce': { generic: true, kcal: 306, p: 5.5, c: 59.5, f: 6, approx: { colher: 20 } }, // TACO 'Doce, de leite, cremoso' — o sentido default de "doce" solto no PT-BR
+  'ervilha': { generic: true, kcal: 74, p: 4.6, c: 13.4, f: 0.4, approx: { colher: 25 } }, // TACO 'Ervilha, enlatada, drenada' — a de lata, a mais comum na despensa
+  'estrogonofe': { generic: true, kcal: 157, p: 18, c: 3, f: 8, approx: { concha: 150, prato: 200 } }, // = 'strogonoff' (grafia PT correta que a TACO indexa; mesma decisão: frango é o padrão)
+  'figo': { generic: true, kcal: 41.5, p: 1, c: 10.2, f: 0.2, approx: { unidade: 50 } }, // TACO 'Figo, cru'
+  'goiaba': { generic: true, kcal: 54, p: 1.1, c: 13, f: 0.4, approx: { unidade: 170 } }, // TACO 'Goiaba, vermelha, com casca, crua'
+  'graviola': { generic: true, kcal: 62, p: 0.8, c: 15.8, f: 0.2, approx: { fatia: 100 } }, // TACO 'Graviola, crua'
+  'lambari': { generic: true, kcal: 327, p: 28.4, c: 0, f: 22.8, approx: { prato: 100 } }, // TACO 'Lambari, congelado, frito' — como esse peixe pequeno é comido na prática
+  'lasanha': { generic: true, kcal: 164, p: 5.8, c: 32.5, f: 1.2, approx: { fatia: 150, prato: 250 } }, // TACO 'Lasanha, massa fresca, cozida' — só a massa (a TACO não tem o prato pronto com molho/recheio); mais próximo do real do que a IA a chutar do zero
+  'limao': { generic: true, kcal: 32, p: 0.9, c: 11.1, f: 0.1, approx: { unidade: 70 }, label: 'Limão' }, // TACO 'Limão, tahiti, cru' — a lima mais comum no Brasil
+  'manjuba': { generic: true, kcal: 349, p: 30.1, c: 0, f: 24.5, approx: { prato: 100 } }, // TACO 'Manjuba, frita' — como esse peixe pequeno é comido na prática
+  'maracuja': { generic: true, kcal: 68, p: 2, c: 12.3, f: 2.1, approx: { unidade: 100 }, label: 'Maracujá' }, // TACO 'Maracujá, cru'
+  'margarina': { generic: true, kcal: 596, p: 0, c: 0, f: 67.4, approx: { colher: 10 } }, // TACO 'Margarina, com óleo hidrogenado, com sal (65% de lipídeos)' — a margarina de mesa padrão
+  'maria': { generic: true, kcal: 301, p: 3.8, c: 73.5, f: 0.2, approx: { unidade: 20 }, label: 'Maria mole' }, // TACO 'Maria mole' (doce de coco, não a bolacha)
+  'mexerica': { generic: true, kcal: 37, p: 0.7, c: 9.3, f: 0.1, approx: { unidade: 80 } }, // TACO 'Mexerica, Rio, crua'
+  'palmito': { generic: true, kcal: 23, p: 1.8, c: 4.3, f: 0.4, approx: { unidade: 20, pedaco: 20 } }, // TACO 'Palmito, Juçara, em conserva'
+  'pessego': { generic: true, kcal: 36, p: 0.8, c: 9.3, f: 0, approx: { unidade: 130 }, label: 'Pêssego' }, // TACO 'Pêssego, Aurora, cru'
+  'pimentao': { generic: true, kcal: 21, p: 1.1, c: 4.9, f: 0.1, approx: { unidade: 100 }, label: 'Pimentão' }, // TACO 'Pimentão, verde, cru'
+  'pintado': { generic: true, kcal: 152, p: 30.8, c: 0, f: 2.3, approx: { posta: 120, file: 100 } }, // TACO 'Pintado, grelhado'
+  'pitanga': { generic: true, kcal: 41, p: 0.9, c: 10.2, f: 0.2, approx: { xicara: 100 } }, // TACO 'Pitanga, crua'
+  'quibe': { generic: true, kcal: 136, p: 14.6, c: 12.9, f: 2.7, approx: { unidade: 80 } }, // TACO 'Quibe, assado' — menos gordura que o frito, mais realista que o cru
+  'repolho': { generic: true, kcal: 17, p: 0.9, c: 3.9, f: 0.1, approx: { xicara: 70, prato: 100 } }, // TACO 'Repolho, branco, cru'
+  'tangerina': { generic: true, kcal: 38, p: 0.8, c: 9.6, f: 0.1, approx: { unidade: 110 } }, // TACO 'Tangerina, Poncã, crua'
+  'toucinho': { generic: true, kcal: 593, p: 11.5, c: 0, f: 60.3, approx: { fatia: 20 } }, // TACO 'Toucinho, cru'
+  'tremoco': { generic: true, kcal: 121, p: 11.1, c: 12.4, f: 3.8, approx: { colher: 15, xicara: 50 }, label: 'Tremoço' }, // TACO 'Tremoço, em conserva' — como é vendido/comido, não o grão seco
+  'umbu': { generic: true, kcal: 37, p: 0.8, c: 9.4, f: 0, approx: { unidade: 15 } }, // TACO 'Umbu, cru'
 }
+

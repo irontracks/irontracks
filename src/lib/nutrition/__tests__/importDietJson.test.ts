@@ -383,7 +383,17 @@ describe('macros derivados da base local quando o JSON não os traz', () => {
 describe('chaveDaBase — casamento por TOKENS, não por substring', () => {
     it('acha a entrada mesmo com palavra no MEIO do nome', () => {
         // "arroz BRANCO cozido" quebrava o `includes('arroz cozido')`.
-        expect(chaveDaBase('Arroz branco cozido')).toBe('arroz cozido')
+        //
+        // Expectativa ATUALIZADA em 02/09/2026: a curadoria dos genéricos da
+        // TACO (ver `food-database.ts`) acrescentou a chave 'arroz branco',
+        // com os MESMOS quatro macros de 'arroz cozido' (130 kcal · P3 C28
+        // G0.3 — decisão consciente do arquivo: duas chaves quase-sinônimas
+        // com números DIFERENTES é que seria bug). As duas casam 2 tokens em
+        // "Arroz branco cozido"; o desempate por distância (que já existia
+        // aqui, não mudou) passou a favorecer 'arroz branco' porque "branco"
+        // fica mais perto de "arroz" que "cozido" no texto. Não é regressão:
+        // é a mesma comida, os mesmos números, uma chave mais específica.
+        expect(chaveDaBase('Arroz branco cozido')).toBe('arroz branco')
     })
 
     it('prefere a entrada mais específica', () => {
@@ -407,8 +417,16 @@ describe('chaveDaBase — casamento por TOKENS, não por substring', () => {
     })
 
     it('NÃO confunde "coxa" de frango com "coxão mole" (carne bovina)', () => {
-        // Tokens diferentes: 'coxa' nunca casa com 'coxao mole'.
-        expect(chaveDaBase('Coxa ou sobrecoxa sem pele')).toMatch(/^(coxa|sobrecoxa)$/)
+        // Tokens diferentes: 'coxa' nunca casa com 'coxao mole'. É ESSE o invariante
+        // que este caso trava — e ele continua valendo.
+        //
+        // 02/09/2026: a base ganhou a chave composta 'coxa e sobrecoxa' (o corte único
+        // vendido no açougue, 200 kcal/100 g = média de coxa 167 e sobrecoxa 233). Como
+        // `chaveDaBase` casa por SACO DE TOKENS e descarta conectivos, "Coxa ou
+        // sobrecoxa" passa a preferir a chave de dois tokens. Para um plano alimentar
+        // que oferece uma OU outra, a média é defensável — e o que importa aqui,
+        // frango nunca virar bovino, segue travado pelo próprio regex.
+        expect(chaveDaBase('Coxa ou sobrecoxa sem pele')).toMatch(/^(coxa|sobrecoxa|coxa e sobrecoxa)$/)
     })
 })
 

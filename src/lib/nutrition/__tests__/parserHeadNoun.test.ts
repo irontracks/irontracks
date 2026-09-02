@@ -102,12 +102,27 @@ describe('pratos que ninguém tinha e agora a base local resolve', () => {
     expect(parse('1 strogonoff').kcal).toBe(314)
   })
 
-  it('o que a TACO JÁ cobre fica fora da base local, pra não sobrescrever dado curado', () => {
-    // 'pastel', 'quibe' e 'lasanha' têm alias exato na TACO. A fase local roda ANTES
-    // dela, então duplicar aqui trocaria número real por estimativa minha.
-    for (const t of ['1 pastel de queijo', '1 quibe', '1 lasanha de frango']) {
+  it('prato com sabor declarado vai para quem lê a frase inteira, não para a chave genérica', () => {
+    // Este caso NASCEU dizendo "a TACO já cobre 'pastel'/'quibe'/'lasanha', então
+    // duplicar na base local trocaria número real por estimativa". Medido em
+    // 02/09/2026, a premissa era falsa: a TACO reivindica esses aliases com VÁRIAS
+    // linhas de macros diferentes, e quem vencia era a ordem física da tabela —
+    // pastel tem SEIS linhas, de 289 a 570 kcal/100 g; quibe, três (109/136/254);
+    // "lasanha" são as duas linhas da MASSA, não do prato. O "número real" era um
+    // sorteio, e um VACUUM no banco o trocava em silêncio.
+    //
+    // Hoje a política de alias ambíguo (taco-source.ts) descarta esses aliases, e a
+    // base local traz uma escolha curada e EXPLÍCITA para a palavra sozinha. O que
+    // este caso trava agora é o que de fato importa: sabor/recheio DECLARADO na
+    // frase não pode ser engolido pela chave genérica — vai para a cascata, que lê
+    // a frase inteira.
+    for (const t of ['1 pastel de queijo', '1 lasanha de frango']) {
       expect(parse(t).unknown).toHaveLength(1)
     }
+    // Palavra sozinha, sem sabor declarado: resolve com a escolha curada (quibe
+    // assado, 136 kcal/100 g × 80 g), em vez de sortear entre 109 e 254.
+    expect(parse('1 quibe').unknown).toHaveLength(0)
+    expect(parse('1 quibe').kcal).toBe(109)
   })
 })
 
