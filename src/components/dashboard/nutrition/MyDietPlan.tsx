@@ -8,6 +8,7 @@ import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, 
 import { refeicaoComEscolhas } from '@/lib/nutrition/escolhaDaProteina'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
+import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
 /**
  * A dieta que o PRÓPRIO usuário salvou — o lugar onde ela vira algo pra seguir, e
@@ -195,6 +196,9 @@ export default function MyDietPlan({
       const res = await applyGeneratedMealAction(
         { name: meal.name, calories: meal.totals.calories, protein: meal.totals.protein, carbs: meal.totals.carbs, fat: meal.totals.fat },
         dateKey,
+        // Os alimentos da refeição, cada um com as próprias gramas — sem eles o
+        // diário grava um item único chamado "Jantar" que ninguém consegue editar.
+        planMealToLogItems(meal),
       )
       if (!res?.ok) { setError(String(res?.error || 'Falha ao lançar.')); return }
       setAppliedIdx((prev) => new Set(prev).add(idx))

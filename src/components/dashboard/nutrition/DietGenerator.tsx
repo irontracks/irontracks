@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -203,6 +204,7 @@ export default function DietGenerator({
       const res = await applyGeneratedMealAction(
         { name: meal.name, calories: meal.totals.calories, protein: meal.totals.protein, carbs: meal.totals.carbs, fat: meal.totals.fat },
         dateKey,
+        planMealToLogItems(meal),
       )
       if (!res?.ok) { setError(String(res?.error || 'Falha ao aplicar.')); return }
       setAppliedIdx((prev) => new Set(prev).add(idx))

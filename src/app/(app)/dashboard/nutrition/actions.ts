@@ -16,6 +16,7 @@ import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { MealItem } from '@/lib/nutrition/engine'
 
 /**
  * Fire-and-forget self push when the user crosses their daily calorie or
@@ -254,6 +255,16 @@ export async function estimateFoodAction(text: string) {
 export async function applyGeneratedMealAction(
   meal: { name: string; calories: number; protein: number; carbs: number; fat: number },
   dateKey?: string,
+  /**
+   * Os alimentos da refeição do plano, cada um com as próprias gramas.
+   *
+   * Sem eles o diário grava UM item com o nome da refeição e `grams: 0`, e o
+   * editor não consegue oferecer o campo de quantidade — foi o relato do dono
+   * em 02/09/2026 ("lanço o jantar da dieta semanal e não dá para editar").
+   * Opcional para não quebrar chamador antigo, mas há guard cobrando que as
+   * telas de plano passem: quem lança um cardápio TEM os itens na mão.
+   */
+  items?: MealItem[] | null,
 ) {
   try {
     const supabase = await createClient()
@@ -273,7 +284,16 @@ export async function applyGeneratedMealAction(
     }
     if (mealLog.calories <= 0 && mealLog.protein <= 0) return { ok: false, error: 'Refeição vazia.' }
 
-    const row = await trackMeal(userId, mealLog, resolvedDateKey)
+    const safeItems = (Array.isArray(items) ? items : []).slice(0, 20).map((it) => ({
+      label: sanitizeFoodName(String(it?.label ?? '')).slice(0, 120) || 'Item',
+      grams: Math.max(0, Number(it?.grams) || 0),
+      calories: Math.max(0, Number(it?.calories) || 0),
+      protein: Math.max(0, Number(it?.protein) || 0),
+      carbs: Math.max(0, Number(it?.carbs) || 0),
+      fat: Math.max(0, Number(it?.fat) || 0),
+    }))
+
+    const row = await trackMeal(userId, mealLog, resolvedDateKey, safeItems.length ? safeItems : null)
     revalidatePath('/dashboard/nutrition')
     waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
     return { ok: true, meal: mealLog, entry: row || null }
