@@ -50,16 +50,32 @@ function escapeRegex(text: string): string {
  * macarrão virava MAÇÃ (78 kcal). Depois de "maca" vem "r", não "s" nem espaço —
  * a borda de palavra mata isso sem quebrar plural.
  */
+const CONECTIVOS_OPCIONAIS = new Set(['de', 'da', 'do', 'dos', 'das'])
+
 function buildKeyPattern(key: string): string {
   // Plural OPCIONAL em cada palavra, não só na última: o usuário escreve
   // "3 claraS de ovo" e a chave é 'clara de ovo'. Com o -s só no fim, isso não
   // casava a clara e casava 'ovo' — ovo inteiro, 4,5×. Mesmo caso de
   // "castanhaS de caju".
-  return key
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => `${escapeRegex(word)}s?`)
-    .join('\\s+')
+  //
+  // E o CONECTIVO de posse é opcional, porque ninguém fala com ele: o dono
+  // digitou "200g filé sobrecoxa sem pele grelhado" (02/09/2026) e a chave
+  // 'file de sobrecoxa' não casou por falta do "de". Não foi só deixar de
+  // reconhecer — em "filé coxa e sobrecoxa" a chave composta também não casou,
+  // então o separador de itens quebrou a frase e sobrou "sobrecoxa" solta, que
+  // casou assumindo 110 g: 256 kcal silenciosos no lugar de 400. Erro por
+  // conectivo é sempre assim, some antes de aparecer.
+  const words = key.split(/\s+/).filter(Boolean)
+  return words
+    .map((word, i) => {
+      const esc = escapeRegex(word)
+      if (i === 0) return `${esc}s?`
+      // O conectivo leva o próprio espaço para dentro do grupo opcional —
+      // senão "file sobrecoxa" ficaria com dois `\s+` e exigiria espaço duplo.
+      if (CONECTIVOS_OPCIONAIS.has(word.toLowerCase())) return `(?:\\s+${esc})?`
+      return `\\s+${esc}s?`
+    })
+    .join('')
 }
 
 /**
