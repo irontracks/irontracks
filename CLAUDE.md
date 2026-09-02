@@ -2628,8 +2628,11 @@ Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a sess
 Aconteceu em 31/07/2026 (1.18 → 1.19) e **de novo em 22/08/2026 (1.20 → 1.21)** —
 nas duas vezes o archive rodou inteiro antes de o upload ser recusado. Se for
 subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION`
-ANTES — evita um ciclo perdido (~5 min). **Estado em 22/08/2026: versão 1.21,
-build 77 no TestFlight** (leva a ordem das Live Activities; ver a seção da LA).
+ANTES — evita um ciclo perdido (~5 min). **Estado em 01/09/2026: versão 1.21.2,
+build 81 no TestFlight** (leva a remoção da exceção ATS do WebView — SEC-09; a
+1.21.1 já estava na loja, por isso o bump). O guard `superficiePublicaHonesta`
+cobra que `APP_VERSION` (`lib/appVersion.ts`) espelhe a `MARKETING_VERSION` —
+bump no pbxproj sem o espelho reprova no CI.
 O bump é `sed` nas 10 ocorrências do `pbxproj`, e o release refaz com
 `npm run ios:release <build>` para não pular número.
 
@@ -3446,7 +3449,7 @@ toolchains — lockfile commitado nunca satisfaz o runner) e roda o
 mudo desde 24/07. ⚠️ **Medido em 29/08/2026: não é urgente** — não há usuário
 Android real (a conta da medição está na seção do funil). As 3 chaves seguem
 fora do repo: service account do Firebase, só o dono gera. Restante da auditoria não
-atacado: ATS iOS (SEC-09, exige build + aparelho físico), E2E/SAST no CI,
+atacado: ~~ATS iOS (SEC-09)~~ — fechado em 01/09/2026 (1.21.2 build 81) —, E2E/SAST no CI,
 sprint de performance (PERF-01…08), `pg_trgm` fora do schema public.
 
 ## Auditoria de COBRANÇAS 2026-08-14 — fechada no mesmo dia (PRs #821–#828)
