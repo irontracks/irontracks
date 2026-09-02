@@ -955,6 +955,11 @@ NÃO sobe sourcemaps, porque `SENTRY_AUTH_TOKEN` não existe fora da Vercel
 `.js.map` roda antes do `tsc`, e é a soma que estoura o container. Por isso o OOM
 não reproduz na máquina local.
 
+**Reincidiu em 02/09/2026 (#1044), JÁ com `NODE_OPTIONS=--max-old-space-size=6144`
+no comando de build** — o passo 1 abaixo não basta mais; o preview do mesmo
+commit ficou READY. Sem acesso ao painel, o único redeploy alcançável daqui é
+um novo push na `main` (PR pequeno). Subir a Build Machine é decisão do dono.
+
 **O que fazer, nesta ordem** (tudo no painel da Vercel — nenhum é mudança de código):
 1. env var `NODE_OPTIONS=--max-old-space-size=6144` no projeto;
 2. subir a Build Machine (Settings → Build & Development);
