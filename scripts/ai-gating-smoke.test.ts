@@ -109,7 +109,9 @@ function check(name: string, pass: boolean, detail?: string): void {
 const body = JSON.stringify({ not_a_valid_field: true })
 
 async function post(cookie?: string): Promise<number> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
+  // A guarda de origem BLOQUEIA desde 01/09/2026: POST sem `Origin` recebe 403
+  // antes de chegar à rota, e o smoke media a guarda em vez da cota.
+  const headers: Record<string, string> = { 'content-type': 'application/json', origin: BASE_URL }
   if (cookie) headers.cookie = cookie
   const res = await fetch(EXERCISE_SWAP_URL, { method: 'POST', headers, body })
   return res.status
