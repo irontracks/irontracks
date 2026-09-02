@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { respondDbError } from '@/utils/api/dbError'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,12 @@ export async function POST(req: Request) {
     const { data: authData } = await supabase.auth.getUser()
     const user = authData?.user
     if (!user?.id) return NextResponse.json({ ok: true, inserted: 0 })
+
+    // Auditoria 01/09/2026: rota de escrita sem limite. 60 lotes/min por usuário
+    // é folga de sobra para o app (o cliente agrupa e deduplica em 1,2 s) e fecha
+    // a porta de encher `user_activity_events` por script.
+    const rl = await checkRateLimitAsync(`telemetry:user-event:${user.id}`, 60, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: true, inserted: 0, rate_limited: true })
 
     const admin = createAdminClient()
     const uid = user.id

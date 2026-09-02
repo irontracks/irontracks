@@ -7,6 +7,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 // Cache TTL: 120s (resultados de busca mudam raramente durante uma sessão)
 const SEARCH_CACHE_TTL = 120
@@ -95,7 +96,6 @@ export async function GET(request: Request) {
     await cacheSet(cacheKey, payload, SEARCH_CACHE_TTL)
     return NextResponse.json(payload, { headers: { 'cache-control': CACHE_CONTROL } })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:exercises:search', e)
   }
 }

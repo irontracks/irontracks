@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { buildStreakDays, calcStreak } from '@/lib/social/streak'
 import { logError } from '@/lib/logger'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -194,6 +195,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:social:leaderboard', e)
   }
 }

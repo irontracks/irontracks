@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { logWarn } from '@/lib/logger'
 import { cacheDelete } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true, revoked: entitlement_id, user_id: ent.user_id })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
+        return respondInternalError('api:admin:vip:revoke', e)
     }
 }

@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       .from(BUCKET)
       .createSignedUploadUrl(path)
     if (signErr || !signed) {
-      return NextResponse.json({ ok: false, error: signErr?.message || 'failed_to_sign' }, { status: 400 })
+      return respondDbError('api:workout-photo-import:signed-upload', signErr)
     }
 
     const { error: insErr } = await admin.from('workout_photo_import_files').insert({

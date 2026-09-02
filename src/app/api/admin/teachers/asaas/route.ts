@@ -160,7 +160,7 @@ export async function POST(req: Request) {
           existing = data || null
         }
         if (!existing) {
-          return NextResponse.json({ ok: false, error: insertErr?.message || 'failed_to_insert_teacher' }, { status: 400 })
+          return respondDbError('api:admin:teachers:asaas', insertErr)
         }
         teacherRow = existing
       } else {

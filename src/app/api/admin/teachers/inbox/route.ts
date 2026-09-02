@@ -5,6 +5,7 @@ import { jsonError, requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { logError } from '@/lib/logger'
 import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -109,7 +110,7 @@ export async function GET(req: Request) {
       .select('user_id, name')
       .eq('teacher_id', teacherId)
       .limit(1000)
-    if (stErr) return jsonError(400, stErr.message)
+    if (stErr) return respondDbError('api:admin:teachers:inbox', stErr)
 
     const list = Array.isArray(students) ? students : []
     const studentUserIds = list.map((s) => String((s as Record<string, unknown>)?.user_id ?? '').trim()).filter(Boolean)
@@ -130,7 +131,7 @@ export async function GET(req: Request) {
       .eq('is_template', false)
       .order('date', { ascending: false })
       .limit(5000)
-    if (lwErr) return jsonError(400, lwErr.message)
+    if (lwErr) return respondDbError('api:admin:teachers:inbox', lwErr)
 
     const lastWorkoutByUser = new Map<string, number>()
     for (const w of Array.isArray(lastWorkouts) ? lastWorkouts : []) {
@@ -150,7 +151,7 @@ export async function GET(req: Request) {
       .gte('date', since14.toISOString())
       .order('date', { ascending: false })
       .limit(5000)
-    if (w14Err) return jsonError(400, w14Err.message)
+    if (w14Err) return respondDbError('api:admin:teachers:inbox', w14Err)
 
     for (const w of Array.isArray(workouts14) ? workouts14 : []) {
       const uid = String((w as Record<string, unknown>)?.user_id ?? '').trim()
@@ -254,7 +255,7 @@ export async function GET(req: Request) {
       .eq('coach_id', teacherId)
       .in('student_user_id', studentUserIds)
       .limit(5000)
-    if (stStateErr) return jsonError(400, stStateErr.message)
+    if (stStateErr) return respondDbError('api:admin:teachers:inbox', stStateErr)
 
     const stateByKey = new Map<string, { status: string; snoozeUntil: number }>()
     for (const s of Array.isArray(states) ? states : []) {

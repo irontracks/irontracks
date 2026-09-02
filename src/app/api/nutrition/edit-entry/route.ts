@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { editEntryCore } from '@/lib/nutrition/mutations'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +52,6 @@ export async function POST(req: Request) {
     const { totals } = await editEntryCore(auth.supabase, userId, entryId, draft)
     return NextResponse.json({ ok: true, totals })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message || 'nutrition_edit_entry_failed' }, { status: 500 })
+    return respondInternalError('api:nutrition:edit-entry', e)
   }
 }

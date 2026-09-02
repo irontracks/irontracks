@@ -90,16 +90,20 @@ describe('enforce é decisão explícita', () => {
 
   it('default é relatar (env ausente/qualquer coisa ≠ true)', () => {
     delete process.env.ORIGIN_GUARD_ENFORCE
-    expect(originGuardEnforced()).toBe(false)
+    // Polaridade invertida em 01/09/2026: sem a var, BLOQUEIA — o default fica
+    // do lado seguro, como no CSP. Antes esta linha esperava `false`.
+    expect(originGuardEnforced()).toBe(true)
     process.env.ORIGIN_GUARD_ENFORCE = '1'
-    expect(originGuardEnforced()).toBe(false)
-  })
-
-  it('só "true" liga', () => {
+    expect(originGuardEnforced()).toBe(true)
     process.env.ORIGIN_GUARD_ENFORCE = 'true'
     expect(originGuardEnforced()).toBe(true)
     process.env.ORIGIN_GUARD_ENFORCE = 'TRUE'
     expect(originGuardEnforced()).toBe(true)
+    // Só a string exata `false` (qualquer caixa) é o freio.
+    process.env.ORIGIN_GUARD_ENFORCE = 'false'
+    expect(originGuardEnforced()).toBe(false)
+    process.env.ORIGIN_GUARD_ENFORCE = ' False '
+    expect(originGuardEnforced()).toBe(false)
   })
 })
 

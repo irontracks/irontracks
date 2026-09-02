@@ -9,6 +9,8 @@ import { hasValidInternalSecret, requireRoleOrBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 import { logWarn } from '@/lib/logger'
 import { safePg, safeEmailLike } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -196,10 +198,7 @@ export async function POST(req: Request) {
     if (templateIds.length > 0) {
       const { data: raw, error: pErr } = await admin.from('workouts').select(selectTpl).in('id', templateIds)
       if (pErr) {
-        return NextResponse.json(
-          { ok: false, error: pErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { sourceUserId, templateIdsCount: templateIds.length } } : {}) },
-          { status: 400 },
-        )
+        return respondDbError('api:admin:workouts:sync-templates:read', pErr)
       }
       providedTemplatesRaw = Array.isArray(raw) ? raw.filter(isRecord) : []
     }
@@ -210,7 +209,7 @@ export async function POST(req: Request) {
       .eq('user_id', sourceUserId)
       .eq('is_template', true)
     if (ownerErr) {
-      return NextResponse.json({ ok: false, error: ownerErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { sourceUserId } } : {}) }, { status: 400 })
+      return respondDbError('api:admin:workouts:sync-templates:owner', ownerErr)
     }
 
     const isOwnedSyncable = (t: Record<string, unknown>): boolean => {
@@ -267,7 +266,7 @@ export async function POST(req: Request) {
       .eq('user_id', targetUserId)
       .eq('is_template', true)
     if (existingErr) {
-      return NextResponse.json({ ok: false, error: existingErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { targetUserId } } : {}) }, { status: 400 })
+      return respondDbError('api:admin:workouts:sync-templates:existing', existingErr)
     }
 
     const syncedExisting = (Array.isArray(existing) ? existing : []).filter((w) => String((w as Record<string, unknown>)?.created_by ?? '') === auth.user.id)
@@ -522,7 +521,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], ...(process.env.NODE_ENV === 'development' ? { debug } : {}) })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return respondInternalError('api:admin:workouts:sync-templates', e)
   }
 }

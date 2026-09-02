@@ -13,6 +13,9 @@ const comAnalisador = withBundleAnalyzer({
 })
 
 const nextConfig: NextConfig = {
+  // Auditoria 01/09/2026: o header anunciava o framework em toda resposta de
+  // produção. Não é vulnerabilidade — é reconhecimento de graça.
+  poweredByHeader: false,
   // ─── App version injected at build time (used by ServiceWorkerRegister) ───
   // Falls back to VERCEL_GIT_COMMIT_SHA → VERCEL_DEPLOYMENT_ID → package version
   env: {

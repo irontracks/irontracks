@@ -16,6 +16,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { logError } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 export async function POST() {
   try {
@@ -33,7 +34,7 @@ export async function POST() {
 
     if (error) {
       logError('api:push/badge-seen', error)
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('api:push:badge-seen', error, 500)
     }
 
     return NextResponse.json({ ok: true })

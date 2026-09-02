@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { safePg } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,7 +104,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, challenges: enriched })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:social:challenges', e)
   }
 }
 
@@ -259,6 +260,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: false, error: 'invalid_action' }, { status: 400 })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:social:challenges', e)
   }
 }

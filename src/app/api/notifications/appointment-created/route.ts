@@ -7,6 +7,7 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
 import { respondDbError } from '@/utils/api/dbError'
 import { canNotifyStudentAppointment } from '@/utils/auth/appointmentNotifyAccess'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, notified: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:notifications:appointment-created', e)
   }
 }

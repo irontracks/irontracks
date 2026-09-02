@@ -14,6 +14,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { scheduleRestEndPush } from '@/lib/push/restEndScheduler'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheSet } from '@/utils/cache'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,6 +69,6 @@ export async function POST(req: Request) {
     try { await cacheSet(`rest:push:owner:${scheduleId}`, user.id, delaySec + 120) } catch { /* cache best-effort */ }
     return NextResponse.json({ ok: true, scheduleId })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    return respondInternalError('api:rest:schedule-push', e)
   }
 }

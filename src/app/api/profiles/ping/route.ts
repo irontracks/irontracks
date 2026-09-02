@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { getUpstashConfig } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function POST() {
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:profiles:ping', e)
   }
 }
 

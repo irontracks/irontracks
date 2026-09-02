@@ -48,18 +48,50 @@ function walkRouteFiles(dir: string): string[] {
   return out
 }
 
+
+/** Do `(` da chamada até o `)` que o fecha — ignora parênteses dentro de strings/templates. */
+function argumentosDaChamada(source: string, start: number): string {
+  const open = source.indexOf('(', start)
+  if (open < 0) return ''
+  let depth = 0
+  let quote: string | null = null
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i]
+    if (quote) {
+      if (ch === '\\') { i++; continue }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; continue }
+    if (ch === '(') depth++
+    else if (ch === ')') { depth--; if (depth === 0) return source.slice(open, i + 1) }
+  }
+  return source.slice(open, open + 300)
+}
 const RESPONSE_CALL = /NextResponse\.json\s*\(|new\s+Response\s*\(|new\s+NextResponse\s*\(|jsonError\s*\(/g
 
 describe('exceção não vaza em resposta de rota (SEC-05, auditoria 2026-08-13)', () => {
-  it('nenhuma chamada de resposta carrega getErrorMessage na janela de argumentos', () => {
+  it('nenhuma chamada de resposta carrega mensagem de exceção na janela de argumentos', () => {
     const offenders: string[] = []
     for (const file of walkRouteFiles(API_DIR)) {
       const rel = path.relative(ROOT, file)
       if (ALLOWLIST.has(rel)) continue
       const source = stripComments(fs.readFileSync(file, 'utf8'))
       for (const call of source.matchAll(RESPONSE_CALL)) {
-        const windowText = source.slice(call.index!, call.index! + 300)
-        if (/getErrorMessage\s*\(/.test(windowText)) {
+        // A janela é a CHAMADA (parêntese balanceado), não 300 caracteres fixos:
+        // a janela fixa atravessava para o código seguinte e acusava um
+        // `String(error.message).includes('duplicate')` de condição — não resposta.
+        const windowText = argumentosDaChamada(source, call.index!)
+        // A CLASSE, não a forma: em 01/09/2026 a auditoria achou 23 rotas devolvendo
+        // `e.message` / `String(e)` / `error.message` — este guard só procurava
+        // `getErrorMessage(` e passava verde com o vazamento vivo (jeito nº 6 da
+        // lista de guards falsos do CLAUDE.md). Qualquer leitura de `.message` de
+        // um erro, ou `String(<erro>)`, na janela da resposta reprova.
+        // A primeira versão desta regex casava `.message` solto e acusou 69 rotas
+        // que devolvem `{ message: data }` no payload — o jeito nº 8 (largo demais).
+        // O que identifica o vazamento é `.message` LIDO DE UMA VARIÁVEL DE ERRO
+        // (`e`, `err`, `error`, `signErr`, `created.error`…), ou `String(<erro>)`.
+        if (/getErrorMessage\s*\(|\b(?:e|err|error|\w*[eE]rr(?:or)?)\??\.message\b|String\s*\(\s*(?:e|err|error|\w*[eE]rr(?:or)?)\s*\)/.test(windowText)) {
           offenders.push(`${rel} (índice ${call.index})`)
           break
         }

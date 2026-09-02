@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
 import { logError } from '@/lib/logger'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:social:stories:delete', e)
   }
 }

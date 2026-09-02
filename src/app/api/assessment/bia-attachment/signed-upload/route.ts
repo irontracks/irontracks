@@ -20,6 +20,7 @@ import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,14 +99,14 @@ export async function POST(request: Request) {
         fileSizeLimit: FILE_LIMIT_BYTES,
         allowedMimeTypes: ALLOWED_CONTENT_TYPES,
       })
-      if (created.error) return NextResponse.json({ ok: false, error: created.error.message }, { status: 400 })
+      if (created.error) return respondDbError('api:assessment:bia-attachment:signed-upload', created.error)
     } else if (b.data.public !== false || b.data.file_size_limit !== FILE_LIMIT_BYTES) {
       const updated = await admin.storage.updateBucket(BUCKET, {
         public: false,
         fileSizeLimit: FILE_LIMIT_BYTES,
         allowedMimeTypes: ALLOWED_CONTENT_TYPES,
       })
-      if (updated.error) return NextResponse.json({ ok: false, error: updated.error.message }, { status: 400 })
+      if (updated.error) return respondDbError('api:assessment:bia-attachment:signed-upload', updated.error)
     }
 
     const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(safe.path)

@@ -13,6 +13,7 @@ import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
 import { cancelRestEndPush } from '@/lib/push/restEndScheduler'
 import { cacheGet, cacheDelete } from '@/utils/cache'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,6 @@ export async function POST(req: Request) {
     try { await cacheDelete(`rest:push:owner:${scheduleId}`) } catch { /* best-effort */ }
     return NextResponse.json({ ok: true, cancelled })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    return respondInternalError('api:rest:cancel-push', e)
   }
 }

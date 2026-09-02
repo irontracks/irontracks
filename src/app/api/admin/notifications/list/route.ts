@@ -13,6 +13,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +59,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, notifications: enriched, unreadCount })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:admin:notifications:list', e)
   }
 }

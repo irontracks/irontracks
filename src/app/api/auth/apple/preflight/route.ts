@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 const BodySchema = z.object({
   email: z.string().email(),
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       .insert({ name: safeName, email })
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message || 'insert_failed' }, { status: 400 })
+      return respondDbError('api:auth:apple:preflight', error)
     }
 
     return NextResponse.json({ ok: true, inserted: true })

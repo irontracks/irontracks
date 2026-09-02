@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
 
     if (error) {
       logError('api:social:follow:cancel', error)
-      return NextResponse.json({ ok: false, error: String(error.message || 'Erro ao cancelar') }, { status: 500 })
+      return respondDbError('api:social:follow:cancel', error, 500)
     }
 
     // Clean up notifications

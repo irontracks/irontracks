@@ -11,6 +11,7 @@ import { waitUntil } from '@vercel/functions'
 import { extractMentions } from '@/lib/social/extractMentions'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,9 +154,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, id: inserted.id })
   } catch (e: unknown) {
     logError('team-chat', '[TeamChat] Unexpected error', e)
-    return NextResponse.json(
-      { ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) },
-      { status: 500 }
-    )
+    return respondInternalError('api:team:chat:notify', e)
   }
 }

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -114,7 +115,7 @@ export async function GET(req: Request) {
       .select('user_id, name')
       .eq('teacher_id', requesterId)
       .limit(1000)
-    if (stErr) return jsonError(400, stErr.message)
+    if (stErr) return respondDbError('api:teacher:inbox:feed', stErr)
 
     const list = Array.isArray(students) ? students : []
     const studentUserIds = list.map((s) => String((s as Record<string, unknown>)?.user_id ?? '').trim()).filter(Boolean)
@@ -147,9 +148,9 @@ export async function GET(req: Request) {
         .eq('coach_id', requesterId).in('student_user_id', studentUserIds).limit(5000),
     ])
 
-    if (lwErr) return jsonError(400, lwErr.message)
-    if (w14Err) return jsonError(400, w14Err.message)
-    if (stStateErr) return jsonError(400, stStateErr.message)
+    if (lwErr) return respondDbError('api:teacher:inbox:feed', lwErr)
+    if (w14Err) return respondDbError('api:teacher:inbox:feed', w14Err)
+    if (stStateErr) return respondDbError('api:teacher:inbox:feed', stStateErr)
 
     const lastWorkoutByUser = new Map<string, number>()
     for (const w of Array.isArray(lastWorkouts) ? lastWorkouts : []) {

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { safeEmailLike } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +82,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, rows: rows || [] })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:admin:workouts:by-student', e)
   }
 }

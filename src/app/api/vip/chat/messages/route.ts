@@ -5,6 +5,7 @@ import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
     if (error) return respondDbError('vip:chat:messages:list', error)
     return NextResponse.json({ ok: true, messages: data || [] })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:vip:chat:messages', e)
   }
 }
 
@@ -88,6 +89,6 @@ export async function POST(req: Request) {
     if (error) return respondDbError('vip:chat:messages:create', error)
     return NextResponse.json({ ok: true, message: data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:vip:chat:messages', e)
   }
 }

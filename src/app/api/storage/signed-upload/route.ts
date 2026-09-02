@@ -5,6 +5,7 @@ import { canUploadToChatMediaPath, isSafeStoragePath, requireUser } from '@/util
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 const BodySchema = z
   .object({
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(safe.path)
-    if (error || !data) return NextResponse.json({ ok: false, error: error?.message || 'failed to sign' }, { status: 400 })
+    if (error || !data) return respondDbError('api:storage:signed-upload', error)
 
     return NextResponse.json({ ok: true, path: safe.path, token: data.token })
   } catch (e: unknown) {

@@ -6,6 +6,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 import { resolveDeliveryStatus, type AuditRow } from '@/utils/email/deliveryStatus'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,8 +67,7 @@ export async function GET(req: Request) {
       }
     })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:admin:access-requests:list', e)
   }
 }
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseSearchParams } from '@/utils/zod'
 import { safePgLike } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,7 +111,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, items })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:team:invite-candidates', e)
   }
 }

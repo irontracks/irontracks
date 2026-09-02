@@ -61,10 +61,10 @@ export async function POST(request: Request) {
     const b = await admin.storage.getBucket(bucket)
     if (!b?.data) {
       const created = await admin.storage.createBucket(bucket, { public: false, fileSizeLimit: LIMIT })
-      if (created.error) return NextResponse.json({ ok: false, error: created.error.message }, { status: 400 })
+      if (created.error) return respondDbError('api:storage:social-stories:signed-upload', created.error)
     } else if (b.data.file_size_limit !== LIMIT) {
       const updated = await admin.storage.updateBucket(bucket, { public: false, fileSizeLimit: LIMIT })
-      if (updated.error) return NextResponse.json({ ok: false, error: updated.error.message }, { status: 400 })
+      if (updated.error) return respondDbError('api:storage:social-stories:signed-upload', updated.error)
     }
 
     const { data: b2 } = await admin.storage.getBucket(bucket)

@@ -5,6 +5,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 import { safePgLike } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, users })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:admin:user-activity:users', e)
   }
 }

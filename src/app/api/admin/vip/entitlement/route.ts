@@ -5,6 +5,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseSearchParams } from '@/utils/zod'
 import { safeEmailLike } from '@/utils/safePgFilter'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +45,6 @@ export async function GET(req: Request) {
     const entitlement = await getVipPlanLimits(admin, userId)
     return NextResponse.json({ ok: true, user_id: userId, entitlement })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:admin:vip:entitlement', e)
   }
 }
