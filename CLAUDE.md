@@ -3342,9 +3342,13 @@ do git). Além do SEC-05 e do origin guard (acima), entrou no mesmo dia:
   O WebView só carrega `https://irontracks.com.br` e o CSP já força https em
   tudo. **Mudança nativa — só chega com build nova no TestFlight.**
 
-**Ficou de fora, com dono:** `UPSTASH_REDIS_*` e a confirmação do enforce na
-Vercel (painel); *leaked password protection* (painel do Supabase); remoção do
-código Asaas (toca pagamentos — pede confirmação por regra do dono).
+**Confirmado pelo dono no painel em 02/09/2026:** `UPSTASH_REDIS_REST_URL` e
+`UPSTASH_REDIS_REST_TOKEN` existem em All Environments na Vercel (o rate limit
+de produção é distribuído, não por instância) e *leaked password protection*
+já estava ligada no Supabase Auth. As duas vars da Upstash estão como
+"Config / Needs Attention" — reclassificar como Sensitive é só esconder o
+valor do painel e dos logs de build, sem efeito em runtime. **Ainda com
+dono:** remoção do código Asaas (toca pagamentos — pede confirmação).
 
 ## Auditoria 2026-08-13 — fechada em 14/08/2026 (PRs #805–#819)
 
