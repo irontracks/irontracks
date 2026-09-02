@@ -5,6 +5,7 @@ import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/action
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { planDays, type MacroTotals, type PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape'
+import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
 // Tipos da FONTE ÚNICA (`dietPlanShape`). Estavam copiados aqui, e a cópia já
 // estava atrasada: não tinha o `note` da refeição, então a orientação escrita
@@ -103,6 +104,7 @@ export default function PrescribedDietPlan({
       const res = await applyGeneratedMealAction(
         { name: meal.name, calories: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat },
         dateKey,
+        planMealToLogItems(meal),
       )
       if (!res?.ok) { setError(String(res?.error || 'Falha ao lançar.')); return }
       setAppliedIdx((prev) => new Set(prev).add(idx))
