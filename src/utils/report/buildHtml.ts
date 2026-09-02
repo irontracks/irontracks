@@ -1,6 +1,8 @@
 import { escapeHtml } from '@/utils/escapeHtml'
 import { checkinEnergyLabel, checkinPlainValue, checkinSleepLabel, checkinWeightLabel } from '@/lib/workout/checkinFields'
 import { buildMuscleMapHtml } from '@/utils/report/buildMuscleMapHtml'
+import { buildSetMediaRowsHtml } from '@/utils/report/buildSetMediaHtml'
+import { groupSetMediaByKey } from '@/lib/workout/setMediaView'
 import {
   isRecord,
   formatDate,
@@ -523,6 +525,11 @@ export function buildReportHTML(
   }) : null
   const muscleMapHtml = buildMuscleMapHtml(muscleMapWeek, { origin: reportOrigin, gender: muscleGender, assets: muscleMapAssets })
 
+  // Foto/vídeo das séries + resposta da IA — a MESMA lista que a tela mostra
+  // (`useSetMediaForWorkout`), agrupada por "exIdx-setIdx". Só texto no PDF:
+  // a mídia fica no app (URL assinada expira), a resposta é o que interessa a
+  // quem avalia de fora.
+  const setMediaByKey = groupSetMediaByKey(opts?.setMedia)
   const preCheckinOpt = isRecord(opts?.preCheckin) ? (opts.preCheckin as Record<string, unknown>) : null
   const postCheckinOpt = isRecord(opts?.postCheckin) ? (opts.postCheckin as Record<string, unknown>) : null
   const checkinRecommendations = Array.isArray(opts?.checkinRecommendations)
@@ -757,6 +764,11 @@ export function buildReportHTML(
       if (note) {
         const colSpan = showProgression ? 4 : 3
         rowHtml += `<tr><td colspan="${colSpan}" class="td-note">Obs: ${escapeHtml(note)}</td></tr>`
+      }
+      const midias = setMediaByKey[`${exIdx}-${rowIdx}`]
+      if (Array.isArray(midias) && midias.length > 0) {
+        const colSpan = showProgression ? 4 : 3
+        rowHtml += buildSetMediaRowsHtml(midias, colSpan)
       }
       return rowHtml
     }).join('')

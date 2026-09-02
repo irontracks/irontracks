@@ -151,6 +151,8 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     workout_assigned: tipo(<Dumbbell size={15} />, 'Treino novo', 'lembrete'),
     workout_updated: tipo(<Dumbbell size={15} />, 'Treino', 'lembrete'),
     diet_updated: tipo(<Utensils size={15} />, 'Dieta', 'lembrete'),
+    // A IA respondeu sobre a foto/vídeo anexado à série — a resposta mora no histórico.
+    set_media_analyzed: tipo(<Camera size={15} />, 'Foto/vídeo', 'lembrete'),
 
     default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
@@ -253,6 +255,7 @@ const DESTINO_POR_TIPO: Record<string, string> = {
     workout_assigned: '/dashboard',
     workout_updated: '/dashboard',
     diet_updated: '/dashboard/nutrition',
+    set_media_analyzed: '/dashboard',
     streak_at_risk: '/dashboard',
     inactivity: '/dashboard',
     pr_close: '/dashboard',

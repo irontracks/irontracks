@@ -4,10 +4,14 @@ import { setTopWeightReps, setBestE1rm, setVolume, isNonWorkingSet, nonWorkingSe
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
 import { isCardioExercise, getCardioSummary } from '@/utils/report/cardioSummary'
+import { ReportSetMediaRow } from '@/components/workout-report/ReportSetMediaRow'
+import type { SetMediaView } from '@/lib/workout/setMediaView'
 
 type AnyObj = Record<string, unknown>
 
 interface ReportExerciseCardProps {
+    /** Foto/vídeo anexados às séries deste treino, por chave "exIdx-setIdx" (com a resposta da IA). */
+    setMediaByKey?: Record<string, SetMediaView[]>
     exercise: AnyObj
     exIdx: number
     sessionLogs: Record<string, unknown>
@@ -135,7 +139,7 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs }: ReportExerciseCardProps) => {
+export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs, setMediaByKey }: ReportExerciseCardProps) => {
     const obj = exercise
     const exName = String(obj?.name || '').trim()
     // Cardio (esteira/bike/…) não tem carga/reps/1RM — renderiza tempo/velocidade
@@ -376,6 +380,11 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                             </td>
                                         </tr>
                                     )
+                                })()}
+                                {(() => {
+                                    const midias = setMediaByKey?.[`${exIdx}-${sIdx}`]
+                                    if (!Array.isArray(midias) || midias.length === 0) return null
+                                    return <ReportSetMediaRow key={`${sIdx}-media`} items={midias} colSpan={5} />
                                 })()}
                             </React.Fragment>
                         )

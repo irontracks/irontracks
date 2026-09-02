@@ -24,6 +24,7 @@ import { inventoryFromSettings } from '@/utils/plates/plateInventory';
 import { FailureToggle } from './FailureToggle';
 import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { selectFieldContent } from '@/utils/ui/selectOnFocus'
+import { SetMediaAttach } from '@/components/workout/SetMediaAttach';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -927,6 +928,14 @@ const NormalSetInner = ({
             placeholder="Observações da série (opcional)"
             rows={2}
             className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 shadow-sm shadow-yellow-500/10 transition duration-200"
+          />
+          <SetMediaAttach
+            log={log}
+            logKey={key}
+            exerciseIndex={exIdx}
+            setIndex={setIdx}
+            exerciseName={String(ex?.name ?? '')}
+            updateLog={updateLog}
           />
         </div>
       )}

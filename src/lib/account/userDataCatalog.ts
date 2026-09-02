@@ -131,6 +131,8 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   exercise_muscle_maps: { mechanism: 'cascade', export: own(['user_id']) },
   exercise_alias_jobs: { mechanism: 'cascade', export: skip('fila técnica de normalização de nomes; o resultado está em exercise_aliases') },
   exercise_execution_submissions: { mechanism: 'cascade', export: own(['student_user_id']) },
+  // Foto/vídeo da observação da série (02/09/2026). Arquivos no bucket set-media (prefixo userId).
+  workout_set_media: { mechanism: 'cascade', export: own(['user_id']) },
   exercise_videos: {
     mechanism: 'anonymize',
     reason: 'biblioteca compartilhada; created_by vira NULL (SET NULL) e o vídeo segue servindo os demais',
@@ -296,6 +298,7 @@ export const USER_PREFIX_BUCKETS = [
   'social-stories',
   'execution-videos',
   'workout-imports',
+  'set-media',
 ] as const
 
 /** Decisão por bucket — o guard exige que todo bucket de produção conste. */
@@ -306,5 +309,6 @@ export const BUCKET_DECISIONS: Record<string, string> = {
   'social-stories': 'prefixo userId — varrido na exclusão',
   'execution-videos': 'prefixo userId — varrido na exclusão',
   'workout-imports': 'prefixo userId (`${userId}/imports/...`) — varrido na exclusão',
+  'set-media': 'prefixo userId — varrido na exclusão',
   'chat-media': 'path por canal — objetos resolvidos via direct_messages antes do cascade',
 }

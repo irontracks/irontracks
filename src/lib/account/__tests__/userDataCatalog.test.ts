@@ -48,14 +48,14 @@ const PROD_TABLES_SNAPSHOT = [
   'user_location_settings', 'user_settings', 'user_update_views', 'video_channel_whitelist',
   'vip_chat_messages', 'vip_chat_threads', 'vip_periodization_exercise_state', 'vip_periodization_programs',
   'vip_periodization_workouts', 'vip_profile', 'vip_usage_daily', 'vip_welcome_views', 'webhook_dead_letters',
-  'whatsapp_conversations', 'workout_checkins', 'workout_photo_import_files', 'workout_photo_imports',
+  'whatsapp_conversations', 'workout_checkins', 'workout_photo_import_files', 'workout_set_media', 'workout_photo_imports',
   'workout_session_logs', 'workout_set_logs',
   'workout_sync_mappings', 'workout_sync_subscriptions', 'workouts',
 ]
 
-/** `select id from storage.buckets` — 22/08/2026 */
+/** `select id from storage.buckets` — 02/09/2026 (`set-media` entrou com a mídia das séries) */
 const PROD_BUCKETS_SNAPSHOT = [
-  'bioimpedance-files', 'body-photos', 'chat-media', 'execution-videos', 'lab-exams', 'social-stories',
+  'bioimpedance-files', 'body-photos', 'chat-media', 'execution-videos', 'lab-exams', 'set-media', 'social-stories',
   'workout-imports',
 ]
 

@@ -18,6 +18,8 @@ type Props = {
     loading: boolean
     onRangeChange: (range: string) => void
     onOpenReport: (type: 'week' | 'month') => void
+    /** Dossiê completo (treino + dieta + exames + avaliações) — semanal/mensal. */
+    onOpenDossier?: (type: 'week' | 'month') => void
 }
 
 const RANGE_OPTIONS = [
@@ -39,6 +41,7 @@ export function HistorySummaryCard({
     loading,
     onRangeChange,
     onOpenReport,
+    onOpenDossier,
 }: Props) {
     return (
         <HistorySummaryShell
@@ -79,6 +82,9 @@ export function HistorySummaryCard({
                     <>
                         <SummaryAction variant="gold" onClick={() => onOpenReport('week')}>Semanal</SummaryAction>
                         <SummaryAction onClick={() => onOpenReport('month')}>Mensal</SummaryAction>
+                        {onOpenDossier && (
+                            <SummaryAction onClick={() => onOpenDossier('week')}>Dossiê</SummaryAction>
+                        )}
                     </>
                 ),
             } : undefined}

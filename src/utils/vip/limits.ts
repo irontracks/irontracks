@@ -14,6 +14,13 @@ export type VipTierLimits = {
   // análise de exames laboratoriais por IA (Gemini Pro) — TODO plano VIP
   // (start/pro/elite). O comentário antigo dizia "pro+" e divergia do código.
   lab_exams: boolean
+  /**
+   * Análise por IA da foto/vídeo anexado à observação de uma série (02/09/2026):
+   * "é a máquina certa?", "a execução está correta?". Roda na finalização do
+   * treino; vídeo custa mais que foto no Gemini, por isso é feature VIP com
+   * teto diário anti-abuso (BOOLEAN_DAILY_CEILING).
+   */
+  media_analysis: boolean
 }
 
 export type VipEntitlementSource =
@@ -40,7 +47,8 @@ export const FREE_LIMITS: VipTierLimits = {
   nutrition_macros: false,
   analytics: false,
   offline: false,
-  lab_exams: false
+  lab_exams: false,
+  media_analysis: false,
 }
 
 // Admin/Teacher gets everything unlimited
@@ -52,7 +60,8 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   nutrition_macros: true,
   analytics: true,
   offline: true,
-  lab_exams: true
+  lab_exams: true,
+  media_analysis: true,
 }
 
 export const normalizePlanId = (raw: unknown) => {
@@ -126,6 +135,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: false,
         offline: false,
               lab_exams: true, // disponível em todo VIP (start/pro/elite)
+              media_analysis: true,
       }
     }
     if (normalized === 'vip_pro') {
@@ -143,6 +153,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: false,
         offline: true,
               lab_exams: true,
+              media_analysis: true,
       }
     }
     if (normalized === 'vip_elite') {
@@ -156,6 +167,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: true,
         offline: true,
               lab_exams: true,
+              media_analysis: true,
       }
     }
     return limits
@@ -320,6 +332,9 @@ async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promis
 // teacher (source='role') são isentos. Auditoria 2026-06-28 (R2 — VIP boolean metering).
 const BOOLEAN_DAILY_CEILING: Partial<Record<keyof VipTierLimits, number>> = {
   lab_exams: 50,
+  // 20 mídias/dia: um treino de 8 exercícios com 1 foto ou vídeo por exercício
+  // cabe folgado; 200 vídeos num dia é script, não aluno.
+  media_analysis: 20,
   nutrition_macros: 200,
   analytics: 150,
 }

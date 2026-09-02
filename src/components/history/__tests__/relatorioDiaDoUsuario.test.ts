@@ -15,7 +15,8 @@ import { describe, it, expect } from 'vitest'
  * heatmap de nutrição. A fonte única `brtDateKey` existe desde então.
  */
 
-const hook = readFileSync('src/components/history/hooks/useHistoryPeriodReport.ts', 'utf8')
+// A conta mora em `periodStats.ts` desde 02/09/2026 (o hook delega; o dossiê reusa).
+const hook = readFileSync('src/utils/report/periodStats.ts', 'utf8')
 const executavel = hook.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, '')
 
 describe('o dia do relatório é o dia do usuário', () => {

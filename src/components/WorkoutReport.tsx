@@ -21,6 +21,7 @@ import {
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
 import { ReportSummaryCards } from '@/components/workout-report/ReportSummaryCards'
 import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCard'
+import { useSetMediaForWorkout } from '@/hooks/useSetMediaForWorkout'
 import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
 import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
 import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
@@ -118,6 +119,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
     } = useReportData({ session, previousSession, user, settings });
+    // Foto/vídeo das séries + resposta da IA: a mesma lista vai para os cards E para o PDF.
+    const setMedia = useSetMediaForWorkout(typeof session?.id === 'string' ? session.id : null);
 
     // Calorias por exercício: distribui o total EXIBIDO da sessão (mesmo número do
     // stat "Calorias") pelos exercícios, garantindo que a soma feche. Funciona pra
@@ -257,6 +260,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 preCheckin,
                 postCheckin,
                 checkinRecommendations,
+                setMedia: setMedia.items,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
@@ -831,6 +835,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                                 sessionLogs={sessionLogs}
                                 prevLogs={(Array.isArray(prevLogsMap[exKey]) ? prevLogsMap[exKey] : []) as unknown[]}
                                 baseMs={prevBaseMsMap[exKey] ?? null}
+                                setMediaByKey={setMedia.byKey}
                             />
                         );
                     })}

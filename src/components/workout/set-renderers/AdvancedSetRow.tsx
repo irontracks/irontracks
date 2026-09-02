@@ -6,6 +6,7 @@ import { useWorkoutContext } from '../WorkoutContext';
 import { FailureToggle } from './FailureToggle';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { normalizeExerciseKey } from '../utils';
+import { SetMediaAttach } from '@/components/workout/SetMediaAttach';
 
 /**
  * A LINHA de uma série de método avançado — o molde único dos 11 renderers que
@@ -250,6 +251,14 @@ export function AdvancedSetRow({
             rows={2}
             aria-label="Observações da série"
             className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+          <SetMediaAttach
+            log={log}
+            logKey={key}
+            exerciseIndex={exIdx}
+            setIndex={setIdx}
+            exerciseName={String((ex as { name?: unknown } | null)?.name ?? '')}
+            updateLog={updateLog}
           />
         </div>
       )}
