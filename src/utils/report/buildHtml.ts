@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/utils/escapeHtml'
+import { checkinEnergyLabel, checkinPlainValue, checkinSleepLabel, checkinWeightLabel } from '@/lib/workout/checkinFields'
 import { buildMuscleMapHtml } from '@/utils/report/buildMuscleMapHtml'
 import {
   isRecord,
@@ -423,6 +424,73 @@ export function buildReportData(
   }
 }
 
+/**
+ * Seção de Check-in / Check-out do PDF — o mesmo painel que a tela mostra
+ * (`ReportCheckinPanel`), com as MESMAS funções de formatação
+ * (`lib/workout/checkinFields`). Auditoria de 02/09/2026: o check-in e o
+ * check-out eram gravados, apareciam na tela do relatório, e o PDF — o
+ * artefato que de fato sai do app para uma avaliação externa (professor,
+ * nutricionista) — nunca os desenhava; os dois só alimentavam a estimativa
+ * de calorias por baixo dos panos.
+ *
+ * `''` (sem seção) quando os dois são nulos — mesmo critério do
+ * `ReportCheckinPanel`: um relatório de sessão antiga, sem check-in nenhum,
+ * não ganha um bloco vazio.
+ */
+function buildCheckinSectionHtml(
+  preCheckin: Record<string, unknown> | null,
+  postCheckin: Record<string, unknown> | null,
+  recommendations: string[],
+): string {
+  if (!preCheckin && !postCheckin) return ''
+
+  const field = (label: string, value: string, wide = false) => `
+        <div class="checkin-field${wide ? ' checkin-field-wide' : ''}">
+          <div class="checkin-field-label">${escapeHtml(label)}</div>
+          <div class="checkin-field-value">${escapeHtml(value)}</div>
+        </div>`
+
+  const preFields = preCheckin ? `
+        ${field('Energia', checkinEnergyLabel(preCheckin?.energy))}
+        ${field('Dor muscular', checkinPlainValue(preCheckin?.soreness))}
+        ${field('Peso do dia', checkinWeightLabel(preCheckin?.weight))}
+        ${field('Sono', checkinSleepLabel(preCheckin?.sleepHours))}
+        ${field('Tempo disponível', checkinPlainValue(preCheckin?.timeMinutes, ' min'), true)}
+        ${field('Observações', checkinPlainValue(preCheckin?.notes), true)}` : `
+        <div class="checkin-field checkin-field-wide"><div class="checkin-field-value" style="color:#a3a3a3">Sem check-in registrado.</div></div>`
+
+  const postFields = postCheckin ? `
+        ${field('RPE', checkinPlainValue(postCheckin?.rpe))}
+        ${field('Satisfação', checkinPlainValue(postCheckin?.satisfaction))}
+        ${field('Dor muscular', checkinPlainValue(postCheckin?.soreness), true)}
+        ${field('Observações', checkinPlainValue(postCheckin?.notes), true)}` : `
+        <div class="checkin-field checkin-field-wide"><div class="checkin-field-value" style="color:#a3a3a3">Sem check-out registrado.</div></div>`
+
+  const recsHtml = recommendations.length
+    ? `
+      <div class="ai-card" style="grid-column:1 / -1;margin-top:12px">
+        <div class="ai-card-label">Recomendações</div>
+        <ul class="bullet-list">${recommendations.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>`
+    : ''
+
+  return `
+      <div class="section-block">
+        <div class="section-title"><span class="section-dot"></span>Check-in &amp; Check-out</div>
+        <div class="ai-grid">
+          <div class="ai-card">
+            <div class="ai-card-label">Pré-treino</div>
+            <div class="checkin-fields">${preFields}</div>
+          </div>
+          <div class="ai-card">
+            <div class="ai-card-label">Pós-treino</div>
+            <div class="checkin-fields">${postFields}</div>
+          </div>
+          ${recsHtml}
+        </div>
+      </div>`
+}
+
 export function buildReportHTML(
   session: unknown,
   previousSession: unknown,
@@ -454,6 +522,13 @@ export function buildReportHTML(
     overlays: Record<string, string>
   }) : null
   const muscleMapHtml = buildMuscleMapHtml(muscleMapWeek, { origin: reportOrigin, gender: muscleGender, assets: muscleMapAssets })
+
+  const preCheckinOpt = isRecord(opts?.preCheckin) ? (opts.preCheckin as Record<string, unknown>) : null
+  const postCheckinOpt = isRecord(opts?.postCheckin) ? (opts.postCheckin as Record<string, unknown>) : null
+  const checkinRecommendations = Array.isArray(opts?.checkinRecommendations)
+    ? (opts.checkinRecommendations as unknown[]).filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    : []
+  const checkinSectionHtml = buildCheckinSectionHtml(preCheckinOpt, postCheckinOpt, checkinRecommendations)
 
   const volumeDeltaStr = reportData?.summaryMetrics?.volumeDeltaPctVsPrev != null
     ? Number(reportData.summaryMetrics.volumeDeltaPctVsPrev).toFixed(1)
@@ -878,6 +953,12 @@ export function buildReportHTML(
     .ai-card-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #a3a3a3; margin-bottom: 10px; }
     .ai-label-green { color: #4ade80 !important; }
     .ai-label-red   { color: #f87171 !important; }
+
+    /* ── Check-in / Check-out ─────────────────────── */
+    .checkin-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 4px; }
+    .checkin-field-wide { grid-column: 1 / -1; }
+    .checkin-field-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; color: #a3a3a3; margin-bottom: 3px; }
+    .checkin-field-value { font-size: 13px; font-weight: 700; color: #f5f5f5; }
     .bullet-list { padding-left: 0; list-style: none; display: grid; gap: 6px; margin-top: 4px; }
     .bullet-list li { font-size: 13px; color: #d4d4d4; line-height: 1.5; padding-left: 14px; position: relative; }
     .bullet-list li::before { content: '–'; position: absolute; left: 0; color: #f59e0b; }
@@ -1057,6 +1138,7 @@ export function buildReportHTML(
       </div>
     </div>
 
+    ${checkinSectionHtml}
     ${buildBikeCards()}
     ${buildAiSection()}
     ${muscleMapHtml}

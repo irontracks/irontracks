@@ -54,7 +54,7 @@ import {
     type AiState,
 } from '@/hooks/useReportData'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
-import { readCheckinSatisfaction } from '@/utils/checkin/metrics'
+import { readCheckinSatisfaction, readCheckinSleepHours } from '@/utils/checkin/metrics'
 import { useMuscleMapWeek } from '@/hooks/useMuscleMapWeek'
 
 type AnyObj = Record<string, unknown>
@@ -247,6 +247,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 // Weekly muscle map snapshot — same data the in-page section uses
                 muscleMapWeek: muscleMapWeek.status === 'ready' ? muscleMapWeek.data : null,
                 muscleMapAssets,
+                // Check-in/check-out: os MESMOS objetos já resolvidos que o
+                // ReportCheckinPanel desta tela usa (ver 100 linhas acima) — o PDF
+                // não pode reabrir a pergunta "pré ou pós, local ou banco?" com
+                // outra resposta. Sem isto o PDF entregue a um profissional externo
+                // (professor, nutricionista) ficava mudo sobre como o aluno chegou
+                // e saiu do treino — só a estimativa de calorias usava esses dados
+                // por baixo dos panos.
+                preCheckin,
+                postCheckin,
+                checkinRecommendations,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
@@ -424,6 +434,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             if (db?.soreness != null) base.soreness = db.soreness;
             if (timeMinutes != null && String(timeMinutes) !== '') base.timeMinutes = timeMinutes;
             if (db?.notes != null && String(db.notes).trim()) base.notes = db.notes;
+            // Peso do dia e sono: mesma regra dos campos acima — o rascunho local (o
+            // que o usuário acabou de digitar) vale até a linha do banco chegar com
+            // um valor de verdade. Sem isto, abrir o relatório pelo HISTÓRICO (sem o
+            // rascunho em memória) nunca mostraria peso nem sono, mesmo gravados.
+            const sleepHours = readCheckinSleepHours(db);
+            if (sleepHours != null) base.sleepHours = sleepHours;
+            const weightKg = answers?.body_weight_kg;
+            if (weightKg != null && String(weightKg) !== '') base.weight = weightKg;
             return base;
         }
         return local;
