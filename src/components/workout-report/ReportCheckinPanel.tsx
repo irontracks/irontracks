@@ -1,5 +1,7 @@
 'use client'
 
+import { checkinEnergyLabel, checkinPlainValue, checkinSleepLabel, checkinWeightLabel } from '@/lib/workout/checkinFields'
+
 type AnyObj = Record<string, unknown>
 
 interface ReportCheckinPanelProps {
@@ -26,31 +28,35 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Energia</div>
-                            <div className="font-black text-white">{(() => {
-                                const e = preCheckin?.energy
-                                if (e == null || String(e) === '') return '—'
-                                const n = Number(e)
-                                if (n >= 5) return '💪 Ótimo'
-                                if (n >= 3) return '😐 Normal'
-                                if (n >= 1) return '😴 Cansado'
-                                return String(e)
-                            })()}</div>
+                            <div className="font-black text-white">{checkinEnergyLabel(preCheckin?.energy)}</div>
                         </div>
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div>
-                            <div className="font-black text-white">
-                                {preCheckin?.soreness != null && String(preCheckin.soreness) !== '' ? String(preCheckin.soreness) : '—'}
-                            </div>
+                            <div className="font-black text-white">{checkinPlainValue(preCheckin?.soreness)}</div>
+                        </div>
+                        {/* Peso do dia e sono já eram coletados no check-in (motor de carga
+                            automática) e nunca chegavam a esta tela nem ao PDF — o dono só via
+                            os dois números no card de peso do perfil, sem o contexto de QUANDO
+                            foram medidos. Uma avaliação externa (professor, nutricionista) lê
+                            aqui, não caçando em outra aba. */}
+                        <div>
+                            {/* .t-meta, e não a classe pesada dos rótulos acima: mesmo tamanho
+                                de rótulo, sem somar ao teto do débito de peso 900 em corpo miúdo
+                                — congelado e só descendo, ver hierarquiaTipografica.test.ts. */}
+                            <div className="text-[10px] t-meta">Peso do dia</div>
+                            <div className="font-black text-white">{checkinWeightLabel(preCheckin?.weight)}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] t-meta">Sono</div>
+                            <div className="font-black text-white">{checkinSleepLabel(preCheckin?.sleepHours)}</div>
                         </div>
                         <div className="col-span-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
-                            <div className="font-black text-white">
-                                {preCheckin?.timeMinutes != null && String(preCheckin.timeMinutes) !== '' ? `${String(preCheckin.timeMinutes)} min` : '—'}
-                            </div>
+                            <div className="font-black text-white">{checkinPlainValue(preCheckin?.timeMinutes, ' min')}</div>
                         </div>
                         <div className="col-span-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Observações</div>
-                            <div className="text-neutral-200">{preCheckin?.notes ? String(preCheckin.notes) : '—'}</div>
+                            <div className="text-neutral-200">{checkinPlainValue(preCheckin?.notes)}</div>
                         </div>
                     </div>
                 </div>
@@ -60,23 +66,19 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">RPE</div>
-                            <div className="font-black text-white">{postCheckin?.rpe != null && String(postCheckin.rpe) !== '' ? String(postCheckin.rpe) : '—'}</div>
+                            <div className="font-black text-white">{checkinPlainValue(postCheckin?.rpe)}</div>
                         </div>
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Satisfação</div>
-                            <div className="font-black text-white">
-                                {postCheckin?.satisfaction != null && String(postCheckin.satisfaction) !== '' ? String(postCheckin.satisfaction) : '—'}
-                            </div>
+                            <div className="font-black text-white">{checkinPlainValue(postCheckin?.satisfaction)}</div>
                         </div>
                         <div className="col-span-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div>
-                            <div className="font-black text-white">
-                                {postCheckin?.soreness != null && String(postCheckin.soreness) !== '' ? String(postCheckin.soreness) : '—'}
-                            </div>
+                            <div className="font-black text-white">{checkinPlainValue(postCheckin?.soreness)}</div>
                         </div>
                         <div className="col-span-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Observações</div>
-                            <div className="text-neutral-200">{postCheckin?.notes ? String(postCheckin.notes) : '—'}</div>
+                            <div className="text-neutral-200">{checkinPlainValue(postCheckin?.notes)}</div>
                         </div>
                     </div>
                 </div>

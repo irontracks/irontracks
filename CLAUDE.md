@@ -348,6 +348,35 @@ Duas armadilhas medidas ao construir, as duas fora do alcance de teste unitário
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
+**Check-in/check-out no PDF (02/09/2026) — antes só a tela mostrava.** O
+check-in (pré-treino: energia, dor, tempo disponível, observações) e o
+check-out (pós-treino: RPE, satisfação, dor, observações) sempre foram
+gravados e sempre apareceram no `ReportCheckinPanel` da tela — mas o PDF, que
+é o artefato que de fato sai do app para uma avaliação externa (professor,
+nutricionista, médico), nunca os desenhava: os dois só alimentavam a
+estimativa de calorias por baixo dos panos (`sessionKcalInputs`). Hoje
+`buildCheckinSectionHtml` em `buildHtml.ts` desenha o mesmo painel, e
+`WorkoutReport.tsx` passa os MESMOS objetos `preCheckin`/`postCheckin`/
+`checkinRecommendations` já resolvidos pela tela — não uma segunda leitura.
+
+**De quebra, dois campos que nem a TELA mostrava: peso do dia e horas de
+sono.** Os dois já eram coletados no check-in pré-treino (`workout_checkins`:
+`answers.body_weight_kg` e a coluna `sleep_hours`) e já alimentavam o motor de
+carga automática (`suggestWeight.ts`) — só nunca chegavam a lugar nenhum que o
+usuário ou um profissional externo pudesse ler. Fonte única de formatação:
+`lib/workout/checkinFields.ts` (`checkinEnergyLabel`/`checkinWeightLabel`/
+`checkinSleepLabel`/`checkinPlainValue`), usada pelos DOIS lados — a mesma
+regra da seção de calorias acima ("mexeu num, cheque o outro"), agora com um
+guard de classe (`checkinTelaEPdfNaoDivergem.test.ts`) que compara as duas
+chamadas em vez de fixar os nomes de hoje.
+
+⚠️ **O comentário que EXPLICA por que não usar `text-[10px] font-black` casou
+com o próprio guard que proíbe esse padrão** (ratchet de tipografia,
+`hierarquiaTipografica.test.ts`) — jeito nº 2 da lista de guards falsos, desta
+vez no meu próprio código, no mesmo dia em que escrevi o guard. O teto não
+strippa comentário; reescrever o texto sem os dois tokens juntos na mesma
+linha resolveu.
+
 ⚠️ **A página `/dashboard/nutrition` somava a kcal de treino de uma tabela
 MORTA até 31/08/2026.** Ela lia `workout_session_logs` — **1 linha em toda a
 produção**, a última de 02/04/2026, e **nenhum escritor no código** — e
