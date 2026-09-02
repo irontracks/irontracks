@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { env } from '@/utils/env'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       .select('id, student_user_id')
       .eq('id', submissionId)
       .maybeSingle()
-    if (rowErr) return jsonError(400, rowErr.message)
+    if (rowErr) return respondDbError('api:teacher:execution-videos:review', rowErr)
     if (!row?.id) return jsonError(404, 'not_found')
 
     const studentUserId = String(row.student_user_id || '').trim()
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
       .from('exercise_execution_submissions')
       .update({ status, teacher_feedback: feedback || null })
       .eq('id', submissionId)
-    if (upErr) return jsonError(400, upErr.message)
+    if (upErr) return respondDbError('api:teacher:execution-videos:review', upErr)
 
     if (sendMessage && feedback) {
       const { data: channelId, error: chErr } = await auth.supabase.rpc('get_or_create_direct_channel', {

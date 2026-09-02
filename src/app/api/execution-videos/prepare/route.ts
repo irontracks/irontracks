@@ -7,6 +7,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { env } from '@/utils/env'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
       video_object_path: objectPath,
       status: 'pending',
     })
-    if (insertErr) return jsonError(400, insertErr.message)
+    if (insertErr) return respondDbError('api:execution-videos:prepare', insertErr)
 
     try {
       const { data: existing } = await admin.storage.getBucket(bucketId)
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
     } catch (e) { logWarn('execution-videos:prepare', 'silenced', e) }
 
     const { data: signed, error: signedErr } = await admin.storage.from(bucketId).createSignedUploadUrl(objectPath)
-    if (signedErr || !signed?.token) return jsonError(400, signedErr?.message || 'signed_upload_failed')
+    if (signedErr || !signed?.token) return respondDbError('api:execution-videos:prepare', signedErr)
 
     return NextResponse.json(
       { ok: true, submission_id: submissionId, bucket: bucketId, path: objectPath, token: signed.token, teacher_user_id: teacherId },

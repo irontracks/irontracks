@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -228,7 +229,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, suggestion })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return respondInternalError('api:ai:suggest-load', e)
   }
 }

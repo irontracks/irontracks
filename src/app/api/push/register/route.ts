@@ -12,6 +12,20 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { respondDbError } from '@/utils/api/dbError'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
+
+/** Token de push (APNs 64 hex; FCM até ~200) + plataforma + device. Tolerante ao
+ *  que o app já manda; o teto de tamanho é o que importa — token é PK. */
+const BodySchema = z
+  .object({
+    token: z.string().trim().min(1).max(512).optional(),
+    platform: z.string().trim().max(20).optional(),
+    deviceId: z.string().trim().max(200).optional(),
+    device_id: z.string().trim().max(200).optional(),
+  })
+  .strip()
 
 const normalizeToken = (v: unknown) => String(v ?? '').trim()
 
@@ -29,12 +43,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    let body: Record<string, unknown> = {}
-    try { body = await request.json() } catch { /* empty body */ }
+    // Auditoria 01/09/2026: era a única rota autenticada de escrita sem limite e
+    // sem schema — um cliente em loop encheria `device_push_tokens` à vontade.
+    const rl = await checkRateLimitAsync(`push:register:${user.id}`, 20, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const token = normalizeToken(body?.token)
-    const platform = normalizePlatform(body?.platform)
-    const deviceId = String(body?.deviceId ?? body?.device_id ?? '').trim()
+    const parsed = await parseJsonBody(request, BodySchema)
+    if (parsed.response || !parsed.data) {
+      return parsed.response ?? NextResponse.json({ ok: false, error: 'Invalid input' }, { status: 400 })
+    }
+    const body = parsed.data
+
+    const token = normalizeToken(body.token)
+    const platform = normalizePlatform(body.platform)
+    const deviceId = String(body.deviceId ?? body.device_id ?? '').trim()
 
     if (!token) {
       return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 })

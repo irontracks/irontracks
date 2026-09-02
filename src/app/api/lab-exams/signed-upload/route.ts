@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       .from(BUCKET)
       .createSignedUploadUrl(path)
     if (signErr || !signed) {
-      return NextResponse.json({ ok: false, error: signErr?.message || 'failed_to_sign' }, { status: 400 })
+      return respondDbError('api:lab-exams:signed-upload', signErr)
     }
 
     const { error: insErr } = await admin.from('lab_exam_files').insert({

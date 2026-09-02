@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,8 +85,7 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, teacher: teacher || null })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return respondInternalError('api:teachers:wallet', e)
   }
 }
 
@@ -171,7 +171,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, teacher: updated })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return respondInternalError('api:teachers:wallet', e)
   }
 }

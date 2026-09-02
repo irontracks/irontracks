@@ -3311,6 +3311,38 @@ já estava presente no mount — o cronômetro ia a zero. Quem pegou foi
 ## Notas de dados (evitar re-exploração cara do banco)
 - **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
 
+## Auditoria de segurança 01/09/2026 — score 8,2 e o que mudou no mesmo dia
+
+Relatório em `Relatorio/auditoria-seguranca-2026-09-01.md` (pasta local, fora
+do git). Além do SEC-05 e do origin guard (acima), entrou no mesmo dia:
+
+- **`access_requests` não aceita mais INSERT anônimo direto pelo PostgREST.** A
+  policy "Allow public insert" deixava qualquer portador da anon key encher a
+  fila de aprovação fora do rate limit da rota; os dois escritores legítimos
+  (`access-request/create`, `auth/apple/request-access`) já gravavam por
+  service-role. Migration `auditoria_seguranca_access_requests_profiles_public_trgm`.
+- **`profiles_public` continua SECURITY DEFINER de propósito** — a RLS de
+  `profiles` só libera próprio/professor/admin, e a comunidade precisa das 6
+  colunas públicas de todos. O advisor ERROR fica; o que saiu foram os grants
+  de ESCRITA que um `GRANT ALL` tinha deixado na view. Não "conserte" trocando
+  para invoker: a lista da comunidade some.
+- **`pg_trgm` mora em `extensions`.** Seguro porque o `search_path` do banco já
+  inclui `extensions`, nenhuma função do app chama `similarity()`, e o único
+  uso é o índice GIN `idx_exercises_name_trgm`.
+- **Senha mínima subiu de 6 para 8** (onboarding, recovery, recovery-code).
+  Senhas existentes não mudam. *Leaked password protection* é no painel do
+  Supabase Auth — não alcançável daqui.
+- **Rate limit** em `push/register` (que também não tinha Zod),
+  `telemetry/user-event` e `workouts/update`. `poweredByHeader: false`.
+  `admin/workouts/templates-list` removida (sem chamador).
+- **iOS: `NSAllowsArbitraryLoadsInWebContent` saiu do `Info.plist`** (SEC-09).
+  O WebView só carrega `https://irontracks.com.br` e o CSP já força https em
+  tudo. **Mudança nativa — só chega com build nova no TestFlight.**
+
+**Ficou de fora, com dono:** `UPSTASH_REDIS_*` e a confirmação do enforce na
+Vercel (painel); *leaked password protection* (painel do Supabase); remoção do
+código Asaas (toca pagamentos — pede confirmação por regra do dono).
+
 ## Auditoria 2026-08-13 — fechada em 14/08/2026 (PRs #805–#819)
 
 O relatório vive em `Relatorio/auditoria-ponta-a-ponta-2026-08-13.md`; a
@@ -3323,20 +3355,38 @@ completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
 | SEC-01 XSS relatório | #806 | escape na atribuição + guard 5 payloads × 5 campos |
 | SEC-02 delete sem conferir Auth | #807 | `deleteUser` verificado + `account_deleted`/`_delete_auth_failed` em audit_events |
 | SEC-03 catálogo LGPD | #808 | `lib/account/userDataCatalog.ts` dirige export E delete (ver abaixo) |
-| SEC-05 erro cru em resposta | #809 | `respondInternalError` (requestId) em 111 rotas + guard classe inteira |
+| SEC-05 erro cru em resposta | #809 | `respondInternalError` (requestId) em 111 rotas + guard classe inteira — ⚠️ **reaberto e fechado em 01/09/2026**, ver abaixo |
 | SEC-04 SECURITY DEFINER | #811 | migrations APLICADAS `20260814095015/31`; advisors 41→16 WARN |
 | SEC-07/10/11 | #812 | connect-src + rate limit auto-reportável + npm audit 0 |
 | Mapa muscular VIP quebrado | #813 | `maxItems` aninhado estourava o Gemini (400 desde 10/08) |
 | SEC-08 guarda de origem | #814 | middleware, MODO RELATÓRIO (ver abaixo) |
 | Xcode Cloud sempre vermelho | #815–#819 | verde no run #1732 (ver abaixo) |
 
+⚠️ **O guard SEC-05 era de FORMA e deixou passar a CLASSE (01/09/2026).** Ele
+procurava só `getErrorMessage(` na resposta; a auditoria achou **52 rotas**
+devolvendo a mesma coisa por outras sintaxes — `e.message`, `String(e)`,
+`const message = e instanceof Error ? e.message : String(e)` seguido de
+`error: message`, `jsonError(400, dbErr.message)`, `signErr?.message || '…'`.
+Rotas de usuário comum entre elas (`vip/chat`, `social/feed`, `rest/fire`,
+`nutrition/log-entry`), e uma pública (`auth/apple/preflight`, mensagem do
+Supabase num 400). Hoje o guard casa `.message` lido de QUALQUER variável de
+erro e `String(<erro>)`, e a janela é a chamada com parêntese balanceado — a
+janela fixa de 300 caracteres atravessava para o código seguinte e acusou um
+`String(error.message).includes('duplicate')` de condição. A primeira versão
+ampliada casava `.message` solto e acusou 69 rotas que devolvem `{ message }`
+no payload (jeito nº 8). Padrão para erro de BANCO/STORAGE em 400:
+`respondDbError(key, err)`; para o catch-all: `respondInternalError(key, e)`.
+
 **Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
 1. ~~**CSP**~~ — **LIGADO em 27/08/2026**, com a polaridade invertida. Detalhes
    na seção do middleware, que é onde este assunto mora.
-2. **Guarda de origem (SEC-08)**: mutante+cookie de outra origem hoje só
-   RELATA (kind `cross-origin`|`missing-origin`). Janela limpa (especialmente
-   `missing-origin` zerado) → `ORIGIN_GUARD_ENFORCE=true` na Vercel. Função
-   pura em `utils/security/originGuard.ts`; bearer/webhook/cron passam SEMPRE.
+2. ~~**Guarda de origem (SEC-08)**~~ — **BLOQUEIA desde 01/09/2026**, com a
+   polaridade invertida como no CSP: o default é enforce e
+   `ORIGIN_GUARD_ENFORCE=false` na Vercel é o freio (env var, sem deploy). A
+   janela de relatório ficou 30+ dias com ZERO mismatches em `audit_events` e
+   ninguém virou a chave — com o default no lado seguro, o esquecimento
+   protege. Regra em `originGuardEnforcedFrom`; bearer/webhook/cron passam
+   SEMPRE. Função pura em `utils/security/originGuard.ts`.
 
    ⚠️ **A janela NÃO EXISTIA até 29/08/2026, e esta nota prometia lê-la.** O
    relato era só `console.error('[origin-guard]', …)`, ou seja runtime log da

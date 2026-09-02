@@ -132,7 +132,7 @@ export async function GET(req: Request) {
       deviceTokens: {
         total: tokenCount,
         ios: iosTokenCount,
-        tokenFetchError: tokenErr?.message ?? null,
+        tokenFetchError: Boolean(tokenErr),
         tokens: Array.isArray(tokens)
           ? tokens.map((t) => ({
               platform: t.platform,

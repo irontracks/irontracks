@@ -167,7 +167,7 @@ export async function POST(
       .eq('user_id', studentId)
       .maybeSingle()
 
-    if (selErr) return NextResponse.json({ ok: false, error: selErr.message }, { status: 400 })
+    if (selErr) return respondDbError('api:teacher:control:studentId', selErr)
     if (!session) return NextResponse.json({ ok: false, error: 'no active session' }, { status: 404 })
     // Admins can release any control; teachers only if they are the controller
     if (teacherAuth.role !== 'admin' && session.controlled_by !== teacherId) {
@@ -179,7 +179,7 @@ export async function POST(
       .update({ controlled_by: null, control_status: null })
       .eq('user_id', studentId)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('api:teacher:control:studentId', error)
 
     await sendPushToAllPlatforms(
       [studentId],

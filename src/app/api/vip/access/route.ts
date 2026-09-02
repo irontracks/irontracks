@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser, resolveRoleByUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,6 @@ export async function GET() {
     await cacheSet(cacheKey, payload, 300)
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:vip:access', e)
   }
 }

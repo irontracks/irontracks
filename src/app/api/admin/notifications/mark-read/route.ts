@@ -15,6 +15,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,7 +62,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, marked: all ? 'all' : id })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return respondInternalError('api:admin:notifications:mark-read', e)
   }
 }

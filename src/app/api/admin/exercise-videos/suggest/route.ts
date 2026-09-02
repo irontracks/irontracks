@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       .select('id, normalized_name')
       .single()
     if (libErr || !libRow?.id) {
-      return NextResponse.json({ ok: false, error: libErr?.message || 'library_upsert_failed' }, { status: 400 })
+      return respondDbError('api:admin:exercise-videos:suggest', libErr)
     }
 
     let queries: string[] = []

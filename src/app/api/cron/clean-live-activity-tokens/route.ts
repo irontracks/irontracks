@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { respondInternalError } from '@/utils/api/internalError'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isCronAuthorized } from '@/utils/cron/auth'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
       const code = String(error.code || '').toLowerCase()
       const tableMissing = code === '42p01' || code === 'pgrst205' || /does not exist|schema cache|could not find the table/i.test(error.message || '')
       if (tableMissing) return NextResponse.json({ ok: true, deferred: true })
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('api:cron:clean-live-activity-tokens', error, 500)
     }
 
     const deletedRows = Array.isArray(data) ? data.length : 0

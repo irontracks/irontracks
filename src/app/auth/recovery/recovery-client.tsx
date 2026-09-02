@@ -117,8 +117,8 @@ export default function AuthRecoveryClient() {
 
     const p1 = String(password || '').trim()
     const p2 = String(password2 || '').trim()
-    if (p1.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.')
+    if (p1.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.')
       return
     }
     if (p1 !== p2) {

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
 import { env } from '@/utils/env'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       .select('id, student_user_id, video_bucket_id, video_object_path')
       .eq('id', submissionId)
       .maybeSingle()
-    if (rowErr) return jsonError(400, rowErr.message)
+    if (rowErr) return respondDbError('api:execution-videos:media', rowErr)
     if (!row?.id) return jsonError(404, 'not_found')
 
     const requesterId = String(auth.user.id)
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     if (!objectPath) return jsonError(400, 'missing_object_path')
 
     const { data: signed, error: signedErr } = await admin.storage.from(bucketId).createSignedUrl(objectPath, 60 * 10)
-    if (signedErr || !signed?.signedUrl) return jsonError(400, signedErr?.message || 'signed_url_failed')
+    if (signedErr || !signed?.signedUrl) return respondDbError('api:execution-videos:media', signedErr)
 
     return NextResponse.json({ ok: true, url: signed.signedUrl }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

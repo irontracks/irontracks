@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { setWaterCore, resolveDateKey } from '@/lib/nutrition/mutations'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,6 @@ export async function POST(req: Request) {
     const { water_ml } = await setWaterCore(auth.supabase, userId, ml, resolveDateKey(dateKey))
     return NextResponse.json({ ok: true, water_ml })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message || 'nutrition_water_failed' }, { status: 500 })
+    return respondInternalError('api:nutrition:water', e)
   }
 }

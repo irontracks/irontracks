@@ -124,6 +124,11 @@ async function test_access_requests_status_pending(ctx: Ctx): Promise<void> {
   )
   await ctx.admin.from('access_requests').delete().eq('email', bogusEmail)
 
+  // Auditoria 01/09/2026: o INSERT anônimo direto pelo PostgREST foi FECHADO. O
+  // cadastro legítimo passa por /api/access-request/create (service-role, com
+  // rate limit); a policy pública deixava qualquer portador da anon key encher
+  // a fila de aprovação sem passar por esse limite. Este check dizia o
+  // contrário até então — o invariante mudou de lado.
   const legitEmail = `${EMAIL_PREFIX}-legit@irontracks-test.local`
   const { error: legitErr } = await anon.from('access_requests').insert({
     email: legitEmail,
@@ -131,9 +136,9 @@ async function test_access_requests_status_pending(ctx: Ctx): Promise<void> {
     status: 'pending',
   })
   check(
-    'access_requests allows anon INSERT with status=pending (legit signup)',
-    !legitErr,
-    legitErr?.message,
+    'access_requests blocks anon INSERT even with status=pending (signup goes through the service-role route)',
+    !!legitErr,
+    legitErr ? undefined : 'anon insert succeeded (spam vector on the approval queue is OPEN)',
   )
   await ctx.admin.from('access_requests').delete().eq('email', legitEmail)
 }

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -91,7 +92,7 @@ export async function GET(req: Request) {
       // Supabase Storage path — generate a short-lived signed URL
       const bucket = 'social-stories'
       const { data: signed, error: sErr } = await admin.storage.from(bucket).createSignedUrl(mediaPath, signedSeconds)
-      if (sErr || !signed?.signedUrl) return new Response(sErr?.message || 'failed_to_sign', { status: 400 })
+      if (sErr || !signed?.signedUrl) return respondDbError('api:social:stories:media:sign', sErr)
       redirectUrl = String(signed.signedUrl)
     }
 
@@ -154,7 +155,7 @@ export async function POST(req: Request) {
     const admin = createAdminClient()
     const bucket = 'social-stories'
     const { data, error: sErr } = await admin.storage.from(bucket).createSignedUrl(mediaPath, signedSeconds)
-    if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
+    if (sErr || !data?.signedUrl) return respondDbError('api:social:stories:media', sErr)
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
   } catch (e: unknown) {

@@ -3,6 +3,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { streakFromDates } from '@/lib/social/streak'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,6 +121,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ userId: 
       recentPRs,
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:social:profile:userId', e)
   }
 }

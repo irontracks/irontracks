@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { logError } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
 
       if (error) {
         logError('api:social:follow:respond:accept', error)
-        return NextResponse.json({ ok: false, error: String(error.message || 'Erro ao aceitar') }, { status: 500 })
+        return respondDbError('api:social:follow:respond', error, 500)
       }
 
       // Mark follow_request notifications as read
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
 
       if (error) {
         logError('api:social:follow:respond:deny', error)
-        return NextResponse.json({ ok: false, error: String(error.message || 'Erro ao recusar') }, { status: 500 })
+        return respondDbError('api:social:follow:respond', error, 500)
       }
 
       // Mark follow_request notifications as read

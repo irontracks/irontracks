@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { isTeamSessionMember } from '@/utils/team/sessionMembership'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,9 +46,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, data: data || [] })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) },
-      { status: 500 }
-    )
+    return respondInternalError('api:team:chat:messages', e)
   }
 }

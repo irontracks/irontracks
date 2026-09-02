@@ -8,6 +8,7 @@ import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import { cacheGet } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,6 +131,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    return respondInternalError('api:notifications:direct-message', e)
   }
 }

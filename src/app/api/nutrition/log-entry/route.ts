@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { trackMeal } from '@/lib/nutrition/engine'
 import { sanitizeFoodName } from '@/lib/nutrition/security'
 import { resolveDateKey } from '@/lib/nutrition/mutations'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +78,6 @@ export async function POST(req: Request) {
     const row = await trackMeal(userId, meal, resolveDateKey(body.dateKey), items, body.clientId)
     return NextResponse.json({ ok: true, row: row || null })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message || 'nutrition_log_entry_failed' }, { status: 500 })
+    return respondInternalError('api:nutrition:log-entry', e)
   }
 }

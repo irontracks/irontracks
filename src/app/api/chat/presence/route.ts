@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { cacheSet, cacheDelete } from '@/utils/cache'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,9 +43,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { ok: false, error: (e as { message?: string })?.message ?? String(e) },
-      { status: 500 },
-    )
+    return respondInternalError('api:chat:presence', e)
   }
 }

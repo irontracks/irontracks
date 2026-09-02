@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { respondDbError } from '@/utils/api/dbError'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,6 @@ export async function GET() {
     if (error) return respondDbError('vip:chat:thread', error, 400)
     return NextResponse.json({ ok: true, thread: data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    return respondInternalError('api:vip:chat:thread', e)
   }
 }

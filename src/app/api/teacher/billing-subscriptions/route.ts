@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       .select()
       .single()
 
-    if (subErr || !sub) return NextResponse.json({ ok: false, error: subErr?.message ?? 'Erro ao criar assinatura' }, { status: 400 })
+    if (subErr || !sub) return respondDbError('api:teacher:billing-subscriptions', subErr)
     return NextResponse.json({ ok: true, subscription: sub })
   } catch (e: unknown) {
     return respondInternalError('api:teacher:billing-subscriptions', e)

@@ -13,6 +13,7 @@ import { env } from '@/utils/env'
 import { sendLiveActivityUpdate } from '@/lib/push/apnsLiveActivity'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,6 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true, sent: sentPush + sentLA, push: sentPush, liveActivity: sentLA })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+    return respondInternalError('api:rest:fire', e)
   }
 }

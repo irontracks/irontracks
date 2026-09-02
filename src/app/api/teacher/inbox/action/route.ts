@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
     }
 
     const { error } = await admin.from('coach_inbox_states').upsert(payload, { onConflict: 'coach_id,student_user_id,kind' })
-    if (error) return jsonError(400, error.message)
+    if (error) return respondDbError('api:teacher:inbox:action', error)
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

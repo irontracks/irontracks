@@ -16,7 +16,7 @@
  *
  * Mesma doutrina do CSP: NASCE EM MODO RELATÓRIO. `mismatch` vira log de
  * error (retido na Vercel) e a requisição segue; bloquear é decisão explícita
- * via `ORIGIN_GUARD_ENFORCE=true`, depois de uma janela limpa de relatórios.
+ * (bloqueante por padrão desde 01/09/2026; `ORIGIN_GUARD_ENFORCE=false` desliga).
  * `missing-origin` existe separado de `cross-origin` exatamente para a
  * janela medir se algum cliente legítimo omite o header antes de o enforce
  * tratar ausência como hostil.
@@ -62,6 +62,16 @@ export function evaluateOriginGuard(input: OriginGuardInput): OriginGuardVerdict
   }
 }
 
-/** Enforce só quando explicitamente ligado — o default seguro é relatar. */
-export const originGuardEnforced = () =>
-  String(process.env.ORIGIN_GUARD_ENFORCE || '').toLowerCase() === 'true'
+/**
+ * Bloqueante por PADRÃO; `ORIGIN_GUARD_ENFORCE=false` é o freio de emergência.
+ *
+ * Mesma inversão de polaridade que o CSP fez em 27/08/2026, pelo mesmo motivo:
+ * enquanto proteger dependia de alguém lembrar de setar `=true`, a janela de
+ * relatório passou (zero mismatches em 30 dias, medidos em `audit_events` em
+ * 01/09/2026) e ninguém virou a chave. Com o default no lado seguro, o
+ * esquecimento protege em vez de expor. Só a string exata `false` desliga.
+ */
+export const originGuardEnforcedFrom = (valor: string | undefined) =>
+  String(valor ?? '').toLowerCase().trim() !== 'false'
+
+export const originGuardEnforced = () => originGuardEnforcedFrom(process.env.ORIGIN_GUARD_ENFORCE)

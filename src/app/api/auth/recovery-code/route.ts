@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,7 @@ const BodySchema = z
   .object({
     email: z.preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.string().email()),
     code: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(1)),
-    password: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(6)),
+    password: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(8)),
   })
   .strip()
 
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
 
     const { error: updateError } = await admin.auth.admin.updateUserById(profile.id, { password })
     if (updateError) {
-      return NextResponse.json({ ok: false, error: updateError.message || 'Falha ao atualizar senha.' }, { status: 400 })
+      return respondDbError('api:auth:recovery-code', updateError)
     }
 
     return NextResponse.json({ ok: true })

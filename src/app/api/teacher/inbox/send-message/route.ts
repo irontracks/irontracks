@@ -6,6 +6,7 @@ import { requireRole, jsonError } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,14 +44,14 @@ export async function POST(req: Request) {
       user1: requesterId,
       user2: studentUserId,
     })
-    if (chErr || !channelId) return jsonError(400, chErr?.message || 'failed_channel')
+    if (chErr || !channelId) return respondDbError('api:teacher:inbox:send-message', chErr)
 
     const { error: msgErr } = await auth.supabase.from('direct_messages').insert({
       channel_id: channelId,
       sender_id: requesterId,
       content,
     })
-    if (msgErr) return jsonError(400, msgErr.message)
+    if (msgErr) return respondDbError('api:teacher:inbox:send-message', msgErr)
 
     try {
       await auth.supabase.from('direct_channels').update({ last_message_at: new Date().toISOString() }).eq('id', channelId)

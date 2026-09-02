@@ -6,6 +6,7 @@ import { requireUser, jsonError } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { env } from '@/utils/env'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
       .eq('id', submissionId)
       .eq('student_user_id', userId)
       .maybeSingle()
-    if (error) return jsonError(400, error.message)
+    if (error) return respondDbError('api:execution-videos:complete', error)
     if (!data?.id) return jsonError(404, 'not_found')
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })

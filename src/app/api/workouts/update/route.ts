@@ -8,6 +8,7 @@ import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { cacheDeletePattern } from '@/utils/cache'
 import { respondDbError } from '@/utils/api/dbError'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 
 const safeString = (v: unknown) => String(v ?? '').trim()
 
@@ -73,6 +74,11 @@ export async function PATCH(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    // Auditoria 01/09/2026: `save_workout_atomic` apaga e reinsere as séries a cada
+    // chamada — sem limite, um loop reescrevia o mesmo treino sem parar.
+    const rl = await checkRateLimitAsync(`workouts:update:${user.id}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
     const exercisesPayload = buildExercisesPayload(workout)

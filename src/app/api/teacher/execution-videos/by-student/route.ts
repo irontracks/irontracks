@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (error) return jsonError(400, error.message)
+    if (error) return respondDbError('api:teacher:execution-videos:by-student', error)
 
     return NextResponse.json({ ok: true, items: Array.isArray(data) ? data : [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

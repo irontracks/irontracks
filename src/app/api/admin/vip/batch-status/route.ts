@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
+import { respondInternalError } from '@/utils/api/internalError'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,6 +145,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true, vip: result })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
+        return respondInternalError('api:admin:vip:batch-status', e)
     }
 }
