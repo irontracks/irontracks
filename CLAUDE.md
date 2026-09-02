@@ -1207,6 +1207,30 @@ eliminar deve ser eliminada, não documentada** — nota que descreve um perigo
 evitável vira folclore; e **regra de comportamento do agente vai para o
 `~/.claude/CLAUDE.md` global**, não para este arquivo, que é sobre ESTE repo.
 
+## Feature nova: `/planejamento` — Opus planeja, Sonnet executa
+
+O protocolo está em **`docs/skill-planejamento.md`**, versionado; o comando só
+aponta para ele. Em uma linha: o plano sai de um `Agent(subagent_type: "Plan",
+model: "opus")` — o `model` sobrescreve o da sessão, então funciona esteja você
+em Sonnet ou não —, vira arquivo em `docs/plans/`, passa pelas perguntas ao dono,
+e só então é executado por subagentes Sonnet.
+
+Três coisas de lá que valem mesmo sem rodar o comando, todas medidas na primeira
+execução real (02/09/2026, nutrição):
+
+⚠️ **Não aceite a classificação do subagente sobre teste vermelho.** Ele entregou
+quatro reprovando e explicou que eram "premissas velhas invalidadas pela
+correção"; **três eram regressões reais**. Verificar custou dez minutos.
+
+⚠️ **Suíte verde não prova mudança que altera RESULTADO.** Meça com entradas
+reais. Foi um script de dez linhas com quinze frases comuns que mostrou o
+sequestro de frase composta (`100g leite condensado` devolvendo 61 kcal contra
+~321) — nenhum dos 7.400 testes cobria aquela frase.
+
+⚠️ **Paralelize subagente só com escopo de arquivo DISJUNTO**, declarado
+nominalmente no prompt de cada um, e diga a cada um que os outros existem. E
+sempre: **NÃO use git** no prompt do executor — o orquestrador revisa e commita.
+
 ## Checklist obrigatório antes de declarar qualquer tarefa concluída
 1. **TypeScript:** `npx tsc --noEmit` — zero erros, sem exceção.
 2. **ESLint (comando exato):** `node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0` — output vazio = limpo. Em worktree, ver Gotchas.
