@@ -14,6 +14,7 @@ import { toDateMs, calculateTotalVolumeFromLogs } from '@/components/history/hoo
 import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
 import { buildPeriodSessionDetails, type PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
 import { brtDateKey } from '@/utils/cron/dateBrt';
+import { countDoneSets, countsAsWorkoutFromSummary } from '@/lib/workout/countsAsWorkout';
 
 export const REPORT_DAYS_WEEK = 7;
 export const REPORT_DAYS_MONTH = 30;
@@ -31,9 +32,18 @@ listOverride?: WorkoutSummary[],
         const daysNumber = Number(days);
         if (!Number.isFinite(daysNumber) || daysNumber <= 0) return null;
         const cutoff = Date.now() - daysNumber * DAY_MS;
+        // O MESMO piso do card de resumo (`countsAsWorkoutFromSummary`): sem
+        // ele o dossiê dizia "7 treinos" ao lado de um card que dizia 6 — a
+        // sessão de 44 s com uma série entrava aqui e não lá (visto na tela,
+        // 02/09/2026). A regra do CLAUDE.md é que o piso vale onde o usuário LÊ.
         const list = historyList.filter((s) => {
             const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
-            return Number.isFinite(t) && t !== null && t >= cutoff;
+            if (!(Number.isFinite(t) && t !== null && t >= cutoff)) return false;
+            const rawParsed = RawSessionObjectSchema.safeParse(s?.rawSession);
+            const doneSets = rawParsed.success && rawParsed.data?.logs
+                ? countDoneSets(rawParsed.data as Parameters<typeof countDoneSets>[0])
+                : Number((s as { doneSets?: unknown })?.doneSets) || 0;
+            return countsAsWorkoutFromSummary({ doneSets, totalTimeSeconds: s?.totalTime });
         });
         if (!list.length) return null;
 
