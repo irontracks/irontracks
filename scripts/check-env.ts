@@ -65,11 +65,6 @@ const VARS: VarSpec[] = [
   { key: 'MERCADOPAGO_PIX_KEY', required: false, group: 'MercadoPago' },
   { key: 'MERCADOPAGO_BASE_URL', required: false, group: 'MercadoPago', hint: 'padrão: https://api.mercadopago.com' },
   { key: 'MERCADOPAGO_USER_AGENT', required: false, group: 'MercadoPago', hint: 'padrão: IronTracks/1.0' },
-  // ASAAS
-  { key: 'ASAAS_API_KEY', required: false, group: 'ASAAS', hint: 'PRIVADA' },
-  { key: 'ASAAS_WEBHOOK_SECRET', required: false, group: 'ASAAS', hint: 'PRIVADA' },
-  { key: 'ASAAS_BASE_URL', required: false, group: 'ASAAS', hint: 'padrão: https://api.asaas.com/v3' },
-  { key: 'ASAAS_USER_AGENT', required: false, group: 'ASAAS', hint: 'padrão: IronTracks/1.0' },
   // Marketplace
   { key: 'MARKETPLACE_PLATFORM_FEE_PERCENT', required: false, group: 'Marketplace', hint: 'padrão: 10' },
   // Upstash Redis

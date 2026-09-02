@@ -112,14 +112,6 @@ export const env = {
     get userAgent() { return optionalEnv('MERCADOPAGO_USER_AGENT', 'IronTracks/1.0') },
   },
 
-  // ── ASAAS ─────────────────────────────────────────────────
-  asaas: {
-    get apiKey() { return optionalEnv('ASAAS_API_KEY') },
-    get webhookSecret() { return optionalEnv('ASAAS_WEBHOOK_SECRET') },
-    get baseUrl() { return optionalEnv('ASAAS_BASE_URL', 'https://api.asaas.com/v3') },
-    get userAgent() { return optionalEnv('ASAAS_USER_AGENT', 'IronTracks/1.0') },
-  },
-
   // ── Upstash Redis ─────────────────────────────────────────
   upstash: {
     get restUrl() { return optionalEnv('UPSTASH_REDIS_REST_URL') },

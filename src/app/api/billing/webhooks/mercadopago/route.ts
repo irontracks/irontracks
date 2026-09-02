@@ -35,7 +35,7 @@ export const dynamic = 'force-dynamic'
 
 // Invalida os caches de VIP do usuário após conceder/revogar entitlement. Sem isto, o
 // comprador via MercadoPago ficava com o cache antigo (vip:access TTL 30s / bootstrap)
-// e não via o VIP na hora — os webhooks de RevenueCat/Asaas já faziam isso; o de MP não.
+// e não via o VIP na hora — o webhook do RevenueCat já fazia isso; o de MP não.
 // Best-effort: falha na invalidação não quebra o webhook.
 async function bustVipCaches(userId: string) {
   const uid = String(userId || '').trim()

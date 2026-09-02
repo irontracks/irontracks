@@ -23,10 +23,6 @@ test.describe('API Health Smoke', () => {
         expect(res.status()).not.toBe(500)
     })
 
-    test('GET /api/marketplace/health returns non-500', async ({ request }) => {
-        const res = await request.get('/api/marketplace/health')
-        expect(res.status()).not.toBe(500)
-    })
 })
 
 test.describe('Security Headers', () => {

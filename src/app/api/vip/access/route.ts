@@ -23,7 +23,7 @@ export async function GET() {
     const payload = { ok: true, hasVip, role, entitlement }
     // TTL 300s (era 30s): consistente com o dashboard:bootstrap e o cacheWarmup, que já
     // usam 300. Seguro porque TODOS os paths que mudam o VIP invalidam vip:access —
-    // webhooks RevenueCat/Asaas/MercadoPago, sync IAP, grant/revoke admin e cancel-active
+    // webhooks RevenueCat/MercadoPago, sync IAP, grant/revoke admin e cancel-active
     // (gaps fechados no PA6). Expiração dispara EXPIRATION webhook (que invalida), então a
     // janela de VIP pós-expiração fica limitada à entrega do webhook, não ao TTL.
     await cacheSet(cacheKey, payload, 300)

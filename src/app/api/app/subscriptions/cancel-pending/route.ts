@@ -5,7 +5,6 @@ import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
-import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
@@ -51,7 +50,6 @@ export async function POST(req: Request) {
 
     const provider = String(sub?.provider || '').trim()
     const providerSubId = String(sub?.provider_subscription_id || '').trim()
-    const asaasSubId = String(sub?.asaas_subscription_id || '').trim()
 
     // A7 (auditoria 14/08/2026): o cancelamento local só acontece DEPOIS de o
     // provedor confirmar (ou de a consulta mostrar que já está cancelado lá).
@@ -77,25 +75,6 @@ export async function POST(req: Request) {
       }
     }
 
-    if (provider === 'asaas' && (providerSubId || asaasSubId)) {
-      const target = providerSubId || asaasSubId
-      try {
-        await asaasRequest({
-          method: 'PUT',
-          path: `/subscriptions/${encodeURIComponent(target)}`,
-          body: { status: 'INACTIVE' },
-        })
-      } catch (e) {
-        const already = await asaasRequest<{ status?: string; deleted?: boolean }>({
-          method: 'GET',
-          path: `/subscriptions/${encodeURIComponent(target)}`,
-        }).then((s) => s?.deleted === true || ['INACTIVE', 'EXPIRED'].includes(String(s?.status || '').toUpperCase())).catch(() => false)
-        if (!already) {
-          logError('api:subscriptions:cancel-pending:asaas', e)
-          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
-        }
-      }
-    }
 
     const { error: subUpdErr } = await admin
       .from('app_subscriptions')

@@ -24,11 +24,6 @@ test.describe('Teacher Self-Service API', () => {
         expect(res.status()).not.toBe(401)
     })
 
-    test('GET /api/teachers/wallet returns non-500', async ({ request }) => {
-        const res = await request.get('/api/teachers/wallet')
-        expect(res.status()).not.toBe(500)
-        expect(res.status()).not.toBe(401)
-    })
 })
 
 test.describe('Teacher Inbox API', () => {

@@ -8,7 +8,7 @@
  *
  * O que ela NUNCA pode travar (e por isso PASSA):
  * - GET/HEAD/OPTIONS — leitura não é alvo de CSRF;
- * - requisição SEM cookie de sessão — webhooks (RevenueCat/MP/Asaas), crons
+ * - requisição SEM cookie de sessão — webhooks (RevenueCat/MP), crons
  *   (QStash/Vercel), rotas públicas (csp-report) e clientes só-bearer;
  * - requisição COM header Authorization — bearer nativo: navegador cross-site
  *   não consegue anexar header custom sem preflight de CORS, então a presença

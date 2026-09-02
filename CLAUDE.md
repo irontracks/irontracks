@@ -3504,11 +3504,15 @@ Apple (RevenueCat) e Mercado Pago. **Não configurar `ASAAS_WEBHOOK_SECRET`**:
 sem o secret o webhook responde 500 fail-closed e o canal fica morto por
 desenho — é o estado desejado. Banco conferido no mesmo dia: zero entitlements
 Asaas, zero eventos, e a única assinatura Asaas (conta de teste, vencida desde
-abril) já foi cancelada na reconciliação. O código Asaas (webhook,
-`lib/asaas.ts`, branches nos cancelamentos, colunas `asaas_*`) é LEGADO com
-guards verdes — a REMOÇÃO é tarefa própria, não foi feita; quem for removê-la
-varre também `marketplace_payments`/`marketplace_subscriptions` e o
-`app_subscriptions_provider_check` antes de mexer.
+abril) já foi cancelada na reconciliação. **O código Asaas foi REMOVIDO em
+02/09/2026** (webhook, `lib/asaas.ts`, `admin/teachers/asaas`,
+`marketplace/health`, `teachers/wallet` — nenhuma tinha chamador no front —,
+o branch dos cancelamentos, `env.asaas` e as vars do `.env.example`). **O
+BANCO ficou como estava, de propósito:** `asaas_customers`,
+`asaas_webhook_events`, as colunas `asaas_*` e o valor `'asaas'` no
+`app_subscriptions_provider_check` são dado histórico de pagamento; o
+catálogo LGPD e o `PAYING_PROVIDERS` do funil continuam a conhecê-los. Apagar
+isso é decisão à parte, com migration.
 
 **Pendências (dono):** decisão A11 (Google Play Billing vs remover checkout
 externo no Android) · sandbox ponta a ponta (Apple + Mercado Pago).
