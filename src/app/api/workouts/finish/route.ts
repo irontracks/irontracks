@@ -15,6 +15,14 @@ import { respondDbError } from '@/utils/api/dbError'
 import { buildPostCheckinRow } from './postCheckinRow'
 import { buildUserSnapshot, type ProfileFacts } from '@/lib/user/snapshot'
 import { env } from '@/utils/env'
+import { waitUntil } from '@vercel/functions'
+import { collectSetMediaFromLogs } from '@/lib/workout/setMedia'
+import { analyzeSetMediaForWorkout } from '@/lib/workout/setMediaAnalysis'
+
+// A análise da mídia das séries roda em `waitUntil` DEPOIS da resposta; um
+// vídeo pela Files API do Gemini leva dezenas de segundos e a instância não
+// pode ser congelada antes de a resposta chegar ao banco.
+export const maxDuration = 120
 
 const LogEntrySchema = z
   .object({
@@ -289,6 +297,36 @@ export async function POST(request: Request) {
     }
 
     await notifyWorkoutFinished(user.id, saved?.id ? String(saved.id) : null, sessionObj)
+    // Foto/vídeo anexados às séries: as linhas de `workout_set_media` nasceram
+    // no upload SEM workout_id (o treino ainda não existia). Aqui elas ganham o
+    // treino, o nome do exercício e a observação da série, e a IA responde em
+    // segundo plano (`waitUntil`) — a finalização não espera o Gemini. Só na
+    // primeira gravação: o replay idempotente já fez isso.
+    if (!idempotent && saved?.id) {
+      try {
+        const midias = collectSetMediaFromLogs(sessionObj?.logs)
+        if (midias.length > 0) {
+          const admin = createAdminClient()
+          const exercisesArr = Array.isArray(sessionObj?.exercises) ? sessionObj.exercises : []
+          for (const m of midias) {
+            const exObj = exercisesArr[m.exerciseIndex]
+            const exName = exObj && typeof exObj === 'object' ? String((exObj as Record<string, unknown>).name ?? '').trim() : ''
+            await admin.from('workout_set_media')
+              .update({
+                workout_id: String(saved.id),
+                exercise_index: m.exerciseIndex,
+                set_index: m.setIndex,
+                exercise_name: exName || null,
+                question: m.question ? String(m.question).slice(0, 500) : null,
+              })
+              .eq('id', m.id)
+              .eq('user_id', user.id)
+          }
+          const workoutId = String(saved.id)
+          waitUntil(analyzeSetMediaForWorkout(admin, user.id, workoutId).catch((e) => logError('api:workouts:finish:set-media-analyze', e)))
+        }
+      } catch (e) { logWarn('workouts/finish', 'Failed to link set media', e) }
+    }
 
     // Limpar os caches de listagem de histórico e dashboard ao finalizar o treino
     try {

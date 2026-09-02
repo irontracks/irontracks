@@ -377,6 +377,30 @@ vez no meu próprio código, no mesmo dia em que escrevi o guard. O teto não
 strippa comentário; reescrever o texto sem os dois tokens juntos na mesma
 linha resolveu.
 
+**Foto/vídeo na observação da série + IA na finalização (02/09/2026).** O
+aluno anexa nas observações (`SetMediaAttach`, UM componente para os dois
+renderers que têm notas: `normalSet` e `AdvancedSetRow`); a referência vai
+para o LOG (`log.media`, lida por `lib/workout/setMedia.ts`) e o arquivo para
+o bucket privado `set-media` via URL assinada (`set-media/prepare`). **A IA só
+roda na FINALIZAÇÃO** (`finish` → `waitUntil(analyzeSetMediaForWorkout)`,
+`maxDuration = 120`): a linha de `workout_set_media` nasce sem `workout_id` e é
+ligada ali. Foto = "é o aparelho certo?"; vídeo = "a execução está correta?";
+a observação escrita é a pergunta. Cota VIP `media_analysis` (booleana, teto
+20/dia) cobrada POR mídia; sem VIP/cota a linha fica `skipped` COM motivo — o
+histórico mostra o motivo, não uma falha. Resposta na tela do relatório, no
+PDF (só texto — URL assinada expira) e no painel do professor
+(`StudentSetMediaSection`, decisão do dono). Notificação `set_media_analyzed`,
+uma por treino. Vídeo > 15 MB vai pela Files API do Gemini (inline tem teto).
+Guards em `lib/workout/__tests__/setMedia.test.ts` (4 mutações).
+
+**Dossiê semanal/mensal (02/09/2026)** — botão "Dossiê" no card de resumo do
+Histórico. Treino (`periodStats.ts`, a MESMA conta do relatório de período —
+extraída do hook por isso), dieta (`summarizeHistory`), exame, avaliação
+física e por foto. **Sem IA, de propósito** (guard). Regra do dono, em
+`lib/dossier/buildDossier.ts`: sem registro NO período, entra o ÚLTIMO de
+qualquer data com a data e o aviso "fora do período"; sem nenhum, a seção diz
+isso — nunca some em silêncio. Falha de UMA fonte não derruba o dossiê.
+
 ⚠️ **A página `/dashboard/nutrition` somava a kcal de treino de uma tabela
 MORTA até 31/08/2026.** Ela lia `workout_session_logs` — **1 linha em toda a
 produção**, a última de 02/04/2026, e **nenhum escritor no código** — e

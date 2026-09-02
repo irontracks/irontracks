@@ -22,6 +22,8 @@ import { HistoryListProps, WorkoutSummary } from '@/components/historyListTypes'
 import { useHistoryData, toDateMs } from '@/components/history/hooks/useHistoryData';
 import { useHistoryActions } from '@/components/history/hooks/useHistoryActions';
 import { useHistoryPeriodReport } from '@/components/history/hooks/useHistoryPeriodReport';
+import { useDossier } from '@/hooks/useDossier';
+import { DossierModal } from '@/components/history/DossierModal';
 import { stripDayPrefix } from '@/lib/workout/workoutTitle'
 
 const HistoryList: React.FC<HistoryListProps> = ({
@@ -70,6 +72,11 @@ const HistoryList: React.FC<HistoryListProps> = ({
 
     // ── Period report hook ───────────────────────────────────────────────────
     const report = useHistoryPeriodReport({ historyItems, user, alert, hydrateSessions: data.hydrateSessions });
+    const dossier = useDossier({
+        userId: String(targetId || user?.id || ''),
+        displayName: String(user?.displayName || user?.email || ''),
+        historyItems, hydrateSessions: data.hydrateSessions, alert,
+    });
     const {
         periodReport, periodAi, periodPdf, shareError, buildShareText,
         openPeriodReport, closePeriodReport, downloadPeriodPdf, copyShareText,
@@ -181,6 +188,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                         summary={summary} rangeLabel={rangeLabel} range={range}
                         hasItems={historyItems.length > 0} loading={loading}
                         onRangeChange={setRange} onOpenReport={openPeriodReport}
+                        onOpenDossier={dossier.abrir}
                     />
                     {!loading && historyItems.length === 0 && <HistoryEmptyState isReadOnly={isReadOnly} onAdd={() => setShowManual(true)} />}
                     {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
@@ -414,6 +422,12 @@ const HistoryList: React.FC<HistoryListProps> = ({
                 />
             )}
 
+            {dossier.state.status !== 'idle' && (
+                <DossierModal
+                    state={dossier.state} exporting={dossier.exporting}
+                    onTrocarTipo={dossier.abrir} onClose={dossier.fechar} onExportar={dossier.exportar}
+                />
+            )}
             {/* Period report modal */}
             {periodReport && (
                 <HistoryListPeriodReportModal

@@ -4,20 +4,11 @@ import { useState } from 'react';
 import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 import { translateAiError } from '@/utils/ai/clientErrors';
-import { PeriodStats } from '@/types/workout';
-import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, RawSessionObjectSchema } from '@/components/historyListTypes';
-import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
-import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
-import { buildPeriodSessionDetails, PeriodSessionDetail } from '@/utils/report/periodSessionDetails';
+import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary } from '@/components/historyListTypes';
 import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
-import { brtDateKey } from '@/utils/cron/dateBrt';
+import { buildPeriodStats as buildPeriodStatsPure, REPORT_DAYS_WEEK, REPORT_DAYS_MONTH } from '@/utils/report/periodStats';
 
-const REPORT_DAYS_WEEK = 7;
-const REPORT_DAYS_MONTH = 30;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const PERIOD_SESSIONS_LIMIT = 30;
-const TOP_EXERCISES_LIMIT = 5;
 
 interface UseHistoryPeriodReportProps {
     historyItems: WorkoutSummary[];
@@ -34,103 +25,9 @@ export function useHistoryPeriodReport({ historyItems, user, alert, hydrateSessi
     const [shareError, setShareError] = useState('');
 
     // ── buildPeriodStats ─────────────────────────────────────────────────────
-    // Devolve os agregados (que vão ao prompt da IA) E o detalhe série a série
-    // (que vai só ao arquivo exportado) — separados de propósito: mandar o mês
-    // inteiro de séries ao modelo custa dinheiro e não melhora o insight.
-    const buildPeriodStats = (
-        days: unknown,
-        listOverride?: WorkoutSummary[],
-    ): { stats: PeriodStats; sessions: PeriodSessionDetail[] } | null => {
-        try {
-            const historyList = Array.isArray(listOverride) ? listOverride : (Array.isArray(historyItems) ? historyItems : []);
-            const daysNumber = Number(days);
-            if (!Number.isFinite(daysNumber) || daysNumber <= 0) return null;
-            const cutoff = Date.now() - daysNumber * DAY_MS;
-            const list = historyList.filter((s) => {
-                const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
-                return Number.isFinite(t) && t !== null && t >= cutoff;
-            });
-            if (!list.length) return null;
-
-            const totalSeconds = list.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
-            const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
-            const count = list.length;
-            const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
-            let totalVolumeKg = 0, totalSets = 0, totalReps = 0;
-            const uniqueDays = new Set<string>();
-            const exerciseMap = new Map<string, { name: string; sets: number; reps: number; volumeKg: number; sessions: Set<string> }>();
-            const sessionSummaries: Array<{ date: unknown; minutes: number; volumeKg: number }> = [];
-            const detailSources: Array<{ date: unknown; totalTime: unknown; title: unknown; logs: unknown; exercises: unknown }> = [];
-
-            list.forEach((item) => {
-                const rawParsed = RawSessionObjectSchema.safeParse(item?.rawSession);
-                const raw = rawParsed.success ? rawParsed.data : null;
-                const logs = raw?.logs ?? {};
-                const exercises: unknown[] = Array.isArray(raw?.exercises) ? raw.exercises : [];
-                const v = calculateTotalVolumeFromLogs(logs);
-                const safeVolume = Number.isFinite(v) && v > 0 ? v : 0;
-                if (safeVolume > 0) totalVolumeKg += safeVolume;
-                const dateValue = item?.date ?? raw?.date ?? item?.created_at ?? null;
-                let dayKey = '';
-                try {
-                    const t = toDateMs(dateValue);
-                    // O dia é o do USUÁRIO, não o do servidor. Era
-                    // `toISOString().slice(0,10)` — dia UTC —, então todo treino
-                    // depois das 21h BRT contava no dia SEGUINTE: "dias
-                    // treinados" e "consistência" saíam inflados no relatório
-                    // que a pessoa manda ao professor. É a mesma classe já
-                    // corrigida no streak (5,7% das sessões caíam em dia
-                    // divergente) e no heatmap de nutrição.
-                    if (Number.isFinite(t) && t !== null) { dayKey = brtDateKey(t); if (dayKey) uniqueDays.add(dayKey); }
-                } catch { }
-                const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
-                sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
-                detailSources.push({
-                    date: dateValue,
-                    totalTime: item?.totalTime ?? raw?.totalTime ?? 0,
-                    title: raw?.workoutTitle ?? item?.title ?? item?.name ?? '',
-                    logs,
-                    exercises,
-                });
-                Object.entries(logs || {}).forEach(([key, log]) => {
-                    if (!isRecord(log)) return;
-                    // setTopWeightReps/setVolume tratam unilateral (L_/R_).
-                    const { weight: w, reps: r } = setTopWeightReps(log);
-                    if (w <= 0 || r <= 0) return;
-                    const vol = setVolume(log);
-                    totalSets += 1; totalReps += r;
-                    const exIdx = Number.parseInt(String(key || '').split('-')[0] || '', 10);
-                    const ex = Number.isFinite(exIdx) ? exercises?.[exIdx] : null;
-                    const name = String(isRecord(ex) ? (ex.name ?? '') : '').trim() || 'Exercício';
-                    const current = exerciseMap.get(name) || { name, sets: 0, reps: 0, volumeKg: 0, sessions: new Set<string>() };
-                    current.sets += 1; current.reps += r; current.volumeKg += vol;
-                    if (dayKey) current.sessions.add(dayKey);
-                    exerciseMap.set(name, current);
-                });
-            });
-
-            const avgVolumeKg = count > 0 ? Math.max(0, Math.round(totalVolumeKg / count)) : 0;
-            const exercisesList = Array.from(exerciseMap.values())
-                .map(item => ({ name: String(item?.name || '').trim(), sets: Number(item?.sets) || 0, reps: Number(item?.reps) || 0, volumeKg: Math.max(0, Math.round(Number(item?.volumeKg) || 0)), sessionsCount: item?.sessions ? item.sessions.size : 0 }))
-                .filter(item => item.name);
-            const topExercisesByVolume = [...exercisesList].sort((a, b) => (b.volumeKg || 0) - (a.volumeKg || 0)).slice(0, TOP_EXERCISES_LIMIT);
-            const topExercisesByFrequency = [...exercisesList].sort((a, b) => (b.sessionsCount || 0) - (a.sessionsCount || 0) || (b.sets || 0) - (a.sets || 0)).slice(0, TOP_EXERCISES_LIMIT);
-
-            return {
-                stats: {
-                    days: daysNumber, count, totalMinutes, avgMinutes,
-                    totalVolumeKg: Math.max(0, Math.round(totalVolumeKg)), avgVolumeKg,
-                    totalSets, totalReps, uniqueDaysCount: uniqueDays.size,
-                    topExercisesByVolume, topExercisesByFrequency,
-                    sessionSummaries: sessionSummaries.slice(0, PERIOD_SESSIONS_LIMIT),
-                },
-                // Sem `slice`: o arquivo é o registro do período INTEIRO. O teto de
-                // `sessionSummaries` existe por causa do payload da IA, e o detalhe
-                // não passa por lá.
-                sessions: buildPeriodSessionDetails(detailSources),
-            };
-        } catch { return null; }
-    };
+    // Puro em utils/report/periodStats.ts — o dossiê usa a MESMA conta.
+    const buildPeriodStats = (days: unknown, listOverride?: WorkoutSummary[]) =>
+        buildPeriodStatsPure(Array.isArray(historyItems) ? historyItems : [], days, listOverride);
 
     // ── buildShareText ───────────────────────────────────────────────────────
     const buildShareText = (report: PeriodReport | null) => {
