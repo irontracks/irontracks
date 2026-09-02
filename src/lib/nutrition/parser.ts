@@ -83,12 +83,33 @@ function matchesAtHead(foodName: string, key: string): boolean {
 }
 
 /**
+ * A chave é a FRASE INTEIRA, não só a cabeça — reservado para chaves
+ * genéricas (`FoodItem.generic`).
+ *
+ * Uma palavra genérica ("arroz", "carne", "batata"…) representa UM alimento
+ * específico escolhido por curadoria (ver `food-database.ts`), e casar por
+ * CABEÇA a deixava sequestrar qualquer frase que começasse com ela:
+ * "leite condensado" virava "leite" (1/5 da caloria real), "batata doce"
+ * virava a batata inglesa, "arroz com frango" perdia o frango. A palavra só
+ * pode responder pela frase quando é a frase inteira — sobrando qualquer
+ * coisa, quem resolve é a TACO ou a IA, que leem o resto.
+ */
+function matchesEntirePhrase(foodName: string, key: string): boolean {
+  if (!key) return false
+  const pattern = buildKeyPattern(key)
+  if (!pattern) return false
+  return new RegExp(`^${pattern}$`).test(foodName)
+}
+
+type FoodEntry = { key: string; normalizedKey: string; item: FoodItem; normalizedKeyLength: number }
+
+/**
  * Lista de alimentos: a base estática + os extras (TACO/customizados do usuário).
  * Não há precedência por origem — quem vence é a maior chave que casa na CABEÇA do
  * nome (ver o loop do match). O comentário antigo aqui dizia "static always wins",
  * o que nunca foi verdade.
  */
-function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
+function buildFoodEntries(extraFoods?: Record<string, FoodItem>): FoodEntry[] {
   if (!extraFoods || Object.keys(extraFoods).length === 0) return normalizedFoodEntries
   const extras = Object.entries(extraFoods).map(([key, item]) => {
     const normalizedKey = normalizeFoodText(key)
@@ -223,6 +244,196 @@ export type MealAnalysis = {
  */
 const SOBRA_COM_QUANTIDADE = /\b\d+(?:[.,]\d+)?\s*(?:g|gr|kg|ml|l|colher(?:es)?|conchas?|fatias?|unidades?|un|scoops?|doses?|copos?|latas?|pedacos?)\b\s+\S/i
 
+/** A quantidade e o nome do alimento, lidos de uma linha já normalizada. */
+export type QuantidadeDaLinha = { qtd: number; unitUsed: string; foodName: string; wasApprox: boolean }
+
+const APPROX_UNIT_REGEX =
+  /(\d+(?:[.,]\d+)?)\s*(colher(?:es)?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalh(?:ao|oes)?|espetinhos?|un|unid)\b/i
+const GRAM_UNIT_REGEX = /(\d+(?:[.,]\d+)?)\s*(g|gr|ml)\b/i
+const COUNT_UNIT_REGEX = /^(\d+(?:[.,]\d+)?)\s+(.+)$/i
+
+function parseQtdNum(raw: string): number {
+  return Number.parseFloat(String(raw || '0').replace(',', '.'))
+}
+
+/**
+ * Lê QUANTO e O QUE de uma linha já normalizada ("200g coxa e sobrecoxa" →
+ * qtd 200, unitUsed 'g', foodName "coxa e sobrecoxa").
+ *
+ * Extraída do corpo de `analyzeMeal` (era inline) porque `separarPorConectorE`
+ * também precisa saber onde a quantidade termina e o NOME começa — sem isso,
+ * "200g Coxa e sobrecoxa" seria testado como "200g coxa" + "e" + "sobrecoxa",
+ * e o "200g" ficaria colado à palavra errada na hora de checar se a frase
+ * bate com uma chave composta.
+ */
+export function lerQuantidadeDaLinha(normalizedLine: string): QuantidadeDaLinha {
+  const approxMatch = normalizedLine.match(APPROX_UNIT_REGEX)
+  const gramMatch = normalizedLine.match(GRAM_UNIT_REGEX)
+  const countMatch = normalizedLine.match(COUNT_UNIT_REGEX)
+
+  let qtd = 0
+  let foodName = ''
+  let unitUsed = 'g'
+  let wasApprox = false
+
+  // "ovo(s)" is deliberately NOT a unit here: it's an actual food in the
+  // database, and treating it as a unit ate the food name ("2 ovos cozidos"
+  // → unit "ovos" + name "cozidos" → no match). Let count-parsing handle it.
+  if (approxMatch) {
+    qtd = parseQtdNum(approxMatch[1] || '0')
+    const unitRaw = (approxMatch[2] || '').toLowerCase()
+
+    if (unitRaw.startsWith('colher')) unitUsed = 'colher'
+    else if (unitRaw.startsWith('concha')) unitUsed = 'concha'
+    else if (unitRaw.startsWith('bife')) unitUsed = 'bife'
+    else if (unitRaw.startsWith('fatia')) unitUsed = 'fatia'
+    else if (unitRaw.startsWith('pedaco')) unitUsed = 'pedaco'
+    else if (unitRaw.startsWith('lata')) unitUsed = 'lata'
+    else if (unitRaw.startsWith('scoop') || unitRaw.startsWith('dose')) unitUsed = 'scoop'
+    else if (unitRaw.startsWith('xicara')) unitUsed = 'xicara'
+    else if (unitRaw.startsWith('copo')) unitUsed = 'copo'
+    else if (unitRaw.startsWith('prato')) unitUsed = 'prato'
+    else if (unitRaw.startsWith('rodela')) unitUsed = 'rodela'
+    else if (unitRaw.startsWith('espiga')) unitUsed = 'espiga'
+    else if (unitRaw.startsWith('posta')) unitUsed = 'posta'
+    else if (unitRaw.startsWith('medalh')) unitUsed = 'medalhao'
+    else if (unitRaw.startsWith('espetinho')) unitUsed = 'espetinho'
+    else unitUsed = 'unidade'
+
+    foodName = stripLeadingDe(normalizedLine.replace(approxMatch[0] || '', '')).toLowerCase()
+    // When the unit IS the food ("2 ovos" → unit "ovos", empty name), fall back
+    // to the unit word as the food name so it still matches the database.
+    if (!foodName) foodName = (approxMatch[2] || '').trim().toLowerCase()
+    wasApprox = true
+  } else if (gramMatch) {
+    qtd = parseQtdNum(gramMatch[1] || '0')
+    unitUsed = String(gramMatch[2] || '').toLowerCase() === 'ml' ? 'ml' : 'g'
+    foodName = stripLeadingDe(normalizedLine.replace(gramMatch[0] || '', '')).toLowerCase()
+  } else if (countMatch) {
+    qtd = parseQtdNum(countMatch[1] || '0')
+    unitUsed = 'unidade'
+    foodName = stripLeadingDe(countMatch[2] || '').toLowerCase()
+    wasApprox = true
+  } else {
+    qtd = 1
+    unitUsed = 'unidade'
+    foodName = normalizedLine
+    wasApprox = true
+  }
+
+  return { qtd, unitUsed, foodName, wasApprox }
+}
+
+/**
+ * Qualificadores que NÃO abrem alimento novo depois de " e " — mesmo
+ * raciocínio de `SOBRA_COM_QUANTIDADE`: quantidade denuncia comida nova,
+ * qualificador não é comida. Lista FECHADA de propósito: texto sem dígito e
+ * fora desta lista continua separando ("ovo e banana", "arroz e feijão" —
+ * "banana"/"feijão" não estão aqui, então seguem abrindo item novo).
+ */
+const QUALIFICADORES = [
+  'sem osso',
+  'sem pele',
+  'sem gordura',
+  'sem lactose',
+  'sem acucar',
+  'sem sal',
+  'sem casca',
+  'com pele',
+  'ao natural',
+]
+
+function ehQualificador(trecho: string): boolean {
+  const normalized = normalizeFoodText(trecho)
+  if (!normalized) return false
+  if (/\d/.test(normalized)) return false
+  return QUALIFICADORES.some((q) => normalized === q || normalized.startsWith(`${q} `))
+}
+
+/**
+ * Chaves compostas que contêm um " e " literal (ex. 'coxa e sobrecoxa'),
+ * ordenadas da mais longa pra mais curta — para achar o casamento mais
+ * específico primeiro.
+ */
+function chavesCompostasComE(entries: FoodEntry[]): string[] {
+  const set = new Set<string>()
+  for (const e of entries) {
+    if (e.normalizedKey.includes(' e ')) set.add(e.normalizedKey)
+  }
+  return Array.from(set).sort((a, b) => b.length - a.length)
+}
+
+/**
+ * Separador de " e " que RESPEITA nome composto e qualificador.
+ *
+ * O comentário antigo aqui dizia "nenhum alimento da base contém um ' e '
+ * solitário, então é seguro separar cegamente" — e isso já era FALSO antes
+ * desta correção: 'legumes e salada' virava DOIS alimentos (legumes + salada)
+ * em vez de um, código morto por causa disso desde que o split existe. "Coxa
+ * e sobrecoxa" é o mesmo problema com um corte de frango real, reportado
+ * pelo dono.
+ *
+ * Duas perguntas, nesta ordem:
+ *  1. A CABEÇA da linha (depois de tirar a quantidade) casa uma chave
+ *     composta com " e " (ex. 'coxa e sobrecoxa')? Então essa chave DEFINE o
+ *     alimento e o " e " dela não separa — mesma filosofia de `matchesAtHead`
+ *     (quem manda é o INÍCIO do nome). Isso só é testado UMA VEZ, contra a
+ *     cabeça da linha inteira: depois de resolvido, um " e " SUBSEQUENTE
+ *     (ex. "coxa e sobrecoxa E banana") não reabre essa pergunta — senão
+ *     "banana" seria engolido pelo corte de frango.
+ *  2. Não sendo isso, o lado direito é um QUALIFICADOR (ver acima)? Então
+ *     também não separa — "sem pele e sem osso" é uma coisa só.
+ *
+ * Fora dessas duas, separa como sempre: "ovo e banana" → dois; "arroz e
+ * feijão" → dois; "200g de frango e 100g de arroz" → dois.
+ */
+export function separarPorConectorE(line: string, entries: FoodEntry[]): string[] {
+  const raw = String(line || '')
+  const matches = Array.from(raw.matchAll(/\s+e\s+/gi))
+  if (matches.length === 0) return [raw]
+
+  const segments: string[] = []
+  let cursor = 0
+  for (const m of matches) {
+    const idx = m.index ?? 0
+    segments.push(raw.slice(cursor, idx))
+    cursor = idx + m[0].length
+  }
+  segments.push(raw.slice(cursor))
+
+  const composed = chavesCompostasComE(entries)
+  const result: string[] = []
+  let current = segments[0] ?? ''
+  let nomeCompostoResolvido = false
+
+  for (let i = 0; i < matches.length; i += 1) {
+    const connectorText = matches[i][0]
+    const rightSeg = segments[i + 1] ?? ''
+    const joined = `${current}${connectorText}${rightSeg}`
+
+    if (!nomeCompostoResolvido) {
+      const { foodName } = lerQuantidadeDaLinha(normalizeFoodText(joined))
+      const chave = composed.find((c) => matchesAtHead(foodName, c))
+      if (chave) {
+        current = joined
+        nomeCompostoResolvido = true
+        continue
+      }
+    }
+
+    if (ehQualificador(rightSeg)) {
+      current = joined
+      continue
+    }
+
+    result.push(current)
+    current = rightSeg
+    nomeCompostoResolvido = false
+  }
+  result.push(current)
+  return result
+}
+
 export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>): MealAnalysis {
   const rawText = typeof text === 'string' ? text : ''
   const empty: MealAnalysis = {
@@ -232,6 +443,11 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
   }
   if (!rawText.trim()) return empty
 
+  // Fora do loop, e ANTES do cálculo de `lines`: o separador de " e " precisa
+  // conhecer as chaves compostas (`chavesCompostasComE`) para decidir se um
+  // conector separa ou não — ver `separarPorConectorE`.
+  const allFoodEntries = buildFoodEntries(extraFoods)
+
   const lines = rawText
     .split('\n')
     .flatMap((l) => String(l || '').split(/\s*\+\s*/g))
@@ -239,9 +455,10 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // Comma followed by whitespace is an item separator ("arroz, frango"),
     // but a comma between digits is a decimal ("1,5 colher") — keep that intact.
     .flatMap((l) => String(l || '').split(/,\s+/g))
-    // " e " between items is also a separator ("banana e iogurte"). No food in
-    // the database contains a standalone " e ", so this is safe.
-    .flatMap((l) => String(l || '').split(/\s+e\s+/gi))
+    // " e " between items is also a separator ("banana e iogurte") — mas NÃO
+    // cegamente: nome composto ("coxa e sobrecoxa") e qualificador ("sem pele
+    // e sem osso") não separam. Ver `separarPorConectorE`.
+    .flatMap((l) => separarPorConectorE(String(l || ''), allFoodEntries))
     // " mais " idem ("140g de atum mais 70g de soja") — ninguém escreve um
     // alimento com "mais" no meio do nome.
     //
@@ -257,9 +474,6 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
   const totals: MacroTotals = { p: 0, c: 0, f: 0, kcal: 0 }
   const unknownLines: string[] = []
   const items: ParsedMealItem[] = []
-
-  // Fora do loop: a lista não muda entre as linhas e era reconstruída a cada uma.
-  const allFoodEntries = buildFoodEntries(extraFoods)
 
   // Primeira linha FÍSICA (antes dos splits de item). Ver isTitleLine.
   const firstPhysicalLine = (rawText.split('\n')[0] || '').trim()
@@ -301,65 +515,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     const normalizedLine = normalizeFoodText(rawLine)
     if (!normalizedLine) continue
 
-    let qtd = 0
-    let foodName = ''
-    let unitUsed = 'g'
-    let wasApprox = false
-
-    // "ovo(s)" is deliberately NOT a unit here: it's an actual food in the
-    // database, and treating it as a unit ate the food name ("2 ovos cozidos"
-    // → unit "ovos" + name "cozidos" → no match). Let count-parsing handle it.
-    const approxRegex =
-      /(\d+(?:[.,]\d+)?)\s*(colher(?:es)?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalh(?:ao|oes)?|espetinhos?|un|unid)\b/i
-    const gramRegex = /(\d+(?:[.,]\d+)?)\s*(g|gr|ml)\b/i
-    const countRegex = /^(\d+(?:[.,]\d+)?)\s+(.+)$/i
-
-    const approxMatch = normalizedLine.match(approxRegex)
-    const gramMatch = normalizedLine.match(gramRegex)
-    const countMatch = normalizedLine.match(countRegex)
-    const parseQtd = (raw: string) => Number.parseFloat(String(raw || '0').replace(',', '.'))
-
-    if (approxMatch) {
-      qtd = parseQtd(approxMatch[1] || '0')
-      const unitRaw = (approxMatch[2] || '').toLowerCase()
-
-      if (unitRaw.startsWith('colher')) unitUsed = 'colher'
-      else if (unitRaw.startsWith('concha')) unitUsed = 'concha'
-      else if (unitRaw.startsWith('bife')) unitUsed = 'bife'
-      else if (unitRaw.startsWith('fatia')) unitUsed = 'fatia'
-      else if (unitRaw.startsWith('pedaco')) unitUsed = 'pedaco'
-      else if (unitRaw.startsWith('lata')) unitUsed = 'lata'
-      else if (unitRaw.startsWith('scoop') || unitRaw.startsWith('dose')) unitUsed = 'scoop'
-      else if (unitRaw.startsWith('xicara')) unitUsed = 'xicara'
-      else if (unitRaw.startsWith('copo')) unitUsed = 'copo'
-      else if (unitRaw.startsWith('prato')) unitUsed = 'prato'
-      else if (unitRaw.startsWith('rodela')) unitUsed = 'rodela'
-      else if (unitRaw.startsWith('espiga')) unitUsed = 'espiga'
-      else if (unitRaw.startsWith('posta')) unitUsed = 'posta'
-      else if (unitRaw.startsWith('medalh')) unitUsed = 'medalhao'
-      else if (unitRaw.startsWith('espetinho')) unitUsed = 'espetinho'
-      else unitUsed = 'unidade'
-
-      foodName = stripLeadingDe(normalizedLine.replace(approxMatch[0] || '', '')).toLowerCase()
-      // When the unit IS the food ("2 ovos" → unit "ovos", empty name), fall back
-      // to the unit word as the food name so it still matches the database.
-      if (!foodName) foodName = (approxMatch[2] || '').trim().toLowerCase()
-      wasApprox = true
-    } else if (gramMatch) {
-      qtd = parseQtd(gramMatch[1] || '0')
-      unitUsed = String(gramMatch[2] || '').toLowerCase() === 'ml' ? 'ml' : 'g'
-      foodName = stripLeadingDe(normalizedLine.replace(gramMatch[0] || '', '')).toLowerCase()
-    } else if (countMatch) {
-      qtd = parseQtd(countMatch[1] || '0')
-      unitUsed = 'unidade'
-      foodName = stripLeadingDe(countMatch[2] || '').toLowerCase()
-      wasApprox = true
-    } else {
-      qtd = 1
-      unitUsed = 'unidade'
-      foodName = normalizedLine
-      wasApprox = true
-    }
+    const { qtd, unitUsed, foodName, wasApprox } = lerQuantidadeDaLinha(normalizedLine)
 
     if (!Number.isFinite(qtd) || qtd <= 0) {
       unknownLines.push(rawLine)
@@ -378,11 +534,18 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // resolve com quem sabe mais — TACO (590 alimentos com alias curto) e, no fim,
     // a IA, que lê a frase inteira ("de banana", "com requeijão") e acerta onde uma
     // tabela estática não tem como.
+    // Chave GENÉRICA ('arroz', 'carne', 'batata'…) é um caso à parte: ela só
+    // pode responder pela linha INTEIRA, nunca pela cabeça — ver
+    // `matchesEntirePhrase`. Sem isso "batata doce" caía em 'batata' (a
+    // inglesa) e "arroz com frango" perdia o frango pro 'arroz' sozinho.
     let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
     for (const entry of allFoodEntries) {
       if (!entry.normalizedKey) continue
-      if (!matchesAtHead(foodName, entry.normalizedKey)) continue
+      const matches = entry.item.generic
+        ? matchesEntirePhrase(foodName, entry.normalizedKey)
+        : matchesAtHead(foodName, entry.normalizedKey)
+      if (!matches) continue
       if (!matchedItem || entry.normalizedKeyLength > dbKeyMatched.length) {
         dbKeyMatched = entry.normalizedKey
         matchedItem = entry.item

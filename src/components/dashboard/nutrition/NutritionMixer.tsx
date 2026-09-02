@@ -325,7 +325,10 @@ export default function NutritionMixer({
   // Entry detail state
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<{ food_name: string; items: MealItemView[] } | null>(null)
+  // `itensOriginais` (opcional, espelha `EditDraft` de NutritionEntryCard.tsx):
+  // os itens como estavam ao ABRIR o editor — base fixa para reescalar
+  // quantidade sem acumular arredondamento a cada edição.
+  const [editDraft, setEditDraft] = useState<{ food_name: string; items: MealItemView[]; itensOriginais?: MealItemView[] } | null>(null)
   const [editBusy, setEditBusy] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -836,7 +839,10 @@ export default function NutritionMixer({
     const seeded: MealItemView[] = existing.length > 0
       ? existing.map(it => ({ label: String(it.label || ''), grams: safeNumber(it.grams), calories: safeNumber(it.calories), protein: safeNumber(it.protein), carbs: safeNumber(it.carbs), fat: safeNumber(it.fat) }))
       : [{ label: entry.food_name || 'Refeição', grams: 0, calories: safeNumber(entry.calories), protein: safeNumber(entry.protein), carbs: safeNumber(entry.carbs), fat: safeNumber(entry.fat) }]
-    setEditDraft({ food_name: entry.food_name, items: seeded })
+    // `itensOriginais` é a base FIXA para reescalar quantidade — nunca o item
+    // já reescalado (ver mealItemQuantity.ts). Ao abrir o editor, ela é a
+    // mesma cópia que `items`; diverge só quando o usuário reescala.
+    setEditDraft({ food_name: entry.food_name, items: seeded, itensOriginais: seeded })
   }, [])
 
   const entriesAnchorRef = useRef<HTMLDivElement | null>(null)
