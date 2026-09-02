@@ -52,11 +52,6 @@ test.describe('Marketplace APIs', () => {
         // Plans may be public
     })
 
-    test('GET /api/marketplace/health returns non-500', async ({ request }) => {
-        const res = await request.get('/api/marketplace/health').catch(() => null)
-        if (!res) return // ECONNRESET under load
-        expect(res.status()).not.toBe(500)
-    })
 })
 
 test.describe('Error Reporting', () => {

@@ -3,7 +3,7 @@
  *
  * Os três defeitos que estes testes travam:
  *  1. Falha no provedor era só LOGADA e o banco local virava 'cancelled' mesmo
- *     assim — o app dizia "assinatura cancelada" com o MP/Asaas ainda cobrando.
+ *     assim — o app dizia "assinatura cancelada" com o MP ainda cobrando.
  *     Agora: provedor falhou (e não está já-cancelado lá) → 502, zero escrita.
  *  2. A revogação derrubava TODOS os entitlements ativos do usuário, de
  *     qualquer provedor (um cancelamento MP apagava um VIP Apple).
@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/utils/supabase/server', () => ({ createClient: vi.fn() }))
 vi.mock('@/utils/supabase/admin', () => ({ createAdminClient: vi.fn() }))
 vi.mock('@/lib/mercadopago', () => ({ mercadopagoRequest: vi.fn() }))
-vi.mock('@/lib/asaas', () => ({ asaasRequest: vi.fn() }))
 vi.mock('@/utils/cache', () => ({ cacheDelete: vi.fn(async () => {}) }))
 vi.mock('@/utils/rateLimit', () => ({
   checkRateLimitAsync: vi.fn(async () => ({ allowed: true })),

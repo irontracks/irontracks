@@ -52,13 +52,6 @@ test.describe('Auth Recovery', () => {
 })
 
 test.describe('Admin Teachers Extended', () => {
-    test('GET /api/admin/teachers/asaas returns non-500 (admin)', async ({ request }) => {
-        const res = await request.get('/api/admin/teachers/asaas')
-        expect(res.status()).not.toBe(500)
-        expect(res.status()).not.toBe(401)
-        expect(res.status()).not.toBe(403)
-    })
-
     test('POST /api/admin/teachers/promote rejects empty body (not 500)', async ({ request }) => {
         const res = await request.post('/api/admin/teachers/promote', { data: {} })
         expect(res.status()).not.toBe(500)

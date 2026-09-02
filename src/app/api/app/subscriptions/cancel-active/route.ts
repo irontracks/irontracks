@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
-import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
@@ -18,7 +17,7 @@ export const dynamic = 'force-dynamic'
  * Auditoria de cobranças 14/08/2026 (A7) — três correções:
  *  1. O cancelamento local só acontece DEPOIS de o provedor confirmar (ou de a
  *     consulta mostrar que já está cancelado lá). Antes, a falha era só logada
- *     e o app dizia "assinatura cancelada" enquanto o MP/Asaas seguia cobrando.
+ *     e o app dizia "assinatura cancelada" enquanto o MP seguia cobrando.
  *  2. O período JÁ PAGO fica de pé: o entitlement não é revogado — o resolvedor
  *     corta sozinho quando valid_until passar. O cancelamento só garante que a
  *     janela é FINITA (valid_until NULL ganha o fim do período, ou agora).
@@ -65,6 +64,9 @@ export async function POST(req: Request) {
 
     const provider = String(sub?.provider || '').trim()
     const providerSubId = String(sub?.provider_subscription_id || '').trim()
+    // Asaas foi descontinuado (14/08/2026; código removido em 02/09/2026). A coluna
+    // continua sendo a chave dos entitlements das assinaturas legadas — só não há
+    // mais provedor para cancelar remotamente.
     const asaasSubId = String(sub?.asaas_subscription_id || '').trim()
 
     // Apple IAP (via RevenueCat) CANNOT be cancelled server-side by design —
@@ -103,25 +105,6 @@ export async function POST(req: Request) {
       }
     }
 
-    if (provider === 'asaas' && (providerSubId || asaasSubId)) {
-      const target = providerSubId || asaasSubId
-      try {
-        await asaasRequest({
-          method: 'PUT',
-          path: `/subscriptions/${encodeURIComponent(target)}`,
-          body: { status: 'INACTIVE' },
-        })
-      } catch (e) {
-        const already = await asaasRequest<{ status?: string; deleted?: boolean }>({
-          method: 'GET',
-          path: `/subscriptions/${encodeURIComponent(target)}`,
-        }).then((s) => s?.deleted === true || ['INACTIVE', 'EXPIRED'].includes(String(s?.status || '').toUpperCase())).catch(() => false)
-        if (!already) {
-          logError('api:subscriptions:cancel-active:asaas', e)
-          return NextResponse.json({ ok: false, error: 'provedor_falhou' }, { status: 502 })
-        }
-      }
-    }
 
     {
       const { error: subUpdErr } = await admin
