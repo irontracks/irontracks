@@ -189,7 +189,13 @@ function WorkoutCardInner({
         isActive ? 'ring-2 ring-green-500/60' : '',
         showToday ? 'ring-1 ring-yellow-400/60 shadow-[0_0_24px_rgba(234,179,8,0.18)]' : '',
         density === 'compact' ? 'p-3' : 'p-4',
+        'workout-card-in',
       ].join(' ')}
+      /* Entrada escalonada: a lista é a primeira coisa que o usuário vê ao abrir
+         o app, e aparecer de uma vez só faz o bloco inteiro ler como imagem
+         estática. O teto de 6 (240ms) é deliberado — quem tem 12 treinos não
+         pode esperar quase um segundo para o último assentar. */
+      style={{ animationDelay: `${Math.min(idx, 6) * 40}ms` }}
       onClick={handleClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
     >

@@ -678,7 +678,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             </div>
 
             {/* Report content — starts below fixed header with pt for safe offset */}
-            <div ref={reportRef} className="bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)' }}>
+            <div ref={reportRef} className="bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto stagger-children" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)' }}>
                 <div className="pb-8 mb-8">
                     <div className="flex items-start justify-between gap-6">
                         <div className="min-w-0">
