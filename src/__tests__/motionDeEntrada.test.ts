@@ -142,3 +142,41 @@ describe('count-up é fonte única e respeita movimento reduzido', () => {
         expect(copias, 'count-up tem que ter uma implementação só').toEqual([])
     })
 })
+
+describe('count-up abaixo da dobra só conta quando entra na tela', () => {
+    /**
+     * Achado do dono no aparelho, 03/09/2026: `ReportSummaryCards` é o 8º
+     * bloco do relatório de treino — o usuário nunca chegava a ver a
+     * animação de volume/calorias, porque os 900ms terminavam bem antes de
+     * o scroll alcançar o card. `useInViewOnce` + o parâmetro `start` do
+     * `useCountUp` resolvem isso; estes casos travam a fiação dos DOIS.
+     */
+    const countUpSrc = readFileSync(join(SRC, 'hooks', 'useCountUp.ts'), 'utf8')
+    const inViewSrc = readFileSync(join(SRC, 'hooks', 'useInViewOnce.ts'), 'utf8')
+    const cardsSrc = readFileSync(join(SRC, 'components', 'workout-report', 'ReportSummaryCards.tsx'), 'utf8')
+
+    it('useCountUp aceita um gatilho e não anima enquanto ele for falso', () => {
+        expect(countUpSrc).toMatch(/function useCountUp\([^)]*start\s*=\s*true/)
+        expect(countUpSrc).toMatch(/if \(!start\) return/)
+    })
+
+    it('useInViewOnce existe e é de UMA vez só (desconecta ao entrar em vista)', () => {
+        expect(inViewSrc).toMatch(/IntersectionObserver/)
+        expect(inViewSrc).toMatch(/io\.disconnect\(\)/)
+    })
+
+    it('o card de resumo liga o gatilho de scroll aos DOIS contadores', () => {
+        expect(cardsSrc).toMatch(/useInViewOnce/)
+        // Precisa ser o MESMO booleano nos dois — gatilho por card divergiria
+        // e um número contaria enquanto o outro ainda espera.
+        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(currentVolume\),\s*900,\s*emVista\)/)
+        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(calories\),\s*900,\s*emVista\)/)
+    })
+
+    it('o ref do gatilho está no elemento que hospeda os dois números', () => {
+        // A âncora do IntersectionObserver precisa ser o grid que contém
+        // Volume E Calorias — um ref solto sem `ref={gridRef}` no JSX real
+        // deixaria o hook declarado e nunca observando nada.
+        expect(cardsSrc).toMatch(/ref=\{gridRef\}/)
+    })
+})
