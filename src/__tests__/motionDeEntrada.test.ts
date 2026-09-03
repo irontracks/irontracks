@@ -160,6 +160,19 @@ describe('count-up abaixo da dobra só conta quando entra na tela', () => {
         expect(countUpSrc).toMatch(/if \(!start\) return/)
     })
 
+    /**
+     * A duração é PISO, não valor exato: o dono relatou em 03/09/2026 que a
+     * 900ms "quase não dá pra ver a animação". Com `easeOutCubic` os primeiros
+     * 25% do tempo cobrem 58% do caminho, então duração curta vira borrão.
+     * Travar o número exato seria tautologia; travar o piso preserva a decisão
+     * (dá para ler o número subindo) e deixa espaço para ajuste fino.
+     */
+    it('a contagem é lenta o bastante para ser lida', () => {
+        const ms = Number(countUpSrc.match(/DURACAO_PADRAO_MS\s*=\s*(\d+)/)?.[1])
+        expect(ms, 'a duração padrão precisa estar declarada em uma constante').toBeGreaterThan(0)
+        expect(ms).toBeGreaterThanOrEqual(1500)
+    })
+
     it('useInViewOnce existe e é de UMA vez só (desconecta ao entrar em vista)', () => {
         expect(inViewSrc).toMatch(/IntersectionObserver/)
         expect(inViewSrc).toMatch(/io\.disconnect\(\)/)
@@ -169,8 +182,13 @@ describe('count-up abaixo da dobra só conta quando entra na tela', () => {
         expect(cardsSrc).toMatch(/useInViewOnce/)
         // Precisa ser o MESMO booleano nos dois — gatilho por card divergiria
         // e um número contaria enquanto o outro ainda espera.
-        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(currentVolume\),\s*900,\s*emVista\)/)
-        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(calories\),\s*900,\s*emVista\)/)
+        //
+        // ⚠️ O 2º argumento (duração) fica como `[^,]*`: fixar o literal aqui
+        // seria ancorar no que a próxima mudança APAGA — foi o que aconteceu ao
+        // subir a duração de 900 para 2200ms, e o guard reprovou uma mudança
+        // legítima. O que importa é o 3º argumento ser o gatilho.
+        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(currentVolume\),[^,]*,\s*emVista\)/)
+        expect(cardsSrc).toMatch(/useCountUp\(Math\.round\(calories\),[^,]*,\s*emVista\)/)
     })
 
     it('o ref do gatilho está no elemento que hospeda os dois números', () => {

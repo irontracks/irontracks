@@ -3,21 +3,24 @@ import { render, act, cleanup } from '@testing-library/react'
 import { ReportSummaryCards } from '../ReportSummaryCards'
 
 /**
- * Guard de COMPORTAMENTO, não de forma — a lição registrada no CLAUDE.md deste
- * repo é que "guard de forma não substitui teste de comportamento" (o caso da
- * semana em cinco arquivos que passava com "data − 1 dia"). Os casos em
- * `motionDeEntrada.test.ts` provam que o código CHAMA `useInViewOnce` e passa
- * `emVista`; este arquivo prova que a CONSEQUÊNCIA acontece: o valor fica
- * parado em 0 até a interseção disparar, e só sobe depois.
+ * Guard de COMPORTAMENTO do gatilho de scroll do count-up.
  *
- * Achado do dono no aparelho, 03/09/2026: sem isso, `ReportSummaryCards` — o
- * 8º bloco da tela — animava na montagem, e o scroll chegava lá com a
- * contagem de 900ms já terminada havia muito.
+ * ⚠️ A PRIMEIRA versão deste arquivo era GUARD FALSO e passou verde com o bug
+ * inteiro reposto (os dois `useCountUp` sem gatilho, contando desde a
+ * montagem). O motivo: ela afirmava `getByText('0')` logo após o render, e em
+ * jsdom o `requestAnimationFrame` não tinha tickado ainda — o valor era 0 com
+ * ou sem a correção. O teste media o relógio do harness, não o app.
+ *
+ * Por isso aqui o relógio e o rAF são CONTROLADOS: `avancarFrames()` empurra o
+ * tempo e executa a fila. Só assim "ficou parado em 0" significa alguma coisa —
+ * significa que ninguém agendou animação, que é exatamente o invariante.
  */
 
-// jsdom não implementa IntersectionObserver. O mock guarda o callback que o
-// hook registrou, para o teste disparar a interseção manualmente — é a
-// simulação de "o usuário rolou até aqui".
+// ── Relógio e fila de frames controlados ──────────────────────────────────
+let agora = 0
+let filaRaf: FrameRequestCallback[] = []
+
+// ── IntersectionObserver: jsdom não implementa ────────────────────────────
 let ultimoCallback: IntersectionObserverCallback | null = null
 let observados: Element[] = []
 let desconectado = false
@@ -30,10 +33,15 @@ class IntersectionObserverMock {
 }
 
 beforeEach(() => {
+    agora = 0
+    filaRaf = []
     ultimoCallback = null
     observados = []
     desconectado = false
     vi.stubGlobal('IntersectionObserver', IntersectionObserverMock)
+    vi.stubGlobal('performance', { now: () => agora })
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { filaRaf.push(cb); return filaRaf.length })
+    vi.stubGlobal('cancelAnimationFrame', () => { /* a fila é descartada por bloco */ })
 })
 
 afterEach(() => {
@@ -41,70 +49,66 @@ afterEach(() => {
     vi.unstubAllGlobals()
 })
 
+/** Empurra o relógio e executa a fila de frames pendente, em rodadas. */
+const avancarFrames = (ms: number, rodadas = 4) => {
+    for (let i = 0; i < rodadas; i++) {
+        agora += ms / rodadas
+        const fila = filaRaf
+        filaRaf = []
+        act(() => { fila.forEach((cb) => cb(agora)) })
+    }
+}
+
 const dispararIntersecao = (isIntersecting: boolean) => {
     act(() => {
-        ultimoCallback?.(
-            [{ isIntersecting } as IntersectionObserverEntry],
-            {} as IntersectionObserver,
-        )
+        ultimoCallback?.([{ isIntersecting } as IntersectionObserverEntry], {} as IntersectionObserver)
     })
 }
 
+const montar = () => render(
+    <ReportSummaryCards
+        session={{ totalTime: 3000 }}
+        currentVolume={4820}
+        volumeDelta={5.2}
+        calories={612}
+        outdoorBike={null}
+        cardioGps={null}
+        hasPreviousSession={true}
+    />,
+)
+
 describe('ReportSummaryCards: count-up só conta quando o card entra na tela', () => {
-    it('fica em 0 antes da interseção, mesmo com volume e calorias reais', () => {
-        const { getByText, queryByText } = render(
-            <ReportSummaryCards
-                session={{ totalTime: 3000 }}
-                currentVolume={4820}
-                volumeDelta={5.2}
-                calories={612}
-                outdoorBike={null}
-                cardioGps={null}
-                hasPreviousSession={true}
-            />,
-        )
-        // O observer foi registrado (o hook rodou) mas ainda não disparou.
-        expect(observados.length).toBeGreaterThan(0)
+    it('mesmo com o tempo correndo, não conta nada antes da interseção', () => {
+        const { queryByText, getByText } = montar()
+        expect(observados.length).toBeGreaterThan(0) // o observer foi registrado
+
+        // ESTE é o passo que faltava na versão falsa: o tempo passa de verdade.
+        avancarFrames(5000)
+
+        expect(getByText('0')).toBeTruthy()   // volume parado
+        expect(getByText('~0')).toBeTruthy()  // calorias paradas
         expect(queryByText('4.820')).toBeNull()
-        expect(getByText('0')).toBeTruthy() // volume em 0
-        expect(getByText('~0')).toBeTruthy() // calorias em 0
+        expect(queryByText('~612')).toBeNull()
     })
 
-    it('começa a contar só depois que a interseção dispara — e desconecta (uma vez só)', () => {
-        const { getByText } = render(
-            <ReportSummaryCards
-                session={{ totalTime: 3000 }}
-                currentVolume={4820}
-                volumeDelta={5.2}
-                calories={612}
-                outdoorBike={null}
-                cardioGps={null}
-                hasPreviousSession={true}
-            />,
-        )
-        expect(desconectado).toBe(false)
-
+    it('depois da interseção, os dois números sobem até o valor final', () => {
+        const { getByText } = montar()
         dispararIntersecao(true)
-        expect(desconectado).toBe(true) // é UMA vez só — não segue observando
-        // A rampa de easeOutCubic e o valor final já são cobertos pelos casos
-        // unitários de `useCountUp` (com `requestAnimationFrame` real, sob
-        // fake timers próprios) — este teste prova só a FIAÇÃO até aqui: o
-        // gatilho dispara e o observer se desliga.
+        expect(desconectado).toBe(true) // dispara UMA vez só
+
+        avancarFrames(5000) // além dos 2200ms de duração
+
+        expect(getByText('4.820')).toBeTruthy()
+        expect(getByText('~612')).toBeTruthy()
     })
 
-    it('interseção que NÃO intersecta (saiu de vista antes de entrar) não dispara nada', () => {
-        render(
-            <ReportSummaryCards
-                session={{ totalTime: 3000 }}
-                currentVolume={4820}
-                volumeDelta={5.2}
-                calories={612}
-                outdoorBike={null}
-                cardioGps={null}
-                hasPreviousSession={true}
-            />,
-        )
+    it('interseção que não intersecta não libera a contagem', () => {
+        const { getByText } = montar()
         dispararIntersecao(false)
+        avancarFrames(5000)
+
         expect(desconectado).toBe(false)
+        expect(getByText('0')).toBeTruthy()
+        expect(getByText('~0')).toBeTruthy()
     })
 })

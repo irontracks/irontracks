@@ -33,7 +33,16 @@ import { useEffect, useRef, useState } from 'react'
  * que precisa de gatilho de scroll passa `false` até o elemento entrar em
  * viewport (ver `useInViewOnce`).
  */
-export function useCountUp(target: number, duration = 900, start = true): number {
+/**
+ * 2200ms, e não os 900 originais: com `easeOutCubic` a contagem gasta os
+ * primeiros 25% do tempo cobrindo 58% do caminho, então em 900ms o que sobrava
+ * de legível era um borrão de ~300ms. Relato do dono em 03/09/2026 — "está
+ * muito rápido, quase não dá pra ver a animação". Em 2200ms a chegada lenta da
+ * curva vira o que ela deveria ser: o número subindo à vista até parar.
+ */
+const DURACAO_PADRAO_MS = 2200
+
+export function useCountUp(target: number, duration = DURACAO_PADRAO_MS, start = true): number {
     const [value, setValue] = useState(0)
     const raf = useRef(0)
     // Ponto de partida da PRÓXIMA contagem. Escrito só dentro do frame e lido só

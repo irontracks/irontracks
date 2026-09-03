@@ -31,8 +31,8 @@ export const ReportSummaryCards = memo(({
     // visibilidade, os 900ms de contagem terminavam bem antes de o usuário
     // rolar até aqui (achado do dono no aparelho, 03/09/2026).
     const [gridRef, emVista] = useInViewOnce<HTMLDivElement>()
-    const animVol = useCountUp(Math.round(currentVolume), 900, emVista)
-    const animCal = useCountUp(Math.round(calories), 900, emVista)
+    const animVol = useCountUp(Math.round(currentVolume), undefined, emVista)
+    const animCal = useCountUp(Math.round(calories), undefined, emVista)
 
     return (
         <>
