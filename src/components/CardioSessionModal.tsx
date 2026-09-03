@@ -245,7 +245,26 @@ export default function CardioSessionModal({
             value={(session.caloriesEstimated ?? 0) > 0 ? `~${Math.round(session.caloriesEstimated!)} kcal` : '—'}
             orange
           />
+          {/* Frequência cardíaca: hoje só o Apple Watch mede, então a célula só
+              existe quando há leitura. Mostrar "—" numa sessão do iPhone seria
+              anunciar uma lacuna que não é do usuário — ele não tem o sensor. */}
+          {Number(session.avgHeartRate) > 0 && (
+            <MetricCard
+              label={Number(session.maxHeartRate) > 0 ? 'FC média · máx' : 'FC média'}
+              value={
+                Number(session.maxHeartRate) > 0
+                  ? `${Math.round(Number(session.avgHeartRate))} · ${Math.round(Number(session.maxHeartRate))} bpm`
+                  : `${Math.round(Number(session.avgHeartRate))} bpm`
+              }
+            />
+          )}
         </div>
+
+        {/* De onde veio a medição. Só aparece para o Watch: "iPhone" é o caminho
+            de todo mundo e não precisa ser dito. */}
+        {session.cardioSource === 'apple-watch' && (
+          <p className="text-[11px] text-neutral-400 -mt-2">Medido pelo Apple Watch</p>
+        )}
 
         {/* Compartilhar Story (estilo Strava) */}
         <button

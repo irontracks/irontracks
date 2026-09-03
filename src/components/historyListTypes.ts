@@ -63,6 +63,12 @@ export interface WorkoutSummary {
     perceivedEffort?: number | null;
     /** User notes (cardio sessions) */
     cardioNotes?: string | null;
+    /** FC média em bpm — hoje só o Apple Watch mede (null nas sessões do iPhone). */
+    avgHeartRate?: number | null;
+    /** FC máxima em bpm — idem. */
+    maxHeartRate?: number | null;
+    /** Quem mediu a sessão: 'iphone' | 'apple-watch'. */
+    cardioSource?: string | null;
     /** Resumo vindo da rota magra (servidor extrai do notes; ver slimHistoryRow.ts) */
     volumeKg?: number;
     exCount?: number;

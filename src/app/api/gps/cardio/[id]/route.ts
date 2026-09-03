@@ -28,7 +28,7 @@ export async function GET(
 
   const { data, error } = await auth.supabase
     .from('cardio_tracks')
-    .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, route, started_at')
+    .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, avg_heart_rate, max_heart_rate, source, route, started_at')
     .eq('id', id)
     .eq('user_id', auth.user.id) // RLS guard — só o dono lê a própria rota
     .single()

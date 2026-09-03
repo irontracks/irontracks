@@ -145,6 +145,17 @@ struct WatchSetLog: Codable, Identifiable, Equatable {
 
 // MARK: - Cardio session
 
+/// Um ponto do percurso, no MESMO formato que `/api/gps/cardio/save` espera
+/// (`routePointSchema`: lat, lng, ts, alt?). Nomear diferente aqui obrigaria o
+/// JS a traduzir campo a campo — e é exatamente aí que um traçado se perde.
+struct WatchRoutePoint: Codable, Equatable {
+    let lat: Double
+    let lng: Double
+    /// Epoch em MILISSEGUNDOS. O schema do servidor recebe `ts` como número.
+    let ts: Double
+    let alt: Double?
+}
+
 struct WatchCardioSummary: Codable, Equatable {
     let distanceMeters: Double
     let durationSeconds: Int
@@ -154,6 +165,15 @@ struct WatchCardioSummary: Codable, Equatable {
     let avgPaceMinKm: Double?
     let startedAt: Date
     let finishedAt: Date
+    /// running | walking | cycling — o esporte que o usuário escolheu na tela do
+    /// relógio. Sem isto o iPhone gravava tudo como "running", e uma pedalada
+    /// virava corrida no histórico.
+    let activityType: String
+    /// O traçado do percurso. O Watch já gravava a rota no HealthKit
+    /// (`HKWorkoutRouteBuilder`), mas ela morria lá: o app do iPhone recebia
+    /// `route: []` e a corrida do relógio ficava sem mapa, enquanto a do iPhone
+    /// tinha. Os pontos são os MESMOS que o `LocationManager` já filtrou.
+    let route: [WatchRoutePoint]
 }
 
 // MARK: - Gym (check-in)

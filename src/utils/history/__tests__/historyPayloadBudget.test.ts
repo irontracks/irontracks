@@ -92,6 +92,12 @@ const CHAVES_CARDIO = new Set([
     'id', 'kind', 'name', 'date', 'completed_at', 'created_at', 'is_template',
     'activity_type', 'distance_meters', 'duration_seconds', 'avg_pace_min_km',
     'calories_estimated', 'cardio_notes', 'perceived_effort',
+    // 02/09/2026 — decisão consciente: FC média/máxima e a origem da sessão
+    // (iphone | apple-watch). O Apple Watch mede FC e o app descartava o dado
+    // por não ter onde guardar; sem estes campos na LISTA, o modal de cardio
+    // precisaria de uma segunda requisição para exibir dois números que já
+    // vieram na mesma consulta. ~40 B por linha de cardio.
+    'avg_heart_rate', 'max_heart_rate', 'source',
 ])
 
 /** Campos pesados: se aparecerem no payload, a lista voltou a baixar a sessão. */

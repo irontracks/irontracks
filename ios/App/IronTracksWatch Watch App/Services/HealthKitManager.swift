@@ -121,7 +121,11 @@ final class HealthKitManager: NSObject, ObservableObject {
 
     /// Encerra a sessão e descarta o builder (sem salvar workout permanente —
     /// o iPhone faz isso ao receber o cardioFinish via WatchConnectivity).
-    func stop(saveToHealth: Bool = true) async -> WatchCardioSummary? {
+    /// - Parameters:
+    ///   - activityType: o esporte escolhido na tela (running/walking/cycling).
+    ///   - route: os pontos já filtrados pelo `LocationManager`. Vão para o
+    ///     iPhone junto do resumo — a rota do HealthKit não sai do relógio.
+    func stop(saveToHealth: Bool = true, activityType: String = "running", route: [CLLocation] = []) async -> WatchCardioSummary? {
         guard let session = session, let builder = builder else { return nil }
         let endDate = Date()
         session.end()
@@ -132,6 +136,12 @@ final class HealthKitManager: NSObject, ObservableObject {
             }
         } catch { /* ignore */ }
 
+        // Teto de 10.000 pontos: é o `.max(10_000)` do schema do servidor, e
+        // estourá-lo devolveria 400 — a sessão inteira seria perdida por causa
+        // do traçado. Acima disso, decima uniformemente em vez de cortar o fim:
+        // truncar deixaria o mapa parando no meio do percurso.
+        let pontos = Self.decimateRoute(route, limit: 10_000)
+
         let summary = WatchCardioSummary(
             distanceMeters: self.distanceMeters,
             durationSeconds: Int(self.elapsedSeconds),
@@ -140,7 +150,9 @@ final class HealthKitManager: NSObject, ObservableObject {
             caloriesEstimated: Int(self.caloriesActive),
             avgPaceMinKm: paceMinKm,
             startedAt: sessionStartDate ?? endDate,
-            finishedAt: endDate
+            finishedAt: endDate,
+            activityType: activityType,
+            route: pontos
         )
 
         self.session = nil
@@ -148,6 +160,31 @@ final class HealthKitManager: NSObject, ObservableObject {
         self.routeBuilder = nil
         self.isRunning = false
         return summary
+    }
+
+    /// Reduz o traçado ao teto do servidor mantendo a FORMA do percurso.
+    ///
+    /// Amostragem uniforme (não corte no fim), e o último ponto é sempre
+    /// preservado — senão o mapa terminaria antes da chegada.
+    static func decimateRoute(_ locations: [CLLocation], limit: Int) -> [WatchRoutePoint] {
+        guard limit > 0 else { return [] }
+        let mapear: (CLLocation) -> WatchRoutePoint = { loc in
+            WatchRoutePoint(
+                lat: loc.coordinate.latitude,
+                lng: loc.coordinate.longitude,
+                ts: loc.timestamp.timeIntervalSince1970 * 1000,
+                alt: loc.verticalAccuracy >= 0 ? loc.altitude : nil
+            )
+        }
+        if locations.count <= limit { return locations.map(mapear) }
+        let passo = Double(locations.count - 1) / Double(limit - 1)
+        var out: [WatchRoutePoint] = []
+        out.reserveCapacity(limit)
+        for i in 0..<limit {
+            let idx = min(locations.count - 1, Int((Double(i) * passo).rounded()))
+            out.append(mapear(locations[idx]))
+        }
+        return out
     }
 
     /// Adiciona uma localização ao route builder (chamado pelo LocationManager).

@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     // Also fetch standalone cardio sessions (no workout_id) in parallel
     let cardioQuery = supabase
       .from('cardio_tracks')
-      .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, notes, perceived_effort, started_at, finished_at, created_at')
+      .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, avg_heart_rate, max_heart_rate, source, notes, perceived_effort, started_at, finished_at, created_at')
       .eq('user_id', user.id)
       .is('workout_id', null)
       .order('created_at', { ascending: false })
@@ -76,6 +76,9 @@ export async function GET(req: Request) {
       duration_seconds: number | null
       avg_pace_min_km: number | null
       calories_estimated: number | null
+      avg_heart_rate: number | null
+      max_heart_rate: number | null
+      source: string | null
       notes: string | null
       perceived_effort: number | null
       started_at: string | null
@@ -95,6 +98,13 @@ export async function GET(req: Request) {
       duration_seconds: c.duration_seconds,
       avg_pace_min_km: c.avg_pace_min_km,
       calories_estimated: c.calories_estimated,
+      // FC e origem: ~40 B por linha de cardio, decisão consciente registrada na
+      // allowlist do guard de payload. Sem eles, o dado do Watch é gravado e
+      // ninguém vê — e o modal teria de fazer uma segunda requisição só para ler
+      // dois números que já vieram na mesma consulta.
+      avg_heart_rate: c.avg_heart_rate,
+      max_heart_rate: c.max_heart_rate,
+      source: c.source,
       cardio_notes: c.notes,
       perceived_effort: c.perceived_effort,
     }))
