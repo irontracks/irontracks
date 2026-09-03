@@ -710,3 +710,51 @@ select {
     display: none;
   }
 }
+
+/* ── Entrada de modal, por ESTRUTURA e não por classe ──────────────────
+   Medido em 03/09/2026: 84 dos 93 overlays full-screen do app entravam e
+   saíam por corte seco. As classes `.overlay-enter` / `.overlay-content-enter`
+   existiam para exatamente isso e tinham DOIS usuários cada — o vocabulário
+   estava pronto e a adoção é que nunca aconteceu.
+
+   Marcar 84 arquivos à mão seria 84 chances de errar num JSX (uma varredura
+   por regex já colapsou 73 arquivos neste repo). Estas regras alcançam os
+   modais pelo que eles JÁ SÃO: `dialogProps()` injeta role + aria-modal desde
+   o PR #779, e 40 arquivos declaram o par literalmente. Efeito colateral que é
+   o ponto: modal NOVO nasce animado sem ninguém lembrar de nada.
+
+   `:has()` já é usado neste arquivo (a regra da legenda do story) — não é
+   aposta nova sobre o WKWebView.
+
+   Duas FORMAS convivem no app e pedem tratamentos diferentes:
+     A) contêiner fixo  >  painel com role=dialog   → painel sobe, véu esmaece
+     B) o próprio fixo TEM role=dialog (tela cheia) → só esmaece
+   Deslizar uma tela cheia de 12px não lê como entrada: lê como tremor. */
+
+@keyframes overlay-panel-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* B — o overlay É o diálogo: esmaece inteiro, sem deslocamento */
+.fixed[role='dialog'][aria-modal='true'] {
+  animation: fadeIn 0.2s ease-out both;
+}
+
+/* A — painel hospedado por um contêiner fixo */
+.fixed [role='dialog'][aria-modal='true']:not(.fixed) {
+  animation: overlay-panel-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* …e o véu que o hospeda. `:has()` sem `>` porque o painel raramente é filho
+   direto: quase sempre há um wrapper de layout no meio. */
+.fixed:not([role='dialog']):has([role='dialog'][aria-modal='true']) {
+  animation: fadeIn 0.18s ease-out both;
+}
+
+/* Entrada da lista de treinos — delay vem do `idx` no componente, porque
+   `.stagger-children` age sobre TODOS os filhos diretos e ali convivem cards,
+   avisos de erro e estados vazios, que não devem entrar em cascata. */
+.workout-card-in {
+  animation: fadeIn 0.28s ease-out both;
+}

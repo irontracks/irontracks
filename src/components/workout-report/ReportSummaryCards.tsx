@@ -1,7 +1,8 @@
 'use client'
-import React, { memo, useEffect, useRef, useState } from 'react'
+import React, { memo } from 'react'
 import { TrendingUp, TrendingDown, Flame, Clock, Dumbbell, Trophy, MapPin } from 'lucide-react'
 import { formatDuration, formatKm, formatKmh } from '@/utils/report/formatters'
+import { useCountUp } from '@/hooks/useCountUp'
 
 type AnyObj = Record<string, unknown>
 
@@ -13,23 +14,6 @@ interface ReportSummaryCardsProps {
     outdoorBike: AnyObj | null
     cardioGps?: AnyObj | null
     hasPreviousSession: boolean
-}
-
-// Animated count-up hook
-function useCountUp(target: number, duration = 900) {
-    const [value, setValue] = useState(0)
-    const raf = useRef<number>(0)
-    useEffect(() => {
-        const start = performance.now()
-        const tick = (now: number) => {
-            const progress = Math.min(1, (now - start) / duration)
-            setValue(Math.round(target * progress))
-            if (progress < 1) raf.current = requestAnimationFrame(tick)
-        }
-        raf.current = requestAnimationFrame(tick)
-        return () => cancelAnimationFrame(raf.current)
-    }, [target, duration])
-    return value
 }
 
 // eslint-disable-next-line react/display-name

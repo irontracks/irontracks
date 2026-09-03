@@ -48,7 +48,13 @@ export function ReportHighlightsPanel({
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/90 via-neutral-950/60 to-neutral-950/30" />
             <div className="relative z-10 p-3 flex flex-col gap-1">
-              <div className="text-2xl font-black text-yellow-400">{prCount}</div>
+              {/* O PR é a única conquista do app que o usuário não controla — ele
+                  acontece. `badge-slam` estava no design system desde sempre com
+                  ZERO usuários; é o gesto de selo batendo, e é aqui que ele
+                  pertence. O atraso deixa o card assentar primeiro: bater junto
+                  com a entrada vira uma coisa só e não lê como carimbo. */}
+              <div className="text-2xl font-black text-yellow-400 animate-badge-slam inline-block origin-center"
+                style={{ animationDelay: '260ms' }}>{prCount}</div>
               <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
                 {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
               </div>
