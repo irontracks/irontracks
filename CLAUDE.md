@@ -617,6 +617,56 @@ orientação por refeição só era gravável por SQL. **Campo que alguém LÊ p
 de quem ESCREVE — procure o caminho do autor antes de dar a feature por
 concluída.**
 
+⚠️ **O apelido genérico da TACO decidia o significado das palavras por ORDEM
+FÍSICA da tabela (02/09/2026).** `250g arroz branco` saía com **384 kcal · P27
+C29 G18** — mais proteína que carboidrato e 18 g de gordura, o que não descreve
+arroz. Era **arroz carreteiro**: cada linha da `foods_taco` publica a primeira
+palavra do nome como alias, então `arroz` pertence a **7 linhas**, `frango` a
+**25** e `carne` a **60** — e vencia quem fosse gravado por último, **sem
+`ORDER BY` na consulta**. Não era só errado: era instável, e um `VACUUM` trocava
+o significado em silêncio. Hoje alias com macros divergentes é DESCARTADO
+(`taco-source.ts`), a consulta é ordenada, e 67 palavras genéricas ganharam
+entrada curada. Medido: `200g carne assada` caiu de 626 kcal · G51 (carne seca
+crua) para 424 · G22.
+
+⚠️ **E curar a palavra genérica criou um defeito NOVO, que nenhum teste pegou.**
+A base local roda ANTES da TACO e casava pela CABEÇA da frase, então a chave de
+um token sequestrava tudo que começasse com ela: `100g leite condensado` virou
+**61 kcal** (o real é ~321 — cinco vezes menos), `batata doce` virou batata
+inglesa, `arroz com frango` perdeu o frango. Chave marcada como `generic` passou
+a exigir **casamento da frase inteira** — e SÓ ela: chave normal
+(`arroz cozido`, `strogonoff`) continua casando na cabeça, que é o que faz
+"frango GRELHADO" e "esfirra de frango COM requeijão" funcionarem (ver a nota do
+`matchesAtHead`, mais abaixo). As duas regras convivem por desenho. Os 7.400 testes estavam verdes o tempo
+todo: quem achou foi um script de quinze frases comuns. **Mudança que altera
+RESULTADO precisa de medição com entrada real, não de suíte verde.**
+
+⚠️ **O conectivo de posse é OPCIONAL no casamento — e a falta dele mentia em
+silêncio.** O dono digitou `200g filé sobrecoxa sem pele grelhado` e o parser não
+reconheceu: a chave é `file de sobrecoxa` e o padrão exigia o "de" literal, que
+ninguém fala. Pior que não reconhecer: em `filé coxa e sobrecoxa` a chave
+COMPOSTA também deixava de casar, o separador quebrava a frase no " e ", sobrava
+`sobrecoxa` solta e ela casava **assumindo 110 g** — 256 kcal gravados no lugar
+de 400. Hoje `de/da/do/dos/das` são grupo opcional. Tornar token opcional só
+AMPLIA o que casa, então nenhum guard anterior pode afrouxar por construção.
+
+**Lançar refeição do plano leva os ALIMENTOS, não só o total.** As três telas de
+cardápio (`MyDietPlan`, `PrescribedDietPlan`, `DietGenerator`) mandavam nome +
+totais para `applyGeneratedMealAction`, descartando `PlanMeal.items`. O diário
+gravava UM item chamado "Jantar" com `grams: 0` — e item sem gramas não ganha
+campo de quantidade, então a refeição era impossível de editar. Fonte única em
+`lib/nutrition/planMealItems.ts`. **O padrão certo já existia 50 linhas abaixo no
+mesmo arquivo** (`applyChatSimulationAction` persiste os itens do card): era
+lapso, não desenho — procure o irmão que acertou antes de projetar do zero.
+
+**Editar a quantidade de um item já lançado** (`lib/nutrition/mealItemQuantity.ts`):
+só a QUANTIDADE, com recálculo proporcional. Não o nome (trocar "arroz" por
+"batata doce" mantendo os macros grava dado mentiroso — trocar alimento é remover
+e adicionar) nem os macros (contaminam o repertório de troca). Item sem densidade
+gravada (memo/legado, `grams: 0`) **não ganha campo**: inventar 100 g afirmaria
+uma medição que ninguém fez. Reescala sempre a partir do item ORIGINAL, senão
+250 → 150 → 250 não volta ao valor exato.
+
 **O motor de troca de alimento não usa IA — e o repertório "aprendido" É LIXO.** `nutrition_learned_foods` guarda o que o usuário DIGITOU no lançamento, e ele digita refeição inteira: dos 42 "alimentos" da conta do dono, **1** servia de substituto (37 compostos, 14 com densidade fisicamente impossível — 1070/1285/1650 kcal/100 g, que é o TOTAL da refeição gravado no campo `per_100g` —, 17 com a quantidade no nome). **A fonte certa é `nutrition_meal_entries.items`**, que o parser já quebrou em alimentos individuais com gramas e macros absolutos (`{"label": "150g arroz", "grams": 150, …}`) — e **desde 25/08/2026 a estimativa por IA também separa** (antes ela somava tudo num item só; ver "Histórico de REFEIÇÕES") — daí sai nome limpo e macros/100 g derivados de gramas reais (`lib/nutrition/mealItemFoods`). Todo candidato passa por `foodItemSanity` (sem composto, sem densidade impossível, sem quantidade no nome).
 
 ⚠️ **Não confunda com `nutrition_custom_foods`, que é a BIBLIOTECA e é dado
@@ -2681,6 +2731,13 @@ vale **com build nova**; o lado do push entra por deploy web.
 
 **Integridade do alvo iOS:** o widget `IronTracksWidgets` precisa existir no `pbxproj`, estar em *Embed App Extensions* e ter os 4 fontes. `scripts/add-watch-target.rb` **reescreve o pbxproj inteiro** — é vetor real de perda de target (por isso existem os backups). O guard cobre isso.
 
+⚠️ **Esse script é do APP DO APPLE WATCH, não do widget** — a redação anterior
+sugeria o contrário e custou uma investigação inteira em 02/09/2026. São três
+alvos diferentes: `IronTracksWidgets` (Live Activity do iPhone),
+`IronTracksWatch Watch App` (app watchOS completo) e `IronTracksWatchComplications`
+(mostrador do relógio). **Ver `docs/APPLE_WATCH.md`** antes de mexer em qualquer
+um deles.
+
 ## iOS — release pra App Store / TestFlight
 **REGRA FIXA do usuário: SEMPRE subir build pro App Store Connect via terminal, NUNCA abrir Xcode UI pra Archive/Distribute. Faz o claude perder tempão.**
 
@@ -2710,9 +2767,11 @@ Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a sess
 Aconteceu em 31/07/2026 (1.18 → 1.19) e **de novo em 22/08/2026 (1.20 → 1.21)** —
 nas duas vezes o archive rodou inteiro antes de o upload ser recusado. Se for
 subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION`
-ANTES — evita um ciclo perdido (~5 min). **Estado em 01/09/2026: versão 1.21.2,
-build 81 no TestFlight** (leva a remoção da exceção ATS do WebView — SEC-09; a
-1.21.1 já estava na loja, por isso o bump). O guard `superficiePublicaHonesta`
+ANTES — evita um ciclo perdido (~5 min). **Estado em 02/09/2026: versão 1.21.2,
+build 82 SUBMETIDA à review** (auto-release ligado; leva as correções do app do
+Apple Watch — ver `docs/APPLE_WATCH.md`). A 1.21.2 ainda não tinha sido
+publicada, então a build nova entrou nela sem precisar bumpar a versão pública —
+`node scripts/ios-submit.mjs --dry-run` diz isso de graça, antes de arquivar. O guard `superficiePublicaHonesta`
 cobra que `APP_VERSION` (`lib/appVersion.ts`) espelhe a `MARKETING_VERSION` —
 bump no pbxproj sem o espelho reprova no CI.
 O bump é `sed` nas 10 ocorrências do `pbxproj`, e o release refaz com
