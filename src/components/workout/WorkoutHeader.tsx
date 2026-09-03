@@ -101,7 +101,18 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="bg-neutral-950/80 backdrop-blur-xl border-b border-white/[0.06] px-4 md:px-6 pb-2 flex-shrink-0 relative"
+        /**
+         * `z-30`: o header é irmão do contêiner que rola e vem ANTES dele no DOM.
+         * Sem z próprio, qualquer elemento posicionado da lista pinta por cima —
+         * e era o que acontecia com o menu "…": os botões de ação do exercício
+         * (enviar vídeo, vincular, trocar, editar, excluir) apareciam ATRAVÉS do
+         * dropdown. O `z-10` interno do menu não resolvia porque só competia
+         * dentro do stacking context do próprio header.
+         *
+         * 30 fica abaixo do rodapé (`z-50`) e da barra de descanso (`z-[2100]`),
+         * que continuam por cima de propósito.
+         */
+        className="bg-neutral-950/80 backdrop-blur-xl border-b border-white/[0.06] px-4 md:px-6 pb-2 flex-shrink-0 relative z-30"
         style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 48px), 6px)' }}
       >
         {/* Halo dourado no topo — profundidade sem peso visual */}
