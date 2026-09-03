@@ -3,6 +3,7 @@ import React, { memo } from 'react'
 import { TrendingUp, TrendingDown, Flame, Clock, Dumbbell, Trophy, MapPin } from 'lucide-react'
 import { formatDuration, formatKm, formatKmh } from '@/utils/report/formatters'
 import { useCountUp } from '@/hooks/useCountUp'
+import { useInViewOnce } from '@/hooks/useInViewOnce'
 
 type AnyObj = Record<string, unknown>
 
@@ -26,12 +27,16 @@ export const ReportSummaryCards = memo(({
     cardioGps,
     hasPreviousSession,
 }: ReportSummaryCardsProps) => {
-    const animVol = useCountUp(Math.round(currentVolume))
-    const animCal = useCountUp(Math.round(calories))
+    // Este bloco é o 8º da tela — fica abaixo da dobra. Sem o gatilho de
+    // visibilidade, os 900ms de contagem terminavam bem antes de o usuário
+    // rolar até aqui (achado do dono no aparelho, 03/09/2026).
+    const [gridRef, emVista] = useInViewOnce<HTMLDivElement>()
+    const animVol = useCountUp(Math.round(currentVolume), 900, emVista)
+    const animCal = useCountUp(Math.round(calories), 900, emVista)
 
     return (
         <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
                 {/* Tempo Total */}
                 <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 p-4 rounded-2xl border border-neutral-800 flex flex-col gap-2 shadow-sm shadow-black/30">
                     <div className="flex items-center gap-2">

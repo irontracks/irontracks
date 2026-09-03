@@ -24,8 +24,16 @@ import { useEffect, useRef, useState } from 'react'
  *    depois da montagem (o histórico chega do cache e depois da rede, padrão
  *    deste app), o número despencava a zero e subia de novo. Agora parte de
  *    onde está.
+ *
+ * Um 4º defeito, achado pelo dono no aparelho em 03/09/2026: a animação
+ * disparava na MONTAGEM, e o único consumidor de hoje (`ReportSummaryCards`)
+ * fica abaixo da dobra — o usuário via um número já parado ao rolar até lá,
+ * porque os 900ms tinham acabado bem antes. `start` resolve isso: por padrão
+ * `true` (comportamento de sempre, não quebra chamador nenhum), e o chamador
+ * que precisa de gatilho de scroll passa `false` até o elemento entrar em
+ * viewport (ver `useInViewOnce`).
  */
-export function useCountUp(target: number, duration = 900): number {
+export function useCountUp(target: number, duration = 900, start = true): number {
     const [value, setValue] = useState(0)
     const raf = useRef(0)
     // Ponto de partida da PRÓXIMA contagem. Escrito só dentro do frame e lido só
@@ -34,6 +42,7 @@ export function useCountUp(target: number, duration = 900): number {
     const de = useRef(0)
 
     useEffect(() => {
+        if (!start) return
         if (!Number.isFinite(target)) return
         const partida = de.current
         if (partida === target) return
@@ -48,9 +57,12 @@ export function useCountUp(target: number, duration = 900): number {
             return () => cancelAnimationFrame(raf.current)
         }
 
-        const start = performance.now()
+        // `t0`, não `start`: o parâmetro `start` (o gatilho) já ocupa esse nome
+        // no escopo de fora — reusar daria shadow silencioso e confundiria
+        // quem ler "start" aqui pensando que é o booleano.
+        const t0 = performance.now()
         const tick = (now: number) => {
-            const t = Math.min(1, (now - start) / duration)
+            const t = Math.min(1, (now - t0) / duration)
             const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
             const v = Math.round(partida + (target - partida) * eased)
             de.current = v
@@ -59,7 +71,7 @@ export function useCountUp(target: number, duration = 900): number {
         }
         raf.current = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf.current)
-    }, [target, duration])
+    }, [target, duration, start])
 
     return value
 }
