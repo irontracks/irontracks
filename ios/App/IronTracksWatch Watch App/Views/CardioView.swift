@@ -39,6 +39,16 @@ struct CardioView: View {
             case .cycling: return "bicycle"
             }
         }
+
+        /// O vocabulário que `/api/gps/cardio/save` aceita (`VALID_ACTIVITY_TYPES`).
+        /// Mandar o rawValue em português ("Corrida") seria 400 no servidor.
+        var serverActivityType: String {
+            switch self {
+            case .running: return "running"
+            case .walking: return "walking"
+            case .cycling: return "cycling"
+            }
+        }
     }
 
     var body: some View {
@@ -228,7 +238,13 @@ struct CardioView: View {
         timer?.invalidate()
         timer = nil
         location.stopTracking()
-        let summary = await health.stop(saveToHealth: true)
+        // O esporte escolhido e o traçado viajam JUNTO do resumo: sem eles o
+        // iPhone gravava toda sessão como "running" e sem mapa.
+        let summary = await health.stop(
+            saveToHealth: true,
+            activityType: sport.serverActivityType,
+            route: location.trackPoints
+        )
         if let summary = summary {
             session.sendCardioFinish(summary)
         }

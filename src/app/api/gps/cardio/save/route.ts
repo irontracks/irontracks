@@ -23,6 +23,13 @@ const saveTrackSchema = z.object({
   avg_pace_min_km: z.number().nullable().optional(),
   max_speed_kmh: z.number().nullable().optional(),
   calories_estimated: z.number().int().min(0).max(50_000).optional(),
+  // Frequência cardíaca: hoje só o Apple Watch mede (HKLiveWorkoutBuilder).
+  // Faixa igual à do CHECK no banco — número fora dela é erro de leitura, não
+  // um coração humano.
+  avg_heart_rate: z.number().int().min(20).max(260).nullable().optional(),
+  max_heart_rate: z.number().int().min(20).max(260).nullable().optional(),
+  /** Quem mediu a sessão. Ausente = iPhone, que é o caminho histórico. */
+  source: z.enum(['iphone', 'apple-watch']).nullable().optional(),
   route: z.array(routePointSchema).max(10_000), // max 10k points
   started_at: z.string().datetime(),
   finished_at: z.string().datetime(),
@@ -56,10 +63,15 @@ export async function POST(req: Request) {
       max_speed_kmh: d.max_speed_kmh ?? null,
       calories_estimated: d.calories_estimated ?? 0,
       route: d.route,
+      avg_heart_rate: d.avg_heart_rate ?? null,
+      max_heart_rate: d.max_heart_rate ?? null,
+      // Ausente = iPhone: é o caminho que existia antes do Watch e continua
+      // sendo o de todo mundo que não tem relógio.
+      source: d.source ?? 'iphone',
       started_at: d.started_at,
       finished_at: d.finished_at,
     })
-    .select('id, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, created_at')
+    .select('id, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, avg_heart_rate, max_heart_rate, source, created_at')
     .single()
 
   if (error) return respondDbError('gps:cardio:save', error)
@@ -76,7 +88,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await auth.supabase
     .from('cardio_tracks')
-    .select('id, workout_id, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, started_at, finished_at, created_at')
+    .select('id, workout_id, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, avg_heart_rate, max_heart_rate, source, started_at, finished_at, created_at')
     .eq('user_id', auth.user.id)
     .order('created_at', { ascending: false })
     .limit(limit)

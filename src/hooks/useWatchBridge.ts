@@ -87,6 +87,15 @@ export interface WatchSetLog {
   completedAt: string
 }
 
+/** Um ponto do percurso, no mesmo formato que `/api/gps/cardio/save` espera. */
+export interface WatchRoutePoint {
+  lat: number
+  lng: number
+  /** Epoch em milissegundos. */
+  ts: number
+  alt?: number | null
+}
+
 export interface WatchCardioSummary {
   distanceMeters: number
   durationSeconds: number
@@ -96,6 +105,10 @@ export interface WatchCardioSummary {
   avgPaceMinKm?: number | null
   startedAt: string
   finishedAt: string
+  /** running | walking | cycling — o esporte escolhido na tela do relógio. */
+  activityType?: string | null
+  /** O traçado. Vem do `LocationManager` do Watch, já filtrado e decimado. */
+  route?: WatchRoutePoint[] | null
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────

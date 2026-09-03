@@ -102,19 +102,26 @@ export default function WatchSyncProvider({
         if (onCardioFinishedRef.current) {
           onCardioFinishedRef.current(summary)
         } else {
-          // Payload no shape do saveTrackSchema (senão 400): `route` é
-          // obrigatório e o campo é `calories_estimated` (não `calories`).
-          // Batimentos não têm coluna em cardio_tracks → não são enviados.
+          // Payload no shape do saveTrackSchema (senão 400): o campo é
+          // `calories_estimated` (não `calories`).
+          //
+          // 02/09/2026: três dados que o relógio media e morriam aqui —
+          // o ESPORTE (tudo virava "running", e uma pedalada entrava como
+          // corrida), o TRAÇADO (ia `[]`, então a corrida do Watch não tinha
+          // mapa) e a FREQUÊNCIA CARDÍACA (não havia coluna; agora há).
           const res = await fetch('/api/gps/cardio/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              activity_type: 'running',
+              activity_type: summary.activityType || 'running',
               distance_meters: summary.distanceMeters,
               duration_seconds: Math.round(summary.durationSeconds),
               calories_estimated: Math.round(summary.caloriesEstimated),
               avg_pace_min_km: summary.avgPaceMinKm ?? null,
-              route: [],
+              route: Array.isArray(summary.route) ? summary.route : [],
+              avg_heart_rate: summary.avgHeartRate ?? null,
+              max_heart_rate: summary.maxHeartRate ?? null,
+              source: 'apple-watch',
               started_at: summary.startedAt,
               finished_at: summary.finishedAt,
             }),

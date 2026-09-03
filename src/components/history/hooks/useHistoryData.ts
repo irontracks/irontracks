@@ -146,6 +146,9 @@ export function useHistoryData({
                             caloriesEstimated: Number(w.calories_estimated) || 0,
                             perceivedEffort: w.perceived_effort != null ? Number(w.perceived_effort) : null,
                             cardioNotes: w.cardio_notes != null ? String(w.cardio_notes) : null,
+                            avgHeartRate: w.avg_heart_rate != null ? Number(w.avg_heart_rate) : null,
+                            maxHeartRate: w.max_heart_rate != null ? Number(w.max_heart_rate) : null,
+                            cardioSource: w.source != null ? String(w.source) : null,
                         };
                     }
                     // ── Regular workout ────────────────────────────────────
