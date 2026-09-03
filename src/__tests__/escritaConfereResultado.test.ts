@@ -26,7 +26,9 @@ import { join } from 'path'
  */
 const CONGELADOS: Record<string, number> = {
   'components/settings/AvatarUploadModal.tsx': 2,
-  'components/WatchSyncProvider.tsx': 2,
+  // 'components/WatchSyncProvider.tsx' saiu da lista em 02/09/2026 (auditoria
+  // do Watch, D-1/D-5/D-6): os três handlers (check-in, log-set, cardio-save)
+  // agora conferem `res.ok`/status antes de comemorar ou desistir.
   'components/NotificationCenter.tsx': 1,
   'components/ExecutionVideoCapture.tsx': 1,
   'components/teacher/TeacherControlModal.tsx': 1,

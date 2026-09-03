@@ -1025,9 +1025,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // ── Apple Watch: dashboard payload ────────────────────────────────────────
     const watchNextWorkout = useMemo((): WatchWorkout | null => {
+        // ⚠️ O treino ATIVO tem prioridade sobre `workouts[0]`.
+        //
+        // Antes isto mandava sempre o primeiro treino salvo. O relógio logava a
+        // série com o `exerciseId` desse payload, e o servidor
+        // (`log-set-from-watch`) resolve o índice comparando com os exercícios da
+        // SESSÃO ATIVA — então bastava o usuário iniciar qualquer treino que não
+        // fosse o primeiro da lista para todo `set.log` voltar 404
+        // `exercise_not_found`. A série era marcada no relógio, o app tocava o
+        // háptico de sucesso, e ela não existia em lugar nenhum.
+        const ativoRaw = activeSession as Record<string, unknown> | null
+        const doAtivo = (ativoRaw?.workout && typeof ativoRaw.workout === 'object')
+            ? (ativoRaw.workout as Record<string, unknown>)
+            : null
         const list = Array.isArray(workouts) ? (workouts as Array<Record<string, unknown>>) : []
-        if (!list.length) return null
-        const w = list[0]
+        const w = doAtivo ?? list[0]
+        if (!w) return null
         const exercises = Array.isArray(w?.exercises) ? (w.exercises as Array<Record<string, unknown>>) : []
         return {
             id: String(w?.id ?? ''),
@@ -1035,7 +1048,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             dayLabel: '',
             estimatedMinutes: Math.round(exercises.length * 4),
             scheduledAt: null,
-            exercises: exercises.slice(0, 12).map((ex, i) => ({
+            // Sem `slice`: truncar em 12 deixava o relógio sem os últimos
+            // exercícios de um treino grande, silenciosamente — e o app tem
+            // treinos de 10+ exercícios como padrão.
+            exercises: exercises.map((ex, i) => ({
+                // O id PRECISA ser o mesmo que a sessão ativa conhece. O fallback
+                // sintético `ex-${i}` nunca casa com nada no servidor: era 404
+                // garantido em todo treino criado à mão (sem id no exercício).
+                // `_itx_exKey` é a segunda chave que o servidor aceita.
                 id: String(ex?.id ?? ex?._itx_exKey ?? `ex-${i}`),
                 name: String(ex?.name ?? ''),
                 sets: Number(ex?.sets ?? 3) || 3,
@@ -1046,7 +1066,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 notes: ex?.notes ? String(ex.notes) : null,
             })),
         }
-    }, [workouts])
+    }, [workouts, activeSession])
 
     const watchDashboard = useMemo((): WatchDashboard => ({
         streakDays: streakStats?.currentStreak ?? 0,

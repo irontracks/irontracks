@@ -2,7 +2,21 @@
 //  CardioView.swift
 //  IronTracksWatch
 //
-//  Tela 3 — Cardio: rastreamento de corrida/caminhada/bike via GPS do Watch + FC.
+//  Tela 3 — Cardio: corrida / caminhada / bike com GPS do relógio + FC do HealthKit.
+//
+//  ⚠️ Reescrita em 02/09/2026. O que estava quebrado aqui custava a corrida inteira:
+//
+//   • PAUSAR VOLTAVA PARA A TELA INICIAL. A tela trocava por `if health.isRunning`,
+//     e o delegate zerava esse flag ao pausar. Pausar num semáforo levava ao
+//     `idleView` sem botão de retomar — e "INICIAR" criava uma segunda sessão por
+//     cima da primeira, que ficava órfã. Hoje a tela olha `hasActiveSession`, que
+//     inclui pausado.
+//   • A ABA ADOTAVA A SESSÃO DA OUTRA TELA. Como o HealthKitManager é singleton,
+//     uma sessão de musculação iniciada na aba Treino fazia esta tela se desenhar
+//     como "corrida em andamento" — sem GPS, sem cronômetro, sem rota. Hoje só
+//     assume a tela ativa se `activeKind == .cardio`.
+//   • GPS NEGADO INICIAVA MESMO ASSIM, sem avisar: o usuário corria 40 min para
+//     descobrir no fim que a distância era zero.
 //
 
 import SwiftUI
@@ -17,7 +31,13 @@ struct CardioView: View {
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer?
     @State private var sport: Sport = .running
-    @State private var isPaused: Bool = false
+    @State private var aviso: String?
+
+    /// Esta tela só se considera ativa se a sessão viva for DELA. Sem isto, a aba
+    /// Cardio se desenhava por causa de um treino de musculação da aba vizinha.
+    private var cardioAtivo: Bool {
+        health.hasActiveSession && health.activeKind == .cardio
+    }
 
     enum Sport: String, CaseIterable {
         case running = "Corrida"
@@ -49,16 +69,27 @@ struct CardioView: View {
             case .cycling: return "cycling"
             }
         }
+
+        /// Perfil de filtro do GPS. Bike passa de 45 km/h em qualquer descida — o
+        /// limiar fixo antigo descartava esses pontos e o traçado virava uma corda
+        /// reta cortando a descida, com a distância do trecho perdida.
+        var locationProfile: LocationManager.SportProfile {
+            switch self {
+            case .running: return .running
+            case .walking: return .walking
+            case .cycling: return .cycling
+            }
+        }
     }
 
     var body: some View {
         Group {
             if !session.dashboard.isVip {
-                // F-022: bloqueia acesso a feature VIP — não inicia HKWorkoutSession nem GPS.
+                // Bloqueia feature VIP — não inicia HKWorkoutSession nem GPS.
                 VipGatePaywallView()
             } else {
                 ScrollView {
-                    if health.isRunning {
+                    if cardioAtivo {
                         activeView
                     } else {
                         idleView
@@ -67,9 +98,14 @@ struct CardioView: View {
                 .navigationTitle("Cardio")
             }
         }
+        .onDisappear {
+            // Sem isto o Timer seguia no RunLoop retendo o closure quando a view
+            // era descartada com o treino ativo.
+            if !cardioAtivo { pararTimer() }
+        }
     }
 
-    // ─── Tela quando NÃO está rodando ───────────────────────────────────
+    // ─── Ocioso ─────────────────────────────────────────────────────────
 
     private var idleView: some View {
         VStack(spacing: 8) {
@@ -80,90 +116,123 @@ struct CardioView: View {
             }
             .pickerStyle(.navigationLink)
             .frame(height: 36)
+            .accessibilityLabel("Esporte")
+            .accessibilityValue(sport.rawValue)
 
             Button(action: startCardio) {
                 HStack {
                     Image(systemName: "play.fill")
                     Text("INICIAR")
-                        .font(.caption.bold())
+                        .font(.system(size: 15, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.green)
+            .tint(Brand.success)
+            .accessibilityLabel("Iniciar \(sport.rawValue)")
 
             statusBadge
+
+            if let aviso {
+                Text(aviso)
+                    .font(Brand.labelFont)
+                    .foregroundStyle(Brand.warning)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .padding(6)
     }
 
-    // ─── Tela ativa ────────────────────────────────────────────────────
+    // ─── Ativo ──────────────────────────────────────────────────────────
 
     private var activeView: some View {
-        VStack(spacing: 4) {
-            // Distância principal (destaque)
+        VStack(spacing: 6) {
+            // HERÓI: distância. Uma métrica domina — as outras apoiam. Antes os
+            // quatro números tinham o mesmo peso e nenhum se lia de relance.
             VStack(spacing: 0) {
                 Text(formatDistance(location.distanceMeters))
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(LinearGradient(
-                        colors: [Color(red: 0.95, green: 0.78, blue: 0.30), Color(red: 0.78, green: 0.55, blue: 0.10)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                    .font(Brand.heroFont)
+                    .foregroundStyle(Brand.goldGradient)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
                 Text(location.distanceMeters >= 1000 ? "km" : "metros")
-                    .font(.caption2)
+                    .font(Brand.labelFont)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Distância")
+            .accessibilityValue("\(formatDistance(location.distanceMeters)) \(location.distanceMeters >= 1000 ? "quilômetros" : "metros")")
 
-            // Stats em grid
+            // SEGUNDO: o tempo, que é o número que o corredor cruza com a distância.
+            Text(formatTime(elapsedSeconds))
+                .font(Brand.secondaryMetricFont)
+                .foregroundStyle(health.isPaused ? Brand.warning : .white)
+                .accessibilityLabel("Tempo")
+                .accessibilityValue(formatTime(elapsedSeconds))
+
+            // APOIO: pace, FC e calorias.
             HStack(spacing: 4) {
-                statTile(label: "TEMPO", value: formatTime(elapsedSeconds), color: .white)
-                statTile(label: "PACE", value: formatPace, color: .yellow)
-            }
-            HStack(spacing: 4) {
-                statTile(label: "FC", value: health.heartRate > 0 ? "\(health.heartRate)" : "—", color: .red)
-                statTile(label: "KCAL", value: "\(Int(health.caloriesActive))", color: .orange)
+                statTile(label: "PACE", value: formatPace, color: Brand.goldLight, acessivel: "Ritmo")
+                statTile(label: "FC", value: health.heartRate > 0 ? "\(health.heartRate)" : "—", color: Brand.danger, acessivel: "Frequência cardíaca")
+                statTile(label: "KCAL", value: "\(Int(health.caloriesActive))", color: Brand.warning, acessivel: "Calorias")
             }
 
-            // Acurácia GPS (informativo)
+            if health.isPaused {
+                Text("PAUSADO")
+                    .font(Brand.labelFont)
+                    .foregroundStyle(Brand.warning)
+            }
+
             HStack {
                 Image(systemName: gpsIcon)
                     .foregroundStyle(gpsColor)
                 Text(location.accuracyMeters > 0 ? "±\(Int(location.accuracyMeters))m" : "GPS…")
-                    .font(.caption2)
+                    .font(Brand.labelFont)
                     .foregroundStyle(.secondary)
                 Spacer()
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Precisão do GPS")
 
-            // Controles
+            if let erro = health.lastError ?? location.lastError {
+                Text(erro)
+                    .font(Brand.labelFont)
+                    .foregroundStyle(Brand.warning)
+                    .multilineTextAlignment(.leading)
+            }
+
             HStack(spacing: 4) {
-                if isPaused {
+                if health.isPaused {
                     Button(action: resumeCardio) {
                         Image(systemName: "play.fill")
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.green)
+                    .tint(Brand.success)
+                    .accessibilityLabel("Retomar")
                 } else {
                     Button(action: pauseCardio) {
                         Image(systemName: "pause.fill")
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.yellow)
+                    .tint(Brand.goldLight)
+                    .accessibilityLabel("Pausar")
                 }
                 Button(action: { Task { await stopCardio() } }) {
                     Image(systemName: "stop.fill")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.red)
+                .tint(Brand.danger)
+                .accessibilityLabel("Encerrar \(sport.rawValue)")
             }
         }
         .padding(.horizontal, 4)
@@ -171,95 +240,134 @@ struct CardioView: View {
 
     // ─── Componentes ────────────────────────────────────────────────────
 
-    private func statTile(label: String, value: String, color: Color) -> some View {
+    private func statTile(label: String, value: String, color: Color, acessivel: String) -> some View {
         VStack(spacing: 0) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(Brand.labelFont)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.title3.bold().monospacedDigit())
+                .font(Brand.tileValueFont)
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.vertical, 5)
+        .brandTile()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(acessivel)
+        .accessibilityValue(value)
+    }
+
+    private var gpsLiberado: Bool {
+        location.authorizationStatus == .authorizedWhenInUse || location.authorizationStatus == .authorizedAlways
     }
 
     private var statusBadge: some View {
         HStack(spacing: 4) {
-            Image(systemName: location.authorizationStatus == .authorizedWhenInUse || location.authorizationStatus == .authorizedAlways ? "location.fill" : "location.slash")
-                .foregroundStyle(location.authorizationStatus == .authorizedWhenInUse ? .green : .orange)
-            Text(location.authorizationStatus == .authorizedWhenInUse ? "GPS pronto" : "GPS pendente")
-                .font(.caption2)
+            Image(systemName: gpsLiberado ? "location.fill" : "location.slash")
+                .foregroundStyle(gpsLiberado ? Brand.success : Brand.warning)
+            Text(gpsLiberado ? "GPS pronto" : "GPS pendente")
+                .font(Brand.labelFont)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(gpsLiberado ? "GPS pronto" : "GPS pendente")
     }
 
     // ─── Ações ──────────────────────────────────────────────────────────
 
     private func startCardio() {
-        // Defesa em profundidade: nunca iniciar cardio sem VIP, mesmo se UI vazar.
         guard session.dashboard.isVip else { return }
-        if location.authorizationStatus == .notDetermined {
+        aviso = nil
+
+        // GPS negado não pode iniciar em silêncio: sem localização não há
+        // distância, pace nem traçado — o usuário correria para nada.
+        switch location.authorizationStatus {
+        case .notDetermined:
             location.requestAuthorization()
+            aviso = "Autorize a localização e toque em INICIAR de novo."
+            return
+        case .denied, .restricted:
+            aviso = "Sem GPS não dá para medir a corrida. Libere a localização nos Ajustes."
+            return
+        default:
+            break
         }
+
+        location.configure(for: sport.locationProfile)
         location.reset()
         location.onValidLocation = { locs in
             health.appendLocations(locs)
         }
         location.startTracking()
-        health.start(activityType: sport.hkType, locationType: .outdoor)
-        elapsedSeconds = 0
-        isPaused = false
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            Task { @MainActor in
-                if !isPaused { elapsedSeconds += 1 }
-            }
+
+        // `start` devolve false quando já existe sessão viva — antes isso era um
+        // guard mudo e a tela seguia como se tivesse começado.
+        guard health.start(kind: .cardio, activityType: sport.hkType, locationType: .outdoor) else {
+            location.stopTracking()
+            aviso = "Já existe um treino em andamento."
+            return
         }
+
+        elapsedSeconds = 0
+        iniciarTimer()
         WKInterfaceDeviceShim.success()
     }
 
     private func pauseCardio() {
-        isPaused = true
         location.stopTracking()
         health.pause()
     }
 
     private func resumeCardio() {
-        isPaused = false
         location.startTracking()
         health.resume()
     }
 
     private func stopCardio() async {
-        timer?.invalidate()
-        timer = nil
+        pararTimer()
         location.stopTracking()
-        // O esporte escolhido e o traçado viajam JUNTO do resumo: sem eles o
-        // iPhone gravava toda sessão como "running" e sem mapa.
         let summary = await health.stop(
             saveToHealth: true,
             activityType: sport.serverActivityType,
             route: location.trackPoints
         )
-        if let summary = summary {
-            session.sendCardioFinish(summary)
-        }
-        WKInterfaceDeviceShim.notification()
         location.reset()
         elapsedSeconds = 0
-        isPaused = false
+
+        guard let summary else {
+            // Antes o app tocava o háptico de SUCESSO e limpava a tela mesmo
+            // quando o resumo tinha evaporado — confirmação tátil de um treino
+            // que foi descartado.
+            aviso = "Não consegui fechar o treino. Nada foi perdido no relógio."
+            WKInterfaceDeviceShim.failure()
+            return
+        }
+        session.sendCardioFinish(summary)
+        WKInterfaceDeviceShim.notification()
+    }
+
+    private func iniciarTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in
+                // O cronômetro segue o estado REAL da sessão: pausado não conta,
+                // e é a mesma conta que vai no resumo salvo.
+                if health.sessionState == .running { elapsedSeconds += 1 }
+            }
+        }
+    }
+
+    private func pararTimer() {
+        timer?.invalidate()
+        timer = nil
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────
 
     private func formatDistance(_ meters: Double) -> String {
-        if meters < 1000 {
-            return "\(Int(meters))"
-        }
+        if meters < 1000 { return "\(Int(meters))" }
         return String(format: "%.2f", meters / 1000)
     }
 
@@ -267,17 +375,14 @@ struct CardioView: View {
         let h = seconds / 3600
         let m = (seconds % 3600) / 60
         let s = seconds % 60
-        if h > 0 {
-            return String(format: "%d:%02d:%02d", h, m, s)
-        }
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
         return String(format: "%d:%02d", m, s)
     }
 
     private var formatPace: String {
         guard location.distanceMeters > 0, elapsedSeconds > 0 else { return "—" }
         let km = location.distanceMeters / 1000
-        let minutes = Double(elapsedSeconds) / 60
-        let pace = minutes / km
+        let pace = (Double(elapsedSeconds) / 60) / km
         let mins = Int(pace)
         let secs = Int((pace - Double(mins)) * 60)
         return String(format: "%d'%02d\"", mins, secs)
@@ -292,9 +397,9 @@ struct CardioView: View {
 
     private var gpsColor: Color {
         if location.accuracyMeters == 0 { return .gray }
-        if location.accuracyMeters <= 10 { return .green }
-        if location.accuracyMeters <= 30 { return .yellow }
-        return .red
+        if location.accuracyMeters <= 10 { return Brand.success }
+        if location.accuracyMeters <= 30 { return Brand.goldLight }
+        return Brand.danger
     }
 }
 

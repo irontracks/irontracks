@@ -111,6 +111,42 @@ export interface WatchCardioSummary {
   route?: WatchRoutePoint[] | null
 }
 
+/**
+ * D-2: chave de idempotência do cardio do Watch, DETERMINÍSTICA a partir do
+ * conteúdo do resumo — não um id aleatório. `WatchCardioSummary` não carrega
+ * `id` (o Watch não gera um), e o mesmo cardio pode chegar ao iPhone por DOIS
+ * transportes (`sendMessage` + o reply dele, ver WatchSyncProvider): se cada
+ * transporte calculasse uma chave própria, a proteção de idempotência da rota
+ * de save não pegaria a duplicata. Como os dois transportes carregam o MESMO
+ * conteúdo, hashear os campos estáveis do resumo dá a MESMA chave nos dois
+ * caminhos. Não precisa ser cripto-forte: só precisa ser estável e caber no
+ * `client_id` (64 chars) da rota.
+ */
+export function buildCardioIdempotencyKey(summary: WatchCardioSummary): string {
+  const raw = [
+    String(summary.startedAt || ''),
+    String(summary.finishedAt || ''),
+    Math.round(Number(summary.distanceMeters) || 0),
+    Math.round(Number(summary.durationSeconds) || 0),
+  ].join('|')
+  return `watch_${cyrb53(raw)}`
+}
+
+/** Hash não-criptográfico determinístico (variante do cyrb53). Só precisa
+ *  de estabilidade — a mesma string sempre produz a mesma saída. */
+function cyrb53(str: string): string {
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36)
+}
+
 // ─── Hook ────────────────────────────────────────────────────────────────
 
 export interface UseWatchBridgeOptions {

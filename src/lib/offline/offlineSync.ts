@@ -251,6 +251,10 @@ const runFlushOfflineQueue = async ({ max = 50, force = false }: { max?: number;
         await processNutritionEdit(j);
       } else if (jobType === 'nutrition_water') {
         await processNutritionWater(j);
+      } else if (jobType === 'watch_cardio_save') {
+        await processWatchCardioSave(j);
+      } else if (jobType === 'watch_log_set') {
+        await processWatchLogSet(j);
       } else {
         // Tipo desconhecido (ex.: version skew — build novo enfileira tipo que um build
         // carregado depois não conhece). NÃO deleta (um reload pode reconhecê-lo), mas
@@ -479,6 +483,87 @@ export const queueNutritionWater = async (payload: Record<string, unknown>) => {
     status: 'pending',
     attempts: 0,
     maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut({ ...job, userId: currentOfflineUserId })
+  return id
+}
+
+// ─── Watch Job Processors (D-5, WatchSyncProvider) ────────────────────────────
+//
+// O Watch já apagou o dado da fila PRÓPRIA dele assim que entrega ao iPhone
+// (sendMessage/reply) — se o POST daqui falhar sem retry, o cardio ou a série
+// somem para sempre. `postWatchJob` segue o MESMO critério terminal×transitório
+// de `postNutritionJob`: 4xx que não seja 401/408/429 é permanente (payload
+// inválido ou estado que reenvio não conserta — ex. `no_active_session`,
+// `exercise_not_found`); 401 (sessão do iPhone expirada)/408/429/5xx/erro de
+// rede sobem pro backoff da fila.
+
+async function postWatchJob(url: string, payload: unknown) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload ?? {}),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
+      throw new Error(`Validation error (4xx): ${text}`)
+    }
+    throw new Error(`API error: ${response.status} - ${text}`)
+  }
+}
+
+async function processWatchCardioSave(job: OfflineJob) {
+  await postWatchJob('/api/gps/cardio/save', job.payload)
+}
+
+async function processWatchLogSet(job: OfflineJob) {
+  await postWatchJob('/api/workouts/log-set-from-watch', job.payload)
+}
+
+/**
+ * Enfileira o cardio do Watch quando o POST direto falhou de forma
+ * TRANSITÓRIA (401/408/429/5xx/rede — ver WatchSyncProvider). Id estável pelo
+ * `client_id` (a mesma chave de idempotência de D-2): reenfileirar o MESMO
+ * cardio duas vezes (ex. dois retries do bridge nativo) colapsa num job só,
+ * em vez de duplicar na fila.
+ */
+export const queueWatchCardioSave = async (payload: Record<string, unknown>) => {
+  const cid = String(payload?.client_id || '').trim()
+  const id = cid ? `watchcardio_${cid}` : `watchcardio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'watch_cardio_save',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: 'Cardio do Apple Watch',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 7,
+    nextAttemptAt: 0,
+  }
+  await queuePut({ ...job, userId: currentOfflineUserId })
+  return id
+}
+
+/**
+ * Enfileira uma série registrada no Watch quando o POST direto falhou de
+ * forma TRANSITÓRIA. Id estável pelo `id` do `WatchSetLog` (gerado no
+ * relógio) — mesmo motivo do cardio acima.
+ */
+export const queueWatchLogSet = async (payload: Record<string, unknown>) => {
+  const setId = String(payload?.id || '').trim()
+  const id = setId ? `watchset_${setId}` : `watchset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'watch_log_set',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: 'Série do Apple Watch',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 7,
     nextAttemptAt: 0,
   }
   await queuePut({ ...job, userId: currentOfflineUserId })

@@ -42,6 +42,7 @@
 		D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */; };
 		E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */; };
 		E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */; };
+		B7A1D3E2C40911F0A1B2C3D5 /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1D3E2C40911F0A1B2C3D4 /* Brand.swift */; };
 		F5154C927A750EA1C00B3A12 /* WatchSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FAEA38D348DCD70A6720E4F /* WatchSharedStore.swift */; };
 		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
 		NS006NS006NS006NS006 /* NotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -160,6 +161,7 @@
 		D4F5306B577DAB4CF49320B7 /* SharedModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
 		D63264B20D182409F2E8EB56 /* WorkoutView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
 		DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		B7A1D3E2C40911F0A1B2C3D4 /* Brand.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Brand.swift; sourceTree = "<group>"; };
 		DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CardioOfflineQueue.swift; sourceTree = "<group>"; };
 		E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E3B78FD61B78C679FF19A936 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 				45C7B568677AE56DA12C6742 /* IronTracksWatch.entitlements */,
 				01C8FC5B5A5672EB03203531 /* IronTracksWatchApp.swift */,
 				9CD5C45CA4628CB33965C540 /* Models */,
+				B7A1D3E2C40911F0A1B2C3D6 /* DesignSystem */,
 				A89561B7B7FA12233D2648FF /* Services */,
 				6B82CCCF3E8AC464DF711F60 /* Views */,
 			);
@@ -318,6 +321,15 @@
 			);
 			name = Models;
 			path = Models;
+			sourceTree = "<group>";
+		};
+		B7A1D3E2C40911F0A1B2C3D6 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				B7A1D3E2C40911F0A1B2C3D4 /* Brand.swift */,
+			);
+			name = DesignSystem;
+			path = DesignSystem;
 			sourceTree = "<group>";
 		};
 		A89561B7B7FA12233D2648FF /* Services */ = {
@@ -607,6 +619,7 @@
 				93D071EABBCB7F8D6387AC40 /* SharedModels.swift in Sources */,
 				0E3A2E8BFA31635F597666E4 /* WatchSessionManager.swift in Sources */,
 				E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */,
+				B7A1D3E2C40911F0A1B2C3D5 /* Brand.swift in Sources */,
 				6B3C2121D43C56CA1ABE69E0 /* LocationManager.swift in Sources */,
 				64F5E12B0FBE761409E7EC1F /* CardioView.swift in Sources */,
 				BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */,
