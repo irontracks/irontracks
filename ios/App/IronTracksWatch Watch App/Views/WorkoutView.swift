@@ -48,7 +48,14 @@ struct WorkoutView: View {
             }
         }
         .navigationTitle("Treino")
-        .onAppear(perform: startSessionIfNeeded)
+        .onAppear {
+            // O `.onAppear` ficava no Group de FORA, então bastava deslizar até
+            // esta aba para uma HKWorkoutSession começar — inclusive para quem
+            // está vendo o paywall. Usuário free ficava com treino aberto no app
+            // Saúde e bateria drenando. O gate agora é de verdade.
+            guard session.dashboard.isVip else { return }
+            startSessionIfNeeded()
+        }
         .onChange(of: exerciseIndex) { _ in seedFromPrescription() }
         .onChange(of: rest.isResting) { resting in
             // Descanso entre exercícios terminou (ou foi pulado) → avança sozinho.
@@ -129,7 +136,7 @@ struct WorkoutView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
-        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+        .brandCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(exercise.name). Série \(setNumber) de \(exercise.sets). Alvo \(exercise.reps) repetições.")
     }
@@ -137,7 +144,7 @@ struct WorkoutView: View {
     private func metric(_ label: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(label)
-                .font(.system(size: 9))
+                .font(Brand.labelFont)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.title3.bold())
@@ -188,7 +195,7 @@ struct WorkoutView: View {
                     .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.yellow)
+            .tint(Brand.goldLight)
         }
     }
 
@@ -205,7 +212,7 @@ struct WorkoutView: View {
             stepperButton("−", action: onDecrement)
             VStack(spacing: -2) {
                 Text(title)
-                    .font(.system(size: 8))
+                    .font(Brand.labelFont)
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.caption.bold())
@@ -264,7 +271,7 @@ struct WorkoutView: View {
                     .accessibilityLabel("Descanso: \(left) segundos restantes")
 
                 ProgressView(value: rest.progress(at: context.date))
-                    .tint(.yellow)
+                    .tint(Brand.goldLight)
                     .accessibilityHidden(true)
 
                 HStack(spacing: 4) {
@@ -277,7 +284,7 @@ struct WorkoutView: View {
                 .tint(.gray)
             }
             .padding(8)
-            .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+            .brandCard()
         }
     }
 
@@ -324,8 +331,14 @@ struct WorkoutView: View {
     // ─── Ações ──────────────────────────────────────────────────────────
 
     private func startSessionIfNeeded() {
-        if !health.isRunning {
-            health.start(activityType: .traditionalStrengthTraining, locationType: .indoor)
+        // Defesa em profundidade — o chamador já checa, mas esta função não pode
+        // depender disso (foi exatamente o que falhou antes).
+        guard session.dashboard.isVip else { return }
+        // Só inicia se NÃO houver sessão viva. `hasActiveSession` inclui pausada:
+        // com `isRunning` uma sessão pausada era invisível e nascia uma segunda
+        // por cima, deixando a primeira órfã.
+        if !health.hasActiveSession {
+            health.start(kind: .strength, activityType: .traditionalStrengthTraining, locationType: .indoor)
         }
         seedFromPrescription()
     }
@@ -338,8 +351,17 @@ struct WorkoutView: View {
     private func endWorkout() {
         rest.skip()
         Task {
+            // ⚠️ Só encerra se a sessão viva for DESTA tela. Antes, "Encerrar"
+            // aqui matava uma CORRIDA em andamento na aba Cardio, chamando
+            // `stop()` com os defaults (activityType "running", rota vazia) e
+            // DESCARTANDO o resumo — a corrida inteira sumia sem aviso, e o
+            // iPhone nunca recebia o `cardio.finish`.
+            guard health.activeKind == .strength else {
+                WKInterfaceDeviceShim.failure()
+                return
+            }
             _ = await health.stop(saveToHealth: true)
-            WKInterfaceDevice.current().play(.success)
+            WKInterfaceDeviceShim.success()
         }
     }
 

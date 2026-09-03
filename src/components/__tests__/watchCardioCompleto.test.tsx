@@ -44,13 +44,16 @@ describe('rota de save: aceita e GRAVA o que o Watch manda', () => {
   })
 
   it('o insert grava os três — aceitar sem gravar seria pior que recusar', () => {
-    const i = rota.indexOf('.insert({')
-    expect(i, 'o insert precisa existir — se sumiu, o guard perdeu o alvo').toBeGreaterThan(-1)
+    // D-2 (02/09/2026) extraiu os campos para `baseInsert` (reusado por
+    // `tryInsert` na idempotência do client_id) — o valor gravado é o mesmo,
+    // só a localização do literal mudou.
+    const i = rota.indexOf('const baseInsert = {')
+    expect(i, 'baseInsert precisa existir — se sumiu, o guard perdeu o alvo').toBeGreaterThan(-1)
     let prof = 0
-    let fim = i + '.insert('.length
+    let fim = i + 'const baseInsert = '.length
     for (; fim < rota.length; fim++) {
-      if (rota[fim] === '(') prof++
-      else if (rota[fim] === ')') { prof--; if (prof === 0) break }
+      if (rota[fim] === '{') prof++
+      else if (rota[fim] === '}') { prof--; if (prof === 0) break }
     }
     const bloco = rota.slice(i, fim + 1)
     expect(bloco).not.toBe('')

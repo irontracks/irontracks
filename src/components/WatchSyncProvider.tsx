@@ -27,6 +27,7 @@
 import { useContext, useEffect, useRef } from 'react'
 import {
   useWatchBridge,
+  buildCardioIdempotencyKey,
   type WatchDashboard,
   type WatchGym,
   type WatchSetLog,
@@ -34,6 +35,18 @@ import {
 } from '@/hooks/useWatchBridge'
 import { logWarn, logInfo } from '@/lib/logger'
 import { ToastContext } from '@/contexts/ToastContext'
+import { queueWatchCardioSave, queueWatchLogSet } from '@/lib/offline/offlineSync'
+
+/**
+ * Status HTTP que indicam falha TRANSITÓRIA (sessão do iPhone expirada, rede
+ * instável, servidor fora do ar) — reenfileirar resolve sozinho no próximo
+ * flush. `status === 0` cobre o `fetch` que nem completou (erro de rede: o
+ * `.catch(() => null)` das chamadas abaixo devolve `res: null`).
+ * Ver D-5/D-6 do relatório de auditoria do Watch (02/09/2026).
+ */
+export function isTransientStatus(status: number): boolean {
+  return status === 0 || status === 401 || status === 408 || status === 429 || status >= 500
+}
 
 interface Props {
   /** Estado do dashboard a ser empurrado pro Watch. Pode ser null/undefined enquanto carrega. */
@@ -84,14 +97,47 @@ export default function WatchSyncProvider({
       try {
         if (onSetLoggedRef.current) {
           onSetLoggedRef.current(log)
-        } else {
-          // Default: posta no endpoint padrão do app
-          await fetch('/api/workouts/log-set-from-watch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(log),
-          }).catch(() => null)
+          return
         }
+
+        // D-6: antes o resultado nunca era olhado — a rota devolve 404
+        // `no_active_session` (treino iniciado só no relógio) ou
+        // `exercise_not_found` (id do exercício não bate com o treino ativo)
+        // em cenários reais, e a série sumia sem NENHUM aviso.
+        const res = await fetch('/api/workouts/log-set-from-watch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(log),
+        }).catch(() => null)
+
+        if (res && res.ok) return
+
+        const status = res?.status ?? 0
+        if (isTransientStatus(status)) {
+          // D-5: sessão expirada / rede caiu / servidor fora do ar — o Watch
+          // já descartou a série da fila DELE ao entregar aqui, então sem
+          // reenfileirar o dado morria de vez. `queueWatchLogSet` é
+          // idempotente pelo `log.id` (não duplica se cair aqui de novo).
+          await queueWatchLogSet(log as unknown as Record<string, unknown>)
+          toastCtx?.('Série do Watch salva — será reenviada automaticamente.', 'info' as const)
+          return
+        }
+
+        // Falha PERMANENTE (400/404): reenviar não conserta nada, então NÃO
+        // enfileira — só avisa com a causa específica em vez de sumir calado.
+        let reason = 'Não foi possível registrar a série do Watch.'
+        try {
+          const body = res ? await res.clone().json() : null
+          if (body?.error === 'no_active_session') {
+            reason = 'Nenhum treino ativo no iPhone — a série do Watch não foi registrada.'
+          } else if (body?.error === 'exercise_not_found') {
+            reason = 'Exercício do Watch não encontrado no treino ativo do iPhone.'
+          } else if (body?.error === 'invalid_session_state') {
+            reason = 'Sessão de treino corrompida no iPhone — reabra o treino.'
+          }
+        } catch { /* corpo sem JSON — mantém mensagem genérica */ }
+        logWarn('WatchSync', `log-set falhou definitivamente: status=${status} — ${reason}`)
+        toastCtx?.(reason, 'error' as const)
       } catch (e) {
         logWarn('WatchSync', 'log-set falhou:', e)
       }
@@ -101,38 +147,62 @@ export default function WatchSyncProvider({
       try {
         if (onCardioFinishedRef.current) {
           onCardioFinishedRef.current(summary)
-        } else {
-          // Payload no shape do saveTrackSchema (senão 400): o campo é
-          // `calories_estimated` (não `calories`).
-          //
-          // 02/09/2026: três dados que o relógio media e morriam aqui —
-          // o ESPORTE (tudo virava "running", e uma pedalada entrava como
-          // corrida), o TRAÇADO (ia `[]`, então a corrida do Watch não tinha
-          // mapa) e a FREQUÊNCIA CARDÍACA (não havia coluna; agora há).
-          const res = await fetch('/api/gps/cardio/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              activity_type: summary.activityType || 'running',
-              distance_meters: summary.distanceMeters,
-              duration_seconds: Math.round(summary.durationSeconds),
-              calories_estimated: Math.round(summary.caloriesEstimated),
-              avg_pace_min_km: summary.avgPaceMinKm ?? null,
-              route: Array.isArray(summary.route) ? summary.route : [],
-              avg_heart_rate: summary.avgHeartRate ?? null,
-              max_heart_rate: summary.maxHeartRate ?? null,
-              source: 'apple-watch',
-              started_at: summary.startedAt,
-              finished_at: summary.finishedAt,
-            }),
-          }).catch(() => null)
-          if (res && res.ok) {
-            toastCtx?.('Cardio do Watch salvo!', 'success' as const)
-          } else {
-            logWarn('WatchSync', 'cardio-save do Watch falhou', res?.status)
-            toastCtx?.('Não foi possível salvar o cardio do Watch.', 'error' as const)
-          }
+          return
         }
+
+        // Payload no shape do saveTrackSchema (senão 400): o campo é
+        // `calories_estimated` (não `calories`).
+        //
+        // 02/09/2026: três dados que o relógio media e morriam aqui —
+        // o ESPORTE (tudo virava "running", e uma pedalada entrava como
+        // corrida), o TRAÇADO (ia `[]`, então a corrida do Watch não tinha
+        // mapa) e a FREQUÊNCIA CARDÍACA (não havia coluna; agora há).
+        //
+        // D-2: `client_id` é a chave de idempotência determinística (mesmo
+        // cardio → mesma chave, mesmo vindo por dois transportes do bridge
+        // nativo). A rota (`/api/gps/cardio/save`) descarta duplicata por ela;
+        // ver `buildCardioIdempotencyKey`.
+        const payload = {
+          activity_type: summary.activityType || 'running',
+          distance_meters: summary.distanceMeters,
+          duration_seconds: Math.round(summary.durationSeconds),
+          calories_estimated: Math.round(summary.caloriesEstimated),
+          avg_pace_min_km: summary.avgPaceMinKm ?? null,
+          route: Array.isArray(summary.route) ? summary.route : [],
+          avg_heart_rate: summary.avgHeartRate ?? null,
+          max_heart_rate: summary.maxHeartRate ?? null,
+          source: 'apple-watch',
+          started_at: summary.startedAt,
+          finished_at: summary.finishedAt,
+          client_id: buildCardioIdempotencyKey(summary),
+        }
+
+        const res = await fetch('/api/gps/cardio/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => null)
+
+        if (res && res.ok) {
+          toastCtx?.('Cardio do Watch salvo!', 'success' as const)
+          return
+        }
+
+        const status = res?.status ?? 0
+        if (isTransientStatus(status)) {
+          // D-5: o Watch já apagou o cardio da fila DELE ao entregar aqui —
+          // sem reenfileirar, uma sessão expirada ou uma queda de rede
+          // apagava a corrida inteira. `queueWatchCardioSave` é idempotente
+          // pelo mesmo `client_id` acima.
+          await queueWatchCardioSave(payload)
+          toastCtx?.('Cardio do Watch salvo — será reenviado automaticamente.', 'info' as const)
+          return
+        }
+
+        // Falha PERMANENTE (400 de payload inválido): reenviar não conserta,
+        // então NÃO enfileira — só avisa.
+        logWarn('WatchSync', 'cardio-save do Watch falhou definitivamente', status)
+        toastCtx?.('Não foi possível salvar o cardio do Watch.', 'error' as const)
       } catch (e) {
         logWarn('WatchSync', 'cardio-save falhou:', e)
       }
@@ -152,19 +222,36 @@ export default function WatchSyncProvider({
       try {
         if (onCheckinRequestedRef.current) {
           await onCheckinRequestedRef.current(gym)
-        } else {
-          await fetch('/api/gps/qr-checkin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              source: 'apple-watch',
-              gym_id: gym.id,
-              latitude: gym.latitude,
-              longitude: gym.longitude,
-            }),
-          }).catch(() => null)
-          toastCtx?.(`Check-in em ${gym.name}`, 'success' as const)
+          return
         }
+
+        // D-1: o Watch manda check-in por PROXIMIDADE (WatchGym = id/lat/lng,
+        // sem QR nenhum). `/api/gps/qr-checkin` exige `qr_token` (uuid) — nunca
+        // enviado aqui —, então essa chamada voltava 400 em 100% das vezes. O
+        // endpoint certo é `/api/gps/checkin`, que aceita exatamente
+        // gym_id/latitude/longitude (ver route.ts: "registrar check-in via GPS").
+        const res = await fetch('/api/gps/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gym_id: gym.id,
+            latitude: gym.latitude,
+            longitude: gym.longitude,
+          }),
+        }).catch(() => null)
+
+        // Antes o toast de sucesso era incondicional (nem olhava o `.catch`
+        // nem o status) — comemorava check-in que nunca aconteceu.
+        if (res && res.ok) {
+          toastCtx?.(`Check-in em ${gym.name}`, 'success' as const)
+          return
+        }
+
+        logWarn('WatchSync', 'check-in falhou', res?.status)
+        const msg = res?.status === 401
+          ? 'Sessão expirada no iPhone — abra o app e tente de novo.'
+          : `Não foi possível fazer check-in em ${gym.name}.`
+        toastCtx?.(msg, 'error' as const)
       } catch (e) {
         logWarn('WatchSync', 'check-in falhou:', e)
       }

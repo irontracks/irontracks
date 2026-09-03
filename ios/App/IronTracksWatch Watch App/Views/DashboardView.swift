@@ -13,10 +13,7 @@ struct DashboardView: View {
 
     private var dashboard: WatchDashboard { session.dashboard }
     private var goldGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(red: 0.95, green: 0.78, blue: 0.30), Color(red: 0.78, green: 0.55, blue: 0.10)],
-            startPoint: .top, endPoint: .bottom
-        )
+        Brand.goldGradient
     }
 
     var body: some View {
@@ -70,7 +67,8 @@ struct DashboardView: View {
                     .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.yellow)
+                .tint(Brand.goldLight)
+                .accessibilityLabel("Tentar sincronizar de novo")
             }
             .padding(.horizontal, 6)
         }
@@ -83,15 +81,15 @@ struct DashboardView: View {
         HStack(spacing: 4) {
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.caption2)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Brand.warning)
             Text("\(session.pendingCardioCount) pendente\(session.pendingCardioCount == 1 ? "" : "s")")
                 .font(.caption2.bold())
-                .foregroundStyle(.orange)
+                .foregroundStyle(Brand.warning)
             Spacer()
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+        .background(Brand.warning.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
     }
 
     // ─── Header ──────────────────────────────────────────────────────────
@@ -108,7 +106,7 @@ struct DashboardView: View {
             if !session.isReachable {
                 Image(systemName: "wifi.slash")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Brand.warning)
             }
         }
     }
@@ -134,7 +132,10 @@ struct DashboardView: View {
             Spacer()
         }
         .padding(8)
-        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+        .brandCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ofensiva")
+        .accessibilityValue("\(dashboard.streakDays) dias")
     }
 
     // ─── Semana ──────────────────────────────────────────────────────────
@@ -150,14 +151,39 @@ struct DashboardView: View {
                     .font(.caption.bold())
                     .foregroundStyle(goldGradient)
             }
-            ProgressView(
-                value: Double(min(dashboard.weekWorkouts, dashboard.weekGoal)),
-                total: Double(max(dashboard.weekGoal, 1))
-            )
-            .tint(.yellow)
+            // Anel, não barra. Progresso no relógio quer ser anel — é o
+            // vocabulário da plataforma desde os Activity Rings, e uma barra
+            // linear é o componente mais genérico que existe no watchOS.
+            weekRing
+                .frame(height: 44)
+                .frame(maxWidth: .infinity)
         }
         .padding(8)
-        .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+        .brandCard()
+    }
+
+    /// Anel de progresso da semana. `animation` no `trim` faz o traço crescer
+    /// quando um treino novo chega — é o único movimento da tela, e marca
+    /// exatamente o momento que importa.
+    private var weekRing: some View {
+        let feitos = Double(min(dashboard.weekWorkouts, dashboard.weekGoal))
+        let meta = Double(max(dashboard.weekGoal, 1))
+        let pct = meta > 0 ? feitos / meta : 0
+        return ZStack {
+            Circle()
+                .stroke(Brand.hairline, lineWidth: 5)
+            Circle()
+                .trim(from: 0, to: pct)
+                .stroke(Brand.goldGradient, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.5), value: pct)
+            Text("\(dashboard.weekWorkouts)")
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+                .foregroundStyle(Brand.goldLight)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Treinos da semana")
+        .accessibilityValue("\(dashboard.weekWorkouts) de \(dashboard.weekGoal)")
     }
 
     // ─── Próximo treino / Treino ativo ──────────────────────────────────
@@ -186,7 +212,7 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
                 }
                 .padding(8)
-                .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                .brandCard()
             } else {
                 VStack(spacing: 4) {
                     Image(systemName: "calendar")
@@ -198,7 +224,7 @@ struct DashboardView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(8)
-                .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                .brandCard()
             }
         }
     }
@@ -208,24 +234,24 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Circle()
-                    .fill(Color.green)
+                    .fill(Brand.success)
                     .frame(width: 6, height: 6)
                 Text("EM ANDAMENTO")
                     .font(.caption2.bold())
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Brand.success)
                 Spacer()
                 if !dashboard.isVip {
                     // Sinalização leve — não bloqueia a view, só comunica que features avançadas precisam VIP.
                     HStack(spacing: 2) {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 8))
+                            .font(Brand.labelFont)
                         Text("VIP")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(Brand.labelFont)
                     }
                     .foregroundStyle(goldGradient)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
-                    .background(Color.black.opacity(0.5), in: Capsule())
+                    .background(Brand.surfaceRaised, in: Capsule())
                 }
             }
             Text(workout.name)
@@ -237,10 +263,10 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(8)
-        .background(Color.green.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+        .background(Brand.success.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.green.opacity(0.6), lineWidth: 1)
+                .stroke(Brand.success.opacity(0.6), lineWidth: 1)
         )
     }
 }

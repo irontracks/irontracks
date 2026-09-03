@@ -41,7 +41,7 @@ struct CheckinView: View {
     private var header: some View {
         HStack(spacing: 4) {
             Image(systemName: "mappin.and.ellipse")
-                .foregroundStyle(.yellow)
+                .foregroundStyle(Brand.goldLight)
             Text("Academias por perto")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -57,10 +57,10 @@ struct CheckinView: View {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(checkingInGymId == gym.id ? Color.yellow.opacity(0.3) : Color.black.opacity(0.5))
+                        .fill(checkingInGymId == gym.id ? Brand.gold.opacity(0.3) : Brand.surfaceRaised)
                         .frame(width: 32, height: 32)
                     Image(systemName: lastSuccessGymId == gym.id ? "checkmark" : "dumbbell.fill")
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(Brand.goldLight)
                         .font(.caption.bold())
                 }
                 VStack(alignment: .leading, spacing: 0) {
@@ -68,7 +68,7 @@ struct CheckinView: View {
                         .font(.caption.bold())
                         .lineLimit(1)
                     Text("\(Int(gym.radiusMeters))m de raio")
-                        .font(.system(size: 9))
+                        .font(Brand.labelFont)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -78,10 +78,13 @@ struct CheckinView: View {
                 }
             }
             .padding(6)
-            .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            .brandTile()
         }
         .buttonStyle(.plain)
         .disabled(checkingInGymId != nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Fazer check-in em \(gym.name)")
+        .accessibilityHint(checkingInGymId == gym.id ? "Enviando" : "")
     }
 
     private var emptyState: some View {

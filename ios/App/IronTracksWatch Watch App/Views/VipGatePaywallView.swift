@@ -14,10 +14,7 @@ struct VipGatePaywallView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var goldGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(red: 0.95, green: 0.78, blue: 0.30), Color(red: 0.78, green: 0.55, blue: 0.10)],
-            startPoint: .top, endPoint: .bottom
-        )
+        Brand.goldGradient
     }
 
     var body: some View {
@@ -45,7 +42,7 @@ struct VipGatePaywallView: View {
                         .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.yellow)
+                .tint(Brand.goldLight)
                 .padding(.top, 2)
             }
             .padding(.horizontal, 6)
