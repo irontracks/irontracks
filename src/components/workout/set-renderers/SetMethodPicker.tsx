@@ -78,7 +78,7 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
         <ChevronDown size={9} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="flex flex-wrap gap-1 mt-1">
+        <div className="expand-enter flex flex-wrap gap-1 mt-1">
           {SET_METHOD_OPTIONS.map((opt) => (
             <button
               key={opt}

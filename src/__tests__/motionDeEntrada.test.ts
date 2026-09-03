@@ -84,6 +84,23 @@ describe('o vocabulário do design system é usado, não decorativo', () => {
         expect(css).toMatch(/\.workout-card-in\s*\{[^}]*animation:\s*fadeIn/)
     })
 
+    /**
+     * `.expand-enter` existia com UM usuário enquanto 14 disclosures (botão com
+     * `aria-expanded` + painel condicional) abriam por corte seco, empurrando o
+     * conteúdo abaixo sem o olho ter como acompanhar.
+     *
+     * Este caso trava a CLASSE, não a contagem: o que não pode voltar é a regra
+     * ficar órfã de novo. Os disclosures restantes têm estruturas heterogêneas
+     * e pedem edição arquivo a arquivo — dívida conhecida, não esquecimento.
+     */
+    it('a expansão de painel tem consumidor', () => {
+        // RATCHET: só sobe. `toBeGreaterThan(1)` foi a primeira versão e era
+        // GUARD FALSO — tirar a classe de um arquivo ainda deixava dois, e o
+        // teste passava verde com o defeito reposto (provado por mutação).
+        expect(usadoEmTsx('expand-enter')).toBeGreaterThanOrEqual(3)
+        expect(css).toMatch(/\.expand-enter\s*\{[^}]*animation:\s*expandIn/)
+    })
+
     it('a tela pós-treino entra em cascata', () => {
         const rel = readFileSync(join(SRC, 'components', 'WorkoutReport.tsx'), 'utf8')
         expect(rel).toMatch(/stagger-children/)

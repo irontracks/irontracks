@@ -132,7 +132,7 @@ export default function PRPrediction({
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-2">
+        <div className="expand-enter px-3 pb-3 space-y-2">
           {/* Target selector */}
           <div className="flex items-center gap-2">
             {/* WCAG 1.4.3 AA — neutral-500 mede 4.18:1 sobre #0a0a0a e reprova; 400 dá 7.85:1 */}
