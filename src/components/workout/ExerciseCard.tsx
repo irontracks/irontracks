@@ -40,6 +40,7 @@ import PlateCalculatorSheet from './PlateCalculatorSheet'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 import { resolveIncrement } from '@/utils/autoload/plateMath';
 import { inventoryFromSettings, type PlateInventory } from '@/utils/plates/plateInventory';
+import { nextPendingExercise } from '@/lib/workout/deferredExercises';
 
 function useSafeTeamWorkout() {
   try {
@@ -51,7 +52,7 @@ function useSafeTeamWorkout() {
 
 type GroupPos = 'first' | 'middle' | 'last';
 
-function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> }) {
+function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar = true }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>>; temDestinoAoAdiar?: boolean }) {
   // Só as entradas de log DESTE exercício (passadas pelo wrapper connected, com referência
   // estável). Assim o card só re-renderiza quando as próprias séries mudam — não a cada
   // tecla em qualquer outro exercício. Ver helpers/exerciseLogSlice.ts.
@@ -134,7 +135,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   // e o app leva o usuário ao próximo pendente. Não oferecemos a ação num
   // exercício já CONCLUÍDO: adiar o que acabou de ser feito não quer dizer nada.
   const isDeferred = !!deferredExercises?.has(exIdx);
-  const canDefer = !allSetsDone && typeof deferExercise === 'function';
+  // ...e só quando existe PARA ONDE ir. No último exercício pendente, adiar não
+  // leva a lugar nenhum: o controller já trata isso ficando parado
+  // (`nextPendingExercise` devolve null), mas o botão continuava oferecendo a
+  // ação — e o único efeito visível era recolher o card que o usuário está
+  // fazendo. Quem calcula o destino é o ExerciseList, que tem os logs de todos.
+  const canDefer = !allSetsDone && typeof deferExercise === 'function' && temDestinoAoAdiar;
 
   // ── Calculadora de anilhas ────────────────────────────────────────────────
   // Só aparece em exercício de BARRA: em máquina/cabo/halter não existe anilha por
@@ -1021,13 +1027,14 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
 // de logs DESTE exercício muda (shallow por referência). Assim uma tecla em outro exercício
 // (que gera um slice novo mas shallow-igual aqui) NÃO re-renderiza este card.
 function arePropsEqual(
-  prev: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
-  next: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
+  prev: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>>; temDestinoAoAdiar?: boolean },
+  next: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>>; temDestinoAoAdiar?: boolean },
 ): boolean {
   return (
     prev.ex === next.ex &&
     prev.exIdx === next.exIdx &&
     prev.groupPos === next.groupPos &&
+    prev.temDestinoAoAdiar === next.temDestinoAoAdiar &&
     shallowEqualByRef(prev.logsSlice, next.logsSlice)
   );
 }
@@ -1043,6 +1050,25 @@ const ExerciseCardMemo = React.memo(ExerciseCardInner, arePropsEqual);
 function ExerciseCard({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
   const logs = useWorkoutLogs() as Record<string, Record<string, unknown>>;
   const logsSlice = pickExerciseLogSlice(logs, exIdx) as Record<string, Record<string, unknown>>;
-  return <ExerciseCardMemo ex={ex} exIdx={exIdx} groupPos={groupPos} logsSlice={logsSlice} />;
+  // "Fazer depois" precisa de um destino. O cálculo mora AQUI, no wrapper, e não
+  // no card: ele já re-renderiza a cada tecla (é barato) e tem os logs de TODOS,
+  // enquanto o card só recebe a fatia dele. Fazendo assim, os quatro call sites
+  // (lista, overlay do parceiro, 2× painel do professor) seguem sem mudança.
+  const { exercises: todos, deferredExercises } = useWorkoutContext();
+  const temDestinoAoAdiar = React.useMemo(() => {
+    // Simula o adiamento antes de procurar o destino — é o que o controller faz
+    // (`nextPendingExercise({ ...ctx, deferred: nextDeferred }, from)`). Sem
+    // marcar este exercício, a busca dá a volta na lista e devolve ELE MESMO,
+    // porque ele é o único que continua pendente: o botão "apareceria com
+    // destino" justamente no caso em que não há para onde ir.
+    const deferred = new Set<number>(deferredExercises ?? []);
+    deferred.add(exIdx);
+    return nextPendingExercise({
+      exercises: (Array.isArray(todos) ? todos : []) as unknown[],
+      logs: logs as Record<string, unknown>,
+      deferred,
+    }, exIdx) !== null;
+  }, [todos, logs, deferredExercises, exIdx]);
+  return <ExerciseCardMemo ex={ex} exIdx={exIdx} groupPos={groupPos} logsSlice={logsSlice} temDestinoAoAdiar={temDestinoAoAdiar} />;
 }
 export default ExerciseCard;
