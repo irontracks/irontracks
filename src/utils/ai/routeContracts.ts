@@ -647,3 +647,29 @@ export const workoutPhotoGenerationConfig = () => ({
     // a chance de o modelo "completar" um exercício que a ficha não tem.
     temperature: 0.1,
 })
+
+// ─── exercise-note ───────────────────────────────────────────────────────────
+// A observação técnica de UM exercício, gerada quando o usuário troca o
+// exercício no treino ativo e a nota antiga passaria a descrever o aparelho
+// errado (medido em 03/09/2026: 322 das 384 notas em produção são técnica do
+// aparelho, média de 181 caracteres).
+//
+// UMA nota, não três para escolher. Medido contra a API real: pedindo três, o
+// modelo devolve ASPECTOS COMPLEMENTARES do mesmo movimento (postura, ritmo,
+// setup da máquina) — nenhuma errada. Escolher uma descartaria duas verdades, e
+// cada uma vinha com ~108 caracteres contra 187 da nota única, que já combina
+// postura e ritmo. Escolher entregava MENOS.
+export const EXERCISE_NOTE_RESPONSE_SCHEMA = {
+    type: 'OBJECT',
+    properties: { note: STR },
+    required: ['note'],
+    propertyOrdering: ['note'],
+} as const
+
+export const exerciseNoteGenerationConfig = () => ({
+    responseMimeType: 'application/json',
+    responseSchema: EXERCISE_NOTE_RESPONSE_SCHEMA,
+    maxOutputTokens: 300,
+    // Não é criação livre: é técnica de execução, onde existe certo e errado.
+    temperature: 0.4,
+})

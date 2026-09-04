@@ -21,6 +21,18 @@ export type WorkoutExercise = Omit<Partial<Exercise>, 'setDetails'> & {
   is_unilateral?: boolean;
   side_rest_time?: number | string | null;
   transition_time?: number | string | null;
+  /**
+   * De onde veio a observação (`notes`) que está na tela AGORA.
+   *
+   * `'ai'` = gerada pela máquina ao trocar o exercício, e por isso desenhada na
+   * cor da MÁQUINA (violeta) em vez de se passar pela palavra do professor —
+   * o card chama esse campo de "Observação do professor".
+   *
+   * Vive só na SESSÃO: a rota de update monta colunas explícitas, então este
+   * campo é descartado na fronteira e nunca chega ao banco nem ao payload do
+   * bootstrap (cuja allowlist ele quebraria).
+   */
+  notesSource?: 'ai' | null;
 };
 
 export type WorkoutSetDetail = {

@@ -72,8 +72,11 @@ export default function AIExerciseSwap({
   }, [exerciseName, alternatives.length])
 
   const handleSelect = useCallback((alt: Alternative) => {
-    // Direct swap — updates exercises array immediately
-    swapExerciseName(exerciseIndex, alt.name)
+    // Direct swap — updates exercises array immediately.
+    // `gerarNota`: só a troca INDIVIDUAL pede a observação nova à IA. O
+    // "Adaptar ambiente" troca o treino inteiro num toque e não passa a flag,
+    // senão um gesto viraria N chamadas pagas.
+    swapExerciseName(exerciseIndex, alt.name, { gerarNota: true })
     setApplied(alt.name)
     // Close after brief feedback
     setTimeout(() => {

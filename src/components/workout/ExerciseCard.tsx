@@ -34,6 +34,7 @@ import { PlankSetInput } from './PlankSetInput';
 import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
 import PlateCalculatorSheet from './PlateCalculatorSheet'
@@ -103,6 +104,10 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
   const deloadAlertRaw = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
   const deloadAlert = sessionDeloadAlert ? undefined : deloadAlertRaw;
   const observation = String(ex?.notes || '').trim();
+  // A nota veio da MÁQUINA (gerada ao trocar o exercício) ou do professor? O
+  // campo abaixo se chama "Observação do professor" — deixar texto de IA passar
+  // por palavra do coach seria a máquina falando pela boca de uma pessoa.
+  const notaDaMaquina = String((ex as { notesSource?: unknown })?.notesSource ?? '') === 'ai';
   // Preview sem a abertura que só repete o título (ver exerciseNotePreview).
   const notePreview = useMemo(() => stripRedundantOpening(observation, name), [observation, name]);
   const noteCollapsible = noteNeedsExpand(notePreview);
@@ -563,10 +568,20 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
               em peso com o botão de concluir. Agora nasce em duas linhas, com
               régua neutra, e abre sob toque. */}
           {observation ? (
-            <div className="mt-2 border-l-2 border-white/10 pl-2.5">
+            <div className={`mt-2 border-l-2 pl-2.5 ${notaDaMaquina ? MACHINE_ACCENT.rule : 'border-white/10'}`}>
+              {notaDaMaquina && (
+                // Violeta é a cor da máquina neste app (lib/design/machineAccent):
+                // "violeta = a máquina decidiu, dourado = você decide". O rótulo
+                // existe para o aluno que TEM professor saber, de relance, que
+                // aquilo não veio dele.
+                <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${MACHINE_ACCENT.text}`}>
+                  Sugestão automática
+                </div>
+              )}
               <div
                 className={[
-                  'text-[13px] text-neutral-400 leading-relaxed whitespace-pre-wrap',
+                  'text-[13px] leading-relaxed whitespace-pre-wrap',
+                  notaDaMaquina ? MACHINE_ACCENT.text : 'text-neutral-400',
                   noteOpen ? '' : 'line-clamp-2',
                 ].join(' ')}
               >
