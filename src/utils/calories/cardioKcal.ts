@@ -18,6 +18,7 @@
 import { DEFAULT_BODY_WEIGHT_KG, getSexMultiplier } from './metEstimate'
 // "É cardio?" agora é fonte única (antes havia uma cópia com set fechado aqui).
 import { isCardioExercise } from '@/utils/exercise/isCardio'
+import { metDeEsteira, kcalDoBloco } from '@/lib/cardio/treadmillMet'
 export { isCardioExercise }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -126,6 +127,39 @@ const cardioMinutesDone = (
   return minutes >= 0.5 && minutes <= 240 ? minutes : 0
 }
 
+/**
+ * A execução do cardio, bloco a bloco.
+ *
+ * Cardio em BLOCOS (04/09/2026): "30 min na esteira" pode ser 5 min a 4 km/h +
+ * 10 min a 5 + 15 min a 6. Cada bloco é uma série concluída, com a PRÓPRIA
+ * velocidade e inclinação — e por isso a caloria não pode sair de um MET único
+ * aplicado ao tempo somado: subir a velocidade tem que aparecer no gasto.
+ *
+ * Blocos sem velocidade (todo o histórico anterior a esta data) voltam com
+ * `speed: null` e o chamador cai na tabela por modalidade, como sempre foi.
+ */
+const blocosFeitos = (
+  logs: Record<string, unknown>,
+  exIdx: number,
+): { minutes: number; speed: number | null; incline: number | null }[] => {
+  const blocos: { minutes: number; speed: number | null; incline: number | null }[] = []
+  for (const [key, raw] of Object.entries(logs)) {
+    if (Number(String(key).split('-')[0]) !== exIdx) continue
+    if (!isRecord(raw)) continue
+    if (raw.done !== true) continue
+    const sec = Number(raw.durationSeconds)
+    if (!Number.isFinite(sec) || sec <= 0) continue
+    const sp = Number(raw.speed)
+    const inc = Number(raw.incline)
+    blocos.push({
+      minutes: sec / 60,
+      speed: Number.isFinite(sp) && sp > 0 ? sp : null,
+      incline: Number.isFinite(inc) && inc > 0 ? inc : null,
+    })
+  }
+  return blocos
+}
+
 export interface CardioKcalOpts {
   bodyWeightKg?: number | null
   biologicalSex?: string | null
@@ -171,8 +205,27 @@ export function estimateCardioKcal(session: unknown, opts: CardioKcalOpts = {}):
     const advCfg = cfgRaw && isRecord(cfgRaw.advanced_config) ? (cfgRaw.advanced_config as Record<string, unknown>) : null
     const isHIT = !!advCfg?.isHIT
 
-    const met = metForCardio(ex.name, ex.rpe, isHIT)
-    const kcal = met * bw * (minutes / 60) * sexFactor
+    const metModalidade = metForCardio(ex.name, ex.rpe, isHIT)
+
+    // Blocos COM velocidade usam as equações do ACSM (velocidade + inclinação);
+    // os demais caem no MET da modalidade, que é o comportamento de sempre.
+    // Misturar os dois é proposital: um cardio pode ter blocos preenchidos e
+    // outros não, e cair inteiro na tabela por causa de um bloco em branco
+    // jogaria fora o dado bom dos outros.
+    const blocos = blocosFeitos(logs, idx)
+    let kcal = 0
+    const comVelocidade = blocos.filter(b => b.speed != null)
+    if (comVelocidade.length > 0) {
+      for (const b of blocos) {
+        const metBloco = b.speed != null ? metDeEsteira(b.speed, b.incline) : null
+        kcal += metBloco != null
+          ? kcalDoBloco(metBloco, bw, b.minutes) * sexFactor
+          : metModalidade * bw * (b.minutes / 60) * sexFactor
+      }
+    } else {
+      kcal = metModalidade * bw * (minutes / 60) * sexFactor
+    }
+
     if (Number.isFinite(kcal) && kcal > 0) {
       const rounded = Math.round(kcal)
       totalKcal += rounded

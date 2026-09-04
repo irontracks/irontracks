@@ -117,6 +117,11 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
   const collapsedNow = collapsed.has(exIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   const isExPlank = isPlank(name);
+  // Cardio conta BLOCOS, não séries: um cardio de 30 min dividido em 5/10/15
+  // com velocidades diferentes é UM exercício que sobe de intensidade, e
+  // chamá-lo de "3 sets" faria a tela contradizer o editor (decisão do dono,
+  // 04/09/2026). A mecânica por baixo continua sendo série.
+  const isExCardio = String(ex?.method || '').trim().toLowerCase() === 'cardio';
   // For plank exercises, show planned exercise duration (from first setDetail) instead of rest time.
   // The "Xs" in the header is restTime for normal exercises, which users correctly read as "rest".
   // For planks, users assume "Xs" is how long to hold — so we show durationSeconds here.
@@ -528,7 +533,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
             {collapsedNow ? <ChevronDown size={18} className="text-neutral-400" /> : <ChevronUp size={18} className="text-neutral-400" />}
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
-            <span className="font-mono">{setsCount} sets</span>
+            <span className="font-mono">
+              {isExCardio ? `${setsCount} ${setsCount === 1 ? 'bloco' : 'blocos'}` : `${setsCount} sets`}
+            </span>
             <span className="opacity-30">•</span>
             {isExPlank ? (
               // Plank: show exercise hold time (durationSeconds) with "⏱" prefix so users
