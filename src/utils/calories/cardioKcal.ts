@@ -19,6 +19,7 @@ import { DEFAULT_BODY_WEIGHT_KG, getSexMultiplier } from './metEstimate'
 // "É cardio?" agora é fonte única (antes havia uma cópia com set fechado aqui).
 import { isCardioExercise } from '@/utils/exercise/isCardio'
 import { metDeEsteira, kcalDoBloco } from '@/lib/cardio/treadmillMet'
+import { minutosDeCardioFeitos } from '@/lib/cardio/minutosDeCardio'
 export { isCardioExercise }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -75,56 +76,6 @@ export const metForCardio = (name: unknown, rpe: unknown, isHIT: boolean): numbe
   const base = CARDIO_MET_BASE[norm(name)] ?? DEFAULT_CARDIO_MET
   const met = base * intensityFactor(rpe) * (isHIT ? 1.15 : 1)
   return met
-}
-
-/** Tempo PLANEJADO no editor (`reps` guarda minutos). Só serve de fallback. */
-const plannedMinutesOf = (ex: Record<string, unknown>): number => {
-  const m = Number(ex.reps)
-  return Number.isFinite(m) && m >= 1 && m <= 240 ? m : 0
-}
-
-/**
- * Minutos de cardio EFETIVAMENTE FEITOS, lidos dos logs da sessão.
- *
- * ⚠️ Esta função existe por causa de um bug real (ago/2026, relatado pelo dono):
- * o cálculo lia `ex.reps`, que é o tempo PLANEJADO no editor. Resultado: um
- * treino com "Esteira 20 min" que a pessoa NÃO fez somava 20 minutos e as kcal
- * correspondentes ao finalizar — inflando o gasto de todo mundo que deixa um
- * cardio no plano e pula.
- *
- * O dado certo sempre existiu: `CardioSetInput` grava `durationSeconds` (tempo
- * real do START até parar) e `done: true`. Os três caminhos gravam — cronômetro
- * até o fim, parar antes, e "concluir sem cronômetro".
- *
- * Sem série concluída → ZERO. Não fez, não conta.
- */
-const cardioMinutesDone = (
-  logs: Record<string, unknown>,
-  exIdx: number,
-  ex: Record<string, unknown>,
-): number => {
-  let seconds = 0
-  let concluiuAlguma = false
-
-  for (const [key, raw] of Object.entries(logs)) {
-    if (Number(String(key).split('-')[0]) !== exIdx) continue
-    if (!isRecord(raw)) continue
-    // `done` é o que o usuário afirmou ter feito. Sem isso, é plano, não execução.
-    if (raw.done !== true) continue
-    concluiuAlguma = true
-    const sec = Number(raw.durationSeconds)
-    if (Number.isFinite(sec) && sec > 0) seconds += sec
-  }
-
-  if (!concluiuAlguma) return 0
-
-  // Concluiu mas sem duração registrada: sessão antiga (anterior ao
-  // `durationSeconds`) ou log truncado. Cair no planejado aqui é correto — a
-  // pessoa marcou como feito, só não temos o cronômetro.
-  if (seconds <= 0) return plannedMinutesOf(ex)
-
-  const minutes = seconds / 60
-  return minutes >= 0.5 && minutes <= 240 ? minutes : 0
 }
 
 /**
@@ -196,7 +147,7 @@ export function estimateCardioKcal(session: unknown, opts: CardioKcalOpts = {}):
   ;(sessionObj.exercises as unknown[]).forEach((ex, idx) => {
     if (!isCardioExercise(ex) || !isRecord(ex)) return
     // Minutos FEITOS, não planejados — ver `cardioMinutesDone`.
-    const minutes = cardioMinutesDone(logs, idx, ex)
+    const minutes = minutosDeCardioFeitos(logs, idx, ex)
     if (minutes <= 0) return
 
     const cfgRaw = Array.isArray(ex.setDetails) && isRecord(ex.setDetails[0])

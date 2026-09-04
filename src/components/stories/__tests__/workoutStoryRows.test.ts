@@ -28,6 +28,47 @@ const session = {
     },
 }
 
+/**
+ * Bug real (04/09/2026, relatado pelo dono): fez 30 min de esteira e o Story
+ * publicou "20min" — o tempo PLANEJADO no editor. Conferido no banco da sessão
+ * dele: `reps` = 20, log `durationSeconds` = 1803 (30,05 min).
+ *
+ * É a MESMA classe que a caloria teve em ago/2026 (`cardioMinutesDone` nasceu
+ * disso); a correção de lá nunca chegou ao Story. Hoje os dois leem da mesma
+ * fonte — `lib/cardio/minutosDeCardio`.
+ */
+const sessaoDoDono = {
+    totalTime: 6060,
+    exercises: [
+        { name: 'Esteira', method: 'Cardio', sets: 1, reps: '20', rpe: 5 },
+    ],
+    logs: {
+        '0-0': { done: true, durationSeconds: 1803, speed: 6, incline: 0 },
+    },
+    reportMeta: { exercises: [{ name: 'Esteira', order: 1, caloriesKcal: 300 }] },
+}
+
+describe('o Story publica o tempo FEITO, não o planejado', () => {
+    it('30 min feitos com 20 no plano publicam 30min', () => {
+        const linha = buildWorkoutStoryRows(sessaoDoDono).find((r) => r.name === 'Esteira')!
+        expect(linha.reps).toBe('30min')
+    })
+
+    it('cardio em BLOCOS soma os blocos na linha', () => {
+        const emBlocos = {
+            ...sessaoDoDono,
+            exercises: [{ name: 'Esteira', method: 'Cardio', sets: 3, reps: '20', rpe: 5 }],
+            logs: {
+                '0-0': { done: true, durationSeconds: 5 * 60, speed: 4 },
+                '0-1': { done: true, durationSeconds: 10 * 60, speed: 5 },
+                '0-2': { done: true, durationSeconds: 15 * 60, speed: 6 },
+            },
+        }
+        const linha = buildWorkoutStoryRows(emBlocos).find((r) => r.name === 'Esteira')!
+        expect(linha.reps).toBe('30min')
+    })
+})
+
 describe('buildWorkoutStoryRows — cardio na tabela do Story', () => {
     it('inclui o FitDance mesmo sem série concluída', () => {
         const rows = buildWorkoutStoryRows(session)
