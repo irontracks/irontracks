@@ -14,6 +14,7 @@
  * aqui faria o story divergir do relatório e do PDF.
  */
 import { setTopWeightReps } from '@/utils/report/setVolume'
+import { minutosDeCardioParaExibir } from '@/lib/cardio/minutosDeCardio'
 import { isSetCompleted } from '@/utils/report/setCompletion'
 import { isCardioExercise } from '@/utils/exercise/isCardio'
 import type { WorkoutRow } from '../storyComposerUtils'
@@ -23,11 +24,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 const DASH = '—'
 
-/** Minutos de um cardio (o editor grava o tempo no campo `reps`). */
-const cardioMinutesOf = (ex: Record<string, unknown> | null): number => {
-    const m = Number(ex?.reps)
-    return Number.isFinite(m) && m >= 1 && m <= 240 ? Math.round(m) : 0
-}
+
 
 /** kcal por índice de exercício, lidas do reportMeta salvo na sessão. */
 export const kcalByExerciseIndex = (session: unknown): Map<number, number> => {
@@ -71,7 +68,13 @@ export const buildWorkoutStoryRows = (
 
         // ── Cardio: tempo + kcal, mesmo sem série concluída ───────────────────
         if (isCardioExercise(exRaw)) {
-            const minutes = cardioMinutesOf(ex)
+            // ⚠️ Minutos FEITOS, não planejados. Esta linha lia `ex.reps` — o
+            // tempo do EDITOR —, então um "Esteira 20 min" no plano publicava
+            // "20min" mesmo quando a pessoa fez 30 (relatado pelo dono em
+            // 04/09/2026; medido na sessão: reps=20, log=1803s). É o mesmo
+            // defeito que a caloria teve em ago/2026, e a correção de lá nunca
+            // chegou aqui — daí a fonte única.
+            const minutes = Math.round(minutosDeCardioParaExibir(logs, exIdx, ex))
             if (minutes <= 0 && kcal <= 0) return
             const cardioRpe = Number(ex?.rpe)
             rows.push({
