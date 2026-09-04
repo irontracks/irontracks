@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types';
 import { isObject } from '../utils';
@@ -9,6 +9,7 @@ import { canonicalEditorMethod } from '../helpers/editorMethod';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
 import { applyPlannedSetMethod } from '@/lib/workout/plannedSetMethod';
 import { persistWorkoutPlan } from '@/utils/workout/persistWorkoutPlan';
+import { notaAoTrocar, juntarNota } from '@/lib/workout/exerciseNote';
 import {
   tagExercisesForEdit,
   reconcileEditedExercises,
@@ -638,7 +639,20 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
   /** Directly rename an exercise by index — used by AI swap. */
-  const swapExerciseName = (exIdx: number, newName: string) => {
+  /**
+   * Troca o nome do exercício — e cuida da OBSERVAÇÃO, que antes sobrevivia
+   * descrevendo o aparelho anterior.
+   *
+   * Medido em produção (03/09/2026): 322 das 384 observações são técnica do
+   * aparelho ("pés na parte alta da plataforma"), 181 caracteres de média.
+   * Como este método preserva o resto do objeto no spread, a nota do exercício
+   * velho continuava na tela instruindo sobre uma máquina que saiu.
+   *
+   * `gerarNota` é OPT-IN de propósito: a troca individual pede a nota nova à
+   * IA, e "Adaptar ambiente" — que troca o treino inteiro num toque — NÃO,
+   * senão um gesto viraria N chamadas pagas ao Gemini.
+   */
+  const swapExerciseName = (exIdx: number, newName: string, opts?: { gerarNota?: boolean }) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
     if (exIdx < 0 || exIdx >= exercises.length) return;
     const trimmed = newName.trim();
@@ -646,9 +660,46 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     try {
       const nextExercises = [...exercises];
       const exRaw = nextExercises[exIdx] && typeof nextExercises[exIdx] === 'object' ? nextExercises[exIdx] : {} as WorkoutExercise;
-      nextExercises[exIdx] = { ...exRaw, name: trimmed };
+      const notaAntiga = String((exRaw as { notes?: unknown })?.notes ?? '');
+      // Vazio é melhor que mentiroso: sai a descrição do aparelho velho, fica
+      // só o que CONFIGURA método (o card parseia SST/drop dali).
+      const metodoPreservado = notaAoTrocar(notaAntiga);
+      nextExercises[exIdx] = { ...exRaw, name: trimmed, notes: metodoPreservado };
       onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
+      if (opts?.gerarNota) void gerarNotaDoExercicio(exIdx, trimmed, metodoPreservado);
     } catch { /* silent */ }
+  };
+
+  /**
+   * Busca a técnica do exercício novo e a costura com o método preservado.
+   *
+   * Roda solta (`void`): a troca já aconteceu na tela e não pode esperar rede —
+   * o usuário está de pé na academia. Falha em silêncio de propósito, e o custo
+   * de falhar é o estado honesto (sem observação), nunca a nota errada.
+   */
+  const gerarNotaDoExercicio = async (exIdx: number, nome: string, metodo: string) => {
+    try {
+      const r = await fetch('/api/ai/exercise-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exerciseName: nome }),
+      });
+      if (!r.ok) return;
+      const j = await r.json().catch(() => null);
+      const nota = String(j?.note ?? '').trim();
+      if (!nota) return;
+      const { workout: wFresco, exercises: exFrescos } = estadoFrescoRef.current;
+      if (!wFresco || !Array.isArray(exFrescos)) return;
+      if (exIdx < 0 || exIdx >= exFrescos.length) return;
+      const alvo = exFrescos[exIdx] as UnknownRecord | null;
+      // Só preenche se ainda for o MESMO exercício e a nota continuar sendo o
+      // que a troca deixou — se o usuário já escreveu algo, a palavra é dele.
+      if (!alvo || String(alvo.name ?? '') !== nome) return;
+      if (String(alvo.notes ?? '').trim() !== metodo.trim()) return;
+      const lista = [...exFrescos];
+      lista[exIdx] = { ...alvo, notes: juntarNota(metodo, nota), notesSource: 'ai' };
+      onUpdateSession?.({ workout: { ...wFresco, exercises: lista } });
+    } catch { /* rede ruim na academia é o caso comum, não a exceção */ }
   };
 
   // ── Editor completo DURANTE o treino ativo ─────────────────────────────────
@@ -656,6 +707,21 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   // apagar/reordenar). Ao salvar, os logs das séries já feitas são remapeados
   // por chave estável e o usuário escolhe "só hoje" (sessão) ou "pra sempre"
   // (template). O estado do editor vive aqui (local).
+  /**
+   * Espelho do estado atual para o código ASSÍNCRONO ler.
+   *
+   * `onUpdateSession` só aceita objeto — não tem updater funcional —, então a
+   * nota que volta da IA precisa conferir a lista FRESCA por conta própria:
+   * entre o disparo e a resposta o usuário pode ter trocado de novo, editado
+   * ou apagado o exercício, e escrever por cima de uma lista velha
+   * ressuscitaria o que ele acabou de mudar.
+   *
+   * Alimentada em efeito, nunca no render (React 19 proíbe escrever ref
+   * durante o render).
+   */
+  const estadoFrescoRef = useRef<{ workout: typeof workout; exercises: typeof exercises }>({ workout, exercises });
+  useEffect(() => { estadoFrescoRef.current = { workout, exercises }; }, [workout, exercises]);
+
   const [fullEditorOpen, setFullEditorOpen] = useState(false);
   const [fullEditorWorkout, setFullEditorWorkout] = useState<UnknownRecord | null>(null);
 

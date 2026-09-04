@@ -62,6 +62,8 @@ export const MACHINE_ACCENT = {
   toggleOn: 'bg-violet-500 border-violet-400/40 shadow-[0_0_12px_rgba(139,92,246,0.35)]',
   /** Ícone que marca um bloco inteiro como saída de máquina. */
   icon: 'text-violet-300',
+  /** Régua lateral que marca um bloco de texto como saída de máquina. */
+  rule: 'border-violet-400/30',
   /** Alvo escolhível dentro de um bloco de máquina — a borda acende no toque. */
   hoverBorder: 'hover:border-violet-400/40',
 } as const
