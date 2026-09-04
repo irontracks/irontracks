@@ -28,6 +28,7 @@ import {
   nextPendingExercise,
   pendingDeferred,
 } from '@/lib/workout/deferredExercises';
+import { exercisesToSkip } from '@/lib/workout/skippedExercises';
 import { focoAposSerieConcluida } from '@/lib/workout/focoAposSerie';
 import { scrollToExercise } from './helpers/scrollToExercise';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
@@ -131,6 +132,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const {
     collapsed, setCollapsed,
     deferredExercises, setDeferredExercises,
+    skippedExercises, setSkippedExercises,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
     linkedWeightExercises, setLinkedWeightExercises,
@@ -696,6 +698,54 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     triggerHaptic('light').catch(() => { });
   }, [exercises, deferredExercises, setDeferredExercises, setCollapsed, deferralCtx, focusExercise]);
 
+  /**
+   * "Não vou fazer esse hoje" — dispensa o exercício DA CONTA de hoje.
+   *
+   * Diferente do `deferExercise`, que só tira do caminho: o dispensado deixa de
+   * ser pendente, sai do denominador do progresso e não é cobrado ao finalizar.
+   * O template não é tocado — amanhã o exercício está lá de novo.
+   */
+  const skipExerciseToday = useCallback((exIdx: number) => {
+    const groups = buildExerciseGroups(exercises as unknown[]);
+    // Mesma regra do adiar: Bi-Set e irmãos vão inteiros.
+    const targets = exercisesToSkip(exIdx, groups);
+    const nextSkipped = new Set<number>([...skippedExercises, ...targets]);
+    setSkippedExercises(nextSkipped);
+    // Sai do "fazer depois" se estava lá: as duas marcas juntas se contradizem
+    // — uma diz "cobre depois", a outra diz "não cobre".
+    setDeferredExercises((prev) => {
+      const next = new Set(prev);
+      for (const i of targets) next.delete(i);
+      return next;
+    });
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      for (const i of targets) next.add(i);
+      return next;
+    });
+    const from = targets.length > 0 ? Math.max(...targets) : exIdx;
+    const next = nextPendingExercise({ ...deferralCtx, deferred: new Set([...deferredExercises, ...targets]) }, from);
+    if (next !== null) focusExercise(next);
+    triggerHaptic('light').catch(() => { });
+  }, [exercises, skippedExercises, setSkippedExercises, deferredExercises, setDeferredExercises, setCollapsed, deferralCtx, focusExercise]);
+
+  /** Desfaz a dispensa — "vou fazer sim". */
+  const unskipExercise = useCallback((exIdx: number) => {
+    const groups = buildExerciseGroups(exercises as unknown[]);
+    const targets = exercisesToSkip(exIdx, groups);
+    setSkippedExercises((prev) => {
+      const next = new Set(prev);
+      for (const i of targets) next.delete(i);
+      return next;
+    });
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.delete(exIdx);
+      return next;
+    });
+    focusExercise(exIdx);
+  }, [exercises, setSkippedExercises, setCollapsed, focusExercise]);
+
   const resumeExercise = useCallback((exIdx: number) => {
     const groups = buildExerciseGroups(exercises as unknown[]);
     const targets = exercisesToDefer(exIdx, groups);
@@ -729,6 +779,21 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // elapsedSeconds + formatElapsed now live in WorkoutTimerContext
 
   // ── Centralized progress calculation (single source of truth) ───────────
+  // O progresso desconta o que foi DISPENSADO ("não vou fazer esse hoje"): sem
+  // isso a barra jamais chega a 100% e o app cobra para sempre um trabalho que
+  // o usuário já decidiu não fazer. A conta (incluindo o caso de série já feita
+  // em exercício depois dispensado) vive em `lib/workout/skippedExercises`.
+  // O progresso desconta os DISPENSADOS ("não vou fazer esse hoje"): sem isso a
+  // barra jamais chega a 100% e o app cobra para sempre um trabalho que o
+  // usuário decidiu não fazer.
+  //
+  // ⚠️ A conta é INLINE de propósito, e não numa função pura importada — o que
+  // seria o padrão desta base. Motivo medido: aqui o `logs` é montado a partir
+  // de um ref, e passar dado derivado dele para QUALQUER função (de outro módulo
+  // ou local) faz o `react-hooks/refs` acusar acesso a ref durante o render em
+  // toda a cadeia do arquivo — 15 erros, e o husky barra o commit. Verificado
+  // por eliminação: chamada externa com dado FIXO passa limpa; com dado dos logs,
+  // não. Por isso o guard desta regra é de FORMA (ver naoVouFazerHoje.test.ts).
   const { completedSets, totalSets, progressPct, remainingSets } = useMemo(() => {
     let total = 0;
     let done = 0;
@@ -736,15 +801,18 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
       const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
       const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
-      total += count;
+      const dispensado = skippedExercises.has(exIdx);
       for (let i = 0; i < count; i++) {
         const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
-        if (log?.done) done++;
+        const feita = !!log?.done;
+        if (feita) { done++; total++; continue; }
+        if (dispensado) continue;
+        total++;
       }
     });
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     return { completedSets: done, totalSets: total, progressPct: pct, remainingSets: total - done };
-  }, [exercises, logs]);
+  }, [exercises, logs, skippedExercises]);
 
   // ── Prompt automático ao concluir TODOS os exercícios ───────────────────
   // Quando o usuário marca a última série pendente, abre um confirm
@@ -808,8 +876,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     collapsed,
     setCollapsed,
     deferredExercises,
+    skippedExercises,
     deferredPending,
     deferExercise,
+    skipExerciseToday,
+    unskipExercise,
     resumeExercise,
     focusExercise,
     finishing,
@@ -969,6 +1040,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     props.onSavePlateSetup,
     collapsed, setCollapsed, finishing,
     deferredExercises, deferredPending, deferExercise, resumeExercise, focusExercise,
+    skippedExercises, skipExerciseToday, unskipExercise,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,

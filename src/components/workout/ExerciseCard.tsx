@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, RotateCcw, Share2, SkipForward, Trash2, Trophy, Weight } from 'lucide-react';
+import { ArrowDown, Ban, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, RotateCcw, Share2, SkipForward, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import { stripRedundantOpening, noteNeedsExpand } from './helpers/exerciseNotePreview';
@@ -90,6 +90,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
     deferredExercises,
     deferExercise,
     resumeExercise,
+    skippedExercises,
+    skipExerciseToday,
+    unskipExercise,
   } = useWorkoutContext();
 
   const teamCtx = useSafeTeamWorkout();
@@ -145,6 +148,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
   // e o app leva o usuário ao próximo pendente. Não oferecemos a ação num
   // exercício já CONCLUÍDO: adiar o que acabou de ser feito não quer dizer nada.
   const isDeferred = !!deferredExercises?.has(exIdx);
+  // "Não vou fazer esse hoje": diferente do adiar, sai da CONTA — o progresso
+  // desconta as séries que faltavam, e o finalizar não cobra.
+  const isSkipped = !!skippedExercises?.has(exIdx);
   // ...e só quando existe PARA ONDE ir. No último exercício pendente, adiar não
   // leva a lugar nenhum: o controller já trata isso ficando parado
   // (`nextPendingExercise` devolve null), mas o botão continuava oferecendo a
@@ -864,6 +870,31 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
         </div>
       )}
 
+      {isSkipped && (
+        // Neutro, não âmbar: o âmbar do "fazer depois" sinaliza pendência, e
+        // dispensar é o oposto — a decisão está tomada e não há o que cobrar.
+        // Fica FORA do `!collapsedNow` pelo mesmo motivo do adiado: dispensar
+        // recolhe o card, e esconder o "Vou fazer sim" atrás de uma expansão
+        // custaria dois toques exatamente na hora de voltar atrás.
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-neutral-700/60 bg-neutral-800/40 px-3 py-2">
+          <Ban size={14} className="flex-shrink-0 text-neutral-400" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-[11px] leading-snug text-neutral-300">
+            Fora do treino de hoje.
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              try { e.preventDefault(); e.stopPropagation(); } catch { }
+              unskipExercise?.(exIdx);
+            }}
+            className="tap-44 h-9 px-3 inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-neutral-600 bg-neutral-700/50 text-neutral-100 text-xs font-bold active:scale-95 transition-transform"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            Vou fazer sim
+          </button>
+        </div>
+      )}
+
       {plateCalcOpen ? (
         <PlateCalculatorSheet
           isOpen={plateCalcOpen}
@@ -973,6 +1004,24 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
             >
               <SkipForward size={15} aria-hidden="true" />
               <span className="text-sm font-bold">Pular — fazer depois</span>
+            </button>
+          )}
+
+          {!allSetsDone && !isSkipped && typeof skipExerciseToday === 'function' && (
+            // Linha própria, abaixo do "fazer depois", e nesta ORDEM de propósito:
+            // as duas são saídas, mas adiar é a reversível e por isso vem antes.
+            //
+            // ⚠️ Sem `temDestinoAoAdiar` aqui: dispensar não precisa de destino.
+            // Adiar o último pendente não leva a lugar nenhum (por isso o botão
+            // some), mas dispensar o último é legítimo — é dizer "terminei o que
+            // ia fazer hoje", e o progresso passa a refletir isso.
+            <button
+              type="button"
+              onClick={() => skipExerciseToday?.(exIdx)}
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/50 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-all"
+            >
+              <Ban size={15} aria-hidden="true" />
+              <span className="text-sm font-bold">Não vou fazer esse hoje</span>
             </button>
           )}
 
