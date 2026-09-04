@@ -57,6 +57,24 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
         } catch { }
     }, [deferredExercises, deferredKey]);
 
+    // ---- "Não vou fazer esse hoje" (persisted) ----
+    // Mesmo armazenamento do `deferred`, e pelo mesmo motivo: é estado de
+    // EXECUÇÃO desta sessão, não do plano. A chave é derivada da do adiar para
+    // não inventar um segundo esquema de nome.
+    //
+    // ⚠️ Dispensar ≠ adiar: o adiado continua PENDENTE e é cobrado ao finalizar;
+    // o dispensado sai da conta (ver lib/workout/skippedExercises).
+    const skippedKey = deferredKey ? `${deferredKey}.skipped` : null;
+    const [skippedExercises, setSkippedExercises] = useState<Set<number>>(() => readIndexSet(skippedKey));
+
+    useEffect(() => {
+        if (!skippedKey) return;
+        try {
+            if (typeof window === 'undefined') return;
+            window.localStorage.setItem(skippedKey, JSON.stringify([...skippedExercises]));
+        } catch { }
+    }, [skippedExercises, skippedKey]);
+
     // ---- Notes & UI ----
     const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
     const [inviteOpen, setInviteOpen] = useState<boolean>(false);
@@ -217,6 +235,7 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
         collapsed, setCollapsed,
         // "Fazer depois"
         deferredExercises, setDeferredExercises,
+        skippedExercises, setSkippedExercises,
         // Notes & UI flags
         openNotesKeys, setOpenNotesKeys,
         inviteOpen, setInviteOpen,
