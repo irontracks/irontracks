@@ -2119,19 +2119,34 @@ O que É verificável no simulador continua sendo o de sempre: o que reage a TOQ
 e a DIGITAÇÃO. A autocorreção, por exemplo, se prova em 30 segundos — digitar
 "Bi A Drop teste" num campo de nome e ler o que ficou lá.
 
-⚠️ **Animação curta não se fotografa: GRAVE.** O `screenshot` leva 2–3 s de
-ida-e-volta, então qualquer coisa que dure menos que isso já terminou quando a
-foto sai. Em 05/09/2026 tentei pegar a celebração de fim de treino (3,1 s de
-ponta a ponta) e ela nunca apareceu na captura — não por estar quebrada, e sim
-por latência. Perder duas rodadas nisso é o custo de não saber que existe:
+⚠️ **Animação não se PROVA no simulador — se prova no navegador.** O
+`screenshot` leva 2–3 s de ida-e-volta, então qualquer coisa mais curta que isso
+já terminou quando a foto sai. Em 05/09/2026 a celebração de fim de treino nunca
+apareceu em captura nenhuma — não por estar quebrada, e sim por latência.
+
+O que de fato funcionou, quatro vezes na mesma noite (centralização, perfil de
+crescimento e a entrada do véu duas vezes): **reproduzir os keyframes num HTML
+solto e AMOSTRAR o computed style** ao longo do tempo. Devolve número, não
+impressão, e responde em segundos.
+
+```js
+const escala = () => new DOMMatrixReadOnly(getComputedStyle(el).transform).a
+// amostre em marcos (0, 500, 900, 1500…) e leia a curva que sai
+```
+
+Foi assim que saíram "0,04 → 0,757 na metade → 1 sem passar de 1" e "véu em 0
+enquanto o relatório está sozinho na tela". Um caso de teste não pega isso:
+jsdom não computa animação.
+
+⚠️ **`recordVideo` NÃO substitui isso** — ele MOSTRA, não prova, porque o agente
+não assiste a vídeo. Serve para o dono ver, e só quando ele pedir (**print
+continua proibido** — regra de 15/08/2026):
 
 ```bash
 xcrun simctl io <UDID> recordVideo --codec=h264 saida.mp4   # Ctrl-C encerra
 ```
 
-Medido: 92 KB para 4 s. O vídeo pode ir ao dono por `SendUserFile` quando ele
-pedir — mas **print continua proibido** (ver a regra de 15/08/2026), e vídeo só
-quando ele pedir.
+Medido: 92 KB para 4 s.
 
 ### O que ficou provado ONDE (não misturar as duas coisas)
 
@@ -2810,11 +2825,20 @@ Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a sess
 Aconteceu em 31/07/2026 (1.18 → 1.19) e **de novo em 22/08/2026 (1.20 → 1.21)** —
 nas duas vezes o archive rodou inteiro antes de o upload ser recusado. Se for
 subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION`
-ANTES — evita um ciclo perdido (~5 min). **Estado em 02/09/2026: versão 1.21.2,
-build 82 SUBMETIDA à review** (auto-release ligado; leva as correções do app do
-Apple Watch — ver `docs/APPLE_WATCH.md`). A 1.21.2 ainda não tinha sido
-publicada, então a build nova entrou nela sem precisar bumpar a versão pública —
-`node scripts/ios-submit.mjs --dry-run` diz isso de graça, antes de arquivar. O guard `superficiePublicaHonesta`
+ANTES — evita um ciclo perdido (~5 min).
+
+⚠️ **Estado datado, e ele APODRECEU em três dias — confira antes de acreditar.**
+Esta linha dizia "versão 1.21.2, build 82 SUBMETIDA à review" (02/09/2026).
+Medido em **05/09/2026** com `node scripts/ios-submit.mjs --dry-run`: a 1.21.2 já
+saiu, a **build 83 está VALID** e a marketing version dela, **1.21.3, é NOVA na
+loja** — ou seja, o script *criaria* a versão, porque ela não existe no App Store
+Connect. Traduzindo: **a build 83 foi subida e nunca submetida**, e com ela ficou
+parada a abertura sem flash branco (#1057) e a correção do crash da voz.
+Submeter é decisão do dono.
+
+**A lição, que vale mais que o número:** o `--dry-run` responde o estado real de
+graça, em segundos e sem tocar em nada. Qualquer afirmação de versão aqui é
+pista datada — rode ele em vez de reler esta linha. O guard `superficiePublicaHonesta`
 cobra que `APP_VERSION` (`lib/appVersion.ts`) espelhe a `MARKETING_VERSION` —
 bump no pbxproj sem o espelho reprova no CI.
 O bump é `sed` nas 10 ocorrências do `pbxproj`, e o release refaz com
