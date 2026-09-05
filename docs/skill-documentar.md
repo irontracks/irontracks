@@ -147,9 +147,14 @@ grep -in "<palavra-chave da nota>" CLAUDE.md | head
 ### Fase 5½ — O orçamento do arquivo
 
 O `CLAUDE.md` é lido INTEIRO em toda sessão de toda tarefa. Em 25/08/2026 ele
-estava em **2.505 linhas / 184 KB** — ordem de 46 mil tokens de custo fixo,
-antes de qualquer trabalho começar. Uma skill que só acrescenta transforma o
-arquivo num imposto crescente.
+estava em 2.505 linhas; em **05/09/2026, 3.721** — **+49% em onze dias**, ordem
+de 68 mil tokens de custo fixo antes de qualquer trabalho começar. Ou seja: a
+Fase 5½ existe há semanas e **não está segurando nada**. Toda execução acrescenta
+e nenhuma poda de verdade.
+
+Se você está lendo isto numa execução do comando, trate a poda como parte do
+trabalho, não como bônus: entre no arquivo procurando o que a sua tarefa tornou
+redundante ANTES de escrever o que ela acrescenta.
 
 Duas regras concretas:
 
