@@ -679,8 +679,25 @@ select {
    alinhamento em 53 arquivos — custo alto para resolver ergonomia.
 
    `pointer-events: none` no ::after seria um erro: é justamente ele que
-   precisa receber o toque. Sem `content` não existe caixa nenhuma. */
-.tap-44 { position: relative; }
+   precisa receber o toque. Sem `content` não existe caixa nenhuma.
+
+   ⚠️ O `:not()` NÃO é preciosismo — sem ele esta regra SEQUESTRA o
+   posicionamento de quem já declarou o seu. O Tailwind v4 emite as utilities
+   dentro de `@layer utilities` e este arquivo não tem `@layer` nenhum: CSS
+   fora de camada vence CSS em camada SEMPRE, independente de ordem e de
+   especificidade. Ou seja, `class="tap-44 absolute"` computava `relative`.
+
+   Medido em 05/09/2026: o botão de dispensar da celebração de fim de treino
+   era `absolute inset-0 h-full w-full`, virou item de flex de altura cheia e
+   empurrou a frase 599px abaixo do centro — ela apareceu colada no rodapé do
+   iPhone do dono. Havia mais SETE botões no app com `tap-44` + `absolute`
+   (fechar do modal do Dia das Mães, duas lixeiras do Diário de Progresso,
+   dois "voltar" do chat, o X do criador de story e o botão do mapa do
+   cardio), todos posicionados em algum lugar que não é o declarado.
+
+   Conferido no navegador com as camadas reais: com o `:not()` o `absolute`
+   volta a valer e o alvo do botão pequeno continua 44×44. */
+.tap-44:not(.absolute):not(.fixed):not(.sticky) { position: relative; }
 .tap-44::after {
   content: '';
   position: absolute;

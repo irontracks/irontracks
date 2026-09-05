@@ -188,9 +188,41 @@ describe('alvo de toque mínimo de 44pt', () => {
 
   it('a utility existe no CSS e não neutraliza o próprio alvo', () => {
     const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
-    const bloco = css.slice(css.indexOf('.tap-44'))
+    const bloco = css.slice(css.indexOf('.tap-44:'))
     expect(bloco).toContain("content: ''")
     expect(bloco.slice(0, 400)).not.toContain('pointer-events: none')
+  })
+
+  /**
+   * ⚠️ A utility não pode SEQUESTRAR o posicionamento de quem já declarou o seu.
+   *
+   * O Tailwind v4 emite as utilities dentro de `@layer utilities` e o
+   * `globals.css` não tem `@layer` nenhum — CSS fora de camada vence CSS em
+   * camada SEMPRE, independente de ordem e de especificidade. Com
+   * `.tap-44 { position: relative }` solto, `class="tap-44 absolute"` computava
+   * `relative`.
+   *
+   * Medido em 05/09/2026: o botão de dispensar da celebração de fim de treino
+   * (`absolute inset-0 h-full w-full`) virou item de flex de altura cheia e
+   * empurrou a frase 599px abaixo do centro — ela apareceu colada no rodapé do
+   * iPhone do dono. Outros SETE botões do app tinham a mesma combinação.
+   *
+   * O caso mira na EXCLUSÃO, que é o que precisa ficar de pé — não na sintaxe
+   * de hoje.
+   */
+  it('a utility não rouba o posicionamento de quem declarou o seu', () => {
+    const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
+    const regra = css
+      .split('\n')
+      .find((l) => l.includes('.tap-44') && l.includes('position:') && !l.includes('::after'))
+    expect(regra, 'a regra de posicionamento do tap-44 sumiu').toBeTruthy()
+    for (const utility of ['absolute', 'fixed', 'sticky']) {
+      expect(
+        regra,
+        `\`.tap-44\` precisa NÃO se aplicar a quem já é \`${utility}\` — fora de camada ela vence ` +
+          'a utility do Tailwind e o elemento é posicionado no lugar errado, em silêncio.',
+      ).toContain(`:not(.${utility})`)
+    }
   })
 
   it('o feedback de pressão global continua de pé', () => {
