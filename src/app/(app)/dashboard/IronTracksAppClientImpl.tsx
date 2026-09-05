@@ -632,6 +632,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // é "restaurando sessão" — é a navegação em voo. 30s é folgado de propósito (a
     // rota costuma commitar em <1s); se travar além disso, o cap volta a valer.
     const FINISH_NAV_GRACE_MS = 30_000
+    /**
+     * Janela para a CELEBRAÇÃO de fim de treino — curta e separada da de
+     * navegação de propósito.
+     *
+     * `handleFinishSession` grava o carimbo e chama `setView('report')` no mesmo
+     * tique, então na montagem do relatório a diferença é de milissegundos. Os
+     * 5 s são folga para render lento, não uma janela de verdade: reusar os 30 s
+     * da navegação acoplaria duas decisões sem relação, e um dia alguém mexeria
+     * numa quebrando a outra.
+     *
+     * ⚠️ É ESTE gatilho que impede o retorno do defeito de 03/09/2026, quando a
+     * tela de vitória nascia `useState(true)` e comemorava qualquer relatório
+     * aberto pelo histórico — inclusive treino de duas semanas atrás.
+     */
+    const FINISH_CELEBRATION_MS = 5_000
     const justFinishedAtRef = useRef(0)
     const isFinishNavPending = useCallback(() => Date.now() - justFinishedAtRef.current < FINISH_NAV_GRACE_MS, [])
 
@@ -1569,6 +1584,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             isVip={vipAccess?.hasVip}
                                             settings={userSettingsApi?.settings ?? null}
                                             onUpgrade={() => openVipView()}
+                                            justFinished={Date.now() - justFinishedAtRef.current < FINISH_CELEBRATION_MS}
                                             onClose={() => setView(reportBackView || 'dashboard')}
                                             onSaveToTemplate={handlePersistWorkoutTemplateFromSession}
                                         />
