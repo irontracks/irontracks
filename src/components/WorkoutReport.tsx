@@ -57,6 +57,7 @@ import {
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
 import { readCheckinSatisfaction, readCheckinSleepHours } from '@/utils/checkin/metrics'
 import { useMuscleMapWeek } from '@/hooks/useMuscleMapWeek'
+import WorkoutFinishCelebration from '@/components/workout/WorkoutFinishCelebration'
 
 type AnyObj = Record<string, unknown>
 
@@ -83,9 +84,21 @@ interface WorkoutReportProps {
     settings?: AnyObj | null
     onUpgrade?: () => void
     onSaveToTemplate?: (workout: AnyObj) => Promise<{ ok: boolean; mode?: string; error?: string }>
+    /**
+     * O relatório está sendo aberto porque o treino ACABOU de ser finalizado?
+     *
+     * Só então a celebração roda. Abrir o mesmo relatório pelo histórico depois
+     * NÃO comemora — foi exatamente esse o defeito da tela de vitória removida
+     * em 03/09/2026, que nascia ligada e festejava treino de duas semanas atrás.
+     */
+    justFinished?: boolean
 }
 
-const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose, settings, onUpgrade, onSaveToTemplate }: WorkoutReportProps) => {
+const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose, settings, onUpgrade, onSaveToTemplate, justFinished }: WorkoutReportProps) => {
+    // A celebração é decidida UMA vez, na montagem: se ela lesse a prop a cada
+    // render, um re-render depois de a janela expirar a faria sumir no meio do
+    // zoom.
+    const [celebrando, setCelebrando] = useState(() => justFinished === true);
     const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null;
     const reportRef = useRef<HTMLDivElement | null>(null);
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -518,8 +531,26 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     })();
     const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
 
+    // Mesmo ajuste que governa o alarme de descanso — quem desligou o som do app
+    // não quer ser surpreendido pela fanfarra na academia.
+    const celebSettings = settings && typeof settings === 'object' ? (settings as AnyObj) : null
+    const celebSoundEnabled = celebSettings ? celebSettings.enableSounds !== false : true
+    const celebVolume = (() => {
+        const raw = Number(celebSettings?.soundVolume ?? 100)
+        if (!Number.isFinite(raw)) return 1
+        return Math.max(0, Math.min(1, raw / 100))
+    })()
+
     return (
         <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto overflow-x-hidden">
+            {celebrando && (
+                <WorkoutFinishCelebration
+                    workoutTitle={workoutTitleMain}
+                    soundEnabled={celebSoundEnabled}
+                    soundVolume={celebVolume}
+                    onDone={() => setCelebrando(false)}
+                />
+            )}
             {/* Fixed header bar */}
             <div className={`fixed top-0 left-0 right-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-3 md:px-6 pt-safe pb-1.5 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-1.5">
