@@ -16,13 +16,17 @@ import { playFinishSound } from '@/lib/sounds'
  * o que já passou esvazia a celebração. Aqui quem decide é o chamador, com o
  * carimbo do instante da finalização.
  *
- * ⚠️ **O botão de dispensar NÃO pode levar `tap-44`.** A primeira versão levava,
- * e o resultado no iPhone do dono foi a frase encostada no RODAPÉ: a utility é
- * `position: relative` (globals.css, depois do `@import "tailwindcss"`, mesma
- * especificidade → ela vence o `absolute` do Tailwind), o botão virou item de
- * flex com `h-full w-full` e comeu a coluna inteira. Ele já é a tela toda por
- * `inset-0`; o guard de alvo de toque só reclamava por causa do `p-0`, que
- * estimava uma caixa de 20px. Sem `p-0` o guard fica calado por mérito.
+ * ⚠️ Aqui nasceu o defeito do `tap-44`, e ele JÁ FOI ELIMINADO na origem (ver o
+ * comentário da utility no `globals.css`): o botão de dispensar levava a classe
+ * só para calar o guard de alvo de toque, e a frase apareceu encostada no
+ * RODAPÉ do iPhone do dono. A utility era `position: relative` solta, e o
+ * Tailwind v4 emite `.absolute` dentro de `@layer utilities` — CSS fora de
+ * camada vence CSS em camada, então o `absolute` do botão era ignorado e ele
+ * virava item de flex com `h-full w-full`, comendo a coluna inteira.
+ *
+ * Hoje a utility tem `:not(.absolute)` e a combinação é inofensiva. Ela segue
+ * fora daqui por não servir para nada: o botão já é a tela toda por `inset-0`,
+ * e o guard só reclamava por causa do `p-0`, que estimava uma caixa de 20px.
  *
  * O som é o `playFinishSound`, que já existia em `lib/sounds` com ZERO
  * consumidores — um arpejo ascendente (C5→E5→G5→C6). Ele é Web Audio
