@@ -14,6 +14,7 @@ import { logWarn } from '@/lib/logger'
 import {
     playStartSound,
 } from '@/lib/sounds'
+import { limparFinishEmVoo } from '@/lib/workout/finishEmVoo'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { parseCheckinWeightKg, shouldSyncProfileWeight } from '@/utils/checkin/bodyWeightSync'
 import type { ConfirmFn } from '@/contexts/DialogContext'
@@ -292,12 +293,17 @@ export function useWorkoutCrud({
         } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
         setActiveSession(null)
         if (showReport === false) {
+            limparFinishEmVoo()
             setView('dashboard')
             return
         }
         setReportBackView('dashboard')
         setReportData({ current: sessionData, previous: null })
         setView('report')
+        // A navegação commitou: o eco do DELETE já não tem nada para atrapalhar.
+        // Sem isto a marca ficaria de pé até o teto de 15 s, calando por esse
+        // tempo o aviso legítimo de "finalizado em outro dispositivo".
+        limparFinishEmVoo()
     }, [setActiveSession, setReportBackView, setReportData, setView, suppressForeignFinishToastUntilRef, justFinishedAtRef, user?.id])
 
     const handleCreateWorkout = useCallback(() => {

@@ -24,6 +24,7 @@ import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
 import { diffSessionForSync } from '@/lib/sessionSyncDiff'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
 import { readRestorableSession, activeSessionStorageKey } from '@/lib/workout/restoreSessionGate'
+import { finishEmVoo } from '@/lib/workout/finishEmVoo'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -344,11 +345,26 @@ export function useSessionSync({
                                 // de volta → suprime o banner. A janela de 8s vira só reforço
                                 // (cobre cancel/finish disparado milissegundos antes do commit
                                 // local do estado).
-                                const wasForeign = !!activeSessionRef.current
+                                // ⚠️ O eco do PRÓPRIO finish chega ANTES de a
+                                // sessão local ser limpa — quem a limpa é o
+                                // callback atrasado pelos 280 ms da animação de
+                                // saída. Nessa janela os dois sinais acima
+                                // mentem: `activeSessionRef` ainda tem sessão
+                                // (parece de fora) e a janela de 8 s ainda nem
+                                // foi aberta. `finishEmVoo` é marcado ANTES do
+                                // POST, então é o único que já vale aqui.
+                                const meuProprioFinish = finishEmVoo()
+                                const wasForeign = !!activeSessionRef.current && !meuProprioFinish
                                 const suppressedByWindow = Date.now() < (suppressForeignFinishToastUntilRef.current || 0)
                                 suppressForeignFinishToastUntilRef.current = 0
                                 setActiveSession(null)
-                                setView((prev: string) => (prev === 'active' ? 'dashboard' : prev))
+                                // Navegar aqui, durante o meu próprio finish,
+                                // desmonta o `ActiveWorkout` e o cleanup dele
+                                // CANCELA o timer que abriria o relatório: a
+                                // tela terminava no dashboard, sem erro nenhum.
+                                if (!meuProprioFinish) {
+                                    setView((prev: string) => (prev === 'active' ? 'dashboard' : prev))
+                                }
                                 try { localStorage.removeItem(`irontracks.activeSession.v2.${uid}`) } catch { }
                                 if (wasForeign && !suppressedByWindow) {
                                     try {

@@ -19,6 +19,7 @@ import { isObject } from '../utils'
 import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync'
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload'
 import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
+import { marcarFinishEmVoo } from '@/lib/workout/finishEmVoo'
 import { logWarn } from '@/lib/logger'
 import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
 import { apiAi } from '@/lib/api/ai'
@@ -168,6 +169,13 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
         try {
           let onlineSuccess = false
+
+          // ⚠️ ANTES do POST, e não depois: a rota APAGA a linha de
+          // `active_workout_sessions`, e o DELETE ecoa pelo Realtime enquanto a
+          // animação de saída ainda está rodando. Sem esta marca o eco levava o
+          // app pro dashboard e o relatório nunca abria — ver o cabeçalho de
+          // `lib/workout/finishEmVoo`.
+          marcarFinishEmVoo()
 
           if (isOnline()) {
             try {
