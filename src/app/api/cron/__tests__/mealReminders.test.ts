@@ -7,6 +7,8 @@
  * EXERCITADA com o Supabase mockado, e o teste lê a notificação que sairia.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import path from 'node:path'
 
 const { estado } = vi.hoisted(() => ({
   estado: {
@@ -147,6 +149,12 @@ describe('cron meal-reminders', () => {
     expect(estado.notifs).toHaveLength(1)
   })
 
+  it('não notifica quando o plano não tem refeição nenhuma', async () => {
+    estado.rows = [{ user_id: UID, days: [] }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(0)
+  })
+
   it('⚠️ a hora é BRT: 22:30 não dispara ao meio-dia do servidor', async () => {
     // Mutação-alvo: trocar `instanteBrt` por UTC. Às 15:02Z o servidor está em
     // 15:02 e o usuário em 12:02 — um plano de 15:00 disparia em UTC e não deve.
@@ -154,4 +162,55 @@ describe('cron meal-reminders', () => {
     await GET(req())
     expect(estado.notifs).toHaveLength(0)
   })
+})
+
+/**
+ * ⚠️ O agendamento deste cron NÃO mora no `vercel.json`.
+ *
+ * A conta Vercel do projeto é HOBBY, e o Hobby só aceita expressão DIÁRIA: uma
+ * entrada de 5 em 5 minutos é recusada ANTES de o deploy existir — o check do PR
+ * fica vermelho com "Deployment failed" e um link para a página de preços, sem
+ * log de build para explicar (medido em 05/09/2026, PR #1073). Quem quiser
+ * "consertar" a ausência do cron adicionando a linha lá derruba o deploy inteiro,
+ * e o sintoma não diz o porquê. Este guard diz.
+ */
+describe('meal-reminders — o agendamento é do pg_cron, não da Vercel', () => {
+    const raiz = path.resolve(__dirname, '../../../../..')
+    const vercelJson = JSON.parse(readFileSync(path.join(raiz, 'vercel.json'), 'utf8')) as {
+        crons?: Array<{ path: string; schedule: string }>
+    }
+
+    it('o cron não está no vercel.json', () => {
+        const nossos = (vercelJson.crons ?? []).filter((c) => c.path.includes('meal-reminders'))
+        expect(
+            nossos,
+            'O plano Hobby recusa cron não-diário e o deploy falha sem log. O agendamento vive na migration.',
+        ).toEqual([])
+    })
+
+    it('nenhum cron da Vercel usa expressão sub-diária', () => {
+        // A regra vale para a lista inteira, não só para este cron: o próximo de
+        // 5 em 5 minutos derrubaria o deploy do mesmo jeito. "Uma vez por dia"
+        // significa minuto E hora fixos — qualquer curinga, passo, lista ou
+        // intervalo nesses dois campos dispara mais de uma vez.
+        const naoEhValorFixo = (campo: string) => /[*/,-]/.test(campo)
+        const subdiarios = (vercelJson.crons ?? []).filter((c) => {
+            const [minuto = '', hora = ''] = c.schedule.split(/\s+/)
+            return naoEhValorFixo(minuto) || naoEhValorFixo(hora)
+        })
+        expect(subdiarios, 'o plano Hobby só aceita cron diário').toEqual([])
+    })
+
+    it('existe a migration que agenda o job', () => {
+        const dir = path.join(raiz, 'supabase/migrations')
+        const arquivo = readdirSync(dir).find((f) => f.includes('meal_reminders_pg_cron'))
+        expect(arquivo, 'sem a migration, nada dispara o lembrete').toBeTruthy()
+        const sql = readFileSync(path.join(dir, String(arquivo)), 'utf8')
+        expect(sql).toContain("cron.schedule(")
+        expect(sql).toContain('/api/cron/meal-reminders')
+        // O segredo vem do Vault: hardcodá-lo aqui o deixaria em texto puro na
+        // definição do job e no arquivo versionado.
+        expect(sql).toContain('vault.decrypted_secrets')
+        expect(sql).not.toMatch(/Bearer [A-Za-z0-9_-]{8,}/)
+    })
 })

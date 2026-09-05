@@ -13,6 +13,13 @@ export const dynamic = 'force-dynamic'
 /**
  * Cron a cada 5 minutos — "está na hora do Almoço".
  *
+ * ⚠️ Quem dispara é o **pg_cron do Supabase**, não o `vercel.json`: a conta
+ * Vercel deste projeto é HOBBY, e o Hobby só aceita expressão DIÁRIA — uma
+ * entrada de 5 em 5 minutos lá derruba o deploy antes de ele existir (o check
+ * do PR fica vermelho sem log nenhum). O agendamento está em
+ * `supabase/migrations/20260905075040_meal_reminders_pg_cron.sql`; quem procurar
+ * este cron no `vercel.json` não vai achar, e é de propósito.
+ *
  * A fonte é o PLANO do usuário (`student_diet_plans`, `meals[].time`), não uma
  * tabela de lembretes: o cardápio e a hora de comê-lo são o mesmo fato, e duas
  * tabelas divergiriam no dia em que alguém trocasse uma refeição.
