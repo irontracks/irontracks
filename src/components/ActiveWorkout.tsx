@@ -54,7 +54,31 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   // Exit animation — intercept back/finish callbacks to play slide-down before unmounting
   const [isExiting, setIsExiting] = React.useState(false);
   const exitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
+  /**
+   * O callback que a animação de saída ainda deve, quando ele NÃO pode ser
+   * perdido.
+   *
+   * ⚠️ O cleanup abaixo cancelava o timer e ia embora, então qualquer
+   * desmontagem dentro dos 280 ms engolia a transição inteira — sem erro e sem
+   * log. Foi assim que o relatório de fim de treino deixou de abrir (o eco do
+   * DELETE do Realtime navegava pro dashboard e desmontava esta tela no meio da
+   * janela). A causa daquele caso está resolvida em `lib/workout/finishEmVoo`;
+   * isto aqui é a defesa da CLASSE — a próxima coisa que desmontar esta tela na
+   * hora errada não vai sumir com a navegação.
+   *
+   * Só o finish é obrigatório. `_exitOnBack` fica de fora de propósito: se a
+   * tela já saiu por outro caminho, um "voltar" atrasado navegaria por cima do
+   * destino que o usuário acabou de alcançar.
+   */
+  const exitCbObrigatorioRef = React.useRef<(() => void) | null>(null);
+  React.useEffect(() => () => {
+    if (!exitTimerRef.current) return;
+    clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = null;
+    const cb = exitCbObrigatorioRef.current;
+    exitCbObrigatorioRef.current = null;
+    if (cb) { try { cb(); } catch (e) { logError('ActiveWorkout.exitCleanup', e); } }
+  }, []);
 
   // Ao finalizar OU cancelar o treino, sai da sessão de dupla (se houver): o RPC
   // encerra a sessão (host) ou remove o participante, e o parceiro recebe o
@@ -62,15 +86,17 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   // parceiro achava que o outro ainda treinava. Mantido em ref pra ser chamado
   // do enhancedController (declarado antes do teamCtx).
   const endTeamSessionRef = React.useRef<() => void>(() => {});
-  const triggerExit = React.useCallback((cb: () => void) => {
+  const triggerExit = React.useCallback((cb: () => void, obrigatorio = false) => {
     if (exitTimerRef.current) return; // already exiting — prevent double-tap
     setIsExiting(true);
+    exitCbObrigatorioRef.current = obrigatorio ? cb : null;
     exitTimerRef.current = setTimeout(() => {
       // ── Clear BEFORE calling cb so future attempts aren't permanently blocked.
       // Previously the ref kept the old timeout ID after firing, causing
       // `if (exitTimerRef.current) return` to block ALL subsequent calls —
       // including cancel retries after a failed Finalizar.
       exitTimerRef.current = null;
+      exitCbObrigatorioRef.current = null;
       try { cb(); } catch (e) { logError('ActiveWorkout.triggerExit', e); }
     }, 280);
   }, []);
@@ -187,7 +213,9 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     return {
       ...controller,
       onFinish: originalOnFinish
-        ? (s: unknown, saved: boolean) => triggerExit(() => { try { endTeamSessionRef.current?.(); } catch { } originalOnFinish(s, saved); })
+        // `true` = obrigatório: esta navegação não pode ser engolida por uma
+        // desmontagem no meio da animação (ver o cleanup lá em cima).
+        ? (s: unknown, saved: boolean) => triggerExit(() => { try { endTeamSessionRef.current?.(); } catch { } originalOnFinish(s, saved); }, true)
         : originalOnFinish,
       // cancelWorkout bypasses triggerExit entirely — the cancel flow must
       // NEVER be blocked by a stale exitTimerRef from a previous Finalizar
