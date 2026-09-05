@@ -578,6 +578,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyTrialEnding = Boolean(draft?.notifyTrialEnding ?? true)
     const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
     const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
+    const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
 
     return (
@@ -904,9 +905,16 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                 {/* ── Lembretes ─────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
                     <div className="t-meta text-xs">Lembretes</div>
-                    {/* "Refeições" e "Refeição esquecida" removidos até religar o driver
-                        (a rota nutrition/reminders/trigger precisa de cron a cada minuto —
-                        Supabase pg_cron; a infra atual é diária). A rota fica dormente. */}
+                    {/* "Refeição esquecida" (notifyMissedMeal) continua sem toggle: aquele
+                        driver nunca existiu. "Refeições" voltou em 05/09/2026, quando o
+                        cron `meal-reminders` passou a ler o horário do próprio plano. */}
+                    <NotifRow
+                        title="Refeições"
+                        description="No horário que você definir para cada refeição do seu plano alimentar."
+                        checked={notifyMealReminders}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
+                    />
                     <NotifRow
                         title="Meta diária atingida"
                         description="Quando você bate a meta de calorias ou proteína do dia."

@@ -130,11 +130,12 @@ export const UserSettingsSchema = z
     notifyTrialEnding: z.boolean().default(true),
     notifyBillingIssue: z.boolean().default(true),
     notifyDailyGoal: z.boolean().default(true),
-    // notifyMealReminders / notifyMissedMeal: os TOGGLES foram removidos da UI até
-    // religar o driver (a rota nutrition/reminders/trigger precisa de cron a cada
-    // minuto — pg_cron; a infra atual é diária). As PREFS ficam no schema porque a
-    // rota + o map de preferências (notifyFollowers) seguem dormentes/prontos; ao
-    // religar o pg_cron, é só devolver os dois toggles.
+    // notifyMissedMeal continua SEM toggle na UI: aquele driver ("você não
+    // registrou o almoço") nunca chegou a existir — vivia na rota
+    // nutrition/reminders/trigger, que lia uma tabela nunca criada e foi removida
+    // em 05/09/2026. A pref fica no schema porque o map de tipos a referencia.
+    // notifyMealReminders VOLTOU à UI na mesma data: o cron `meal-reminders` lê o
+    // horário do próprio plano alimentar.
     notifyMissedMeal: z.boolean().default(false),
     notifyChallenges: z.boolean().default(true),
     notifyMealReminders: z.boolean().default(true),
