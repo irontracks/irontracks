@@ -21,6 +21,7 @@ import {
 import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
 import { buildWeightReference } from '@/lib/workout/weightOutlier';
 import { resolveWorkoutKey } from '@/lib/workout/workoutKey';
+import { descreverProximaSerie } from '@/lib/workout/proximaSerie';
 import { buildExerciseGroups } from '@/lib/workoutGroups';
 import {
   exerciseNameAt,
@@ -473,33 +474,28 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           ctx.exerciseName = String(currentEx?.name || '').trim() || undefined;
         }
 
-        // Compute nextSetLabel: what set/exercise comes AFTER the one the user
-        // just completed. Used by the BORA overlay to show "3ª série de Supino"
-        // or "1ª série de Agachamento" so users know what's next without having
-        // to close the overlay.
+        // O que vem DEPOIS da série concluída — nome, número, e a carga/reps que
+        // o campo daquela série mostra agora. A tela de fim de descanso desenha
+        // isso; sem o peso, ela ocupa a tela inteira sem responder a única
+        // pergunta que o atleta tem de pé na academia.
+        //
+        // `logsRef` e não `logs`: no instante da conclusão o React pode ainda não
+        // ter processado a última escrita, e o peso que o motor acabou de sugerir
+        // para a próxima série chegaria vazio.
         if (!ctx.nextSetLabel && Number.isFinite(currentSetIdx) && currentSetIdx >= 0) {
-          const setsHeader = Math.max(0, Number.parseInt(String(currentEx?.sets ?? '0'), 10) || 0);
-          const sdRaw = currentEx?.setDetails ?? (currentEx as Record<string, unknown>)?.set_details;
-          const sdLen = Array.isArray(sdRaw) ? sdRaw.length : 0;
-          const setsCount = Math.max(setsHeader, sdLen);
-
-          if (currentSetIdx + 1 < setsCount) {
-            // Next set of the SAME exercise
-            const name = String(currentEx?.name || '').trim();
-            ctx.nextSetLabel = name
-              ? `${currentSetIdx + 2}ª série de ${name}`
-              : `${currentSetIdx + 2}ª série`;
-          } else {
-            // Move to next exercise's first set
-            const nextEx = exArr[currentExIdx + 1] as Record<string, unknown> | undefined;
-            if (nextEx) {
-              const nextName = String(nextEx?.name || '').trim();
-              ctx.nextSetLabel = nextName
-                ? `1ª série de ${nextName}`
-                : '1ª série do próximo exercício';
-            }
-            // else: last set of last exercise — leave nextSetLabel undefined
+          const proxima = descreverProximaSerie({
+            exercises: exArr,
+            logs: logsRef.current,
+            exIdx: currentExIdx,
+            setIdx: currentSetIdx,
+          });
+          if (proxima) {
+            ctx.nextSetLabel = proxima.label;
+            ctx.next = proxima;
           }
+          // Sem próxima série (última do último exercício) os dois campos ficam
+          // ausentes de propósito: a tela cai no rótulo genérico em vez de
+          // anunciar um "próximo" que não existe.
         }
       }
 

@@ -38,7 +38,13 @@ vi.mock('@/utils/native/irontracksNative', () => ({
     updateWorkoutRestCountdown: vi.fn(async () => undefined),
 }))
 
-const FLASH = /BORA!/i
+/**
+ * Âncora no que vai FICAR, não no texto do momento: este caso já mirava em
+ * "BORA!" e ficou sem alvo quando a tela foi reorganizada (05/09/2026) e o
+ * grito virou eyebrow. O `role="status"` é o contrato da camada — ela anuncia
+ * o fim do descanso para o leitor de tela — e não muda com a redação.
+ */
+const acharFlash = () => screen.queryByRole('status')
 
 const montarDescansoTerminando = () =>
     render(
@@ -91,23 +97,23 @@ describe('RestTimerOverlay — fiação', () => {
     it('sem modal, o flash APARECE (senão o teste abaixo não prova nada)', async () => {
         montarDescansoTerminando()
         await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-        await waitFor(() => expect(screen.getByText(FLASH)).toBeTruthy())
+        await waitFor(() => expect(acharFlash()).toBeTruthy())
     })
 
     it('com modal já aberto, o flash NÃO aparece', async () => {
         abrirModal()
         montarDescansoTerminando()
         await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-        expect(screen.queryByText(FLASH)).toBeNull()
+        expect(acharFlash()).toBeNull()
     })
 
     it('modal aberto DEPOIS do flash derruba o flash', async () => {
         montarDescansoTerminando()
         await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
-        await waitFor(() => expect(screen.getByText(FLASH)).toBeTruthy())
+        await waitFor(() => expect(acharFlash()).toBeTruthy())
 
         await act(async () => { abrirModal(); await vi.advanceTimersByTimeAsync(50) })
-        await waitFor(() => expect(screen.queryByText(FLASH)).toBeNull())
+        await waitFor(() => expect(acharFlash()).toBeNull())
     })
 
     it('a barra do descanso continua na tela — o aviso não foi calado', async () => {
