@@ -90,9 +90,18 @@ describe('a frase NASCE no centro e vem crescendo', () => {
         expect(celebra).toMatch(/transform: scale\(\$\{ESCALA_INICIAL\}\)/)
     })
 
+    /**
+     * O piso subiu de 1200 para 2000 porque o dono pediu "mais lento" DUAS
+     * vezes: saindo de 620 ms e depois de 1,5 s. Um guard que aceitasse 1,2 s
+     * deixaria a próxima "otimização" desfazer os dois pedidos sem ninguém
+     * perceber — e o custo de perceber é ele testar no iPhone de novo.
+     */
     it('a entrada é LENTA — é o tempo que compra a impressão de profundidade', () => {
         const ms = numeroDe(/MS_ENTRADA = (\d+)/)
-        expect(ms, 'a entrada voltou a ser curta demais para ler como emergência').toBeGreaterThanOrEqual(1200)
+        expect(
+            ms,
+            'a entrada voltou a ser curta demais para ler como emergência — o dono pediu mais lento duas vezes',
+        ).toBeGreaterThanOrEqual(2000)
     })
 
     it('parte devagar e desacelera no fim — sem overshoot', () => {
@@ -108,9 +117,36 @@ describe('a frase NASCE no centro e vem crescendo', () => {
         expect(y2, 'overshoot voltou — a frase bate no tamanho em vez de pousar').toBeLessThanOrEqual(1)
     })
 
-    it('o fundo é INFINITO: opaco, sem borda que denuncie a camada', () => {
-        expect(celebra).toMatch(/background: '#0a0a0a'/)
-        expect(celebra, 'fundo com alpha deixa o relatório transparecer por trás').not.toMatch(/background: 'rgba\(/)
+    /**
+     * "Fundo infinito" nunca foi "opaco" — é NÃO TER BORDA que denuncie uma
+     * camada por cima. A primeira versão deste caso exigia `#0a0a0a` chapado, e
+     * isso escondia o relatório inteiro: o dono pediu justamente o contrário
+     * ("aparece a tela do relatório, aí sim o Motion sai dessa tela").
+     *
+     * O que precisa ficar de pé é o degradê alcançar transparência TOTAL na
+     * borda — com qualquer alpha residual ali existe um retângulo visível, e a
+     * celebração deixa de sair de dentro da tela.
+     */
+    it('o fundo não tem borda: o degradê chega a zero na extremidade', () => {
+        expect(celebra, 'chapa opaca esconde o relatório que o dono quer ver primeiro')
+            .not.toMatch(/background: '#[0-9a-f]{6}'/i)
+        expect(celebra).toMatch(/radial-gradient/)
+        expect(celebra, 'sem alpha 0 na ponta sobra um retângulo visível').toMatch(/rgba\(10,10,10,0\)\s*100%/)
+    })
+
+    /**
+     * ⚠️ A batida em que NADA acontece. Sem ela o véu entra no mesmo instante do
+     * mount e o usuário nunca chega a ver o relatório — a celebração parece
+     * estar sobre um vazio preto em vez de sair de dentro da tela dele.
+     */
+    it('o relatório fica sozinho na tela antes de a frase nascer', () => {
+        const espera = Number(celebra.match(/MS_ESPERA = (\d+)/)?.[1])
+        expect(espera, 'a batida inicial sumiu').toBeGreaterThanOrEqual(250)
+        // O atraso vale para os TRÊS: véu, frase e som. Um deles sem ele quebra
+        // a leitura — fanfarra antes da frase é o caso mais gritante.
+        expect(celebra, 'o véu precisa esperar').toMatch(/celebra-veu[^`]*\$\{MS_ESPERA\}ms both/)
+        expect(celebra, 'a frase precisa esperar').toMatch(/celebra-nasce[^`]*\$\{MS_ESPERA\}ms both/)
+        expect(celebra, 'o som precisa esperar').toMatch(/playFinishSound[\s\S]{0,200}?\}, MS_ESPERA\)/)
     })
 
     /**

@@ -36,14 +36,32 @@ import { playFinishSound } from '@/lib/sounds'
  */
 
 /**
- * A entrada é LENTA de propósito (pedido do dono, 05/09/2026): em ~600 ms a
- * frase só "aparecia maior"; é o tempo longo que compra a leitura de estar
- * saindo de dentro da tela. A leitura é curta porque a frase já passou 1,5 s
- * legível enquanto crescia.
+ * A entrada é LENTA de propósito, e o dono pediu isso DUAS vezes (05/09/2026):
+ * primeiro saindo de 620 ms — em que a frase só "aparecia maior" — e depois de
+ * novo, saindo de 1,5 s. É o tempo longo que compra a leitura de estar saindo
+ * de dentro da tela: em movimento, devagar é o que lê como profundidade.
+ *
+ * ⚠️ Antes de acelerar isto "porque 4,7 s é muito", saiba que os dois pedidos
+ * foram nessa direção. Quem acha longo tem a saída: um toque encerra na hora,
+ * e a celebração acontece UMA vez por treino.
  */
-const MS_ENTRADA = 1500
+const MS_ENTRADA = 2400
 const MS_LEITURA = 1100
-const MS_SAIDA = 520
+const MS_SAIDA = 640
+
+/**
+ * A batida em que NADA acontece — o relatório fica sozinho na tela.
+ *
+ * ⚠️ Sem ela o véu entrava no mesmo instante do mount e o usuário nunca via o
+ * relatório: a celebração parecia estar por cima de um vazio preto, e não
+ * saindo de dentro da tela dele (pedido do dono, 05/09/2026 — "aparece a tela
+ * do relatório, aí sim o Motion sai dessa tela").
+ *
+ * Não é um `setTimeout`: é `animation-delay` com `fill-mode: both`, então
+ * durante a espera o véu já está em opacidade 0 e a frase em `ESCALA_INICIAL`.
+ * Um estado a mais no React só para segurar meio segundo seria ruído.
+ */
+const MS_ESPERA = 520
 
 /**
  * O tamanho em que a frase NASCE. Precisa ser quase um ponto — em 0,35 (a
@@ -82,16 +100,19 @@ export default function WorkoutFinishCelebration({
     })
 
     useEffect(() => {
-        // O som sai uma vez, no mesmo instante em que a frase nasce. Falhar aqui
-        // não pode derrubar a celebração: em iOS o AudioContext pode estar
-        // interrompido (ligação, Siri) e `playFinishSound` já engole isso.
-        if (soundEnabled) {
+        // O som sai uma vez, no mesmo instante em que a frase NASCE — por isso
+        // ele também espera a batida em que o relatório fica sozinho. Tocando no
+        // mount, a fanfarra chegava antes de haver o que comemorar na tela.
+        // Falhar aqui não pode derrubar a celebração: em iOS o AudioContext pode
+        // estar interrompido (ligação, Siri) e `playFinishSound` já engole isso.
+        const tSom = setTimeout(() => {
+            if (!soundEnabled) return
             try { playFinishSound({ enabled: true, volume: soundVolume }) } catch { /* som é acessório */ }
-        }
+        }, MS_ESPERA)
 
-        const tSaida = setTimeout(() => setSaindo(true), MS_ENTRADA + MS_LEITURA)
-        const tFim = setTimeout(() => doneRef.current(), MS_ENTRADA + MS_LEITURA + MS_SAIDA)
-        return () => { clearTimeout(tSaida); clearTimeout(tFim) }
+        const tSaida = setTimeout(() => setSaindo(true), MS_ESPERA + MS_ENTRADA + MS_LEITURA)
+        const tFim = setTimeout(() => doneRef.current(), MS_ESPERA + MS_ENTRADA + MS_LEITURA + MS_SAIDA)
+        return () => { clearTimeout(tSom); clearTimeout(tSaida); clearTimeout(tFim) }
     }, [soundEnabled, soundVolume])
 
     // Tocar encerra na hora: quem já viu não deve esperar o relatório.
@@ -111,12 +132,20 @@ export default function WorkoutFinishCelebration({
             aria-live="polite"
             className="fixed inset-0 z-[1300] flex flex-col items-center justify-center overflow-hidden text-center"
             style={{
-                // OPACO. Com alpha, o relatório aparecia por trás e entregava
-                // que isto é uma camada — o "fundo infinito" pedido pelo dono é
-                // justamente não haver borda nem transparência que denuncie.
-                background: '#0a0a0a',
-                animation: `celebra-veu ${saindo ? MS_SAIDA : 160}ms ease-out ${saindo ? 'forwards' : 'backwards'}`,
-                animationDirection: saindo ? 'reverse' : 'normal',
+                // Poço RADIAL, não chapa opaca: escuro no centro (onde a frase
+                // pousa e precisa de contraste) e TRANSPARENTE na borda, então o
+                // relatório continua visível em volta e a celebração lê como
+                // saindo de dentro dele. É o "fundo infinito" do pedido anterior
+                // — o que não pode haver é BORDA denunciando uma camada —, agora
+                // sem esconder a tela que o dono quer ver primeiro.
+                background:
+                    'radial-gradient(120% 75% at 50% 50%, rgba(10,10,10,0.97) 0%,'
+                    + ' rgba(10,10,10,0.93) 38%, rgba(10,10,10,0.55) 72%, rgba(10,10,10,0) 100%)',
+                // Entra JUNTO com o crescimento da frase (não antes), e depois da
+                // batida em que o relatório fica sozinho.
+                animation: saindo
+                    ? `celebra-veu ${MS_SAIDA}ms ease-out forwards reverse`
+                    : `celebra-veu ${Math.round(MS_ENTRADA * 0.7)}ms ease-out ${MS_ESPERA}ms both`,
             }}
         >
             <button
@@ -141,7 +170,10 @@ export default function WorkoutFinishCelebration({
                                 // tamanho normal em vez de bater nele. Sem
                                 // overshoot: o repique é vocabulário de "pop",
                                 // e aqui a frase está emergindo, não pipocando.
-                                : `celebra-nasce ${MS_ENTRADA}ms cubic-bezier(0.5, 0, 0.2, 1) both`,
+                                // O `MS_ESPERA` de atraso com `both` deixa a
+                                // frase parada em `ESCALA_INICIAL` e invisível
+                                // enquanto o relatório fica sozinho na tela.
+                                : `celebra-nasce ${MS_ENTRADA}ms cubic-bezier(0.5, 0, 0.2, 1) ${MS_ESPERA}ms both`,
                         }
                 }
             >
