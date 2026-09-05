@@ -116,10 +116,33 @@ describe('horariosDoPlano — o que o editor mostra', () => {
   it('traz o horário já gravado', () => {
     const dias = aplicarHorarios(semana(), { 'Café da manhã': '07:00', Almoço: '12:00' })
     expect(horariosDoPlano(dias)).toEqual([
-      { nome: 'Café da manhã', time: '07:00' },
-      { nome: 'Almoço', time: '12:00' },
-      { nome: 'Jantar', time: '' },
+      { nome: 'Café da manhã', time: '07:00', dias: 7 },
+      { nome: 'Almoço', time: '12:00', dias: 7 },
+      { nome: 'Jantar', time: '', dias: 7 },
     ])
+  })
+
+  it('conta em quantos DIAS cada refeição aparece', () => {
+    // O plano real da conta de teste: "Café da manhã" só existe no fim de
+    // semana; nos dias de treino a refeição se chama "Pré-treino". Sem esta
+    // contagem o editor promete a semana e entrega dois dias.
+    const dias: PlanDay[] = [
+      { weekday: 0, meals: [refeicao('Café da manhã'), refeicao('Almoço')], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+      { weekday: 1, meals: [refeicao('Pré-treino'), refeicao('Almoço')], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+      { weekday: 6, meals: [refeicao('Café da manhã'), refeicao('Almoço')], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+    ]
+    expect(horariosDoPlano(dias).map((l) => [l.nome, l.dias])).toEqual([
+      ['Café da manhã', 2],
+      ['Almoço', 3],
+      ['Pré-treino', 1],
+    ])
+  })
+
+  it('nome repetido no MESMO dia conta um dia só', () => {
+    const dias: PlanDay[] = [
+      { weekday: 0, meals: [refeicao('Lanche'), refeicao('Lanche')], totals: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+    ]
+    expect(horariosDoPlano(dias)[0]?.dias).toBe(1)
   })
 
   it('acha o horário mesmo quando só um dia o tem', () => {

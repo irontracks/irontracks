@@ -35,6 +35,7 @@ export default function HorariosDasRefeicoes({
     onSaved: () => void
 }) {
     const linhas = useMemo(() => horariosDoPlano(days), [days])
+    const planoDeSemana = days.length > 1
     const [valores, setValores] = useState<Record<string, string>>({})
     const [salvando, setSalvando] = useState(false)
     const [erro, setErro] = useState<string | null>(null)
@@ -101,7 +102,8 @@ export default function HorariosDasRefeicoes({
                         <div className="min-w-0">
                             <h2 className="text-base font-bold text-white">Horários das refeições</h2>
                             <p className="mt-0.5 text-xs text-neutral-400">
-                                O horário vale para todos os dias do plano. Você recebe um lembrete na hora.
+                                Cada horário vale em todos os dias em que a refeição aparece. Você recebe
+                                um lembrete na hora.
                             </p>
                         </div>
                         <button
@@ -124,7 +126,17 @@ export default function HorariosDasRefeicoes({
                                     key={linha.nome}
                                     className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
                                 >
-                                    <span className="min-w-0 truncate text-sm font-semibold text-white">{linha.nome}</span>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-semibold text-white">{linha.nome}</span>
+                                        {/* Plano de semana raramente repete as mesmas refeições nos 7
+                                            dias — sem este número, "Café da manhã" parece cobrir a
+                                            semana quando cobre só o fim de semana. */}
+                                        {planoDeSemana && (
+                                            <span className="block text-[10px] text-neutral-400">
+                                                {linha.dias === 1 ? '1 dia' : `${linha.dias} dias`}
+                                            </span>
+                                        )}
+                                    </span>
                                     <span className="flex shrink-0 items-center gap-2">
                                         <Clock size={14} className="text-neutral-500" aria-hidden="true" />
                                         <input
