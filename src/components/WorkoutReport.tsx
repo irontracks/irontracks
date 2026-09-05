@@ -545,7 +545,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto overflow-x-hidden">
             {celebrando && (
                 <WorkoutFinishCelebration
-                    workoutTitle={workoutTitleMain}
                     soundEnabled={celebSoundEnabled}
                     soundVolume={celebVolume}
                     onDone={() => setCelebrando(false)}
