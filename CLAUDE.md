@@ -257,6 +257,37 @@ contexto mockado estável, o harness remonta por `key`.
 
 **Sessões ficam em `workouts.notes`** (JSON serializado como TEXT), NÃO numa tabela de sessões. `workout_session_logs` está praticamente vazia em produção — **não confie nela**. Finalização: `useWorkoutFinish` → `buildFinishWorkoutPayload` (`src/lib/finishWorkoutPayload.ts`) → `POST /api/workouts/finish` (idempotente via `finish_idempotency_key` + lock Upstash). No finish, `buildReportMetrics` (`utils/report/reportMetrics.ts`) computa e grava `reportMeta` dentro do notes.
 
+⚠️ **Finalizar treino e NÃO abrir o relatório = o eco do Realtime ganhou a
+corrida (05/09/2026).** Sintoma: o app cai no dashboard depois de finalizar, sem
+erro, sem log e de forma intermitente — e a celebração de fim de treino some
+junto, porque ela vive dentro do relatório.
+
+O mecanismo: a rota do finish **apaga** a linha de `active_workout_sessions`;
+de volta no cliente, `onFinish` passa pelo `triggerExit` do `ActiveWorkout`, que
+espera **280 ms** de animação antes do `setView('report')`; nesse meio-tempo o
+DELETE ecoa pelo Realtime e o handler de `useSessionSync` navegava para o
+dashboard, desmontando a tela — e o cleanup dela **cancelava o timer**. Quem
+chegasse primeiro decidia a tela.
+
+Os dois discriminadores que já existiam não alcançam, e nenhum é descuido: o
+`wasForeign` lê a sessão LOCAL, que nessa janela ainda existe (quem a limpa é o
+callback atrasado), e a janela de 8 s do toast é aberta DENTRO desse callback.
+Os dois acertam o caso de *depois*, não o de *durante*. Hoje quem responde é
+`lib/workout/finishEmVoo.ts`, marcado **antes do POST** — o único instante que
+precede a exclusão, o eco e a animação. Ele também mata o aviso falso "treino
+finalizado em outro dispositivo", que era o mesmo defeito pela outra ponta.
+
+**A classe, que vale além deste caso:** cleanup de desmontagem que só faz
+`clearTimeout` **descarta a transição em silêncio**. Hoje o callback do finish é
+marcado como obrigatório e roda mesmo se a tela morrer no meio; o "voltar" fica
+de fora de propósito (navegaria por cima do destino já alcançado).
+
+**A celebração (`WorkoutFinishCelebration`) é disparada pelo CARIMBO do finish,
+nunca por "abriu o relatório".** O app já teve uma tela de vitória e ela foi
+removida em 03/09/2026 porque nascia `useState(true)` e comemorava qualquer
+relatório aberto pelo histórico — inclusive treino de duas semanas atrás.
+Janela própria de 5 s, separada dos 30 s da navegação de propósito.
+
 **Orçamento de payload das rotas quentes (histórico + bootstrap).** Como a sessão inteira mora em `workouts.notes`, qualquer rota que selecione essa coluna e repasse a linha crua serve centenas de KB sem parecer errada. O histórico já engordou assim uma vez (corrigido em ago/2026 por `utils/history/slimHistoryRow.ts` — a rota resume no servidor e o JSON completo é buscado sob demanda). Guards de CI: `utils/history/__tests__/historyPayloadBudget.test.ts` (teto de 450 B por linha de treino, allowlist de chaves, source-guard do `select`) e `app/api/dashboard/__tests__/bootstrapPayloadShape.test.ts` (allowlist de workout/exercise/set nos DOIS caminhos — RPC e fallback TS —, teto por template e source-guard das chaves do `jsonb_build_object` na migration mais recente da RPC). Fixtures realistas em `src/__tests__/fixtures/hotRoutePayloads.ts`. **Campo novo nessas rotas = teste vermelho de propósito**: é o pedido de revisão, não um falso positivo — atualizar a allowlist é uma decisão consciente. Dívida conhecida travada por ratchet: usuário SEM template cai no 2º branch do bootstrap (rota e RPC), que devolve "qualquer workout do user" — inclusive sessões concluídas com o `notes` inteiro.
 
 **Salvar arquivo no iPhone tem UM caminho: `utils/report/exportHtmlAsPdf.ts`.**
@@ -1377,11 +1408,9 @@ O que **não** está feito, para não ser redescoberto nem refeito:
    `__tests__/nonoPixelTextoCorrido.test.ts`, que só desce — o número vinha
    CRESCENDO (47 → 54 em uma semana), porque o piso de 9px virou alvo por
    gravidade. Em corpo, use 10–11px; 9px é para eyebrow label.
-2. ~~**CSP_ENFORCE**~~ — **FEITO em 27/08/2026.** Ligado, com a polaridade
-   invertida (bloqueia por padrão; `CSP_ENFORCE=false` é o freio).
-3. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram
+2. **Quatro modais de método complexo** (Rest-Pause, Drop-Set, Cluster) tiveram
    o X corrigido e provado por TESTE, mas nunca foram tocados na tela.
-4. **Ordem de foco e agrupamento nas telas logadas** — bloqueado daqui: exige
+3. **Ordem de foco e agrupamento nas telas logadas** — bloqueado daqui: exige
    Accessibility Inspector (negado 2×) ou o dono no iPhone. **VoiceOver não
    existe no Simulador.** As 11 janelas de ago/2026 têm a semântica provada por
    guard e por tipo, não por leitor de tela real.
@@ -2089,6 +2118,20 @@ tela — e não conclua "não funcionou" a partir de um contador que parece para
 O que É verificável no simulador continua sendo o de sempre: o que reage a TOQUE
 e a DIGITAÇÃO. A autocorreção, por exemplo, se prova em 30 segundos — digitar
 "Bi A Drop teste" num campo de nome e ler o que ficou lá.
+
+⚠️ **Animação curta não se fotografa: GRAVE.** O `screenshot` leva 2–3 s de
+ida-e-volta, então qualquer coisa que dure menos que isso já terminou quando a
+foto sai. Em 05/09/2026 tentei pegar a celebração de fim de treino (3,1 s de
+ponta a ponta) e ela nunca apareceu na captura — não por estar quebrada, e sim
+por latência. Perder duas rodadas nisso é o custo de não saber que existe:
+
+```bash
+xcrun simctl io <UDID> recordVideo --codec=h264 saida.mp4   # Ctrl-C encerra
+```
+
+Medido: 92 KB para 4 s. O vídeo pode ir ao dono por `SendUserFile` quando ele
+pedir — mas **print continua proibido** (ver a regra de 15/08/2026), e vídeo só
+quando ele pedir.
 
 ### O que ficou provado ONDE (não misturar as duas coisas)
 
@@ -2870,6 +2913,25 @@ Este projeto usa **Tailwind v4** (não v3). A sintaxe e configuração são dife
 - Configuração via `postcss.config.mjs` (não `tailwind.config.js`)
 - Importar via `@import 'tailwindcss'` no CSS (não `@tailwind base/components/utilities`)
 - Não adicionar classes de v3 que foram removidas ou renomeadas na v4
+
+⚠️ **Toda regra escrita à mão no `globals.css` VENCE qualquer utility do
+Tailwind — sempre, e não por especificidade.** A v4 emite as utilities dentro de
+`@layer utilities` e este arquivo não tem `@layer` nenhum; CSS fora de camada
+ganha de CSS em camada por definição da cascata, mesmo com seletor mais fraco e
+declarado antes. Ou seja: uma regra `.minha-classe { position: … }` aqui
+**apaga em silêncio** o `absolute`/`fixed`/`grid`/`flex` que o JSX declarou.
+
+Medido em 05/09/2026: `.tap-44 { position: relative }` fazia
+`class="tap-44 absolute inset-0 h-full w-full"` computar **`relative`**. O botão
+de dispensar da celebração virou item de flex de altura cheia e empurrou a frase
+**599px abaixo do centro** — ela apareceu colada no rodapé do iPhone do dono.
+Havia mais SETE botões do app com a mesma combinação, todos posicionados em
+lugar que não era o declarado.
+
+Corrigido na origem (`.tap-44:not(.absolute):not(.fixed):not(.sticky)`, guard em
+`__tests__/alvoDeToqueMinimo.test.ts`). **Ao escrever utility nova aqui, exclua
+quem já declarou aquela propriedade** — senão a classe do JSX mente, e o sintoma
+aparece a três telas de distância.
 
 ## Erros TypeScript comuns a evitar
 - Variáveis desestruturadas não usadas → remover do destructuring (não prefixar com `_`)
