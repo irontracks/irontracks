@@ -10,6 +10,13 @@ import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 import { logError, logWarnRemote } from '@/lib/logger';
+import type { ProximaSerie } from '@/lib/workout/proximaSerie';
+
+/**
+ * Segundos de excesso antes de o anel virar VERMELHO. Abaixo disso o número
+ * cresce na cor base (informativo); acima, é alarme. Ver `alarmeDeExcesso`.
+ */
+export const SEGUNDOS_ATE_ALARME_DE_EXCESSO = 20;
 
 interface RestTimerContext {
     kind?: string;
@@ -22,6 +29,10 @@ interface RestTimerContext {
      *  - undefined when there is no next set (last set of last exercise)
      */
     nextSetLabel?: string;
+    /** A próxima série em pedaços — nome, número, carga, reps e RPE. É o que a
+     *  tela de fim de descanso desenha (`descreverProximaSerie`). Fica separado
+     *  do `nextSetLabel` porque a tela precisa dos campos, não da frase. */
+    next?: ProximaSerie;
     /** Descanso que venceu com o app FECHADO e foi restaurado (ver
      *  `sanitizeRestoredSession`). Liga o modo silencioso: barra + START
      *  visíveis, sem flash "BORA!", sem alarme, sem auto-advance e sem
@@ -767,13 +778,30 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const redOffset = circ * extraProgress;
 
     const isOvertime = (isFinished && !isRestoredExpired) || extraSeconds > 0;
+    /**
+     * O VERMELHO é o pigmento de alarme deste app, e ele acendia com **zero**
+     * segundo de excesso: no mesmo instante em que a tela dizia "BORA!" em verde
+     * de conquista, o anel já mostrava "+0:00 EXTRA" em vermelho. Duas mensagens
+     * opostas sobre o mesmo instante, a centímetros uma da outra.
+     *
+     * Passar alguns segundos do descanso planejado não é estouro — é o normal de
+     * quem larga o peso, respira e volta. O alarme entra quando o atraso começa a
+     * custar o treino.
+     */
+    const alarmeDeExcesso = extraSeconds >= SEGUNDOS_ATE_ALARME_DE_EXCESSO;
     const kind = String(context?.kind ?? '');
     const isSideRest = kind === 'side_rest';
     const isTransition = kind === 'transition';
-    // Ring color: blue for side-rest, orange for transition, yellow/red for normal rest
+    /** Os pedaços da próxima série; `nextSetLabel` sozinho ainda serve de fallback
+     *  para uma sessão restaurada de antes desta versão. */
+    const proxima: ProximaSerie | null = context?.next
+        ?? (context?.nextSetLabel
+            ? { exerciseName: '', setLabel: '', label: context.nextSetLabel, weight: '', reps: '', rpe: '' }
+            : null);
+    // Ring color: amber for side-rest, orange for transition, yellow/red for normal rest
     const baseRingColor = isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#eab308';
-    const ringColor = isOvertime ? '#ef4444' : baseRingColor;
-    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : isSideRest ? 'rgba(245,158,11,0.4)' : isTransition ? 'rgba(249,115,22,0.4)' : 'rgba(234,179,8,0.4)';
+    const ringColor = alarmeDeExcesso ? '#ef4444' : baseRingColor;
+    const ringGlow = alarmeDeExcesso ? 'rgba(239,68,68,0.5)' : isSideRest ? 'rgba(245,158,11,0.4)' : isTransition ? 'rgba(249,115,22,0.4)' : 'rgba(234,179,8,0.4)';
     const ringOffset = isOvertime ? redOffset : yellowOffset;
 
     return (
@@ -784,26 +812,104 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 workout modal below. */}
             {isFinished && !isTransition && !flashDismissed && !isRestoredExpired && (
                 <div
+                    /* O container segue sendo um VÉU (`presentation`): ele existe
+                       para receber o toque que dispensa. Quem anuncia é a região
+                       interna — ver o `role="status"` logo abaixo. Marcar o véu
+                       como status faria dele um elemento não-interativo com
+                       handler de clique, que é o que o jsx-a11y reprova, e com
+                       razão. */
                     role="presentation"
-                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-amber-500/90' : 'bg-green-600/90'}`}
+                    /* Fundo SÓLIDO e sem blur, por duas razões medidas:
+                       (1) fundo a 90% de opacidade + `backdrop-blur-sm` pagava o
+                           efeito mais caro do WKWebView para deixar passar 10% —
+                           a mesma conta que tirou o blur da barra logo abaixo;
+                       (2) `green-600` dava 3,92:1 com texto branco, abaixo do AA
+                           (4,5:1). `green-700` sólido mede **5,01:1** e passa,
+                           inclusive no texto pequeno. O verde FICA: aqui ele diz
+                           "descanso concluído" — o mesmo significado que ele tem
+                           na tira de exercícios —, e quem chama para a ação é o
+                           botão dourado logo abaixo. Levá-lo para âmbar colidiria
+                           com o TROCA! do descanso de lado. */
+                    className={`fixed inset-0 z-[2000] flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-amber-700' : 'bg-green-700'}`}
                     onClick={(e) => { e.stopPropagation(); setFlashDismissedForTarget(targetTime ?? null); }}
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                 >
-                    <div className="text-7xl mb-4">{isSideRest ? '🔄' : '💪'}</div>
-                    <h1 className="text-5xl font-black text-white uppercase tracking-tighter">{isSideRest ? 'TROCA!' : 'BORA!'}</h1>
+                    {/* `status` + `aria-live`: esta tela nasce SOZINHA, quando o
+                        cronômetro zera, sem nenhuma ação do usuário. Sem isto o
+                        descanso termina em silêncio absoluto para quem usa
+                        VoiceOver — o alarme toca e nada é anunciado.
+
+                        A hierarquia também era invertida: o maior tipo da tela
+                        repetia o que o alarme e a cor já disseram ("BORA!"), e o
+                        dado que o atleta precisa — QUAL CARGA — não existia.
+                        Hoje o grito é eyebrow e o exercício é o herói. */}
+                    <div
+                        role="status"
+                        aria-live="assertive"
+                        aria-atomic="true"
+                        className="flex flex-col items-center"
+                    >
+                    {/* `t-meta-inherit` (peso 500) e não `font-black`: o rótulo
+                        não pode competir com o número que ele nomeia, e o ratchet
+                        de tipografia cobra isso — foi ele que pegou a primeira
+                        versão desta tela. O emoji caiu de 72px para 16px: ele era
+                        o maior objeto de uma tela onde faltava dado. */}
+                    <p className="t-meta-inherit text-white text-xs">
+                        <span aria-hidden="true" className="mr-1.5 text-base align-middle">{isSideRest ? '🔄' : '💪'}</span>
+                        {isSideRest ? 'Troca' : 'Bora'}
+                    </p>
+
                     {isSideRest ? (
-                        <p className="text-white/80 font-bold mt-2 text-lg">Agora o outro lado</p>
-                    ) : context?.nextSetLabel ? (
+                        <p className="text-white font-black text-3xl mt-3 text-center leading-tight">Agora o outro lado</p>
+                    ) : proxima ? (
                         <>
-                            <p className="text-white/70 font-bold mt-2 text-sm uppercase tracking-widest">Próxima</p>
-                            <p className="text-white font-black mt-1 text-2xl text-center leading-tight max-w-full break-words px-2">{context.nextSetLabel}</p>
+                            <h1 className="text-white font-black mt-3 text-3xl text-center leading-[1.1] max-w-full break-words px-2">
+                                {proxima.exerciseName || proxima.label}
+                            </h1>
+                            <p className="text-white font-bold mt-1.5 text-base">{proxima.setLabel}</p>
+
+                            {/* A linha que o app já sabia e não mostrava. Cada
+                                pedaço só entra se existir — inventar "0 kg" ou um
+                                traço afirmaria uma medição que ninguém fez. */}
+                            {(proxima.weight || proxima.reps || proxima.rpe) && (
+                                /* UM destaque por bloco (docs/DESIGN_HIERARCHY.md).
+                                   Os três números nasceram do mesmo tamanho e
+                                   competiam: a CARGA é a única que exige ação
+                                   física — buscar anilha, mudar o pino — enquanto
+                                   reps e RPE são alvo, lidos depois. O olho tem
+                                   que pousar no que decide o próximo movimento. */
+                                <div className="mt-6 flex items-baseline justify-center gap-5 text-white">
+                                    {proxima.weight && (
+                                        <span className="flex flex-col items-center">
+                                            <span className="font-black text-4xl leading-none tabular-nums">{proxima.weight}</span>
+                                            <span className="t-meta-inherit mt-1.5 text-[10px]">carga</span>
+                                        </span>
+                                    )}
+                                    {proxima.reps && (
+                                        <span className="flex flex-col items-center">
+                                            <span className="font-bold text-2xl leading-none tabular-nums">{proxima.reps}</span>
+                                            <span className="t-meta-inherit mt-1.5 text-[10px]">reps</span>
+                                        </span>
+                                    )}
+                                    {proxima.rpe && (
+                                        <span className="flex flex-col items-center">
+                                            <span className="font-bold text-2xl leading-none tabular-nums">{proxima.rpe}</span>
+                                            <span className="t-meta-inherit mt-1.5 text-[10px]">rpe</span>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </>
                     ) : (
-                        <p className="text-white/80 font-bold mt-2 text-lg">{finishedLabel}</p>
+                        <p className="text-white font-black text-3xl mt-3 text-center leading-tight">{finishedLabel}</p>
                     )}
-                    {/* Tap hint — sits near the bottom, above the fixed bar */}
-                    <p className="absolute bottom-28 left-0 right-0 text-center text-white/55 font-bold text-xs uppercase tracking-widest">
+                    </div>
+
+                    {/* Dica de toque: branco puro (5,01:1). Em `white/55` media
+                        2,20:1 — a affordance mais importante da tela era a menos
+                        legível dela. */}
+                    <p className="absolute bottom-28 left-0 right-0 text-center text-white font-bold text-xs uppercase tracking-widest">
                         Toque para ver o treino
                     </p>
                 </div>
@@ -853,7 +959,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             <span
                                 className="text-[9px] font-black uppercase mt-0.5 leading-none"
                                 style={{
-                                    color: isOvertime ? '#ef4444' : isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#737373',
+                                    color: alarmeDeExcesso ? '#ef4444' : isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#737373',
                                     letterSpacing: '0.02em',
                                 }}
                             >
