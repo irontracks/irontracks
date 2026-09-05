@@ -90,9 +90,18 @@ describe('a frase NASCE no centro e vem crescendo', () => {
         expect(celebra).toMatch(/transform: scale\(\$\{ESCALA_INICIAL\}\)/)
     })
 
+    /**
+     * O piso subiu de 1200 para 2000 porque o dono pediu "mais lento" DUAS
+     * vezes: saindo de 620 ms e depois de 1,5 s. Um guard que aceitasse 1,2 s
+     * deixaria a próxima "otimização" desfazer os dois pedidos sem ninguém
+     * perceber — e o custo de perceber é ele testar no iPhone de novo.
+     */
     it('a entrada é LENTA — é o tempo que compra a impressão de profundidade', () => {
         const ms = numeroDe(/MS_ENTRADA = (\d+)/)
-        expect(ms, 'a entrada voltou a ser curta demais para ler como emergência').toBeGreaterThanOrEqual(1200)
+        expect(
+            ms,
+            'a entrada voltou a ser curta demais para ler como emergência — o dono pediu mais lento duas vezes',
+        ).toBeGreaterThanOrEqual(2000)
     })
 
     it('parte devagar e desacelera no fim — sem overshoot', () => {
