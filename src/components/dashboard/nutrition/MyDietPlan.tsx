@@ -8,6 +8,7 @@ import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, 
 import { refeicaoComEscolhas } from '@/lib/nutrition/escolhaDaProteina'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
+import HorariosDasRefeicoes from './HorariosDasRefeicoes'
 import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
 /**
@@ -64,6 +65,7 @@ export default function MyDietPlan({
   const { confirm } = useDialog()
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [horariosAbertos, setHorariosAbertos] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -316,15 +318,33 @@ export default function MyDietPlan({
             {Math.round(day.totals.calories)} kcal · {Math.round(day.totals.protein)}g P
           </div>
         </div>
-        <button
-          type="button"
-          onClick={removePlan}
-          disabled={removing}
-          className="tap-44 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
-        >
-          {removing ? '...' : 'Remover'}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Horários é ação secundária: o dourado do app pertence a lançar a
+              refeição, não a configurar quando ela acontece. */}
+          <button
+            type="button"
+            onClick={() => setHorariosAbertos(true)}
+            className="tap-44 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-white/[0.06] hover:text-white"
+          >
+            Horários
+          </button>
+          <button
+            type="button"
+            onClick={removePlan}
+            disabled={removing}
+            className="tap-44 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold text-neutral-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40"
+          >
+            {removing ? '...' : 'Remover'}
+          </button>
+        </div>
       </div>
+
+      <HorariosDasRefeicoes
+        open={horariosAbertos}
+        days={days}
+        onClose={() => setHorariosAbertos(false)}
+        onSaved={() => { void load().then((p) => { if (p) setRow(p) }) }}
+      />
 
       {/* Navegação por dia — só faz sentido no plano da semana. */}
       {isWeek && (
