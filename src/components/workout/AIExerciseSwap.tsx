@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { RefreshCw, Loader2, X, Check, Dumbbell } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino'
 
 /* ──────────────────────────────────────────────────────────
  * AIExerciseSwap
@@ -42,6 +43,7 @@ export default function AIExerciseSwap({
   const fetchedRef = useRef(false)
 
   const fetchAlternatives = useCallback(async () => {
+    rastrearTreino(EVENTOS_TREINO.trocaAbrir, { cached: fetchedRef.current && alternatives.length > 0 })
     if (fetchedRef.current && alternatives.length > 0) {
       setOpen(true)
       return

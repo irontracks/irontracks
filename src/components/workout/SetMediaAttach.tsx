@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react'
 import { Camera, Loader2, X } from 'lucide-react'
 import { readSetMedia, SET_MEDIA_MAX_PER_SET, type SetMediaRef } from '@/lib/workout/setMedia'
 import { uploadSetMedia, deleteSetMedia } from '@/utils/storage/setMediaUpload'
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino'
 
 /**
  * SetMediaAttach — "Anexar foto/vídeo" dentro das observações da série.
@@ -39,6 +40,7 @@ export function SetMediaAttach({ log, exerciseIndex, setIndex, exerciseName, upd
       if (!res.ok) { setErro(res.error); return }
       const atual = readSetMedia(log)
       updateLog(logKey, { media: [...atual, res.ref] })
+      rastrearTreino(EVENTOS_TREINO.midiaAnexar, { kind: res.ref.kind })
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''

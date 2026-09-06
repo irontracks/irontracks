@@ -11,6 +11,7 @@ import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAc
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 import { logError, logWarnRemote } from '@/lib/logger';
 import type { ProximaSerie } from '@/lib/workout/proximaSerie';
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
 
 interface RestTimerContext {
     kind?: string;
@@ -719,6 +720,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         startBusyRef.current = true;
         // Immediately hide the overlay — don't wait for async React state
         setDismissed(true);
+        rastrearTreino(EVENTOS_TREINO.descansoIniciar, {
+            antecipado: timeLeft > 0,
+            restanteS: Math.max(0, Math.round(timeLeft)),
+            exerciseTimer: Boolean(isExerciseTimer),
+        });
         try {
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);

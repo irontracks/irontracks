@@ -22,6 +22,7 @@
  */
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
 
 /** Os métodos oferecidos na troca rápida. `Normal` limpa a marcação. */
 export const SET_METHOD_OPTIONS = [
@@ -83,7 +84,7 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
             <button
               key={opt}
               type="button"
-              onClick={() => { onSelect(opt); setOpen(false) }}
+              onClick={() => { onSelect(opt); rastrearTreino(EVENTOS_TREINO.metodoDaSerie, { method: opt }); setOpen(false) }}
               className={`tap-44 px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${
                 label === opt
                   ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400'
