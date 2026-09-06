@@ -242,6 +242,7 @@ export default function Modals() {
                 hint="Dor/desconforto agora. 0 = nenhuma."
                 values={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
                 gridCols="grid-cols-6"
+                zero={{ label: 'Sem dor', expandLabel: 'Tenho dor' }}
                 value={String(postCheckinDraft?.soreness ?? '')}
                 onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, soreness: v }))}
               />
