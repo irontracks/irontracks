@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { isNativePlatform } from '@/utils/platform'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logWarnRemote } from '@/lib/logger'
 import { savePendingRestDayAnswer, flushPendingRestDayIntent } from '@/lib/nutrition/restDayIntent'
 
 // IDs das ações do push "vai treinar hoje?" (registradas na categoria
@@ -96,13 +96,24 @@ export function usePushNotifications(userId?: string | null) {
               const value = String(token?.value || '').trim()
               if (!value) return
 
-              await fetch('/api/push/register', {
+              // A RESPOSTA importa: um 409 (`token_owned_by_another_user`)
+              // deixa a conta sem token nenhum — nenhum push chega, e o app
+              // não muda de aparência. Ficou meses assim porque a falha era
+              // engolida num `logWarn` local, que some em produção. Agora vai
+              // para o Sentry, pesquisável (`logWarnRemote`).
+              const res = await fetch('/api/push/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: value, platform, deviceId }),
                 credentials: 'include',
                 cache: 'no-store',
-              }).catch((e) => logWarn('usePushNotifications', 'register fetch failed', e))
+              }).catch((e) => {
+                logWarnRemote('push.register', 'fetch falhou', { erro: String(e) })
+                return null
+              })
+              if (res && !res.ok) {
+                logWarnRemote('push.register', 'servidor recusou o token', { status: res.status, platform })
+              }
             } catch (e) {
               logWarn('usePushNotifications', 'registration handler error', e)
             }
