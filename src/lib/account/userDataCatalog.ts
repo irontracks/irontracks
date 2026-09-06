@@ -273,6 +273,7 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   asaas_webhook_events: { mechanism: 'none', reason: 'log operacional do provedor', export: skip('log operacional') },
   mercadopago_webhook_events: { mechanism: 'none', reason: 'log operacional do provedor', export: skip('log operacional') },
   webhook_dead_letters: { mechanism: 'none', reason: 'fila operacional de reentrega', export: skip('fila operacional') },
+  cron_secrets: { mechanism: 'none', reason: 'segredo de agendamento, sem titular', export: skip('config de infraestrutura') },
 }
 
 /**

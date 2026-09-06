@@ -21,7 +21,7 @@ const { estado } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('@/utils/cron/auth', () => ({ isCronAuthorized: () => true }))
+vi.mock('@/utils/cron/auth', () => ({ isCronAuthorized: () => true, isCronAuthorizedAsync: async () => true }))
 vi.mock('@/lib/logger', () => ({ logError: vi.fn(), logWarn: vi.fn(), logWarnRemote: vi.fn() }))
 vi.mock('@/lib/social/notifyFollowers', () => ({
   insertNotifications: vi.fn(async (list: Array<Record<string, unknown>>) => { estado.notifs.push(...list) }),

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { isCronAuthorized } from '@/utils/cron/auth'
+import { isCronAuthorizedAsync } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { cacheSetNxStatus } from '@/utils/cache'
@@ -47,7 +47,7 @@ function diaDoPlano(days: PlanDay[], weekday: number): PlanDay | null {
 }
 
 export async function GET(req: Request) {
-  if (!isCronAuthorized(req)) {
+  if (!await isCronAuthorizedAsync(req)) {
     return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   }
   try {
