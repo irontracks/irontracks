@@ -573,6 +573,17 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
                 </span>
               );
             })()}
+            {/* Recolhido, o card é UMA linha — e a linha precisa dizer o que
+                falta, senão recolher vira esconder (docs/DESIGN_HIERARCHY.md:
+                o destaque é o número acionável). */}
+            {collapsedNow && setsCount > 0 && (
+              <>
+                <span className="opacity-30">•</span>
+                <span className={`font-mono ${doneSetsCount >= setsCount ? 'text-emerald-400' : 'text-yellow-300'}`}>
+                  {doneSetsCount >= setsCount ? 'feito' : `faltam ${setsCount - doneSetsCount}`}
+                </span>
+              </>
+            )}
           </div>
           {/* Observação do professor — contexto de PREPARAÇÃO, não de execução.
               Antes vinha sempre aberta, em caixa com borda dourada: seis linhas
@@ -580,7 +591,11 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
               fora da tela, e o dourado (que neste app significa AÇÃO) competia
               em peso com o botão de concluir. Agora nasce em duas linhas, com
               régua neutra, e abre sob toque. */}
-          {observation ? (
+          {/* ⚠️ Recolhido = UMA linha. Até 06/09/2026 "recolher" escondia só as
+              séries: a técnica (2 linhas + Ver técnica) e a barra de 5–7 ações
+              ficavam — 206pt para um card fechado, medido no aparelho. Com 10
+              exercícios abertos por padrão, a lista inteira era rolagem. */}
+          {!collapsedNow && observation ? (
             <div className={`mt-2 border-l-2 pl-2.5 ${notaDaMaquina ? MACHINE_ACCENT.rule : 'border-white/10'}`}>
               {notaDaMaquina && (
                 // Violeta é a cor da máquina neste app (lib/design/machineAccent):
@@ -623,7 +638,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
               autoload — daí a feature nunca ter sido usada (0 de 543 sessões).
               Agora ela fala. Só aparece com histórico suficiente e quando há algo
               a dizer; progressão normal não gera ruído. */}
-          {deloadAlert ? (
+          {!collapsedNow && deloadAlert ? (
             <div className="mt-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[13px] text-amber-200 leading-snug">
@@ -674,7 +689,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
             </div>
           )}
         </div>
-        {/* Action toolbar — sibling of collapse trigger, never nested inside interactive element */}
+        {/* Action toolbar — sibling of collapse trigger, never nested inside interactive element.
+            Some no card recolhido: são ações do exercício ABERTO. */}
+        {!collapsedNow && (
         <div className="flex-shrink-0 flex flex-row flex-wrap items-center justify-end gap-1.5 text-neutral-400">
           {videoUrl ? (
             <button
@@ -845,6 +862,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
             </button>
           )}
         </div>
+        )}
       </div>
 
       {isDeferred && (

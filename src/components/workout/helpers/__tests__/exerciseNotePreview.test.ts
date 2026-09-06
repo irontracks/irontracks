@@ -79,14 +79,20 @@ describe('fiação no ExerciseCard', () => {
   it('o dourado saiu da nota — neste app ele significa ação', () => {
     // Recorta só o bloco da observação: o card inteiro usa dourado de propósito
     // (badge do número, ícone), e casar no arquivo todo daria falso positivo.
-    const bloco = /\{observation \? \(([\s\S]*?)\) : null\}/.exec(src)?.[1] ?? ''
+    // `!collapsedNow &&` entrou em 06/09/2026 (card recolhido = uma linha); a
+    // âncora aceita as duas formas, e o `not.toBe('')` abaixo é o que avisa se
+    // ela sumir de novo.
+    const bloco = /\{(?:!collapsedNow && )?observation \? \(([\s\S]*?)\) : null\}/.exec(src)?.[1] ?? ''
     expect(bloco).not.toBe('')
     expect(bloco).not.toMatch(/yellow-|amber-/)
   })
 
   it('ler a técnica não recolhe o exercício', () => {
     // O card inteiro é role="button"; sem stopPropagation o toque borbulha.
-    const bloco = /\{observation \? \(([\s\S]*?)\) : null\}/.exec(src)?.[1] ?? ''
+    // `!collapsedNow &&` entrou em 06/09/2026 (card recolhido = uma linha); a
+    // âncora aceita as duas formas, e o `not.toBe('')` abaixo é o que avisa se
+    // ela sumir de novo.
+    const bloco = /\{(?:!collapsedNow && )?observation \? \(([\s\S]*?)\) : null\}/.exec(src)?.[1] ?? ''
     expect(bloco).toMatch(/stopPropagation/)
     expect(bloco).toMatch(/aria-expanded=\{noteOpen\}/)
   })

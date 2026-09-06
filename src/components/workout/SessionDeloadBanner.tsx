@@ -73,16 +73,18 @@ export default function SessionDeloadBanner() {
   // limpo. Pedido do dono: "deload é por treino, não por exercício".
   if (autoLoadEnabled) {
     return (
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/60 px-4 py-3">
-        <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
-            Descarga do treino
-          </div>
-          <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">
-            {workoutDeloadEnabled
-              ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
-              : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
-          </div>
+      // UMA linha, como o toggle da carga automática logo acima. A frase que
+      // explicava ("Em dia ruim, o app pode aliviar…") foi para o `title`: os
+      // dois cards de configuração somavam ~134pt no topo de TODO treino e o
+      // primeiro "Concluir" ficava a 66% da tela (auditoria de 06/09/2026).
+      <div
+        className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-1"
+        title={workoutDeloadEnabled
+          ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
+          : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
+      >
+        <div className="min-w-0 text-[11px] font-bold uppercase tracking-wide text-neutral-400 truncate">
+          Descarga do treino
         </div>
         <button
           type="button"
@@ -90,7 +92,7 @@ export default function SessionDeloadBanner() {
           aria-pressed={workoutDeloadEnabled}
           aria-label={`Descarga do treino: ${workoutDeloadEnabled ? 'ligada' : 'desligada'}`}
           className={[
-            'shrink-0 inline-flex tap-44 h-9 items-center gap-1.5 rounded-xl border px-3 transition-colors active:scale-95',
+            'shrink-0 inline-flex tap-44 h-8 items-center gap-1.5 rounded-lg border px-2.5 transition-colors active:scale-95',
             workoutDeloadEnabled
               ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
               : 'border-neutral-800 bg-neutral-900 text-neutral-400',
