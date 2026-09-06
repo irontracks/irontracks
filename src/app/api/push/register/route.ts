@@ -14,6 +14,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { decidirDonoDoToken } from '@/lib/push/tokenOwnership'
 import { z } from 'zod'
 
 /** Token de push (APNs 64 hex; FCM até ~200) + plataforma + device. Tolerante ao
@@ -64,18 +65,25 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient()
 
-    // IDOR guard: um push token pertence a UM device. Como a gravação usa
+    // IDOR guard: um push token pertence a UM APARELHO. Como a gravação usa
     // service-role (RLS off) e o upsert resolve conflito por PK 'token', um
     // usuário podia reivindicar o token já registrado por OUTRO usuário,
-    // sequestrando/derrubando as notificações da vítima. Rejeita o conflito de
-    // dono diferente (auditoria 2026-06-27). Caso de device compartilhado entre
-    // contas exige que o dono anterior remova o token primeiro.
+    // sequestrando/derrubando as notificações da vítima (auditoria 2026-06-27).
+    // A régua é o `device_id`: mesmo aparelho = troca de conta legítima e o
+    // token é reatribuído; caso contrário, 409. Ver `lib/push/tokenOwnership`.
     const { data: existingToken } = await admin
       .from('device_push_tokens')
-      .select('user_id')
+      .select('user_id, device_id')
       .eq('token', token)
       .maybeSingle()
-    if (existingToken && existingToken.user_id && existingToken.user_id !== user.id) {
+
+    const decisao = decidirDonoDoToken({
+      donoAtual: existingToken?.user_id,
+      novoDono: user.id,
+      deviceIdGravado: existingToken?.device_id,
+      deviceIdRecebido: deviceId,
+    })
+    if (decisao === 'recusa') {
       return NextResponse.json({ ok: false, error: 'token_owned_by_another_user' }, { status: 409 })
     }
 
@@ -97,7 +105,23 @@ export async function POST(request: Request) {
       return respondDbError('push:register', error, 500)
     }
 
-    return NextResponse.json({ ok: true })
+    // Token que mudou de dono é evento de segurança: fica no banco, não em log
+    // que expira (mesma regra do e-mail transacional e da Live Activity).
+    if (decisao === 'reatribui') {
+      try {
+        await admin.from('audit_events').insert({
+          actor_id: user.id,
+          actor_email: user.email ?? null,
+          actor_role: 'user',
+          action: 'push_token_reassigned',
+          entity_type: 'device_push_token',
+          entity_id: user.id,
+          metadata: { platform, device_id: deviceId || null, previous_user_id: existingToken?.user_id ?? null },
+        })
+      } catch { /* auditoria não pode custar o registro do token */ }
+    }
+
+    return NextResponse.json({ ok: true, reassigned: decisao === 'reatribui' })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
