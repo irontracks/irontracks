@@ -35,7 +35,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
@@ -225,7 +225,8 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
         />
       }
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Sem `plateHint`: a `PlateHintLine` abaixo já monta pelo inventário do usuário. */}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas por lado do peso do método, que é único para os blocos. */}
       <PlateHintLine
         exerciseName={String(ex?.name ?? '')}

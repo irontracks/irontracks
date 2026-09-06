@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect } from 'react'
 import { useWorkoutContext } from '../WorkoutContext'
+import { isPrimeiraSeriePendente } from '../helpers/notaDoMotorUmaVez'
 import { plateHintForExercise } from '@/utils/autoload/plateBreakdown'
 import type { WorkoutExercise } from '../types'
 
@@ -95,7 +96,8 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
 
   return {
     isAutoWeight,
-    rationale: suggestion?.rationale ?? '',
+    // Uma vez por exercício, na primeira série pendente (helpers/notaDoMotorUmaVez).
+    rationale: isPrimeiraSeriePendente(getLog, exIdx, setIdx) ? (suggestion?.rationale ?? '') : '',
     autoInputClass: isAutoWeight ? AUTO_INPUT_CLASS : '',
     suggestedWeight: sugWeight,
     plateHint,

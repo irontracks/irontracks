@@ -15,7 +15,7 @@ const Sistema21SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const { getLog, updateLog, setSistema21Modal, startTimer, settings} = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const s21 = isObject(log.sistema21) ? (log.sistema21 as UnknownRecord) : null;
   const savedWeight = String(s21?.weight ?? log.weight ?? '').trim();
   const phase1 = parseTrainingNumber(s21?.phase1) ?? null;
@@ -46,7 +46,7 @@ const Sistema21SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       onOpen={() => setSistema21Modal({ key, weight: savedWeight, phase1: phase1 ?? 7, phase2: phase2 ?? 7, phase3: phase3 ?? 7, rpe: String(s21?.rpe ?? log.rpe ?? ''), error: '' })}
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas do peso salvo no modal. Nestes métodos não há campo inline: o
           peso é digitado no modal e o card mostra o resumo — a dica acompanha o
           resumo, mesma informação do renderer normal. */}

@@ -15,7 +15,7 @@ const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const { getLog, updateLog, setPontoZeroModal, startTimer, settings } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const pz = isObject(log.ponto_zero) ? (log.ponto_zero as UnknownRecord) : null;
   const savedWeight = String(pz?.weight ?? log.weight ?? '').trim();
   const reps = parseTrainingNumber(pz?.reps ?? log.reps) ?? null;
@@ -53,7 +53,7 @@ const PontoZeroSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       }
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas do peso salvo no modal. Nestes métodos não há campo inline: o
           peso é digitado no modal e o card mostra o resumo — a dica acompanha o
           resumo, mesma informação do renderer normal. */}

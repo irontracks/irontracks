@@ -15,7 +15,7 @@ const WaveSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
   const { getLog, updateLog, setWaveModal, startTimer, settings} = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const waveData = isObject(log.wave) ? (log.wave as UnknownRecord) : null;
   const savedWeight = String(waveData?.weight ?? log.weight ?? '').trim();
   const wavesRaw: unknown[] = Array.isArray(waveData?.waves) ? (waveData.waves as unknown[]) : [];
@@ -52,7 +52,8 @@ const WaveSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
       onOpen={() => setWaveModal({ key, weight: savedWeight, heavyWeight: String(waveData?.heavyWeight ?? savedWeight ?? ''), mediumWeight: String(waveData?.mediumWeight ?? ''), ultraWeight: String(waveData?.ultraWeight ?? ''), waves: defaultWaves, rpe: String(waveData?.rpe ?? log.rpe ?? ''), error: '' })}
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Sem `plateHint`: a `PlateHintLine` abaixo já monta pelo inventário do usuário. */}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas do peso salvo no modal. Nestes métodos não há campo inline: o
           peso é digitado no modal e o card mostra o resumo — a dica acompanha o
           resumo, mesma informação do renderer normal. */}

@@ -42,7 +42,7 @@ const RestPauseSetInner = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
 
   // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
   function useLocalField(external: string, onSave: (v: string) => void) {
@@ -214,7 +214,8 @@ const RestPauseSetInner = ({
         />
       }
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      {/* Sem `plateHint`: a `PlateHintLine` abaixo já monta pelo inventário do usuário. */}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas por lado do peso do método, que é único para as mini-séries. */}
       <PlateHintLine
         exerciseName={String(ex?.name ?? '')}

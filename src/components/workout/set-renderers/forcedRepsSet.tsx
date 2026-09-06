@@ -15,7 +15,7 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
   const { getLog, updateLog, setForcedRepsModal, startTimer, settings} = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const fr = isObject(log.forced_reps) ? (log.forced_reps as UnknownRecord) : null;
   const savedWeight = String(fr?.weight ?? log.weight ?? '').trim();
   // CONTAGEM de reps até falhar — não confundir com a flag `log.failure`, que é o
@@ -48,7 +48,7 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
       onOpen={() => setForcedRepsModal({ key, weight: savedWeight, reps_failure: repsFailure ?? '', forced_count: forcedCount ?? '', rpe: String(fr?.rpe ?? log.rpe ?? ''), error: '' })}
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas do peso salvo no modal. Nestes métodos não há campo inline: o
           peso é digitado no modal e o card mostra o resumo — a dica acompanha o
           resumo, mesma informação do renderer normal. */}
