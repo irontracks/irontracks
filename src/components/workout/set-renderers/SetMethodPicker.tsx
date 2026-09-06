@@ -20,7 +20,7 @@
  * vez por série, e vale para os 14 métodos sem tocar em nenhum deles. É a mesma
  * razão pela qual a escolha de qual série remover também mora no card.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 /** Os métodos oferecidos na troca rápida. `Normal` limpa a marcação. */
@@ -51,6 +51,18 @@ export type SetMethodPickerProps = {
 
 export function SetMethodPicker({ current, onSelect, disabled, className }: SetMethodPickerProps) {
   const [open, setOpen] = useState(false)
+  const chipsRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const el = chipsRef.current
+    if (!el || typeof el.scrollIntoView !== 'function') return
+    // Depois do paint: o `expand-enter` ainda está animando no mesmo frame.
+    const id = requestAnimationFrame(() => {
+      try { el.scrollIntoView({ block: 'nearest' }) } catch { /* */ }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open])
+
   if (disabled) return null
 
   const label = String(current || '').trim() || 'Normal'
@@ -78,7 +90,13 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
         <ChevronDown size={9} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="expand-enter flex flex-wrap gap-1 mt-1">
+        <div
+          ref={chipsRef}
+          /* `scroll-mb-32`: a fileira abre ABAIXO do rótulo, e no fim da tela
+             cai por baixo do FINALIZAR (`WorkoutFooter`, fixed) — o usuário
+             abria o seletor e não via as opções. O efeito acima rola o mínimo
+             para ela aparecer; a margem é o que reserva o espaço do rodapé. */
+          className="expand-enter flex flex-wrap gap-1 mt-1 scroll-mb-32">
           {SET_METHOD_OPTIONS.map((opt) => (
             <button
               key={opt}
