@@ -858,7 +858,16 @@ const NormalSetInner = ({
           </div>
           {/* Linha de rodapé: explicação da sugestão (🧠) à esquerda + chip de falha à direita */}
           <div className="mt-1 flex items-center justify-between gap-2">
-            {isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
+            {done && !isUnilateral && !extReps.trim() ? (
+              /* Série concluída SEM reps. O app aceita (é liberdade: o dono
+                 preenche 872 de 876), mas há aluno concluindo 63% das séries
+                 assim — e para ele volume, e1RM e carga sugerida ficam cegos,
+                 em silêncio. Uma linha, derivada do estado (some ao digitar
+                 as reps), sem modal e sem bloquear. Auditoria de 06/09/2026. */
+              <p data-testid="aviso-sem-reps" className="text-[11px] text-amber-300 leading-tight">
+                Sem reps, esta série não entra no volume nem na carga sugerida.
+              </p>
+            ) : isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
               <AutoloadNote show rationale={autoSuggestion?.rationale ?? ''} plateHint={autoPlateHint} />
             ) : autoLoadEnabled && setType === 'working' && !done && autoSuggestionWeight == null && autoSuggestion?.rationale ? (
               /* Motor ligado que não teve base pra sugerir: mostra o PORQUÊ em cinza.

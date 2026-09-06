@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, Home, MoreHorizontal, Pause, Play, Plus, Satellite, UserPlus, X } from 'lucide-react';
+import { Clock, GripVertical, Home, MoreHorizontal, Pause, Pencil, Play, Satellite, UserPlus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Carregado sob demanda: só quem toca em "Treinar em casa" paga por ele.
@@ -141,8 +141,13 @@ export default function WorkoutHeader() {
                 onClick={() => openFullEditor?.()}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500/40 transition-colors active:scale-95 whitespace-nowrap"
                 title="Editar treino (exercícios, cardio, ordem)"
+                aria-label="Editar treino"
               >
-                <Plus size={16} />
+                {/* Lápis, não "+": no celular o rótulo some (`hidden sm:inline`) e
+                    sobrava um "+" que o usuário lia como "adicionar" — ao lado do
+                    X de descartar. O ícone tem que dizer sozinho o que o botão faz
+                    (auditoria da tela do treino ativo, 06/09/2026). */}
+                <Pencil size={16} />
                 <span className="text-sm font-black hidden sm:inline">Editar treino</span>
               </button>
 
@@ -174,12 +179,14 @@ export default function WorkoutHeader() {
                       Organizar
                     </button>
                     {/* Saída de emergência do cardio GPS — presente só quando o
-                        painel não está no topo (ver openCardioGps no contexto). */}
+                        painel não está no topo (ver openCardioGps no contexto).
+                        Dourado como os irmãos: verde é "concluído" neste app, e
+                        este item é uma AÇÃO. */}
                     {openCardioGps && (
                       <button
                         type="button"
                         onClick={() => { openCardioGps(); setOverflowOpen(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-emerald-400 hover:bg-neutral-800 transition-colors border-t border-neutral-800"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors border-t border-neutral-800"
                       >
                         <Satellite size={15} />
                         Cardio com GPS

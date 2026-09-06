@@ -151,13 +151,71 @@ export function exercisesToDefer(
  */
 export const FINISH_QUESTION_DEFAULT = 'Deseja finalizar o treino?'
 
-export function buildFinishQuestion(deferredNames: readonly string[] | null | undefined): string {
+export interface ProgressoDoTreino {
+  /** Séries concluídas (`done === true`, a mesma régua do contador do histórico). */
+  feitas: number
+  /** Séries planejadas em todos os exercícios. */
+  total: number
+  /** Exercícios em que NENHUMA série foi concluída. */
+  exerciciosSemSerie: number
+}
+
+/**
+ * Quanto do treino foi feito — o que o diálogo de finalizar precisa dizer.
+ *
+ * O rodapé já contava ("Finalizar (N)"), mas só com ≤3 pendentes; com 29 de 30
+ * faltando o diálogo perguntava "Deseja finalizar?" e oferecia Sim como
+ * primário. Uma sessão de 62 s com 1 série virou "treino" no histórico do dono
+ * exatamente assim (24/08/2026).
+ */
+export function progressoDoTreino(exercises: unknown, logs: unknown): ProgressoDoTreino {
+  const lista = Array.isArray(exercises) ? exercises : []
+  const mapa = isObj(logs) ? logs : {}
+  let feitas = 0
+  let total = 0
+  let exerciciosSemSerie = 0
+  lista.forEach((ex, exIdx) => {
+    const n = setsCountOfExercise(ex)
+    total += n
+    let feitasAqui = 0
+    for (let s = 0; s < n; s++) {
+      const log = mapa[`${exIdx}-${s}`]
+      if (isObj(log) && log.done === true) feitasAqui += 1
+    }
+    feitas += feitasAqui
+    if (n > 0 && feitasAqui === 0) exerciciosSemSerie += 1
+  })
+  return { feitas, total, exerciciosSemSerie }
+}
+
+const plural = (n: number, um: string, varios: string) => (n === 1 ? um : varios)
+
+export function buildFinishQuestion(
+  deferredNames: readonly string[] | null | undefined,
+  progresso?: ProgressoDoTreino | null,
+): string {
   const nomes = (Array.isArray(deferredNames) ? deferredNames : [])
     .filter((n): n is string => typeof n === 'string' && n.trim() !== '')
     .map((n) => n.trim())
-  if (nomes.length === 0) return FINISH_QUESTION_DEFAULT
-  const cabeca = nomes.length === 1
-    ? 'Você guardou 1 exercício para fazer depois'
-    : `Você guardou ${nomes.length} exercícios para fazer depois`
-  return `${cabeca}: ${nomes.join(', ')}.\n\nFinalizar o treino mesmo assim?`
+
+  const partes: string[] = []
+  if (nomes.length > 0) {
+    const cabeca = nomes.length === 1
+      ? 'Você guardou 1 exercício para fazer depois'
+      : `Você guardou ${nomes.length} exercícios para fazer depois`
+    partes.push(`${cabeca}: ${nomes.join(', ')}.`)
+  }
+
+  // O NÚMERO vai no diálogo: "faltam 29" muda a resposta; "deseja finalizar?" não.
+  if (progresso && progresso.total > 0 && progresso.feitas < progresso.total) {
+    const faltam = progresso.total - progresso.feitas
+    const linha = `Você fez ${progresso.feitas} de ${progresso.total} séries — ${plural(faltam, 'falta 1', `faltam ${faltam}`)}`
+    const semSerie = progresso.exerciciosSemSerie > 0
+      ? ` · ${progresso.exerciciosSemSerie} ${plural(progresso.exerciciosSemSerie, 'exercício', 'exercícios')} sem nenhuma série`
+      : ''
+    partes.push(`${linha}${semSerie}.`)
+  }
+
+  if (partes.length === 0) return FINISH_QUESTION_DEFAULT
+  return `${partes.join('\n\n')}\n\nFinalizar o treino mesmo assim?`
 }

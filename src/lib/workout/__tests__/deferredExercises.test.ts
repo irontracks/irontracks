@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   FINISH_QUESTION_DEFAULT,
   buildFinishQuestion,
+  progressoDoTreino,
   doneCountOfExercise,
   exerciseNameAt,
   exercisesToDefer,
@@ -167,5 +168,60 @@ describe('buildFinishQuestion', () => {
 
   it('ignora nome vazio em vez de anunciar um exercício fantasma', () => {
     expect(buildFinishQuestion(['  ', ''])).toBe(FINISH_QUESTION_DEFAULT)
+  })
+})
+
+/**
+ * O diálogo de finalizar diz o que FALTA (auditoria de 06/09/2026). Com 1 de
+ * 30 séries feitas ele perguntava só "Deseja finalizar?" — e uma sessão de 62 s
+ * virou "treino" no histórico do dono exatamente assim.
+ */
+describe('progressoDoTreino', () => {
+  const treino = [
+    { name: 'Supino', sets: 3 },
+    { name: 'Remada', sets: 3 },
+    { name: 'Rosca', sets: 2 },
+  ]
+
+  it('conta séries feitas, total e exercícios sem nenhuma série', () => {
+    const logs = { '0-0': { done: true }, '0-1': { done: true }, '1-0': { done: true } }
+    expect(progressoDoTreino(treino, logs)).toEqual({ feitas: 3, total: 8, exerciciosSemSerie: 1 })
+  })
+
+  it('só `done === true` conta — o prefill do motor (peso sem done) não', () => {
+    const logs = { '0-0': { done: true }, '0-1': { weight: '84', weightSource: 'auto' } }
+    expect(progressoDoTreino(treino, logs).feitas).toBe(1)
+  })
+
+  it('treino vazio ou lixo não quebra', () => {
+    expect(progressoDoTreino([], {})).toEqual({ feitas: 0, total: 0, exerciciosSemSerie: 0 })
+    expect(progressoDoTreino(null, null)).toEqual({ feitas: 0, total: 0, exerciciosSemSerie: 0 })
+  })
+})
+
+describe('buildFinishQuestion — com o progresso', () => {
+  it('diz quantas séries faltam e quantos exercícios não foram tocados', () => {
+    const q = buildFinishQuestion([], { feitas: 1, total: 30, exerciciosSemSerie: 9 })
+    expect(q).toContain('Você fez 1 de 30 séries')
+    expect(q).toContain('faltam 29')
+    expect(q).toContain('9 exercícios sem nenhuma série')
+    expect(q).toMatch(/Finalizar o treino mesmo assim\?$/)
+  })
+
+  it('singular certo: "falta 1", "1 exercício"', () => {
+    const q = buildFinishQuestion([], { feitas: 29, total: 30, exerciciosSemSerie: 1 })
+    expect(q).toContain('falta 1')
+    expect(q).toContain('1 exercício sem nenhuma série')
+  })
+
+  it('tudo feito volta à pergunta simples', () => {
+    expect(buildFinishQuestion([], { feitas: 30, total: 30, exerciciosSemSerie: 0 })).toBe(FINISH_QUESTION_DEFAULT)
+  })
+
+  it('exercício guardado E séries faltando aparecem juntos, num diálogo só', () => {
+    const q = buildFinishQuestion(['Rosca'], { feitas: 10, total: 30, exerciciosSemSerie: 0 })
+    expect(q).toContain('Você guardou 1 exercício para fazer depois: Rosca.')
+    expect(q).toContain('Você fez 10 de 30 séries')
+    expect((q.match(/mesmo assim\?/g) || []).length).toBe(1)
   })
 })
