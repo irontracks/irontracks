@@ -378,38 +378,38 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               onClick={() => props.onToggleAutoLoad?.(!Boolean(props.settings?.autoLoad))}
               aria-pressed={Boolean(props.settings?.autoLoad)}
               aria-label="Carga automática"
+              title={props.settings?.autoLoad ? 'O motor sugere seus pesos' : 'Pesos manuais'}
+              /* UMA linha. Era um card de 59pt com subtítulo, acima de outro de
+                 75pt (descarga) — configuração ocupando o espaço nobre de todo
+                 treino, e o primeiro "Concluir" a 66% da tela no maior iPhone
+                 (auditoria de 06/09/2026). O toggle continua a um toque. */
               className={[
-                'mx-4 mt-3 w-[calc(100%-2rem)] rounded-2xl border px-3.5 py-3 flex items-center justify-between gap-3 transition-colors',
+                'mx-4 mt-2 w-[calc(100%-2rem)] rounded-xl border px-3 py-1.5 flex items-center justify-between gap-3 transition-colors',
                 props.settings?.autoLoad
                   ? MACHINE_ACCENT.surface
                   : 'border-white/[0.06] bg-white/[0.03]',
               ].join(' ')}
             >
-              <span className="flex items-center gap-3 min-w-0">
+              <span className="flex items-center gap-2.5 min-w-0">
                 <span className={[
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-colors',
+                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-colors',
                   props.settings?.autoLoad
                     ? MACHINE_ACCENT.surfaceActive
                     : 'border-white/[0.06] bg-white/[0.04] text-neutral-400',
                 ].join(' ')}>
-                  <Brain size={15} />
+                  <Brain size={13} />
                 </span>
-                <span className="text-left min-w-0">
-                  <span className="block text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Carga automática</span>
-                  <span className="block text-[11px] text-neutral-400 truncate mt-0.5">
-                    {props.settings?.autoLoad ? 'O motor sugere seus pesos' : 'Pesos manuais'}
-                  </span>
-                </span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/90 truncate">Carga automática</span>
               </span>
               <span className={[
-                'relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border transition-colors',
+                'relative inline-flex h-[22px] w-[40px] shrink-0 items-center rounded-full border transition-colors',
                 props.settings?.autoLoad
                   ? MACHINE_ACCENT.toggleOn
                   : 'bg-neutral-800 border-white/[0.08]',
               ].join(' ')}>
                 <span className={[
-                  'inline-block h-[20px] w-[20px] transform rounded-full bg-white shadow-sm transition-transform duration-200',
-                  props.settings?.autoLoad ? 'translate-x-[23px]' : 'translate-x-[3px]',
+                  'inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                  props.settings?.autoLoad ? 'translate-x-[21px]' : 'translate-x-[3px]',
                 ].join(' ')} />
               </span>
             </button>
