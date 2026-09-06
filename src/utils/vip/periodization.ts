@@ -5,6 +5,7 @@ import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
 import { vipPeriodizationExerciseSeed, VipExerciseSeed } from '@/data/vipPeriodizationExercises'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone'
 
 export type VipPeriodizationModel = 'linear' | 'undulating'
 export type VipPeriodizationWeeks = 4 | 6 | 8
@@ -377,8 +378,10 @@ export const computeWeeklyStatsFromSessions = (sessions: Array<{ created_at: str
       for (const [, v] of Object.entries(logs)) {
         const log = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
         if (!log) continue
-        const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
-        const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
+        // Fonte única (lib/workout/isLogDone): o prefill do motor tem peso e não
+        // é série feita — sem o skip explícito, `weight > 0` o deixaria passar.
+        if (isEnginePrefillOnly(log)) continue
+        const done = isLogDone(log)
         // setTopWeightReps/setVolume tratam unilateral (L_/R_) além do normal.
         const { weight, reps } = setTopWeightReps(log)
         if (!done && weight <= 0 && reps <= 0) continue

@@ -19,12 +19,17 @@ const normalSet = read('src/components/workout/set-renderers/normalSet.tsx')
 
 describe('histórico não é envenenado pelo prefill do motor', () => {
   it('useWorkoutDeload descarta log que só tem peso automático, sem reps e sem conclusão', () => {
-    expect(deload).toContain('isEnginePrefillOnly')
-    // as três condições precisam estar presentes — afrouxar qualquer uma
-    // reabre o auto-envenenamento
-    expect(deload).toMatch(/weightSource[\s\S]{0,80}auto/)
-    expect(deload).toMatch(/isEnginePrefillOnly[\s\S]{0,220}reps == null/)
-    expect(deload).toMatch(/isEnginePrefillOnly[\s\S]{0,220}doneRaw == null/)
+    // A regra NASCEU aqui e em 06/09/2026 virou fonte única em
+    // `lib/workout/isLogDone` — o relatório dizia "29/30 séries" com uma feita
+    // enquanto este hook já sabia descartar. O deload precisa continuar
+    // chamando a regra (importada), e as três condições vivem no módulo; o
+    // comportamento delas é provado em `lib/workout/__tests__/isLogDone.test.ts`.
+    expect(deload).toMatch(/import \{[^}]*isEnginePrefillOnly[^}]*\} from '@\/lib\/workout\/isLogDone'/)
+    expect(deload).toMatch(/if \(isEnginePrefillOnly\(log\)\) return/)
+    const regra = readFileSync(resolve(process.cwd(), 'src/lib/workout/isLogDone.ts'), 'utf8')
+    expect(regra).toMatch(/weightSource[\s\S]{0,80}auto/)
+    expect(regra).toMatch(/L_reps/)
+    expect(regra).toMatch(/doneBruto\(log\) != null/)
   })
 })
 

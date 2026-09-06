@@ -655,6 +655,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     postCheckinDraft: postCheckinDraft as Record<string, string>,
     setPostCheckinDraft: setPostCheckinDraft as (v: Record<string, string>) => void,
     postCheckinResolveRef, persistDeloadHistoryFromSession,
+    // O descanso vive em `activeSession.timerTargetTime` (raiz do app); zerar
+    // os dois campos é o mesmo que o START/pular fazem em `handleCloseTimer`.
+    onCloseRestTimer: () => propsRef.current?.onUpdateSession?.({ timerTargetTime: null, timerContext: null }),
     finishing, setFinishing,
     alert: alertVoid,
     confirm, onFinish: props.onFinish as ((session: unknown, showReport: boolean) => void) | undefined,

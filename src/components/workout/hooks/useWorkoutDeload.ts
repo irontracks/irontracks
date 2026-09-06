@@ -63,6 +63,7 @@ import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import type { ConfirmFn } from '@/contexts/DialogContext'
+import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone'
 
 interface UseWorkoutDeloadProps {
   session: WorkoutSession | null;
@@ -188,21 +189,21 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
                 })
               : null;
             const hasValues = weight != null || reps != null;
-            const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
-            const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
+            // Fonte única (lib/workout/isLogDone). A regra "prefill do motor não é
+            // série feita" NASCEU aqui e foi promovida para os outros seis lugares
+            // que respondiam a mesma pergunta — o relatório dizia 29/30 com uma
+            // série feita enquanto este hook já sabia descartar (06/09/2026).
+            const done = isLogDone(log);
             if (!done && !hasValues) return;
             // Descarta o PREFILL do próprio motor de carga: peso escrito por ele
             // (weightSource 'auto'), sem nenhuma rep e sem conclusão explícita, é
             // exercício PULADO — não treino executado. Sem esta guarda o prefill
-            // entrava no histórico (só o peso já satisfaz `hasValues`, e `done`
-            // ausente vira true acima), o exercício virava um item com
-            // `setReps: null`, e na sessão seguinte o autoload lia esse item, não
-            // achava rep nenhuma e concluía "sem histórico" — auto-envenenamento.
-            // Deliberadamente estreita: exige as TRÊS condições, para não afrouxar
-            // o default de `done` ausente, do qual as sessões legadas dependem.
-            const isEnginePrefillOnly =
-              String(log.weightSource ?? '').toLowerCase() === 'auto' && reps == null && doneRaw == null;
-            if (isEnginePrefillOnly) return;
+            // entrava no histórico (só o peso já satisfaz `hasValues`), o
+            // exercício virava um item com `setReps: null`, e na sessão seguinte
+            // o autoload lia esse item, não achava rep nenhuma e concluía "sem
+            // histórico" — auto-envenenamento. A regra mora em
+            // `lib/workout/isLogDone` (nasceu aqui; hoje é de todos).
+            if (isEnginePrefillOnly(log)) return;
             // Série levada à falha. Aceita boolean e a string "true" (o log passa
             // por serialização JSON em workouts.notes e volta como texto).
             const failureRaw = log.failure ?? null;

@@ -1,3 +1,4 @@
+import { isLogDone } from '@/lib/workout/isLogDone'
 /**
  * Fonte ÚNICA de extração de peso/reps/volume de uma série logada.
  *
@@ -149,9 +150,8 @@ export const setTotalReps = (log: unknown): number => {
  */
 export const isWorkingSet = (log: unknown): boolean => {
   if (!isRec(log)) return false
-  const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
-  const done = doneRaw == null ? true : doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true'
-  if (!done) return false
+  // Fonte única (lib/workout/isLogDone): o prefill do motor de carga não é série feita.
+  if (!isLogDone(log)) return false
   const rawType = log.set_type ?? log.setType
   if (rawType === 'warmup' || rawType === 'feeler') return false
   if (!rawType && (log.is_warmup || log.isWarmup)) return false

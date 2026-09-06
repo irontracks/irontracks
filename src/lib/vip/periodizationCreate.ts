@@ -11,6 +11,7 @@ import { logError } from '@/lib/logger';
 import { env } from '@/utils/env';
 import { VipPeriodizationQuestionnaire, buildWorkoutPlan } from '@/utils/vip/periodization';
 import { vipPeriodizationExerciseSeed } from '@/data/vipPeriodizationExercises';
+import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone';
 
 /**
  * Criação de um programa de periodização — motor COMPARTILHADO entre o self-service VIP
@@ -58,8 +59,9 @@ export const buildUser1rmMapFromHistory = (history: Array<{ created_at: string; 
             if (!exNameNorm) continue;
             const log = v as LogEntry;
             if (!log) continue;
-            const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
-            const done = doneRaw == null ? true : doneRaw === true || String(doneRaw).toLowerCase() === 'true';
+            // Fonte única (lib/workout/isLogDone): o prefill do motor não é série feita.
+            if (isEnginePrefillOnly(log)) continue;
+            const done = isLogDone(log);
             const { weight, reps } = setTopWeightReps(log);
             if (!done && weight <= 0 && reps <= 0) continue;
             if (weight > 0 && reps > 0) {
