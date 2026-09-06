@@ -41,6 +41,13 @@ interface UseWorkoutFinishProps {
   setPostCheckinDraft: (v: Record<string, string>) => void
   postCheckinResolveRef: React.MutableRefObject<((v: unknown) => void) | null>
   persistDeloadHistoryFromSession: () => void
+  /**
+   * Encerra o descanso em andamento ANTES de o check-out abrir. Sem isto a barra
+   * "1:46 DESC · START ▶ · AUTO" continuava rodando por baixo do check-out — o
+   * treino sendo encerrado e a tela oferecendo iniciar a próxima série
+   * (auditoria da tela do treino ativo, 06/09/2026).
+   */
+  onCloseRestTimer?: () => void
   finishing: boolean
   setFinishing: (v: boolean) => void
   /**
@@ -71,7 +78,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
   const {
     session, workout, exercises: _exercises, logs, ui, userId, settings,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft: _postCheckinDraft, setPostCheckinDraft,
-    postCheckinResolveRef, persistDeloadHistoryFromSession,
+    postCheckinResolveRef, persistDeloadHistoryFromSession, onCloseRestTimer,
     finishing, setFinishing,
     alert, confirm, onFinish: _onFinish,
     deferredPendingNames,
@@ -128,6 +135,10 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
     // Always save to history (removed "Treino curto" dialog per user request)
     const shouldSaveHistory = true
+
+    // O treino acabou: o descanso morre AQUI, antes de qualquer tela seguinte.
+    // Ficava vivo por baixo do check-out, com START à mostra.
+    try { onCloseRestTimer?.() } catch { /* nunca bloqueia a finalização */ }
 
     // Post-workout check-in
     let postCheckin = null

@@ -1,3 +1,4 @@
+import { isEnginePrefillOnly } from '@/lib/workout/isLogDone'
 /**
  * Single source of truth for "was this set completed?" in the client-side report.
  *
@@ -40,6 +41,10 @@ export function isSetCompleted(log: unknown): boolean {
 
   if (isTruthy(l.done)) return true
   if (isTruthy(l.L_done) && isTruthy(l.R_done)) return true
+
+  // O prefill do motor de carga tem `weight > 0` e NÃO é série feita. Sem esta
+  // guarda, uma sessão com 1 série feita saía como "97% · 29/30" (06/09/2026).
+  if (isEnginePrefillOnly(l)) return false
 
   if (isPositiveNumber(l.weight) || isPositiveNumber(l.reps)) return true
   if (isPositiveNumber(l.L_weight) || isPositiveNumber(l.R_weight)) return true

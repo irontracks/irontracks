@@ -6,6 +6,7 @@ import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { sessionKcalInputs, type KcalProfileLike } from '@/utils/calories/sessionKcalInputs'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 import { currentWeekRangeBrt } from '@/utils/cron/weekRangeBrt'
+import { isLogDone } from '@/lib/workout/isLogDone'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -58,9 +59,8 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       const sIdx = Number(parts[1])
       if (Number.isFinite(sIdx)) failureSetIdxs.push(sIdx)
     }
-    const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
-    const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
-    if (!done) return
+    // Fonte única (lib/workout/isLogDone): o prefill do motor de carga não é série feita.
+    if (!isLogDone(value)) return
 
     // ── Skip warmup / feeler sets — they don't count toward exercise stats ─
     const rawType = (value.set_type ?? value.setType) as string | null | undefined
@@ -240,9 +240,8 @@ const buildLogTimes = (
     const eIdx = Number(parts[0])
     if (!Number.isFinite(eIdx) || eIdx !== exerciseIndex) return
     if (!isObject(value)) return
-    const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
-    const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
-    if (!done) return
+    // Fonte única (lib/workout/isLogDone): o prefill do motor de carga não é série feita.
+    if (!isLogDone(value)) return
     // Tempo de execução. ISOMETRIA/CARDIO não gravam `executionSeconds` — o tempo
     // real está em `durationSeconds` (PlankSetInput/CardioSetInput). Sem este
     // fallback a coluna "Execução" da prancha ficava vazia embora o app soubesse
