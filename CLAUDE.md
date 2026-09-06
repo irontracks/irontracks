@@ -224,6 +224,66 @@ na RPC entra por concatenação condicional
 (`|| CASE WHEN x IS NULL THEN '{}'::jsonb ELSE jsonb_build_object(...) END`) —
 `"campo": null` em toda série custaria ~25 B × 24 séries do teto por template.
 
+**Auditoria da tela do treino ativo — 05–06/09/2026, PRs #1079–#1086.** Duas
+auditorias independentes (a segunda em Fable 5.1 para confirmar), 15 achados,
+oito PRs. O que precisa sobreviver ao `/clear`:
+
+⚠️ **Série que o motor só PREENCHEU não é série feita — `lib/workout/isLogDone.ts`
+é a fonte única.** O autoload grava `{ weight, weightSource: 'auto' }` em toda
+série renderizada, sem `done` e sem reps; SETE lugares (`reportMetrics` ×2,
+`setVolume`, `setCompletion`, `periodization`, `periodizationCreate`, deload)
+tratavam log sem `done` como feito. Sessão com 1 série real saía "97% · 29/30"
+e gravava `reportMeta.totals.setsDone = 29`. Medido: 72 fantasmas em 8 de 21
+sessões do dono. Volume/e1RM não inflavam (sem reps); a CONTAGEM inflava. Guard
+de classe varre `src/` por `done == null ? true`. **Ficou com o dono:**
+reprocessar o `setsDone` gravado nas sessões antigas (UPDATE em `workouts.notes`
+de usuários reais).
+
+**A tela diz o que faz:** finalizar conta o que falta ("Você fez 1 de 30 séries
+— faltam 29 · 9 exercícios sem nenhuma série"); série concluída SEM reps ganha
+uma linha âmbar (há aluno concluindo 63% assim, e volume/e1RM/autoload ficam
+cegos em silêncio); FINALIZAR encerra o descanso (`onCloseRestTimer` antes do
+check-out — só a Live Activity era encerrada); card recolhido é UMA linha
+("faltam N"/"feito"); a nota 🧠 do motor aparece na PRIMEIRA série pendente e
+só nela (`helpers/notaDoMotorUmaVez`) — **nos DOIS ramos**, com peso sugerido e
+`muted` (sem histórico); a escala de dor do check-in/out começa em dois chips
+("Sem dor · Tenho dor →").
+
+**O Cluster abria DOIS diálogos:** `Modals.tsx` e `ModalsComplexMethods.tsx`
+desenhavam o mesmo modal, e o primeiro monta o segundo. A cópia velha foi
+removida; guard `umModalUmRenderer.test.ts` — cada `{xxxModal && (` em
+exatamente um arquivo.
+
+⚠️ **`scrollIntoView` rola na HORIZONTAL mesmo em `overflow-x: hidden`** — e o
+usuário não tem como voltar. O #1085 usou `scrollIntoView({ block: 'nearest' })`
+para trazer a fileira de chips do seletor de método para cima do FINALIZAR; a
+fileira era mais larga que a tela e a lista inteira deslocou ~50pt para a
+esquerda em produção (visto no simulador, corrigido no #1086 na mesma hora).
+Use `utils/ui/rolarSoNaVertical` — só `scrollTop`. E a causa da largura:
+**`flex-wrap` não quebra dentro de item de flex com largura de conteúdo** — o
+seletor inline nunca quebrou linha e Cluster/Stripping/Bi-Set ficavam cortados
+fora da vista desde sempre. Hoje a fileira é `absolute left-0 right-0` até a
+LINHA da série, que precisa ser `relative` (guard nos dois chamadores).
+
+**Telemetria do treino ativo:** catálogo `lib/workout/telemetriaTreino.ts`
+(`EVENTOS_TREINO`, `rastrearTreino`), 8 eventos com `type: 'workout'` e
+`screen: 'active_workout'` em `user_activity_events`. Nome de evento
+`workout_…` digitado à mão em `components/`/`hooks/` reprova.
+⚠️ **O E2E do CI escreve na conta de teste com o código do PREVIEW** — eventos
+novos apareceram no banco ANTES do deploy de produção, e a sessão "Feito 42 kg"
+que o simulador restaurou era a do Playwright. Não é usuário, não é bug.
+
+Três armadilhas de ferramental medidas nesta rodada: (1) **Vitest 4 re-lança o
+erro gravado num `vi.fn` que lançou**, mesmo capturado pelo código — `not.toThrow()`
+e matchers sobre o spy falham; para provar "nunca lança", o mock que lança é
+função PLANA e a prova é `try/catch` explícito; (2) o guard háptico
+(`hapticConcluirSerie`) mede uma janela FIXA de 900 caracteres após
+`patchObj.done === true` — código inserido antes do `triggerHaptic` empurra-o
+para fora e o guard fica vermelho com o comportamento intacto: insira DEPOIS do
+bloco; (3) **`npm run pr:merge` deixa o checkout na `main` local** — a branch
+seguinte precisa nascer com `git checkout -b … origin/main`, senão o trabalho
+vai parar na `main`.
+
 **Motor de carga automática (autoload)** — `utils/autoload/`: `suggestWeight.ts` (núcleo puro: e1RM Epley ajustado por RPE → inverte pro alvo; trava anti-regressão, teto de +10%/sessão, prontidão só amortece), `plateMath.ts` (arredonda pro incremento montável, pra baixo), `equipmentFromName.ts` (infere equipamento pelo nome pt-BR). Fiação em `hooks/useWorkoutAutoload.ts` (reusa o `reportHistory` do `useWorkoutDeload` + check-in de hoje). Gate: `settings.autoLoadBeta && settings.autoLoad`. `useAutoloadWeight.ts` é o hook que os renderers avançados usam. **`weightSource: 'user'` no log = o usuário assumiu aquela série; o motor NUNCA reescreve depois disso.**
 
 **Escrever peso sem dizer a FONTE trava o campo (22/08/2026).** O dono relatou
