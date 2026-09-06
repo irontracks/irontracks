@@ -157,7 +157,7 @@ export function descreverProximaSerie(params: ProximaSerieParams): ProximaSerie 
   const atual = isRecord(exercises[exIdx]) ? (exercises[exIdx] as Record<string, unknown>) : null
   if (!atual) return null
 
-  const alvo = resolverAlvo(exercises, exIdx, setIdx, params.nextKey)
+  const alvo = resolverAlvo(exercises, logs, exIdx, setIdx, params.nextKey)
   if (!alvo) return null
 
   const proxEx = isRecord(exercises[alvo.exIdx]) ? (exercises[alvo.exIdx] as Record<string, unknown>) : null
@@ -186,23 +186,42 @@ export function descreverProximaSerie(params: ProximaSerieParams): ProximaSerie 
   }
 }
 
+/** A primeira série ainda não concluída do exercício, ou `null` se acabou. */
+function primeiraSeriePendente(
+  exercises: unknown[],
+  logs: Record<string, unknown>,
+  exIdx: number,
+): number | null {
+  const total = setsCountOfExercise(exercises[exIdx])
+  for (let i = 0; i < total; i++) {
+    const log = logs[`${exIdx}-${i}`]
+    if (!(isRecord(log) && log.done === true)) return i
+  }
+  return null
+}
+
 /**
- * Onde o atleta vai depois desta série.
+ * Onde o atleta vai depois desta série — na ORDEM em que o app decide de fato.
  *
- * 1. `nextKey` do chamador, quando válido — ele sabe mais que nós.
- * 2. Grupo (Bi-Set…): a MESMA regra do `ExerciseList` — fora da última série,
- *    o próximo é o membro seguinte do ciclo, na mesma rodada (`setIdx + 1`).
- * 3. Padrão: próxima série do mesmo exercício, senão a 1ª do exercício seguinte.
+ * 1. Grupo (Bi-Set…): a MESMA regra do `ExerciseList`, que alterna para o
+ *    membro seguinte do ciclo INDEPENDENTEMENTE de qual renderer concluiu a
+ *    série. Por isso o grupo vem ANTES do `nextKey`: uma série de membro de
+ *    Bi-Set com `per_set_method: 'Normal'` renderiza pelo `normalSet`, que
+ *    manda `nextKey` do MESMO exercício — e a tela anunciaria o exercício
+ *    errado (segundo code review, #1077). Como lá, só alterna fora da última
+ *    série, para outro membro, e só se ele ainda tiver série PENDENTE — um
+ *    membro com séries a menos já esgotado não recebe "5ª série" inventada.
+ * 2. `nextKey` do chamador, quando válido.
+ * 3. Padrão: próxima série do mesmo exercício, senão a primeira PENDENTE do
+ *    exercício seguinte (não a série 0 cega — ela pode já estar feita).
  */
 function resolverAlvo(
   exercises: unknown[],
+  logs: Record<string, unknown>,
   exIdx: number,
   setIdx: number,
   nextKey: string | null | undefined,
 ): { exIdx: number; setIdx: number } | null {
-  const informado = parseChaveDeSerie(nextKey)
-  if (informado) return informado
-
   const setsAtual = setsCountOfExercise(exercises[exIdx])
   const naUltimaSerie = setIdx + 1 >= setsAtual
 
@@ -210,10 +229,16 @@ function resolverAlvo(
   if (grupo && !naUltimaSerie) {
     const proximoMembro = grupo.members[(grupo.position + 1) % grupo.size]
     if (typeof proximoMembro === 'number' && proximoMembro !== exIdx) {
-      return { exIdx: proximoMembro, setIdx: setIdx + 1 }
+      const pendente = primeiraSeriePendente(exercises, logs, proximoMembro)
+      if (pendente !== null) return { exIdx: proximoMembro, setIdx: pendente }
     }
   }
 
+  const informado = parseChaveDeSerie(nextKey)
+  if (informado) return informado
+
   if (!naUltimaSerie) return { exIdx, setIdx: setIdx + 1 }
-  return exercises[exIdx + 1] !== undefined ? { exIdx: exIdx + 1, setIdx: 0 } : null
+  if (exercises[exIdx + 1] === undefined) return null
+  const pendente = primeiraSeriePendente(exercises, logs, exIdx + 1)
+  return { exIdx: exIdx + 1, setIdx: pendente ?? 0 }
 }

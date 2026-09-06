@@ -148,7 +148,10 @@ describe('code review #1076 — a tela não pode afirmar a série errada', () =>
       { name: 'Remada', sets: 3, method: 'Bi-Set', setDetails: [{ weight: 60 }, { weight: 60 }, { weight: 60 }] },
       { name: 'Rosca', sets: 3 },
     ]
-    const p = descreverProximaSerie({ exercises: biset, exIdx: 1, setIdx: 0, kind: 'rest', nextKey: null })
+    // Os logs são o estado REAL do momento: a 1ª rodada dos dois já foi feita —
+    // é assim que se chega ao descanso da Remada.
+    const logs = { '0-0': { done: true }, '1-0': { done: true } }
+    const p = descreverProximaSerie({ exercises: biset, logs, exIdx: 1, setIdx: 0, kind: 'rest', nextKey: null })
     expect(p?.exerciseName).toBe('Supino')
     expect(p?.setLabel).toBe('2ª série')
     expect(p?.weight).toBe('84 kg')
@@ -225,5 +228,57 @@ describe('code review #1076 — a tela não pode afirmar a série errada', () =>
       setIdx: 0,
     })
     expect(p?.weight).toBe('84 kg')
+  })
+})
+
+/**
+ * Segundo code review (#1077): a regra de grupo tinha dois buracos que o
+ * `ExerciseList` não tem — e ele é a fonte da verdade sobre para onde o app
+ * leva o atleta.
+ */
+describe('code review #1077 — a regra de grupo é a do ExerciseList, inteira', () => {
+  const biset = [
+    { name: 'Supino', sets: 3, method: 'Bi-Set', setDetails: [{ weight: 80 }, { weight: 84 }, { weight: 84 }] },
+    { name: 'Remada', sets: 3, method: 'Bi-Set', setDetails: [{ weight: 60 }, { weight: 60 }, { weight: 60 }] },
+    { name: 'Rosca', sets: 3 },
+  ]
+
+  it('o grupo VENCE o nextKey do normalSet (série com per_set_method Normal num Bi-Set)', () => {
+    // O ExerciseList alterna seja qual for o renderer; um `nextKey` do mesmo
+    // exercício, vindo do normalSet, não pode fazer a tela dizer "Remada".
+    const logs = { '0-0': { done: true }, '1-0': { done: true } }
+    const p = descreverProximaSerie({ exercises: biset, logs, exIdx: 1, setIdx: 0, kind: 'rest', nextKey: '1-1' })
+    expect(p?.exerciseName).toBe('Supino')
+    expect(p?.setLabel).toBe('2ª série')
+  })
+
+  it('membro-alvo já ESGOTADO não recebe série inventada — cai no fluxo padrão', () => {
+    // Supino com 2 séries, Remada com 3: na 3ª rodada o Supino acabou. O
+    // ExerciseList não alterna (sem pendente), o atleta fica na Remada.
+    const assimetrico = [
+      { name: 'Supino', sets: 2, method: 'Bi-Set' },
+      { name: 'Remada', sets: 3, method: 'Bi-Set' },
+      { name: 'Rosca', sets: 3 },
+    ]
+    const logs = { '0-0': { done: true }, '0-1': { done: true }, '1-0': { done: true } }
+    const p = descreverProximaSerie({ exercises: assimetrico, logs, exIdx: 1, setIdx: 1, kind: 'rest', nextKey: null })
+    expect(p?.exerciseName).toBe('Remada')
+    expect(p?.setLabel).toBe('3ª série')
+  })
+
+  it('alterna para a primeira série PENDENTE do outro membro, não para setIdx+1 cego', () => {
+    // O usuário pulou a 1ª do Supino e fez a 2ª; ao fechar a rodada na Remada,
+    // o pendente do Supino é a 1ª — é para lá que o app leva.
+    const logs = { '0-1': { done: true }, '1-0': { done: true } }
+    const p = descreverProximaSerie({ exercises: biset, logs, exIdx: 1, setIdx: 0, kind: 'rest', nextKey: null })
+    expect(p?.exerciseName).toBe('Supino')
+    expect(p?.setLabel).toBe('1ª série')
+  })
+
+  it('exercício seguinte: a primeira PENDENTE, não a série 0 se ela já foi feita', () => {
+    const logs = { '1-0': { done: true } }
+    const p = descreverProximaSerie({ exercises: treino, logs, exIdx: 0, setIdx: 3, kind: 'rest', nextKey: null })
+    expect(p?.exerciseName).toBe('Crucifixo inclinado')
+    expect(p?.setLabel).toBe('2ª série')
   })
 })
