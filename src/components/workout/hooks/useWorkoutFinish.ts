@@ -25,7 +25,7 @@ import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/
 import { apiAi } from '@/lib/api/ai'
 import * as Sentry from '@sentry/nextjs'
 import type { ConfirmFn } from '@/contexts/DialogContext'
-import { buildFinishQuestion } from '@/lib/workout/deferredExercises'
+import { buildFinishQuestion, progressoDoTreino } from '@/lib/workout/deferredExercises'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -76,7 +76,7 @@ function parseStartedAtMs(raw: unknown): number {
 
 export function useWorkoutFinish(props: UseWorkoutFinishProps) {
   const {
-    session, workout, exercises: _exercises, logs, ui, userId, settings,
+    session, workout, exercises, logs, ui, userId, settings,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft: _postCheckinDraft, setPostCheckinDraft,
     postCheckinResolveRef, persistDeloadHistoryFromSession, onCloseRestTimer,
     finishing, setFinishing,
@@ -117,13 +117,15 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     // Always show report (removed "Gerar relatório?" dialog per user request)
     const showReport = true
 
-    // Confirm finish — a pergunta muda quando há exercício guardado para depois
-    // (a regra e o texto vivem em lib/workout/deferredExercises).
+    // Confirm finish — a pergunta diz o que FALTA (séries e exercícios sem
+    // nenhuma) e o que foi guardado para depois. Com 29 de 30 séries por fazer
+    // ela perguntava só "Deseja finalizar?" (a regra e o texto vivem em
+    // lib/workout/deferredExercises).
     let ok = false
     try {
       ok =
         typeof confirm === 'function'
-          ? await confirm(buildFinishQuestion(deferredPendingNames), 'Finalizar treino', {
+          ? await confirm(buildFinishQuestion(deferredPendingNames, progressoDoTreino(exercises, logs)), 'Finalizar treino', {
             confirmText: 'Sim',
             cancelText: 'Não',
           })
