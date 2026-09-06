@@ -22,7 +22,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import RestTimerOverlay, { SEGUNDOS_ATE_ALARME_DE_EXCESSO } from '../RestTimerOverlay'
+import RestTimerOverlay from '../RestTimerOverlay'
+import { REST_OVERTIME_ALARM_SECONDS } from '../helpers/restAutoAdvance'
 
 vi.mock('@/lib/sounds', () => ({ playTimerFinishSound: vi.fn(), playTick: vi.fn() }))
 vi.mock('@/utils/platform', () => ({ isNativePlatform: () => false }))
@@ -139,14 +140,14 @@ describe('o vermelho é alarme, não marcação de zero', () => {
     })
 
     it('passado o limiar, aí sim vira alarme', async () => {
-        const { container } = montar({ kind: 'rest', next: PROXIMA }, SEGUNDOS_ATE_ALARME_DE_EXCESSO + 5)
+        const { container } = montar({ kind: 'rest', next: PROXIMA }, REST_OVERTIME_ALARM_SECONDS + 5)
         await avancar()
         expect(corDoAnel(container)).toBe('#ef4444')
     })
 
     it('o limiar é curto o bastante para ainda ser útil', () => {
-        expect(SEGUNDOS_ATE_ALARME_DE_EXCESSO).toBeGreaterThan(5)
-        expect(SEGUNDOS_ATE_ALARME_DE_EXCESSO).toBeLessThanOrEqual(60)
+        expect(REST_OVERTIME_ALARM_SECONDS).toBeGreaterThan(5)
+        expect(REST_OVERTIME_ALARM_SECONDS).toBeLessThanOrEqual(60)
     })
 })
 
@@ -169,13 +170,17 @@ describe('fiação: o controller entrega a próxima série ao overlay', () => {
         .replace(/\/\*[\s\S]*?\*\//g, ' ')
         .replace(/^\s*\/\/.*$/gm, '')
 
-    const bloco = controller.slice(
-        controller.indexOf('const startTimer'),
-        controller.indexOf('const startTimer') + 2200,
-    )
+    // Fatiado da DECLARAÇÃO até a CHAMADA (`onStartTimer(s, ctx)`), as duas
+    // estruturais — nunca por janela fixa nem por comentário, que somem sem
+    // avisar (jeito nº 6 da lista de guards falsos, pego pelo code review).
+    const inicio = controller.indexOf('const startTimer')
+    const fim = controller.indexOf('onStartTimer(s, ctx)', inicio)
+    const bloco = inicio !== -1 && fim !== -1 ? controller.slice(inicio, fim) : ''
 
     it('o bloco do startTimer existe (senão o guard fica cego)', () => {
-        expect(bloco).toContain('onStartTimer')
+        expect(inicio, 'âncora inicial sumiu').not.toBe(-1)
+        expect(fim, 'âncora final (a chamada) sumiu').not.toBe(-1)
+        expect(bloco).toContain('descreverProximaSerie')
     })
 
     it('usa a fonte única, e não uma segunda cópia da regra', () => {
@@ -192,6 +197,15 @@ describe('fiação: o controller entrega a próxima série ao overlay', () => {
         // `nextSetLabel` sozinho é a tela antiga: nome e nada mais.
         expect(bloco).toMatch(/ctx\.next\s*=/)
     })
+
+    it('repassa `kind` e `nextKey` do renderer — ele sabe mais que o cálculo', () => {
+        // Sem `kind`, cluster/rest_pause anunciam a série seguinte no meio da
+        // atual; sem `nextKey`, o Bi-Set anuncia o último membro em vez do
+        // primeiro. Os dois foram achados do code review do #1076.
+        const chamada = bloco.slice(bloco.indexOf('descreverProximaSerie('))
+        expect(chamada).toMatch(/kind:\s*[^,]*ctx\.kind/)
+        expect(chamada).toMatch(/nextKey:\s*[^,]*ctx\.nextKey/)
+    })
 })
 
 describe('contraste do flash (guard de forma — o de cor não alcança fundo colorido)', () => {
@@ -205,13 +219,22 @@ describe('contraste do flash (guard de forma — o de cor não alcança fundo co
      */
     const semComentarios = (s: string) =>
         s.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ')
-    // Só o bloco do flash: a barra inferior é preta e tem outras regras.
-    const bloco = semComentarios(
-        fonte.slice(fonte.indexOf('{isFinished && !isTransition'), fonte.indexOf('perf: fundo sólido')),
-    )
+    // Só o bloco do flash: da condição que o abre até o `ref={barRef}` da barra
+    // inferior — as duas âncoras são CÓDIGO. A primeira versão terminava num
+    // comentário ("perf: fundo sólido"): se ele fosse reescrito, `indexOf` daria
+    // -1 e o `slice` engoliria o arquivo inteiro com o guard verde.
+    const inicioFlash = fonte.indexOf('{isFinished && !isTransition')
+    const fimFlash = fonte.indexOf('ref={barRef}', inicioFlash)
+    const bloco = inicioFlash !== -1 && fimFlash !== -1
+        ? semComentarios(fonte.slice(inicioFlash, fimFlash))
+        : ''
 
     it('o bloco existe (senão este guard fica cego)', () => {
+        expect(inicioFlash, 'âncora inicial sumiu').not.toBe(-1)
+        expect(fimFlash, 'âncora final (ref da barra) sumiu').not.toBe(-1)
         expect(bloco.length).toBeGreaterThan(500)
+        // E não engoliu a barra: o START pertence a ela, não ao flash.
+        expect(bloco).not.toContain('START ▶')
     })
 
     it('fundo SÓLIDO nos tons medidos — nada de opacidade nem blur', () => {
