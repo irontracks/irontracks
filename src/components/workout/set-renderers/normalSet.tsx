@@ -862,7 +862,7 @@ const NormalSetInner = ({
             </button>
           </div>
           {/* Linha de rodapé: explicação da sugestão (🧠) à esquerda + chip de falha à direita */}
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="relative mt-1 flex items-center justify-between gap-2">
             {done && !isUnilateral && !extReps.trim() ? (
               /* Série concluída SEM reps. O app aceita (é liberdade: o dono
                  preenche 872 de 876), mas há aluno concluindo 63% das séries
@@ -880,7 +880,12 @@ const NormalSetInner = ({
               /* Motor ligado que não teve base pra sugerir: mostra o PORQUÊ em cinza.
                  O rationale já era computado e jogado fora, então o usuário via uma
                  caixa vazia igualzinha à de quem está com o autoload desligado. */
-              <AutoloadNote show muted rationale={autoSuggestion.rationale} />
+              /* `autoRationale`, não o cru: sem histórico o motor explica o
+                 mesmo em TODAS as séries do exercício, e a regra "uma vez por
+                 exercício" (#1082) só cobria o ramo com peso sugerido — visto
+                 no iPhone em 06/09/2026, três cópias de "Sem histórico neste
+                 exercício" num card. */
+              <AutoloadNote show muted rationale={autoRationale} />
             ) : <span />}
             {/* MÉTODO e FALHA na mesma linha. O seletor morava numa terceira
                 faixa própria: cada série ocupava três linhas (campos, falha,

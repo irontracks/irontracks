@@ -28,7 +28,7 @@ describe('rodapé da série', () => {
     // O `<PlateHintLine` do ramo UNILATERAL aparece antes deste rodapé no
     // arquivo — fatiar pela primeira ocorrência devolvia string vazia, e o
     // teste passaria a medir nada.
-    const inicioRodape = normalSet.indexOf('<div className="mt-1 flex items-center justify-between gap-2">')
+    const inicioRodape = normalSet.indexOf('<div className="relative mt-1 flex items-center justify-between gap-2">')
     const rodape = normalSet.slice(inicioRodape, normalSet.indexOf('<PlateHintLine', inicioRodape))
 
     it('método e falha compartilham a linha', () => {
