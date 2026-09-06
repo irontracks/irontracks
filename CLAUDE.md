@@ -2915,6 +2915,42 @@ que lista builds e versão sem tocar em nada.
 
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
+## ⚠️ Push token é do APARELHO, não da conta (06/09/2026)
+
+Relato: "os lembretes de refeição não notificam". A causa não era o cron nem a
+feature — **a conta oficial do dono não tinha NENHUM token iOS**, então nenhum
+push de tipo nenhum chegava ao iPhone dele havia meses. As notificações
+continuavam nascendo no sino, que é o que fazia tudo parecer normal.
+
+O que mostrou foi o **runtime log da Vercel**, não o banco: `POST
+/api/push/register` → **409** às 03:58 e 04:11 daquele dia, vindo do aparelho
+dele. O 409 tem uma causa só na rota: `token_owned_by_another_user`.
+
+⚠️ **O guard de IDOR (auditoria 27/06/2026) recusava TODA troca de dono do
+token.** O motivo dele é real — quem soubesse o token alheio passaria a receber
+as notificações da vítima —, mas o token do APNs pertence ao **aparelho**: o
+mesmo iPhone devolve o mesmo token qualquer que seja a conta logada. Então,
+depois que UMA conta registrava naquele aparelho, qualquer outra conta do mesmo
+dono batia em 409 **para sempre**. Medido: 5 de 10 contas com notificação nos
+últimos 30 dias estavam sem token iOS.
+
+Hoje a régua é o `device_id` (`identifierForVendor`: estável por aparelho+app,
+independente da conta), em `lib/push/tokenOwnership.ts` — mesmo aparelho
+reatribui e grava `push_token_reassigned` em `audit_events`; aparelho diferente,
+ou sem os dois lados do `device_id`, segue 409.
+
+**A lição que passa deste caso:** o app **engolia a recusa** num `logWarn`, que
+é **no-op em produção** — por isso meses de 409 não produziram sinal nenhum.
+Toda chamada de rede em caminho crítico confere a RESPOSTA, e a falha vai por
+`logWarnRemote`. E, ao investigar "não recebo push", **comece perguntando se o
+token existe** (`device_push_tokens` filtrando `platform`), antes de olhar o
+emissor: o envio iOS lê `platform = 'ios'` e some em silêncio quando a lista
+volta vazia.
+
+⚠️ **Conta de teste e conta oficial no MESMO iPhone é a receita do 409** —
+foi exatamente o que aconteceu. Depois da correção elas convivem, mas só uma
+por vez recebe push naquele aparelho: quem abriu por último leva o token.
+
 ## Badge do ícone (o "32" no app) — duas metades, e nenhuma marca como lido
 O número no ícone é **recalculado pelo servidor a cada push** (`sendPushToUsers`
 conta as notificações não lidas). Por isso zerar só no device não bastava: o 32
