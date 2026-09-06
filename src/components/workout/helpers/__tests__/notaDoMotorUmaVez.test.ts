@@ -79,3 +79,14 @@ describe('guard de classe — anilhas têm UMA fonte por série', () => {
     expect(infratores, 'duas montagens para o mesmo peso, por dois inventários').toEqual([])
   })
 })
+
+describe('normalSet — o ramo SEM peso sugerido (muted) também respeita "uma vez"', () => {
+  it('o AutoloadNote muted recebe autoRationale, não o rationale cru', () => {
+    const src = semComentarios(ler(join(RENDERERS, 'normalSet.tsx')))
+    const m = src.match(/<AutoloadNote\s+show\s+muted\s+rationale=\{([^}]+)\}/)
+    expect(m, 'o ramo muted do normalSet sumiu — confira o JSX').not.toBeNull()
+    // Sem histórico, `suggestWeight` devolve o MESMO rationale para todas as
+    // séries; passar o cru repete a nota em cada uma (visto em 06/09/2026).
+    expect(m?.[1].trim()).toBe('autoRationale')
+  })
+})

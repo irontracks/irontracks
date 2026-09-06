@@ -465,7 +465,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
     const key = `${exIdx}-${setIdx}`;
     const done = !!getLog(key).done;
     return (
-      <div className="px-1 -mt-1 mb-1 flex justify-end">
+      <div className="relative px-1 -mt-1 mb-1 flex justify-end">
         <SetMethodPicker
           current={label}
           disabled={done}

@@ -22,6 +22,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { rolarSoNaVertical } from '@/utils/ui/rolarSoNaVertical';
 import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
 
 /** Os métodos oferecidos na troca rápida. `Normal` limpa a marcação. */
@@ -56,10 +57,13 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
   useEffect(() => {
     if (!open) return
     const el = chipsRef.current
-    if (!el || typeof el.scrollIntoView !== 'function') return
+    if (!el) return
     // Depois do paint: o `expand-enter` ainda está animando no mesmo frame.
+    // SÓ vertical — `scrollIntoView` também rola na horizontal e, no contêiner
+    // `overflow-x: hidden` da lista, deixava a tela deslocada sem volta
+    // (medido em produção em 06/09/2026). Ver `rolarSoNaVertical`.
     const id = requestAnimationFrame(() => {
-      try { el.scrollIntoView({ block: 'nearest' }) } catch { /* */ }
+      try { rolarSoNaVertical(el) } catch { /* */ }
     })
     return () => cancelAnimationFrame(id)
   }, [open])
@@ -93,11 +97,14 @@ export function SetMethodPicker({ current, onSelect, disabled, className }: SetM
       {open && (
         <div
           ref={chipsRef}
-          /* `scroll-mb-32`: a fileira abre ABAIXO do rótulo, e no fim da tela
-             cai por baixo do FINALIZAR (`WorkoutFooter`, fixed) — o usuário
-             abria o seletor e não via as opções. O efeito acima rola o mínimo
-             para ela aparecer; a margem é o que reserva o espaço do rodapé. */
-          className="expand-enter flex flex-wrap gap-1 mt-1 scroll-mb-32">
+          /* ABSOLUTA e esticada (`left-0 right-0`) até o ancestral `relative`,
+             que é a LINHA da série — não este componente. Inline, o seletor é
+             um item de flex com largura de conteúdo, então `flex-wrap` nunca
+             quebrava: os 12 chips saíam numa linha só, mais larga que a tela,
+             e Cluster/Stripping/Bi-Set ficavam cortados fora da vista
+             (medido no iPhone em 06/09/2026). Quem monta o seletor precisa
+             dar `relative` à linha — há guard nos dois chamadores. */
+          className="expand-enter absolute left-0 right-0 top-full z-20 mt-1 flex flex-wrap gap-1 rounded-lg border border-neutral-800 bg-neutral-950/95 p-1.5 shadow-xl">
           {SET_METHOD_OPTIONS.map((opt) => (
             <button
               key={opt}
