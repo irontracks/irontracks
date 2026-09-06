@@ -17,6 +17,7 @@ import {
   remapCurrentIndex,
 } from '../helpers/reconcileEditedExercises';
 import type { ConfirmFn } from '@/contexts/DialogContext';
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
 
 const MAX_EXTRA_SETS_PER_EXERCISE = 50;
 const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
@@ -665,6 +666,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       // só o que CONFIGURA método (o card parseia SST/drop dali).
       const metodoPreservado = notaAoTrocar(notaAntiga);
       nextExercises[exIdx] = { ...exRaw, name: trimmed, notes: metodoPreservado };
+      rastrearTreino(EVENTOS_TREINO.trocaAplicar, { gerarNota: Boolean(opts?.gerarNota) });
       onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
       if (opts?.gerarNota) void gerarNotaDoExercicio(exIdx, trimmed, metodoPreservado);
     } catch { /* silent */ }

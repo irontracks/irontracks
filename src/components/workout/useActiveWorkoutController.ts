@@ -38,6 +38,7 @@ import {
   getPlannedSet,
 } from './helpers/setPlanningHelpers';
 import { HELP_TERMS } from '@/utils/help/terms';
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
 
 // parseStartedAtMs moved to ActiveWorkout.tsx (timer provider) and useWorkoutFinish.ts
 
@@ -246,6 +247,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           triggerHaptic('light').catch(() => { })
           try { navigator?.vibrate?.(10) } catch { /* not supported */ }
         }
+        rastrearTreino(EVENTOS_TREINO.serieConcluida, {
+          exerciseComplete: isExerciseComplete,
+          hasReps: String(({ ...(getLog(`${exIdx}-${sIdx}`) || {}), ...patchObj } as { reps?: unknown }).reps ?? '').trim() !== '',
+        });
       }
 
       // If a WEIGHT changes and this exercise has linked weights enabled, replicate
@@ -622,13 +627,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
   // ── Toggle exercise notes ──────────────────────────────────────────────
   const toggleNotes = useCallback((key: string) => {
+    if (!openNotesKeys?.has(key)) rastrearTreino(EVENTOS_TREINO.notaAbrir);
     setOpenNotesKeys((prev: Set<string>) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }, [setOpenNotesKeys]);
+  }, [openNotesKeys, setOpenNotesKeys]);
 
 
   // ── "Fazer depois" ────────────────────────────────────────────────────────
@@ -687,6 +693,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // membro alternando com um card que o usuário mandou embora.
     const targets = exercisesToDefer(exIdx, groups);
     const nextDeferred = new Set<number>([...deferredExercises, ...targets]);
+    rastrearTreino(EVENTOS_TREINO.exercicioAdiar, { count: targets.length });
     setDeferredExercises(nextDeferred);
     // Recolhe o que foi adiado — card aberto de algo que não vai ser feito agora
     // é só ocupação de tela entre o usuário e o próximo exercício.
