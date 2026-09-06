@@ -31,7 +31,7 @@ import {
 const PROD_TABLES_SNAPSHOT = [
   'access_requests', 'active_workout_sessions', 'admin_emails', 'app_payments', 'app_plans',
   'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events', 'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
-  'client_error_events', 'coach_inbox_states', 'daily_nutrition_logs', 'device_push_tokens', 'direct_channels',
+  'client_error_events', 'coach_inbox_states', 'cron_secrets', 'daily_nutrition_logs', 'device_push_tokens', 'direct_channels',
   'direct_messages', 'error_reports', 'exercise_alias_jobs', 'exercise_aliases', 'exercise_canonical',
   'exercise_execution_submissions', 'exercise_library', 'exercise_muscle_maps', 'exercise_substitutions',
   'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'invites', 'lab_exam_files',
