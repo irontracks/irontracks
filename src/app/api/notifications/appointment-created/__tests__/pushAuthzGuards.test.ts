@@ -39,7 +39,11 @@ describe('crons — authz fail-closed (classe inteira)', () => {
   })
 
   it.each(rotas)('%s autoriza por isCronAuthorized', (rota) => {
-    expect(readFileSync(rota, 'utf8')).toMatch(/isCronAuthorized\(req\)/)
+    // Duas formas válidas: a síncrona (só a env var) e a assíncrona, que também
+    // aceita o segredo gerado no banco (`cron_secrets`, 06/09/2026). A async
+    // EXIGE `await` no mesmo casamento: sem ele a promise é truthy e o `if`
+    // passaria sempre — a rota viraria pública sem nenhum teste reclamar.
+    expect(readFileSync(rota, 'utf8')).toMatch(/(?<!Async)\bisCronAuthorized\(req\)|await isCronAuthorizedAsync\(req\)/)
   })
 
   it.each(rotas)('%s não compara o segredo à mão', (rota) => {
