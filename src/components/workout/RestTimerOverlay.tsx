@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
-import { shouldAutoAdvanceRest, shouldAbandonRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
+import { shouldAutoAdvanceRest, shouldAbandonRest, isOvertimeAlarm, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
 import { shouldSuppressFinishedFlash } from './helpers/flashSuppression';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
@@ -11,12 +11,6 @@ import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAc
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 import { logError, logWarnRemote } from '@/lib/logger';
 import type { ProximaSerie } from '@/lib/workout/proximaSerie';
-
-/**
- * Segundos de excesso antes de o anel virar VERMELHO. Abaixo disso o número
- * cresce na cor base (informativo); acima, é alarme. Ver `alarmeDeExcesso`.
- */
-export const SEGUNDOS_ATE_ALARME_DE_EXCESSO = 20;
 
 interface RestTimerContext {
     kind?: string;
@@ -788,7 +782,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
      * quem larga o peso, respira e volta. O alarme entra quando o atraso começa a
      * custar o treino.
      */
-    const alarmeDeExcesso = extraSeconds >= SEGUNDOS_ATE_ALARME_DE_EXCESSO;
+    const alarmeDeExcesso = isOvertimeAlarm(extraSeconds);
     const kind = String(context?.kind ?? '');
     const isSideRest = kind === 'side_rest';
     const isTransition = kind === 'transition';

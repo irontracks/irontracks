@@ -133,3 +133,97 @@ describe('⚠️ carga, reps e RPE — o dado que faltava na tela', () => {
     expect(p?.reps).toBe('10')
   })
 })
+
+/**
+ * ⚠️ Os quatro achados do code review do #1076 — a primeira versão afirmava a
+ * série ERRADA em 36px em três famílias de treino e discordava do card numa
+ * quarta. Cada caso abaixo reproduz um deles com o formato REAL dos renderers.
+ */
+describe('code review #1076 — a tela não pode afirmar a série errada', () => {
+  it('Bi-Set: depois do ÚLTIMO membro, a próxima é o PRIMEIRO na rodada seguinte', () => {
+    // `groupMethodSet` só dispara o descanso ao concluir o último membro, com
+    // `nextKey: null`, e a auto-alternância leva de volta ao primeiro.
+    const biset = [
+      { name: 'Supino', sets: 3, method: 'Bi-Set', setDetails: [{ weight: 80 }, { weight: 84 }, { weight: 84 }] },
+      { name: 'Remada', sets: 3, method: 'Bi-Set', setDetails: [{ weight: 60 }, { weight: 60 }, { weight: 60 }] },
+      { name: 'Rosca', sets: 3 },
+    ]
+    const p = descreverProximaSerie({ exercises: biset, exIdx: 1, setIdx: 0, kind: 'rest', nextKey: null })
+    expect(p?.exerciseName).toBe('Supino')
+    expect(p?.setLabel).toBe('2ª série')
+    expect(p?.weight).toBe('84 kg')
+  })
+
+  it('Bi-Set: na ÚLTIMA rodada segue o fluxo padrão — o exercício depois do grupo', () => {
+    const biset = [
+      { name: 'Supino', sets: 3, method: 'Bi-Set' },
+      { name: 'Remada', sets: 3, method: 'Bi-Set' },
+      { name: 'Rosca', sets: 3 },
+    ]
+    const p = descreverProximaSerie({ exercises: biset, exIdx: 1, setIdx: 2, kind: 'rest', nextKey: null })
+    expect(p?.exerciseName).toBe('Rosca')
+    expect(p?.setLabel).toBe('1ª série')
+  })
+
+  it('o `nextKey` do renderer VENCE o cálculo por índice', () => {
+    const p = descreverProximaSerie({ exercises: treino, exIdx: 0, setIdx: 0, kind: 'rest', nextKey: '1-0' })
+    expect(p?.exerciseName).toBe('Crucifixo inclinado')
+    expect(p?.setLabel).toBe('1ª série')
+  })
+
+  it('nextKey inválido é ignorado, não quebra', () => {
+    const p = descreverProximaSerie({ exercises: treino, exIdx: 0, setIdx: 0, kind: 'rest', nextKey: 'lixo' })
+    expect(p?.setLabel).toBe('2ª série')
+  })
+
+  it('cluster e rest_pause são descansos DENTRO da série: não há próxima', () => {
+    // Anunciar "3ª série" com dois blocos da 2ª ainda pela frente é mentir para
+    // quem está com a barra na mão.
+    for (const kind of ['cluster', 'rest_pause']) {
+      expect(descreverProximaSerie({ exercises: treino, exIdx: 0, setIdx: 0, kind }), kind).toBeNull()
+    }
+  })
+
+  it('unilateral: lê L_weight/R_weight — lados iguais viram um número', () => {
+    const p = descreverProximaSerie({
+      exercises: treino,
+      logs: { '0-1': { L_weight: '20', R_weight: '20', L_reps: '12', R_reps: '12' } },
+      exIdx: 0,
+      setIdx: 0,
+    })
+    expect(p?.weight).toBe('20 kg')
+    expect(p?.reps).toBe('12')
+  })
+
+  it('unilateral: lados DIFERENTES aparecem os dois — a média seria um peso que não existe', () => {
+    const p = descreverProximaSerie({
+      exercises: treino,
+      logs: { '0-1': { L_weight: '20', R_weight: '22' } },
+      exIdx: 0,
+      setIdx: 0,
+    })
+    expect(p?.weight).toBe('20 / 22 kg')
+  })
+
+  it('peso LIMPO pelo usuário (string vazia no log) não cai no plano — igual ao card', () => {
+    // `normalSet` resolve `log.weight ?? plano`: '' é valor, não ausência. O
+    // card fica em branco; a tela não pode dizer "84 kg" em negrito.
+    const p = descreverProximaSerie({
+      exercises: treino,
+      logs: { '0-1': { weight: '', weightSource: 'user' } },
+      exIdx: 0,
+      setIdx: 0,
+    })
+    expect(p?.weight).toBe('')
+  })
+
+  it('peso AUSENTE do log (undefined) ainda cai no plano', () => {
+    const p = descreverProximaSerie({
+      exercises: treino,
+      logs: { '0-1': { reps: '8' } },
+      exIdx: 0,
+      setIdx: 0,
+    })
+    expect(p?.weight).toBe('84 kg')
+  })
+})

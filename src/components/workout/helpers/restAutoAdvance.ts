@@ -58,6 +58,27 @@ export const REST_ALARM_FULL_CYCLE_MS = 1500
  */
 export const REST_ABANDON_EXTRA_SECONDS = 15 * 60
 
+/**
+ * Segundos ALÉM do planejado antes de o anel do descanso virar VERMELHO.
+ *
+ * O vermelho é o pigmento de alarme do app, e acendia com **zero** segundo de
+ * excesso: no instante em que a tela dizia "BORA!" em verde de conquista, o
+ * anel já mostrava "+0:00 EXTRA" em vermelho — duas mensagens opostas sobre o
+ * mesmo instante. Passar alguns segundos do planejado é o normal de quem larga
+ * o peso e respira; o alarme entra quando o atraso começa a custar o treino.
+ *
+ * Mora aqui, ao lado de `REST_ABANDON_EXTRA_SECONDS`, porque é a mesma família
+ * de regra (limiar em segundos sobre o excesso) e o CLAUDE.md pede a lógica de
+ * negócio fora do componente.
+ */
+export const REST_OVERTIME_ALARM_SECONDS = 20
+
+/** O excesso já justifica o vermelho? */
+export function isOvertimeAlarm(extraSeconds: number): boolean {
+  const extra = Number(extraSeconds)
+  return Number.isFinite(extra) && extra >= REST_OVERTIME_ALARM_SECONDS
+}
+
 export interface AbandonRestInput {
   /** Segundos ALÉM do planejado (0 enquanto o descanso não estourou). */
   extraSeconds: number

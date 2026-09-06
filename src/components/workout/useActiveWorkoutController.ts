@@ -483,11 +483,17 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         // ter processado a última escrita, e o peso que o motor acabou de sugerir
         // para a próxima série chegaria vazio.
         if (!ctx.nextSetLabel && Number.isFinite(currentSetIdx) && currentSetIdx >= 0) {
+          // `kind` e `nextKey` vêm do renderer, que sabe mais que este cálculo:
+          // cluster/rest_pause são descansos DENTRO da série (não há "próxima"),
+          // e o `nextKey` do normalSet já é a chave certa. Ignorá-los foi o que
+          // fez a tela anunciar a série errada em Bi-Set e em cluster (#1076).
           const proxima = descreverProximaSerie({
             exercises: exArr,
             logs: logsRef.current,
             exIdx: currentExIdx,
             setIdx: currentSetIdx,
+            kind: typeof ctx.kind === 'string' ? ctx.kind : null,
+            nextKey: typeof ctx.nextKey === 'string' ? ctx.nextKey : null,
           });
           if (proxima) {
             ctx.nextSetLabel = proxima.label;
