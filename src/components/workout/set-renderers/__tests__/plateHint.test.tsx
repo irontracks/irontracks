@@ -52,7 +52,13 @@ describe('Dica de anilhas na série', () => {
     logStore = { weight: '325', weightSource: 'auto' }
     suggestions = { '0-0': { weight: 325, reps: 15, confidence: 'high', rationale: 'mantive a carga' } }
     renderSet('Leg press 45°')
-    expect(screen.getByText('8×20 + 1×2,5 por lado')).toBeTruthy()
+    // Desde 06/09/2026 a montagem tem UMA fonte na série: a `PlateHintLine`
+    // (inventário do usuário, peso do campo). A dica de anilhas-padrão da
+    // `AutoloadNote` ("8×20 + 1×2,5 por lado") dizia outra coisa para o mesmo
+    // peso e saiu — duas verdades para 325 kg era o defeito.
+    expect(screen.getByText(/Por lado:/)).toBeTruthy()
+    expect(screen.queryByText('8×20 + 1×2,5 por lado')).toBeNull()
+    expect(screen.getAllByText(/2,5/).length).toBe(1)
   })
 
   it('não mostra nada em máquina de pino', () => {
@@ -62,11 +68,17 @@ describe('Dica de anilhas na série', () => {
     expect(screen.queryByText(/por lado/)).toBeNull()
   })
 
-  it('some quando o usuário assume o peso (não é mais a carga do motor)', () => {
+  it('continua quando o usuário assume o peso — a montagem é do CAMPO, não do motor', () => {
+    // Antes este caso dizia "some": era a dica da AutoloadNote (anilhas
+    // padrão, peso sugerido), e a asserção só passava porque /por lado/ não
+    // casa com "Por lado:". A fonte única é a `PlateHintLine`, que monta o
+    // peso que ESTÁ no campo, digitado ou não — quem digita 300 também precisa
+    // saber quantas anilhas são.
     logStore = { weight: '300', weightSource: 'user' }
     suggestions = { '0-0': { weight: 325, reps: 15, confidence: 'high', rationale: 'x' } }
     renderSet('Leg press 45°')
-    expect(screen.queryByText(/por lado/)).toBeNull()
+    expect(screen.getByText(/Por lado:/)).toBeTruthy()
+    expect(screen.queryByText(/🧠/)).toBeNull()
   })
 })
 

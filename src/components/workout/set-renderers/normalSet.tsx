@@ -17,7 +17,7 @@ import type { SetType } from '@/types/workout';
 import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
 import { logWarnRemote } from '@/lib/logger';
 import { decideExternalSync } from '../helpers/inputSyncDecision';
-import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
+import { isPrimeiraSeriePendente } from '../helpers/notaDoMotorUmaVez';
 import { AutoloadNote } from './AutoloadNote';
 import { PlateHintLine } from './PlateHintLine';
 import { inventoryFromSettings } from '@/utils/plates/plateInventory';
@@ -256,8 +256,10 @@ const NormalSetInner = ({
     autoLoadEnabled && log.weightSource === 'auto' && !log.done &&
     autoSuggestionWeight != null && String(log.weight ?? '') === String(autoSuggestionWeight),
   );
-  // Dica de montagem (barra / máquina de anilha): "8×20 + 1×2,5 por lado".
-  const autoPlateHint = plateHintForExercise(ex?.name, autoSuggestionWeight) ?? '';
+  // A explicação 🧠 aparece UMA vez por exercício, na primeira série pendente
+  // (helpers/notaDoMotorUmaVez) — era repetida em cada série, idêntica.
+  const notaDoMotorAqui = isPrimeiraSeriePendente(getLog, exIdx, setIdx);
+  const autoRationale = notaDoMotorAqui ? String(autoSuggestion?.rationale ?? '') : '';
 
   // Preenche a caixa de peso com a sugestão do motor — SÓ em série de trabalho, ainda
   // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
@@ -717,10 +719,13 @@ const NormalSetInner = ({
           {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
+          {/* Sem `plateHint`: a montagem é da `PlateHintLine` logo abaixo, que
+              usa o inventário do usuário e o peso QUE ESTÁ NO CAMPO. Duas dicas
+              para o mesmo peso divergiam ("+2,5 por lado" numa, "≈70kg montável"
+              na outra — auditoria de 06/09/2026). */}
           <AutoloadNote
             show={Boolean(autoLoadEnabled && !done && log.weightSource === 'auto')}
-            rationale={autoSuggestion?.rationale ?? ''}
-            plateHint={autoPlateHint}
+            rationale={autoRationale}
             className="px-0.5"
           />
           {/* "Por lado: 6×20 + 1×10" para o peso QUE ESTÁ NO CAMPO. Independente do
@@ -867,8 +872,10 @@ const NormalSetInner = ({
               <p data-testid="aviso-sem-reps" className="text-[11px] text-amber-300 leading-tight">
                 Sem reps, esta série não entra no volume nem na carga sugerida.
               </p>
-            ) : isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
-              <AutoloadNote show rationale={autoSuggestion?.rationale ?? ''} plateHint={autoPlateHint} />
+            ) : isAutoWeight && autoRationale ? (
+              /* Sem `plateHint`: a montagem é da `PlateHintLine` no fim da série,
+                 com o inventário do usuário e o peso do campo — uma fonte só. */
+              <AutoloadNote show rationale={autoRationale} />
             ) : autoLoadEnabled && setType === 'working' && !done && autoSuggestionWeight == null && autoSuggestion?.rationale ? (
               /* Motor ligado que não teve base pra sugerir: mostra o PORQUÊ em cinza.
                  O rationale já era computado e jogado fora, então o usuário via uma

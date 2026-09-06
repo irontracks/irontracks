@@ -48,7 +48,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass, setUserWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const method = String(ex?.method || '').trim();
   const perSetMethod = explicitSetMethod(log, getPlannedSet(ex, setIdx));
   const effectiveMethod = perSetMethod || method;
@@ -212,7 +212,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha o peso para concluir.</div>}
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas por lado do peso deste exercício do par/trio. */}
       <PlateHintLine
         exerciseName={String(ex?.name ?? '')}

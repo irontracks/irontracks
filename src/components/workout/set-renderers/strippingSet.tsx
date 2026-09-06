@@ -15,7 +15,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const { getLog, updateLog, getPlannedSet, setStrippingModal, startTimer, settings } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
   const stagesPlannedRaw: unknown[] = Array.isArray(cfgRaw) ? cfgRaw : [];
@@ -59,7 +59,7 @@ const StrippingSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       onOpen={() => setStrippingModal({ key, stages: stages.map((s) => ({ weight: s.weight, reps: s.reps ?? null })), error: '' })}
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas por lado do peso da primeira faixa — é a que se monta. */}
       <PlateHintLine
         exerciseName={String(ex?.name ?? '')}

@@ -15,7 +15,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
   const { getLog, updateLog, setFst7Modal, startTimer, settings } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const fst7Data = isObject(log.fst7) ? (log.fst7 as UnknownRecord) : null;
   const blocksRaw: unknown[] = Array.isArray(fst7Data?.blocks) ? (fst7Data.blocks as unknown[]) : [];
   const intraSec = parseTrainingNumber(fst7Data?.intra_sec) ?? 30;
@@ -52,7 +52,7 @@ const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
       onOpen={() => setFst7Modal({ key, blocks: blocks.map((b) => ({ weight: b.weight, reps: b.reps ?? null })), intra_sec: intraSec, error: '' })}
       onToggleDone={handleToggleDone}
     >
-      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} className="pl-12" />
       {/* Anilhas por lado do peso do primeiro bloco — os 7 usam a mesma carga. */}
       <PlateHintLine
         exerciseName={String(ex?.name ?? '')}
