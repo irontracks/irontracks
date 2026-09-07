@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FoodItem } from './food-database'
 import { lookupOffByBarcode } from './sources/off-source'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 type BarcodeResolution = {
   item: FoodItem
@@ -33,7 +34,7 @@ export async function resolveBarcode(
     const { data } = await supabase
       .from('nutrition_custom_foods')
       .select('name, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g')
-      .eq('user_id', uid)
+      .in('user_id', await resolveLibraryUserIds(supabase, uid))
       .eq('barcode', cleanEan)
       .limit(1)
       .maybeSingle()

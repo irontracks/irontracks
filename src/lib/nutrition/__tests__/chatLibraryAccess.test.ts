@@ -40,6 +40,9 @@ function mockSupabase(customFoods: Record<string, unknown>[]) {
         }
         const chain: Record<string, unknown> = {
           eq: () => chain,
+          // .in() entrou com a biblioteca compartilhada (07/09/2026): o leitor passou
+          // a filtrar por VÁRIOS user_ids (o dono e o parceiro de dieta).
+          in: () => chain,
           gte: () => chain,
           lte: () => chain,
           limit: () => result,

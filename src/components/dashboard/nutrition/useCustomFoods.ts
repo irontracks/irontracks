@@ -8,6 +8,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 export interface CustomFood {
   id: string
@@ -73,7 +74,7 @@ export function useCustomFoods(userId: string | null | undefined) {
       const { data, error: err } = await supabase
         .from('nutrition_custom_foods')
         .select('*')
-        .eq('user_id', userId)
+        .in('user_id', await resolveLibraryUserIds(supabase, userId))
         .order('created_at', { ascending: false })
         .limit(50)
       if (cancelledRef.current) return
@@ -134,11 +135,14 @@ export function useCustomFoods(userId: string | null | undefined) {
   const deleteFood = useCallback(async (id: string): Promise<void> => {
     if (!userId) return
     try {
+      // Sem `.eq('user_id', …)`: na biblioteca compartilhada os dois editam e
+      // apagam a MESMA linha, e quem autoriza é a RLS. Com o filtro, apagar um
+      // item cadastrado pelo parceiro casava 0 linhas — sem erro, e com a lista
+      // otimista mostrando uma remoção que o banco não fez.
       await supabase
         .from('nutrition_custom_foods')
         .delete()
         .eq('id', id)
-        .eq('user_id', userId)
       setFoods(prev => prev.filter(f => f.id !== id))
     } catch { /* silent — UI already optimistic */ }
   }, [userId, supabase])
@@ -161,7 +165,6 @@ export function useCustomFoods(userId: string | null | undefined) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .eq('user_id', userId)
         .select()
         .single()
       if (err) throw new Error(err.message)

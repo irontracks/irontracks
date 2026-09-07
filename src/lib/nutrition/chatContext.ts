@@ -19,6 +19,7 @@
  * mais. Quem chama valida/clampa (Zod na rota).
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 export interface SnapshotTotals {
   calories: number
@@ -182,6 +183,10 @@ export async function buildNutritionSnapshot(
 ): Promise<NutritionSnapshot> {
   const monthStart = shiftDateKey(dateKey, -(MONTH_DAYS - 1))
   const weekStart = shiftDateKey(dateKey, -(WEEK_DAYS - 1))
+  // Resolvido ANTES do Promise.all: dentro do array não há como esperar, e
+  // deixar a biblioteca fora do paralelo custaria um round-trip a mais em toda
+  // mensagem do chat.
+  const libraryIds = await resolveLibraryUserIds(supabase, userId)
 
   const [entriesRes, daysRes, repertoireRes, libraryRes] = await Promise.all([
     // Entries CRUAS de hoje → totais com paridade exata com o diário.
@@ -203,11 +208,12 @@ export async function buildNutritionSnapshot(
       .eq('user_id', userId)
       .gte('date', monthStart)
       .lte('date', dateKey),
-    // A biblioteca pessoal — a tabela nutricional que ELE cadastrou.
+    // A biblioteca — a tabela nutricional que ELE (ou o parceiro de dieta)
+    // cadastrou. Ver `libraryScope`.
     supabase
       .from('nutrition_custom_foods')
       .select('name, aliases, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g, serving_size_g')
-      .eq('user_id', userId)
+      .in('user_id', libraryIds)
       .order('updated_at', { ascending: false })
       .limit(MAX_LIBRARY),
   ])

@@ -144,6 +144,14 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   nutrition_meal_entries: { mechanism: 'cascade', export: own(['user_id'], 20000) },
   nutrition_learned_foods: { mechanism: 'cascade', export: own(['user_id']) },
   nutrition_custom_foods: { mechanism: 'cascade', export: own(['user_id']) },
+  // Vínculo de biblioteca COMPARTILHADA entre duas contas (07/09/2026): casal
+  // que faz a mesma dieta cadastra o alimento uma vez e vale para os dois.
+  // Cascateia por FK para auth.users nos DOIS lados (`user_id` e `partner_id`),
+  // então apagar qualquer uma das contas desfaz o vínculo — e a biblioteca de
+  // quem fica continua inteira, porque os alimentos são linhas próprias dela.
+  // Entra no export pelo lado `user_id`: é uma decisão declarada do usuário
+  // sobre com quem ele divide os próprios dados.
+  nutrition_library_partners: { mechanism: 'cascade', export: own(['user_id']) },
   nutrition_favorite_meals: { mechanism: 'cascade', export: own(['user_id']) },
   daily_nutrition_logs: { mechanism: 'cascade', export: own(['user_id'], 20000) },
   // Marcas de "registro incompleto" (24/08/2026). Cascateia pela FK para

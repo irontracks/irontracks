@@ -20,6 +20,7 @@ import { normalizeFoodKey } from './learned-foods'
 import { isUsableAsSwapCandidate } from './foodItemSanity'
 import { buildMealItemFoods } from './mealItemFoods'
 import type { SwapCandidate } from './foodSwap'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 const num = (v: unknown): number => {
   const n = Number(v)
@@ -142,7 +143,7 @@ export async function buildSwapCandidates(supabase: SupabaseClient, userId: stri
     const { data } = await supabase
       .from('nutrition_custom_foods')
       .select('name, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g')
-      .eq('user_id', uid)
+      .in('user_id', await resolveLibraryUserIds(supabase, uid))
       .limit(100)
     custom = (Array.isArray(data) ? data : [])
       .filter(isRecord)

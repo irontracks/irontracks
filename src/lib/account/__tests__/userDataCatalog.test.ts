@@ -38,6 +38,7 @@ const PROD_TABLES_SNAPSHOT = [
   'lab_exams', 'lab_result_markers', 'lab_results', 'live_activity_push_tokens', 'marketplace_payments',
   'marketplace_subscriptions', 'mercadopago_webhook_events', 'muscle_weekly_summaries', 'notifications',
   'nutrition_custom_foods', 'nutrition_day_flags', 'nutrition_favorite_meals', 'nutrition_goals', 'nutrition_learned_foods',
+  'nutrition_library_partners',
   'nutrition_meal_entries', 'onboarding_events', 'password_recovery_codes', 'phone_verifications', 'photos',
   'profiles', 'referrals', 'rest_day_intents', 'sets', 'sets_audit', 'social_follows', 'social_stories',
   'social_story_comments', 'social_story_likes', 'social_story_reactions', 'social_story_views',
