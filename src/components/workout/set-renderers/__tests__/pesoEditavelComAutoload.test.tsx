@@ -195,12 +195,28 @@ describe('varredura — nenhum renderer escreve peso sem dizer a fonte', () => {
       for (const chamada of chamadasUpdateLog(src)) {
         // `L_weight`/`R_weight` (unilateral) casam por conta própria abaixo.
         if (!/[^_]weight\s*:/.test(chamada) && !/\bL_weight\s*:|\bR_weight\s*:/.test(chamada)) continue
-        if (/weightSource/.test(chamada)) continue
         if (/\bdone\s*:/.test(chamada)) continue
-        infratores.push(`${f}: ${chamada.replace(/\s+/g, ' ').slice(0, 120)}`)
+        // A marca precisa ser INCONDICIONAL. Até 07/09/2026 bastava a palavra
+        // `weightSource` aparecer na chamada, e o `normalSet` — o renderer mais
+        // usado do app — escrevia
+        //   `...(autoLoadEnabled ? { weightSource: 'user' } : {})`
+        // ou seja, com o motor desligado o peso digitado entrava SEM fonte e o
+        // log ficava com a anterior ('auto'). Forma presente, comportamento
+        // ausente: o guard passava verde com o defeito vivo, e ele chegou a
+        // gravar como decisão da máquina peso que o dono digitou (07/09/2026).
+        if (/weightSource/.test(chamada) && !/\?[^:]*weightSource|weightSource[^,}]*:\s*[^'"]*\?/.test(chamada)) continue
+        if (!/weightSource/.test(chamada)) {
+          infratores.push(`${f}: SEM FONTE — ${chamada.replace(/\s+/g, ' ').slice(0, 100)}`)
+        } else {
+          infratores.push(`${f}: FONTE CONDICIONAL — ${chamada.replace(/\s+/g, ' ').slice(0, 100)}`)
+        }
       }
     }
-    expect(infratores, 'peso gravado sem fonte — o motor de carga automática vai reescrever por cima').toEqual([])
+    expect(
+      infratores,
+      'peso gravado sem fonte (ou com fonte condicional) — o motor de carga automática ' +
+        'vai reescrever por cima, e o histórico registra como decisão da máquina o que foi do atleta',
+    ).toEqual([])
   })
 
   it('o guard enxerga os renderers (não está varrendo diretório vazio)', () => {
