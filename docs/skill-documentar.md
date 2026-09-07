@@ -192,7 +192,11 @@ gh pr create ...
 # mergear com squash SÓ com o quality-check verde
 ```
 
-Só depois disso diga ao dono que pode dar `/clear`.
+**Encerre a resposta com a linha literal `(pode rodar o /clear)`** — a última
+linha, depois do resumo. Pedido do dono em 07/09/2026: o `/documentar` existe
+para permitir o `/clear`, e ele não deve ter que deduzir se já pode. Só escreva
+essa linha depois do CI verde: dita antes, ela manda apagar a conversa com a
+nota ainda não publicada — e aí o achado morre nas duas pontas.
 
 ---
 
@@ -205,6 +209,7 @@ Só depois disso diga ao dono que pode dar `/clear`.
 - [ ] Armadilhas de verificação registradas (é o que mais economiza tempo depois)
 - [ ] Cada armadilha ou aponta a SOLUÇÃO, ou diz por que não dá para eliminar
 - [ ] PR mergeado com CI verde
+- [ ] Resposta encerrada com `(pode rodar o /clear)` — e só depois do verde
 
 ---
 
