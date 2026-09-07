@@ -257,7 +257,12 @@ export function buildDeloadPatches(input: {
         // Grade da máquina primeiro (o furo do pino que existe de verdade); só
         // então o arredondamento cego de 0,5 kg. Mesma ordem do motor de carga.
         const snapped = snapToLearnedGrid(target, grid);
-        const nextWeight = snapped != null && snapped > 0 ? snapped : roundToStep(target, WEIGHT_ROUND_STEP);
+        // O snap desce para o degrau existente, então pode passar do alvo — o que
+        // é desejável (57 em vez de 58,8). Mas não pode furar o piso: com um
+        // histórico esparso o degrau abaixo pode estar MUITO longe, e o app
+        // entregaria uma redução que nunca anunciou. Furou, volta ao passo cego.
+        const snapUsavel = snapped != null && snapped > 0 && snapped >= floor ? snapped : null;
+        const nextWeight = snapUsavel ?? roundToStep(target, WEIGHT_ROUND_STEP);
         // Nada a reduzir: não grava marca de descarga numa série que não mudou.
         // Gravar era o que fazia o relatório, o PDF e o Coach IA afirmarem uma
         // descarga que não houve — e ainda tirava a sessão da média de referência.

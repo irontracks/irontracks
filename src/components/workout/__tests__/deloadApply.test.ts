@@ -310,6 +310,22 @@ describe('buildDeloadPatches — usa a grade real da máquina', () => {
     expect(plan.patches[0].patch.weight).toBe('57')
   })
 
+  it('o piso vale ACIMA da grade: degrau distante demais não fura os 40 %', () => {
+    // Máquina de passo LARGO (30 em 30). Pedindo 35 % sobre 100, o alvo é 65 e o
+    // degrau existente abaixo dele é 40 — dentro da tolerância do grid, logo o
+    // snap ACEITARIA. Mas 40 é uma redução de 60 %, o dobro do que o app
+    // anunciou. O piso vence a grade: volta ao passo cego, em 65.
+    //
+    // A primeira versão deste caso usava [5,10,15,20,100] e passava verde com a
+    // guarda REMOVIDA — a tolerância do próprio grid já barrava aquele salto, e
+    // o caminho real nunca era exercitado. Pego pelo `npm run mutar`.
+    const sets: DeloadSetInput[] = [
+      { key: '0-0', log: { weight: '100', weightSource: 'user' }, plannedWeight: 100, suggestion: null, cfg: null },
+    ]
+    const plan = apply(sets, { ratio: 0.65, knownWeights: [10, 40, 70, 100] })
+    expect(plan.patches[0].patch.weight).toBe('65')
+  })
+
   it('sem grade confiável, mantém o arredondamento de 0,5 kg', () => {
     const sets: DeloadSetInput[] = [
       { key: '0-0', log: { weight: '84', weightSource: 'user' }, plannedWeight: 84, suggestion: null, cfg: null },

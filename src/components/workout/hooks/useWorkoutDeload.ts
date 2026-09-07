@@ -747,7 +747,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     // aplicações — 60,5 / 51,5 / 37,5 kg não são furo de pino de aparelho nenhum).
     const grid = learnWeightGrid(collectKnownWeights(scopedItems.length ? scopedItems : preferredItems));
     const snappedSuggested = snapToLearnedGrid(rawSuggested, grid);
-    const suggestedWeight = snappedSuggested != null && snappedSuggested > 0
+    // Mesmo cuidado de `buildDeloadPatches`: o degrau existente pode estar longe
+    // demais num histórico esparso, e o piso de 40 % vale acima da grade.
+    const suggestedWeight = snappedSuggested != null && snappedSuggested >= minWeight
       ? snappedSuggested
       : roundToStep(rawSuggested, WEIGHT_ROUND_STEP);
     const appliedReduction = baseWeight > 0 ? clampNumber(1 - suggestedWeight / baseWeight, 0, 1) : targetReduction;
