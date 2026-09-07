@@ -17,6 +17,7 @@ import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MealItem } from '@/lib/nutrition/engine'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 /**
  * Fire-and-forget self push when the user crosses their daily calorie or
@@ -405,10 +406,13 @@ async function saveScannedProductToLibrary(
   item: { kcal: number; p: number; c: number; f: number },
 ): Promise<void> {
   try {
+    // Dedupe no escopo da biblioteca COMPARTILHADA: se o parceiro de dieta já
+    // cadastrou este código de barras, escanear de novo não cria uma segunda
+    // linha — era exatamente a duplicação que o clone de 31/08/2026 produziu.
     const { data: existing } = await supabase
       .from('nutrition_custom_foods')
       .select('id')
-      .eq('user_id', userId)
+      .in('user_id', await resolveLibraryUserIds(supabase, userId))
       .eq('barcode', ean)
       .limit(1)
       .maybeSingle()

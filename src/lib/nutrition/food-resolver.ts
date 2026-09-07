@@ -5,6 +5,7 @@ import { analyzeMeal, type ParsedMealItem } from './parser'
 import { loadTacoFoods } from './sources/taco-source'
 import { searchOffByText } from './sources/off-source'
 import { loadMealMemo, bumpMealMemoUsage } from './learned-foods'
+import { resolveLibraryUserIds } from '@/lib/nutrition/libraryScope'
 
 type ResolveResult = {
   meal: MealLog
@@ -37,7 +38,7 @@ async function loadCustomFoods(
     const { data } = await supabase
       .from('nutrition_custom_foods')
       .select('name, aliases, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g')
-      .eq('user_id', userId)
+      .in('user_id', await resolveLibraryUserIds(supabase, userId))
       .limit(50)
 
     const result: Record<string, FoodItem> = {}
