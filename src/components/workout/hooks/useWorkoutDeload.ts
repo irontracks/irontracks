@@ -33,7 +33,6 @@ import {
   DELOAD_SESSION_MIN_EXERCISES,
   DELOAD_REDUCTION_MIN,
   DELOAD_REDUCTION_MAX,
-  DELOAD_SUGGEST_MODE,
   DEFAULT_SUGGESTED_RPE,
   WEIGHT_ROUND_STEP,
   REPORT_FETCH_TIMEOUT_MS,
@@ -958,11 +957,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
               : reportHistoryStatus?.status === 'error'
                 ? `Relatórios com erro: ${reportHistoryStatus?.error || 'falha desconhecida'}.`
                 : '';
-            const watermarkMsg = DELOAD_SUGGEST_MODE === 'watermark' && suggestionDraft.ok
-              ? 'Sugestões aplicadas em marca d’água. '
-              : '';
+            // A frase "Sugestões aplicadas em marca d'água" saiu daqui em
+            // 07/09/2026: ela descrevia a gravação que ESTE caminho fazia em
+            // `deloadSuggestions`, e essa gravação foi removida (era ela que
+            // envenenava a referência de carga cheia). O texto sobreviveria à
+            // própria causa, afirmando ao usuário algo que não acontece mais.
             try {
-              await alert(`${watermarkMsg}Deload completo indisponível: ${baseErrorClean}${reportMsg ? ` ${reportMsg}` : ''}`);
+              await alert(`Deload completo indisponível: ${baseErrorClean}${reportMsg ? ` ${reportMsg}` : ''}`);
             } catch { }
             return;
           }
