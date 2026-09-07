@@ -330,6 +330,30 @@ export function clampDeloadWeight(
     return { weight, reductionPct: clampNumber(1 - weight / baseWeight, 0, 1) };
 }
 
+/**
+ * Abaixo disto a "descarga" é ruído de arredondamento, não descanso.
+ *
+ * Em 03/08 e 07/09/2026 o modal de uma aluna abriu dizendo "Redução de 0,0 %
+ * devido à estagnação", com o botão habilitado; ela confirmou, e o app gravou
+ * marca de descarga em três exercícios que não mudaram de peso. Acontece com
+ * carga leve, em que o passo de arredondamento é maior que a própria redução.
+ */
+export const REDUCAO_MINIMA_UTIL = 0.01;
+
+/**
+ * A proposta reduz o suficiente para valer a pena ser oferecida?
+ *
+ * Existe como função à parte porque `buildDeloadSuggestion` vive dentro do hook
+ * e não se monta em teste sem arrastar Supabase junto — aqui a regra fica
+ * exercitável de verdade, em vez de guardada por uma frase no arquivo.
+ */
+export const reducaoEhUtil = (baseWeight: unknown, suggestedWeight: unknown): boolean => {
+    const base = Number(baseWeight);
+    const alvo = Number(suggestedWeight);
+    if (!Number.isFinite(base) || !Number.isFinite(alvo) || base <= 0 || alvo <= 0) return false;
+    return 1 - alvo / base >= REDUCAO_MINIMA_UTIL;
+};
+
 // ─── Pure Analysis Functions ──────────────────────────────────────────────────
 
 export const analyzeDeloadHistory = (

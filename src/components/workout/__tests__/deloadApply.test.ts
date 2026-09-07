@@ -8,7 +8,8 @@
  * dois bugs mais graves da auditoria de 2026-07-29.
  */
 import { describe, it, expect } from 'vitest'
-import { buildDeloadPatches, clampDeloadWeight, type DeloadSetInput } from '../helpers/deloadHelpers'
+import { buildDeloadPatches, clampDeloadWeight, reducaoEhUtil, type DeloadSetInput } from '../helpers/deloadHelpers'
+import { readFileSync } from 'node:fs'
 
 const META = { reductionPct: 0.22, reason: 'regressão', historyCount: 6 }
 
@@ -333,6 +334,42 @@ describe('buildDeloadPatches — usa a grade real da máquina', () => {
     const plan = apply(sets, { ratio: 0.7, knownWeights: [84, 84] })
     // 84 × 0,7 = 58,8 → passo de 0,5 ao mais próximo = 59.
     expect(plan.patches[0].patch.weight).toBe('59')
+  })
+})
+
+describe('reducaoEhUtil — o modal não oferece um deload de 0 %', () => {
+  /**
+   * Caso real: em 03/08 e 07/09/2026 o modal de uma aluna abriu dizendo
+   * "Redução de 0,0 % devido à estagnação", com o botão habilitado. Ela
+   * confirmou, e o app gravou marca de descarga em TRÊS exercícios que não
+   * mudaram de peso — 23→23, 29→29, 18→18.
+   */
+  it('recusa quando o peso proposto é o mesmo da base', () => {
+    expect(reducaoEhUtil(23, 23)).toBe(false)
+    expect(reducaoEhUtil(5, 5)).toBe(false)
+  })
+
+  it('recusa redução que é só ruído de arredondamento', () => {
+    expect(reducaoEhUtil(100, 99.6)).toBe(false) // 0,4 %
+  })
+
+  it('aceita a partir de 1 %', () => {
+    expect(reducaoEhUtil(100, 99)).toBe(true)
+    expect(reducaoEhUtil(84, 57)).toBe(true)
+  })
+
+  it('recusa entrada inválida em vez de dividir por zero', () => {
+    expect(reducaoEhUtil(0, 10)).toBe(false)
+    expect(reducaoEhUtil(100, 0)).toBe(false)
+    expect(reducaoEhUtil(Number.NaN, 10)).toBe(false)
+  })
+
+  it('o hook CONSULTA a regra antes de abrir o modal', () => {
+    // Guard de fiação: a função pura acima passa verde sozinha enquanto ninguém
+    // a chama. Mira na CHAMADA, não no nome solto — importar e seguir em frente
+    // é justamente o jeito de o guard ficar cego.
+    const hook = readFileSync('src/components/workout/hooks/useWorkoutDeload.ts', 'utf8')
+    expect(hook).toMatch(/if\s*\(!reducaoEhUtil\(baseWeight,\s*suggestedWeight\)\)/)
   })
 })
 

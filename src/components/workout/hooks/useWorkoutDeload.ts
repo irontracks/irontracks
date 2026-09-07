@@ -55,6 +55,7 @@ import {
   buildDeloadPatches,
   clampDeloadWeight,
   roundSuggestion,
+  reducaoEhUtil,
 } from '../helpers/deloadHelpers';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
@@ -752,6 +753,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       ? snappedSuggested
       : roundToStep(rawSuggested, WEIGHT_ROUND_STEP);
     const appliedReduction = baseWeight > 0 ? clampNumber(1 - suggestedWeight / baseWeight, 0, 1) : targetReduction;
+    // Um deload de 0 % não é um deload — a regra e o porquê vivem em
+    // `reducaoEhUtil`, onde dá para exercitá-la.
+    if (!reducaoEhUtil(baseWeight, suggestedWeight)) {
+      return { ok: false, error: 'Deload indisponível: não há carga menor que a atual neste exercício.' };
+    }
     const result: DeloadSuggestion = {
       ok: true,
       name,
