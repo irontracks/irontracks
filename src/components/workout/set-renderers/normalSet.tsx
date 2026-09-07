@@ -346,10 +346,21 @@ const NormalSetInner = ({
   const noNegWeight = (v: string) => String(v ?? '').replace(/-/g, '');
   // #autoload: ao editar o peso na mão, marca a fonte como 'user' — isso desliga o
   // preenchimento automático desta série e alimenta o aprendizado de override (fase futura).
+  //
+  // Marca SEMPRE, inclusive com a carga automática desligada. Até 07/09/2026 era
+  // `...(autoLoadEnabled ? { weightSource: 'user' } : {})`, e aí o peso digitado
+  // com o motor desligado entrava SEM fonte — o log ficava com a fonte ANTERIOR,
+  // que é 'auto' quando o motor já havia prefilado. Consequências: (1) o histórico
+  // registra como decisão da máquina o que foi do atleta, e (2) se o motor for
+  // religado no meio da sessão, o efeito de re-sincronização tem licença para
+  // reescrever aquele valor por cima — o "não deixa trocar o peso" de 22/08/2026,
+  // por outra porta. A regra correta já estava escrita em `useAutoloadWeight`
+  // ("Marca sempre, inclusive com a carga automática desligada"); este arquivo é
+  // que refazia o updateLog à mão e a contradizia.
   const weightField = useInputField(extWeight, (v) =>
     updateLog(key, {
       weight: noNegWeight(v),
-      ...(autoLoadEnabled ? { weightSource: 'user' } : {}),
+      weightSource: 'user',
       advanced_config: cfg ?? log.advanced_config ?? null,
     }),
   );
@@ -369,9 +380,9 @@ const NormalSetInner = ({
   // Marca a fonte como 'user' ao editar um lado — sem isto a re-sincronização do
   // autoload sobrescreveria o peso que o usuário digitou no lado.
   const lWeightField = useInputField(extLWeight, (v) =>
-    updateLog(key, { L_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
+    updateLog(key, { L_weight: noNegWeight(v), weightSource: 'user' }));
   const rWeightField = useInputField(extRWeight, (v) =>
-    updateLog(key, { R_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
+    updateLog(key, { R_weight: noNegWeight(v), weightSource: 'user' }));
   const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps');
   const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps');
   const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe');
