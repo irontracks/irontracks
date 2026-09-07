@@ -77,7 +77,12 @@ número.
 **"Vou descansar" tem volta.** O card era informativo puro e prendia quem tocou
 por engano até a virada do dia — sem o atalho de treinar e com a meta rebaixada
 (−442 kcal medidos). A capacidade já existia (`setRestDayIntent` faz upsert e
-dispara o evento que o card escuta); faltava o botão.
+dispara o evento que o card escuta); faltava o botão. **Treinar não apaga a
+intenção gravada** (`rest_day_intents.will_train` fica `false` o dia todo, e
+nada no fim do treino a corrige): quem protege é o LEITOR — as duas telas de
+nutrição conferem se houve treino hoje antes de descontar a meta, e o card do
+topo dá lugar ao "Treino concluído hoje". Leitor novo dessa tabela precisa
+repetir a checagem, senão vai achar que a pessoa descansou.
 
 **Exclusão na tela pergunta antes** (`exclusaoPerguntaAntes.test.ts`). O 🗑 da
 academia apagava num toque, levando o QR de check-in junto. O guard varre só
@@ -2939,17 +2944,75 @@ independente da conta), em `lib/push/tokenOwnership.ts` — mesmo aparelho
 reatribui e grava `push_token_reassigned` em `audit_events`; aparelho diferente,
 ou sem os dois lados do `device_id`, segue 409.
 
-**A lição que passa deste caso:** o app **engolia a recusa** num `logWarn`, que
-é **no-op em produção** — por isso meses de 409 não produziram sinal nenhum.
-Toda chamada de rede em caminho crítico confere a RESPOSTA, e a falha vai por
-`logWarnRemote`. E, ao investigar "não recebo push", **comece perguntando se o
-token existe** (`device_push_tokens` filtrando `platform`), antes de olhar o
-emissor: o envio iOS lê `platform = 'ios'` e some em silêncio quando a lista
-volta vazia.
+**A lição que passa deste caso:** o app **engolia a recusa** num `logWarn` (que
+é no-op em produção — ver a seção do e-mail transacional), e por isso meses de
+409 não produziram sinal nenhum. Toda chamada de rede em caminho crítico confere
+a RESPOSTA, e a falha vai por `logWarnRemote`. E, ao investigar "não recebo
+push", **comece perguntando se o token existe** (`device_push_tokens` filtrando
+`platform`): o envio iOS lê `platform = 'ios'` e some em silêncio com a lista
+vazia.
 
 ⚠️ **Conta de teste e conta oficial no MESMO iPhone é a receita do 409** —
 foi exatamente o que aconteceu. Depois da correção elas convivem, mas só uma
 por vez recebe push naquele aparelho: quem abriu por último leva o token.
+
+## Os crons de 5 em 5 min são pg_cron no SUPABASE, não `vercel.json` (06/09/2026)
+
+Quem procurar o agendamento do lembrete de refeição no `vercel.json` não vai
+achar, e é de propósito: **a conta Vercel deste projeto é Hobby, e o Hobby só
+aceita expressão DIÁRIA** — uma entrada de 5 em 5 minutos lá derruba o deploy
+antes de ele existir. O agendamento vive em `cron.job` do Supabase (job
+`meal-reminders`, migration `20260905075040_meal_reminders_pg_cron.sql`), e
+chama a rota por `net.http_get` com `Authorization: Bearer <segredo>`.
+
+**Diagnóstico de cron mudo em duas consultas** — o par existe porque cada uma
+responde uma pergunta diferente, e sozinha nenhuma fecha o caso:
+
+```sql
+-- 1. o job rodou? chegou a fazer a requisição?
+select status, return_message, start_time from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'meal-reminders')
+order by start_time desc limit 5;   -- "0 rows" = rodou e NÃO chamou; "1 row" = chamou
+
+-- 2. o que a rota respondeu?
+select status_code, left(content, 200), created
+from net._http_response order by created desc limit 5;
+```
+
+⚠️ **`succeeded` no pg_cron NÃO quer dizer que a rota foi chamada.** O comando
+do job termina com um `where` que exige o segredo existir; sem ele o `select`
+devolve **zero linhas com status `succeeded`** — verde, silencioso e inútil. Foi
+exatamente o que segurou o lembrete de refeição entre 05 e 06/09/2026: a cada 5
+minutos `succeeded / "0 rows"`, e **zero linhas `meal_reminder` em
+`notifications`** desde sempre. O código estava certo o tempo todo.
+
+**O segredo do cron nasce no banco desde 06/09/2026** (`public.cron_secrets`,
+`gen_random_bytes(32)`, RLS ligada e SEM policy: só service-role alcança).
+Antes, o único valor aceito era a env var `CRON_SECRET` da Vercel — ou seja,
+ligar um cron novo dependia de alguém copiar credencial de um painel à mão, e
+foi o que ninguém fez. `isCronAuthorizedAsync` (`utils/cron/auth.ts`) tenta a
+env PRIMEIRO e só então consulta o banco. ⚠️ **Só a rota do lembrete usa a
+variante async**; as outras 25 seguem na `isCronAuthorized` síncrona, que só
+enxerga a env var — cron novo que queira nascer sem depender de painel precisa
+chamar `isCronAuthorizedAsync`, com `await` (sem ele a promise é truthy e a
+rota vira pública; há guard de classe que reprova).
+
+⚠️ **403 logo depois de mergear costuma ser o DEPLOY, não o segredo.** Os três
+primeiros disparos após o merge voltaram `403 forbidden` e a causa era o build
+ainda não estar no ar — confira o SHA do deployment de produção antes de
+suspeitar da autenticação. (No meio disso rodei um `notify pgrst, 'reload
+schema'` achando que era o cache do PostgREST não enxergar a tabela recém-criada;
+**não confirmei** que fosse necessário — fica como suspeita, não como fato.)
+
+**Para provar um lembrete sem esperar o horário**, use a conta de TESTE: aponte
+uma refeição do weekday de HOJE para daqui a ~4 min e confira as duas consultas
+acima. Provado assim em 06/09: `{"ok":true,"planos":3,"enviados":1}` e a linha
+`🍽️ Café da manhã · 05:40 / 75g Pão francês… · 518 kcal`.
+
+⚠️ **O plano é por DIA DA SEMANA — confira o `weekday` de hoje antes de chamar
+de bug.** Eu afirmei ao dono que o lembrete das 05:30 (Pré-treino) sairia; era
+**domingo**, e no domingo o plano dele começa 09:30. `enviados: 0` estava certo,
+e a linha que li era a de segunda-feira.
 
 ## Badge do ícone (o "32" no app) — duas metades, e nenhuma marca como lido
 O número no ícone é **recalculado pelo servidor a cada push** (`sendPushToUsers`
