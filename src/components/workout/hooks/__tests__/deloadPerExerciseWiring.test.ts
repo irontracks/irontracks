@@ -62,7 +62,10 @@ describe('persistência e toggle', () => {
 
   it('o controle único vive no topo da lista, com a chave do treino', () => {
     const banner = readFileSync('src/components/workout/SessionDeloadBanner.tsx', 'utf8')
-    expect(banner).toMatch(/if \(autoLoadEnabled\) \{/)
+    // Ancorado no que FICA (o toggle e sua condição), não na forma exata do
+    // `if` — que era `if (autoLoadEnabled) {` e deixou de existir em 07/09/2026,
+    // quando o toggle passou a CONVIVER com o banner manual em vez de substituí-lo.
+    expect(banner).toMatch(/autoLoadEnabled \?/)
     expect(banner).toMatch(/toggleWorkoutDeload/)
     expect(banner).toMatch(/Descarga do treino/)
     const ctrl = readFileSync('src/components/workout/useActiveWorkoutController.ts', 'utf8')

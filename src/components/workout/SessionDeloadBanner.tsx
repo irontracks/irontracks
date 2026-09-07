@@ -71,8 +71,13 @@ export default function SessionDeloadBanner() {
   // para uma decisão só, chaveados por nome de exercício (desligar o Supino aqui
   // desligava em todos os treinos). Agora é um controle, no topo, e o card ficou
   // limpo. Pedido do dono: "deload é por treino, não por exercício".
-  if (autoLoadEnabled) {
-    return (
+  // Toggle da descarga contínua do motor. Convive com o banner manual abaixo:
+  // até 07/09/2026 ele RETORNAVA aqui, e com a carga automática ligada o banner
+  // de sessão simplesmente não existia. Sobrava ao usuário o botão "Aliviar X%
+  // hoje" de dentro do aviso de cada card — que nunca foi gated —, ou seja, ele
+  // tinha de decidir oito vezes, exercício por exercício. Era exatamente o que
+  // este banner nasceu para evitar.
+  const toggleDoMotor = autoLoadEnabled ? (
       // UMA linha, como o toggle da carga automática logo acima. A frase que
       // explicava ("Em dia ruim, o app pode aliviar…") foi para o `title`: os
       // dois cards de configuração somavam ~134pt no topo de TODO treino e o
@@ -104,9 +109,9 @@ export default function SessionDeloadBanner() {
           </span>
         </button>
       </div>
-    );
-  }
-  if (!sessionDeloadAlert || dispensado) return null;
+  ) : null;
+
+  if (!sessionDeloadAlert || dispensado) return toggleDoMotor;
 
   const pctSugerido = Math.round(sessionDeloadAlert.suggestedPct * 100);
   const pct = pctEscolhida ?? pctSugerido;
@@ -117,9 +122,21 @@ export default function SessionDeloadBanner() {
   // que o motor recomenda. 5% e 40% são os limites que o app já valida.
   const opcoes = Array.from(new Set([10, 15, 22, 30, pctSugerido])).sort((a, b) => a - b);
 
+  /**
+   * O modal lista o TREINO INTEIRO, com os sinalizados já marcados.
+   *
+   * Antes listava só `sessionDeloadAlert.exIdxs` — os exercícios que o motor
+   * acusou de estagnação. Mas descarga é decisão sistêmica: quem tira uma semana
+   * leve quer o treino todo, inclusive (e principalmente) o que está progredindo,
+   * que é o que mais acumula fadiga. Sem "incluir todos" não havia como alcançá-los
+   * — foi assim que a Remada curvada e a Elevação lateral do dono ficaram de fora
+   * da descarga de 07/09/2026, e ele teve de corrigir o peso na mão.
+   */
+  const todosIdxs = (Array.isArray(exercises) ? exercises : []).map((_, i) => i);
+
   const abrir = () => {
     setSessionDeloadModal({
-      exIdxs: sessionDeloadAlert.exIdxs,
+      exIdxs: todosIdxs.length ? todosIdxs : sessionDeloadAlert.exIdxs,
       selected: [...sessionDeloadAlert.exIdxs],
       status: sessionDeloadAlert.status,
       suggestedPct: pct / 100,
@@ -152,6 +169,7 @@ export default function SessionDeloadBanner() {
 
   return (
     <>
+      {toggleDoMotor}
       <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -213,13 +231,36 @@ export default function SessionDeloadBanner() {
           <div ref={deloadModalRef} {...dialogProps('Descarga do treino')} className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl">
             <div className="text-lg font-bold text-white">Descarga do treino</div>
             <div className="mt-1 text-[13px] leading-snug text-neutral-400">
-              Reduz {Math.round(sessionDeloadModal.suggestedPct * 100)}% da carga nos exercícios marcados.
-              Séries já concluídas não são alteradas.
+              Reduz até {Math.round(sessionDeloadModal.suggestedPct * 100)}% da carga nos exercícios marcados.
+              Séries já concluídas não são alteradas, e o app avisa se a máquina não
+              tiver um peso tão leve.
             </div>
 
-            <div className="mt-4 space-y-2">
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+                {sessionDeloadModal.selected.length} de {sessionDeloadModal.exIdxs.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!sessionDeloadModal) return;
+                  const todos = sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length;
+                  setSessionDeloadModal({
+                    ...sessionDeloadModal,
+                    status: sessionDeloadModal.status as 'stagnation' | 'overtraining',
+                    selected: todos ? [] : [...sessionDeloadModal.exIdxs],
+                  });
+                }}
+                className="tap-44 rounded-lg border border-neutral-800 px-2.5 py-1 text-[12px] font-semibold text-neutral-300 active:scale-95"
+              >
+                {sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length ? 'Desmarcar todos' : 'Marcar todos'}
+              </button>
+            </div>
+
+            <div className="mt-2 space-y-2">
               {sessionDeloadModal.exIdxs.map((i) => {
                 const marcado = sessionDeloadModal.selected.includes(i);
+                const sinalizado = sessionDeloadAlert.exIdxs.includes(i);
                 return (
                   <button
                     key={i}
@@ -239,9 +280,16 @@ export default function SessionDeloadBanner() {
                     >
                       ✓
                     </span>
-                    <span className={marcado ? 'text-[14px] text-white' : 'text-[14px] text-neutral-400'}>
+                    <span className={['min-w-0 flex-1 truncate text-[14px]', marcado ? 'text-white' : 'text-neutral-400'].join(' ')}>
                       {nomeDe(i)}
                     </span>
+                    {/* Distingue quem o motor acusou de quem entrou por decisão
+                        sua. Sem isso o diagnóstico some dentro da lista completa. */}
+                    {sinalizado ? (
+                      <span className="shrink-0 rounded-md border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                        Sem progresso
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

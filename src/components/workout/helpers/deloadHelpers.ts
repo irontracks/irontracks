@@ -33,6 +33,7 @@ import {
     DELOAD_REDUCTION_MIN,
     DELOAD_REDUCTION_MAX,
 } from '../utils';
+import { learnWeightGrid, snapToLearnedGrid } from '@/utils/autoload/machineGrid';
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 
@@ -146,6 +147,16 @@ export type DeloadPlan = {
     /** Séries preservadas por já estarem concluídas. */
     skippedDone: number;
     appliedWeights: number[];
+    /** Séries em que nenhum peso menor era alcançável — nada foi escrito. */
+    unchanged: number;
+    /**
+     * Redução média EFETIVA (0–1) entre as séries que receberam patch.
+     *
+     * É ESTE número que a tela e o log devem mostrar, nunca a porcentagem pedida
+     * no modal: o pino da máquina raramente cai no alvo exato, e a diferença
+     * chegou a 30 pontos percentuais em produção (auditoria de 07/09/2026).
+     */
+    effectiveReduction: number;
 };
 
 /**
@@ -166,19 +177,45 @@ export type DeloadPlan = {
  *     comporem: peso assumido pelo usuário manda; peso posto pelo motor (que já
  *     pode vir descontado por prontidão e reconhecimento) cede lugar ao maior
  *     entre ele e o planejado, para a redução incidir sobre a carga cheia.
+ *  4. Série que JÁ tem deload hoje volta ao `originalWeight` gravado antes de
+ *     recalcular. Sem isso a segunda aplicação partia do peso já reduzido: não
+ *     mudava nada e ainda sobrescrevia o `originalWeight` da primeira — foi assim
+ *     que o Crucifixo invertido do dono ficou registrado como "de 53,5" quando a
+ *     carga real dele é 70 kg (auditoria de 07/09/2026). Reaplicar agora é
+ *     idempotente.
+ *
+ * O PISO mudou em 07/09/2026, e é a correção mais importante deste arquivo. Ele
+ * era `0,5 × 1RM estimado por Epley` — ou seja, `0,5 · w · (1 + reps/30)` —, que
+ * ultrapassa o alvo de −30 % em qualquer série de 12 reps ou mais. Como a base
+ * treina a 12–20 reps, o piso engolia o pedido em silêncio: de 19 aplicações na
+ * história do app, 6 reduziram ZERO e 8 declararam um número que não aplicaram.
+ * Hoje o piso é a redução MÁXIMA que o próprio produto já anuncia no slider
+ * (`DELOAD_REDUCTION_MAX`, 40 %), medida sobre a referência da série. Não é regra
+ * nova: é fazer valer a que já estava na tela, em vez de um segundo limite
+ * escondido que a contradizia.
  */
 export function buildDeloadPatches(input: {
     sets: DeloadSetInput[];
     ratio: number;
-    minWeight: number;
     baseWeight: number;
     appliedAt: string;
     meta: { reductionPct: unknown; reason: unknown; historyCount: unknown };
+    /**
+     * Pesos já registrados neste exercício, de todas as sessões. Alimentam o grid
+     * da máquina (`utils/autoload/machineGrid`), a mesma fonte que o motor de carga
+     * usa para não pedir um furo de pino que não existe. Sem isto o deload
+     * arredondava a 0,5 kg e propunha 60,5 / 51,5 / 37,5 kg — números que máquina
+     * nenhuma tem, e que o usuário corrigia à mão em 100 % das aplicações.
+     */
+    knownWeights?: readonly number[] | null;
 }): DeloadPlan {
-    const { sets, ratio, minWeight, baseWeight, appliedAt, meta } = input;
+    const { sets, ratio, baseWeight, appliedAt, meta, knownWeights } = input;
     const patches: DeloadPatch[] = [];
     const appliedWeights: number[] = [];
+    const reducoes: number[] = [];
     let skippedDone = 0;
+    let unchanged = 0;
+    const grid = learnWeightGrid(knownWeights ?? null);
 
     for (const item of Array.isArray(sets) ? sets : []) {
         const log: UnknownRecord = isObject(item?.log) ? item.log : {};
@@ -202,15 +239,40 @@ export function buildDeloadPatches(input: {
         const lastSessionWeight = toNumber(suggestion?.weight ?? null);
         const plannedWeight = toNumber(item?.plannedWeight ?? null);
         const userOwnsWeight = String(log.weightSource ?? '') === 'user';
-        const reference = userOwnsWeight && logWeight != null
-            ? logWeight
-            : Math.max(logWeight ?? 0, lastSessionWeight ?? 0) || plannedWeight || toNumber(baseWeight) || 0;
+        // Regra 4: deload já aplicado hoje volta à carga cheia gravada. É o único
+        // valor da série que não foi contaminado pelo próprio deload.
+        const priorDeload = isObject(log.deload) ? (log.deload as UnknownRecord) : null;
+        const priorOriginal = toNumber(priorDeload?.originalWeight ?? null);
+        const reference = priorOriginal != null && priorOriginal > 0
+            ? priorOriginal
+            : userOwnsWeight && logWeight != null
+                ? logWeight
+                : Math.max(logWeight ?? 0, lastSessionWeight ?? 0) || plannedWeight || toNumber(baseWeight) || 0;
         if (!reference || reference <= 0) continue;
 
         // Invariante de sanidade: deload REDUZ. Nunca devolve peso acima da
         // referência, qualquer que seja a combinação de piso e arredondamento.
-        const target = Math.min(Math.max(reference * ratio, minWeight || 0), reference);
-        const nextWeight = roundToStep(target, WEIGHT_ROUND_STEP);
+        const floor = reference * (1 - DELOAD_REDUCTION_MAX);
+        const target = Math.min(Math.max(reference * ratio, floor), reference);
+        // Grade da máquina primeiro (o furo do pino que existe de verdade); só
+        // então o arredondamento cego de 0,5 kg. Mesma ordem do motor de carga.
+        const snapped = snapToLearnedGrid(target, grid);
+        // O snap desce para o degrau existente, então pode passar do alvo — o que
+        // é desejável (57 em vez de 58,8). Mas não pode furar o piso: com um
+        // histórico esparso o degrau abaixo pode estar MUITO longe, e o app
+        // entregaria uma redução que nunca anunciou. Furou, volta ao passo cego.
+        const snapUsavel = snapped != null && snapped > 0 && snapped >= floor ? snapped : null;
+        const nextWeight = snapUsavel ?? roundToStep(target, WEIGHT_ROUND_STEP);
+        // Nada a reduzir: não grava marca de descarga numa série que não mudou.
+        // Gravar era o que fazia o relatório, o PDF e o Coach IA afirmarem uma
+        // descarga que não houve — e ainda tirava a sessão da média de referência.
+        if (!(nextWeight > 0) || nextWeight >= reference) { unchanged += 1; continue; }
+
+        // Redução MEDIDA, não a pedida. O `meta.reductionPct` é a intenção do
+        // modal, calculada sobre a MÉDIA do exercício; o peso desta série sai de
+        // outra referência. Gravar a intenção fazia a série dizer "-30 %" tendo
+        // caído 2,5 %.
+        const reducaoEfetiva = 1 - nextWeight / reference;
         const baseSetWeight = reference;
         const currentReps = log.reps;
         const currentRpe = log.rpe;
@@ -228,7 +290,9 @@ export function buildDeloadPatches(input: {
                     appliedAt,
                     originalWeight: baseSetWeight,
                     suggestedWeight: nextWeight,
-                    reductionPct: meta?.reductionPct,
+                    reductionPct: Math.round(reducaoEfetiva * 1000) / 1000,
+                    /** O que o usuário pediu — guardado para diagnóstico, nunca exibido como fato. */
+                    requestedPct: Number(meta?.reductionPct) || null,
                     reason: meta?.reason,
                     historyCount: meta?.historyCount,
                 },
@@ -236,9 +300,13 @@ export function buildDeloadPatches(input: {
             },
         });
         appliedWeights.push(nextWeight);
+        reducoes.push(reducaoEfetiva);
     }
 
-    return { patches, skippedDone, appliedWeights };
+    const effectiveReduction = reducoes.length
+        ? Math.round((reducoes.reduce((a, b) => a + b, 0) / reducoes.length) * 1000) / 1000
+        : 0;
+    return { patches, skippedDone, appliedWeights, unchanged, effectiveReduction };
 }
 
 /**
@@ -261,6 +329,30 @@ export function clampDeloadWeight(
     const weight = roundToStep(bounded, WEIGHT_ROUND_STEP);
     return { weight, reductionPct: clampNumber(1 - weight / baseWeight, 0, 1) };
 }
+
+/**
+ * Abaixo disto a "descarga" é ruído de arredondamento, não descanso.
+ *
+ * Em 03/08 e 07/09/2026 o modal de uma aluna abriu dizendo "Redução de 0,0 %
+ * devido à estagnação", com o botão habilitado; ela confirmou, e o app gravou
+ * marca de descarga em três exercícios que não mudaram de peso. Acontece com
+ * carga leve, em que o passo de arredondamento é maior que a própria redução.
+ */
+export const REDUCAO_MINIMA_UTIL = 0.01;
+
+/**
+ * A proposta reduz o suficiente para valer a pena ser oferecida?
+ *
+ * Existe como função à parte porque `buildDeloadSuggestion` vive dentro do hook
+ * e não se monta em teste sem arrastar Supabase junto — aqui a regra fica
+ * exercitável de verdade, em vez de guardada por uma frase no arquivo.
+ */
+export const reducaoEhUtil = (baseWeight: unknown, suggestedWeight: unknown): boolean => {
+    const base = Number(baseWeight);
+    const alvo = Number(suggestedWeight);
+    if (!Number.isFinite(base) || !Number.isFinite(alvo) || base <= 0 || alvo <= 0) return false;
+    return 1 - alvo / base >= REDUCAO_MINIMA_UTIL;
+};
 
 // ─── Pure Analysis Functions ──────────────────────────────────────────────────
 
