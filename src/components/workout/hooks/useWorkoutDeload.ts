@@ -31,7 +31,6 @@ import {
   DELOAD_REDUCTION_STAGNATION,
   DELOAD_REDUCTION_OVERTRAIN,
   DELOAD_SESSION_MIN_EXERCISES,
-  DELOAD_MIN_1RM_FACTOR,
   DELOAD_REDUCTION_MIN,
   DELOAD_REDUCTION_MAX,
   DELOAD_SUGGEST_MODE,
@@ -53,7 +52,6 @@ import {
   analyzeDeloadHistory,
   buildSessionDeloadAlert,
   parseAiRecommendation,
-  estimate1RmFromSets,
   getDeloadReason,
   buildDeloadPatches,
   clampDeloadWeight,
@@ -64,6 +62,18 @@ import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import type { ConfirmFn } from '@/contexts/DialogContext'
 import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone'
+import { learnWeightGrid, snapToLearnedGrid } from '@/utils/autoload/machineGrid'
+import { collectKnownWeights } from './useWorkoutAutoload'
+
+/**
+ * Teto de treinos distintos guardados por exercício no cache de histórico.
+ *
+ * O corte por treino (ver `buildReportHistoryFromWorkouts`) multiplicaria o
+ * tamanho do cache pelo número de treinos em que o exercício aparece. Quatro
+ * cobre o caso real mais espalhado desta base (Crucifixo invertido vive em três)
+ * e mantém o `localStorage` no mesmo patamar.
+ */
+const MAX_TREINOS_POR_EXERCICIO = 4;
 
 interface UseWorkoutDeloadProps {
   session: WorkoutSession | null;
@@ -129,6 +139,41 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   // com cargas incomparáveis (ver `workoutKey` em ReportHistoryItem).
   const currentWorkoutKey = normalizeExerciseKey(
     String(workout?.name ?? (session as UnknownRecord | null)?.name ?? ''),
+  );
+
+  /**
+   * Recorta o histórico do exercício ao TREINO em curso.
+   *
+   * Cai de volta na lista inteira quando não sobra nada: histórico antigo não tem
+   * `workoutKey` (o campo nasceu em ago/2026), e escopar sem fallback deixaria
+   * quem tem base velha sem deload nenhum.
+   */
+  const scopeItemsToCurrentWorkout = useCallback(
+    (items: ReportHistoryItem[]): ReportHistoryItem[] => {
+      const wanted = String(currentWorkoutKey ?? '').trim();
+      if (!wanted) return items;
+      const same = items.filter((i) => String(i?.workoutKey ?? '') === wanted);
+      return same.length ? same : items;
+    },
+    [currentWorkoutKey],
+  );
+
+  /**
+   * Pesos já registrados neste exercício, para o grid da máquina.
+   *
+   * Deliberadamente NÃO escopado por treino, ao contrário da análise: aqui a
+   * pergunta não é "quanto sugerir" e sim "esse número existe no aparelho?", e
+   * para isso quanto mais observação, melhor. Mesma regra do motor de carga
+   * (`collectKnownWeights`).
+   */
+  const knownWeightsForExercise = useCallback(
+    (ex: WorkoutExercise): number[] => {
+      const name = String((ex as UnknownRecord)?.name || '').trim();
+      if (!name) return [];
+      const items = reportHistory.exercises?.[normalizeExerciseKey(name)]?.items ?? [];
+      return collectKnownWeights(items);
+    },
+    [reportHistory],
   );
 
   useEffect(() => {
@@ -333,10 +378,27 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         Object.keys(next.exercises).forEach((key) => {
           const ex = next.exercises[key];
           const items: ReportHistoryItem[] = Array.isArray(ex?.items) ? ex.items : [];
-          const ordered = items
+          const validos = items
             .filter((it): it is ReportHistoryItem => !!it && typeof it.ts === 'number')
+            .sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
+          // Corta as últimas N sessões POR TREINO, não no total.
+          //
+          // O corte global vinha ANTES do filtro por `workoutKey`, então exercício
+          // que alterna entre dois treinos (Panturrilha do dono: SEG · Upper B e
+          // SEX · Pump) nunca juntava as DELOAD_HISTORY_MIN sessões do treino
+          // corrente — não gerava alerta e nunca era oferecido para descarga.
+          // Guardar 6 de cada resolve sem inchar o cache: o teto total continua.
+          const porTreino = new Map<string, ReportHistoryItem[]>();
+          for (const it of validos) {
+            const wk = String(it.workoutKey ?? '');
+            const lista = porTreino.get(wk) ?? [];
+            lista.push(it);
+            porTreino.set(wk, lista);
+          }
+          const ordered = [...porTreino.values()]
+            .flatMap((lista) => lista.slice(-DELOAD_HISTORY_SIZE))
             .sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0))
-            .slice(-DELOAD_HISTORY_SIZE);
+            .slice(-DELOAD_HISTORY_SIZE * MAX_TREINOS_POR_EXERCICIO);
           next.exercises[key] = { ...ex, items: ordered };
         });
         return next;
@@ -642,12 +704,18 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     const items = history.exercises[key]?.items ?? [];
     const reportItems = reportHistory.exercises[key]?.items ?? [];
     const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
+    // A ANÁLISE já era escopada pelo treino desde jul/2026; `baseWeight` e o piso
+    // não eram, e é aí que o escopo mais importa — o mesmo exercício vive em
+    // treinos diferentes com cargas incomparáveis, então a média global puxava a
+    // referência para longe da carga real de hoje (Crucifixo invertido do dono:
+    // 70 kg neste treino, média global bem menor). Auditoria de 07/09/2026.
+    const scopedItems = scopeItemsToCurrentWorkout(preferredItems);
     const currentInputs = collectExerciseSetInputs(ex, exIdx, getLog);
     const currentSets = currentInputs.sets;
-    const historyCount = preferredItems.length ? preferredItems.length : currentSets.length ? 1 : 0;
+    const historyCount = scopedItems.length ? scopedItems.length : currentSets.length ? 1 : 0;
     const plannedInputs = collectExercisePlannedInputs(ex, exIdx);
     const plannedSets = plannedInputs.sets;
-    const baseWeightFromHistory = averageNumbers(preferredItems.map((i) => i.avgWeight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
+    const baseWeightFromHistory = averageNumbers(scopedItems.map((i) => i.avgWeight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
     const baseWeightFromCurrent = averageNumbers(currentSets.map((s) => s.weight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
     const baseWeightFromPlan = averageNumbers(plannedSets.map((s) => s.weight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
     const baseWeightFromAi = aiSuggestion?.weight != null && aiSuggestion.weight > 0 ? aiSuggestion.weight : null;
@@ -655,7 +723,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     if (!baseWeight || !Number.isFinite(Number(baseWeight)) || Number(baseWeight) <= 0) {
       return { ok: false, error: 'Deload indisponível: sem carga no relatório nem no plano.' };
     }
-    const analysis = analyzeDeloadHistory(preferredItems, currentWorkoutKey);
+    const analysis = analyzeDeloadHistory(scopedItems, currentWorkoutKey);
     // `overridePct` é a escolha do usuário no banner (atalhos 10/15/22/30%).
     // Sem ela vale o diagnóstico: overtraining alivia mais que estagnação.
     // O clamp usa os MESMOS limites do ajuste manual por exercício (5–40%),
@@ -668,11 +736,20 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           : analysis.status === 'stagnation'
             ? DELOAD_REDUCTION_STAGNATION
             : DELOAD_REDUCTION_STABLE;
-    const estSourceSets = baseWeightFromHistory ? [] : baseWeightFromCurrent ? currentSets : baseWeightFromPlan ? plannedSets : [];
-    const est1rm = estimate1RmFromSets(estSourceSets, preferredItems);
-    const minWeight = est1rm ? est1rm * DELOAD_MIN_1RM_FACTOR : 0;
-    const rawSuggested = baseWeight * (1 - targetReduction);
-    const suggestedWeight = roundToStep(Math.max(rawSuggested, minWeight || 0), WEIGHT_ROUND_STEP);
+    // O PISO é a redução máxima que o próprio slider anuncia (40 %), medida sobre
+    // a base. Era `0,5 × 1RM estimado por Epley`, que a 12+ reps fica ACIMA do
+    // alvo de −30 % e cancelava a descarga em silêncio — 6 das 19 aplicações da
+    // história do app reduziram zero por causa dele (auditoria de 07/09/2026).
+    const minWeight = baseWeight * (1 - DELOAD_REDUCTION_MAX);
+    const rawSuggested = Math.max(baseWeight * (1 - targetReduction), minWeight);
+    // Mesma grade do motor de carga: o número que o modal MOSTRA precisa existir
+    // na máquina, senão o usuário corrige à mão toda vez (era o caso em 100 % das
+    // aplicações — 60,5 / 51,5 / 37,5 kg não são furo de pino de aparelho nenhum).
+    const grid = learnWeightGrid(collectKnownWeights(scopedItems.length ? scopedItems : preferredItems));
+    const snappedSuggested = snapToLearnedGrid(rawSuggested, grid);
+    const suggestedWeight = snappedSuggested != null && snappedSuggested > 0
+      ? snappedSuggested
+      : roundToStep(rawSuggested, WEIGHT_ROUND_STEP);
     const appliedReduction = baseWeight > 0 ? clampNumber(1 - suggestedWeight / baseWeight, 0, 1) : targetReduction;
     const result: DeloadSuggestion = {
       ok: true,
@@ -735,7 +812,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const history = loadDeloadHistory(userId);
       const items = history.exercises[key]?.items ?? [];
       const reportItems = reportHistory.exercises[key]?.items ?? [];
-      const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
+      const preferredItems: ReportHistoryItem[] = scopeItemsToCurrentWorkout(reportItems.length ? reportItems : items);
       const ordered = preferredItems.slice().sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
       const latest = ordered.length ? ordered[ordered.length - 1] : null;
       const latestAvgWeight = toNumber(latest?.avgWeight ?? null);
@@ -743,7 +820,6 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const baseSuggestion = buildDeloadSuggestion(ex, exIdx);
       const baseWeight = baseSuggestion.ok ? baseSuggestion.baseWeight : latestAvgWeight ?? null;
       const suggestedWeight = baseSuggestion.ok ? baseSuggestion.suggestedWeight : baseWeight ?? null;
-      const minWeight = baseSuggestion.ok ? baseSuggestion.minWeight : 0;
       const ratio = baseWeight && suggestedWeight ? suggestedWeight / baseWeight : 1;
       const { setsCount } = collectExerciseSetInputs(ex, exIdx, getLog);
       const entries: DeloadSetEntries = {};
@@ -753,7 +829,12 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const cfg = getPlanConfig(ex, setIdx);
         const planned = getPlannedSet(ex, setIdx);
         const baseSetWeight = extractLogWeight(log) ?? toNumber(cfg?.weight ?? planned?.weight ?? baseWeight ?? latestAvgWeight ?? null);
-        const nextWeight = baseSetWeight ? roundToStep(Math.max(baseSetWeight * ratio, minWeight || 0), WEIGHT_ROUND_STEP) : null;
+        // Piso relativo à referência DESTA série. Usar o piso do exercício (que
+        // nasce da média) sobre um peso de série menor era o mesmo defeito de
+        // `buildDeloadPatches`: travava a redução sem dizer nada.
+        const nextWeight = baseSetWeight
+          ? roundToStep(Math.max(baseSetWeight * ratio, baseSetWeight * (1 - DELOAD_REDUCTION_MAX)), WEIGHT_ROUND_STEP)
+          : null;
         const repsBase = toNumber(planned?.reps ?? ex?.reps ?? latestAvgReps ?? null);
         const rpeBase = toNumber(planned?.rpe ?? ex?.rpe ?? null);
         const nextRpe = rpeBase != null ? rpeBase : (nextWeight || repsBase ? DEFAULT_SUGGESTED_RPE : null);
@@ -847,43 +928,23 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
               }
             }
           }
+          // ⚠️ `deloadSuggestions` NÃO é escrito daqui — e isso é a correção, não um
+          // esquecimento. Aquele mapa tem UM significado: o peso do ÚLTIMO TREINO,
+          // que serve de marca d'água no campo e de "referência de carga cheia"
+          // para `buildDeloadPatches` (ver o comentário lá). Até 07/09/2026 abrir
+          // este modal sobrescrevia a mesma chave com o peso JÁ REDUZIDO, então a
+          // segunda aplicação partia do valor descarregado — não mudava nada e
+          // ainda gravava um `originalWeight` falso. Um mapa, um significado.
           const suggestionDraft = buildDeloadSetSuggestions(safeEx, safeIdx);
-          let mergedEntries: DeloadSetEntries | null = suggestionDraft.ok ? { ...suggestionDraft.entries } : null;
           let aiSuggestion: AiRecommendation | null = null;
           if (suggestionDraft.ok && suggestionDraft.itemsCount >= AI_SUGGESTION_MIN_HISTORY) {
             aiSuggestion = await resolveAiSuggestionForExercise(suggestionDraft.name);
-            const ai = aiSuggestion;
-            if (ai && mergedEntries) {
-              Object.keys(mergedEntries).forEach((k) => {
-                const cur = mergedEntries![k];
-                mergedEntries![k] = {
-                  weight: ai.weight != null ? ai.weight : cur.weight ?? null,
-                  reps: ai.reps != null ? ai.reps : cur.reps ?? null,
-                  rpe: ai.rpe != null ? ai.rpe : cur.rpe ?? null,
-                };
-              });
-            }
-          }
-          if (mergedEntries && Object.keys(mergedEntries).length) {
-            setDeloadSuggestions((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), ...mergedEntries }));
           }
           let suggestion = buildDeloadSuggestion(safeEx, safeIdx, aiSuggestion);
           if (!suggestion.ok) {
             const missingWeight = String((suggestion as Record<string, unknown>).error || '').toLowerCase().includes('sem carga');
             if (missingWeight && !aiSuggestion) {
               aiSuggestion = await resolveAiSuggestionForExercise(suggestionDraft.ok ? suggestionDraft.name : name);
-              const ai = aiSuggestion;
-              if (ai && mergedEntries) {
-                Object.keys(mergedEntries).forEach((k) => {
-                  const cur = mergedEntries![k];
-                  mergedEntries![k] = {
-                    weight: ai.weight != null ? ai.weight : cur.weight ?? null,
-                    reps: ai.reps != null ? ai.reps : cur.reps ?? null,
-                    rpe: ai.rpe != null ? ai.rpe : cur.rpe ?? null,
-                  };
-                });
-                setDeloadSuggestions((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), ...mergedEntries }));
-              }
               suggestion = buildDeloadSuggestion(safeEx, safeIdx, aiSuggestion);
             }
           }
@@ -960,7 +1021,6 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         return;
       }
       const ratio = targetWeight / baseWeight;
-      const minWeight = Number(deloadModal.minWeight || 0);
       const appliedAt = new Date().toISOString();
 
       // O cálculo (pular série concluída, escolher a referência que não compõe
@@ -981,9 +1041,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           };
         }),
         ratio,
-        minWeight,
         baseWeight,
         appliedAt,
+        knownWeights: knownWeightsForExercise(ex),
         meta: {
           reductionPct: deloadModal.reductionPct,
           reason: deloadModal.reason,
@@ -1011,17 +1071,20 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       // Sem este aviso a pessoa vê só parte das séries mudar e conclui que o
       // deload falhou — quando na verdade as concluídas foram preservadas de
       // propósito (o peso delas é histórico, não plano).
-      if (skippedDone > 0 && appliedWeights.length > 0) {
-        try {
-          await alert(
-            `Deload aplicado nas séries que faltam. ${skippedDone} série${skippedDone > 1 ? 's' : ''} já concluída${skippedDone > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`,
-          );
-        } catch { }
-      } else if (appliedWeights.length === 0) {
-        try {
-          await alert('Todas as séries deste exercício já foram concluídas — não há o que reduzir.');
-        } catch { }
+      const partes: string[] = [];
+      if (appliedWeights.length > 0) {
+        partes.push(`Descarga de ${Math.round(plan.effectiveReduction * 100)}% aplicada em ${appliedWeights.length} ${appliedWeights.length === 1 ? 'série' : 'séries'}.`);
       }
+      if (skippedDone > 0) {
+        partes.push(`${skippedDone} já concluída${skippedDone > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`);
+      }
+      if (plan.unchanged > 0 && appliedWeights.length === 0) {
+        partes.push('Nenhum peso menor era alcançável neste exercício — nada foi alterado.');
+      } else if (plan.unchanged > 0) {
+        partes.push(`${plan.unchanged} ${plan.unchanged === 1 ? 'série ficou' : 'séries ficaram'} como estava${plan.unchanged === 1 ? '' : 'm'}: não há carga menor disponível.`);
+      }
+      if (!partes.length) partes.push('Todas as séries deste exercício já foram concluídas — não há o que reduzir.');
+      try { await alert(partes.join(' ')); } catch { }
     } catch (e) {
       // Antes este catch era cego: o usuário via a mensagem genérica e ninguém
       // via nada no Sentry. Aplicar deload é escrita em treino real — falha aqui
@@ -1050,6 +1113,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     let exercisesAplicados = 0;
     let seriesAplicadas = 0;
     let seriesPuladas = 0;
+    let seriesSemQueda = 0;
+    const reducoes: number[] = [];
     const semBase: string[] = [];
 
     for (const exIdx of alvos) {
@@ -1080,9 +1145,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             };
           }),
           ratio: sug.suggestedWeight / sug.baseWeight,
-          minWeight: Number(sug.minWeight || 0),
           baseWeight: sug.baseWeight,
           appliedAt,
+          knownWeights: knownWeightsForExercise(ex as WorkoutExercise),
           meta: {
             reductionPct: sug.appliedReduction,
             reason: getDeloadReason(sug.analysis as DeloadAnalysis, Number(sug.appliedReduction || 0), Number(sug.historyCount || 0)),
@@ -1091,16 +1156,20 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         });
         for (const { key, patch } of plan.patches) updateLog(key, patch);
         seriesPuladas += plan.skippedDone;
+        seriesSemQueda += plan.unchanged;
         if (plan.appliedWeights.length > 0) {
           exercisesAplicados += 1;
           seriesAplicadas += plan.appliedWeights.length;
+          reducoes.push(plan.effectiveReduction);
           appendDeloadAudit({
             ts: Date.now(),
             exIdx,
             name: sug.name,
             baseWeight: sug.baseWeight,
             suggestedWeight: sug.suggestedWeight,
-            reductionPct: sug.appliedReduction,
+            // A redução MEDIDA nas séries, não a intenção do banner.
+            reductionPct: plan.effectiveReduction,
+            requestedPct: sug.appliedReduction,
             historyCount: sug.historyCount,
             appliedAt,
             weights: plan.appliedWeights,
@@ -1119,10 +1188,17 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     setSessionDeloadModal(null);
     try {
       if (exercisesAplicados === 0) {
-        await alert('Nada a reduzir: as séries destes exercícios já foram concluídas.');
+        const motivo = seriesSemQueda > 0
+          ? 'Nada a reduzir: não há carga menor disponível nestes exercícios.'
+          : 'Nada a reduzir: as séries destes exercícios já foram concluídas.';
+        await alert(semBase.length ? `${motivo} Sem carga de referência em: ${semBase.join(', ')}.` : motivo);
       } else {
-        const partes = [`Descarga aplicada em ${exercisesAplicados} ${exercisesAplicados === 1 ? 'exercício' : 'exercícios'} (${seriesAplicadas} ${seriesAplicadas === 1 ? 'série' : 'séries'}).`];
+        // A média das reduções EFETIVAS. O banner anunciava a porcentagem pedida
+        // mesmo quando o piso ou a grade da máquina entregavam bem menos.
+        const mediaEfetiva = Math.round((reducoes.reduce((a, b) => a + b, 0) / reducoes.length) * 100);
+        const partes = [`Descarga de ${mediaEfetiva}% aplicada em ${exercisesAplicados} ${exercisesAplicados === 1 ? 'exercício' : 'exercícios'} (${seriesAplicadas} ${seriesAplicadas === 1 ? 'série' : 'séries'}).`];
         if (seriesPuladas > 0) partes.push(`${seriesPuladas} já concluída${seriesPuladas > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`);
+        if (seriesSemQueda > 0) partes.push(`${seriesSemQueda} ${seriesSemQueda === 1 ? 'série ficou' : 'séries ficaram'} como estava${seriesSemQueda === 1 ? '' : 'm'} — sem carga menor disponível.`);
         if (semBase.length) partes.push(`Sem carga de referência em: ${semBase.join(', ')}.`);
         await alert(partes.join(' '));
       }

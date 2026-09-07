@@ -50,21 +50,32 @@ const renderBanner = () => {
 }
 
 describe('SessionDeloadBanner', () => {
-  it('com a carga automática ligada mostra o controle ÚNICO do treino', () => {
-    // Invariante SUBSTITUÍDO em ago/2026 por decisão do dono ("deload é por
-    // treino, não por exercício"). Antes o banner sumia aqui e o liga/desliga
-    // vivia em cada card — oito botões para uma decisão só, chaveados por nome
-    // de exercício (desligar o Supino num treino desligava em todos).
-    // O modal manual continua aposentado com autoLoad ligado (#568); o que
-    // aparece agora é só o consentimento do treino.
+  it('com a carga automática ligada, o toggle CONVIVE com a descarga de hoje', () => {
+    // Invariante revisado em 07/09/2026. A regra "com o motor ligado o modal
+    // manual está aposentado" (#568) valia para o BANNER e para o botão da barra
+    // de ações — mas nunca alcançou o "Aliviar X% hoje" de dentro do aviso de
+    // cada card. Na prática o usuário não perdia o deload manual: perdia só a
+    // versão em BLOCO dele, e tinha de decidir exercício por exercício. Foi o que
+    // aconteceu no treino do dono em 07/09/2026, com dois exercícios ficando de
+    // fora. Hoje as duas coisas convivem: o toggle governa a descarga CONTÍNUA do
+    // motor, o banner aplica a descarga de HOJE.
     ctx = montarCtx(ALERTA)
     ;(ctx as Record<string, unknown>).autoLoadEnabled = true
     ;(ctx as Record<string, unknown>).workoutDeloadEnabled = true
     ;(ctx as Record<string, unknown>).toggleWorkoutDeload = () => { }
     const { container, getByRole } = renderBanner()
-    expect(container).not.toBeEmptyDOMElement()
     expect(getByRole('button', { name: /descarga do treino/i })).toBeTruthy()
-    // e NÃO oferece a aplicação manual em bloco por cima do motor
+    expect(getByRole('button', { name: /Reduzir 15% no treino de hoje/i })).toBeTruthy()
+    expect(container.textContent || '').toMatch(/Reduzir \d+% no treino/)
+  })
+
+  it('sem alerta, a carga automática ligada mostra só o toggle', () => {
+    ctx = montarCtx(null)
+    ;(ctx as Record<string, unknown>).autoLoadEnabled = true
+    ;(ctx as Record<string, unknown>).workoutDeloadEnabled = true
+    ;(ctx as Record<string, unknown>).toggleWorkoutDeload = () => { }
+    const { container, getByRole } = renderBanner()
+    expect(getByRole('button', { name: /descarga do treino/i })).toBeTruthy()
     expect(container.textContent || '').not.toMatch(/Reduzir \d+% no treino/)
   })
 
@@ -86,15 +97,30 @@ describe('SessionDeloadBanner', () => {
     expect(screen.getByText(/carga caiu/i)).toBeTruthy()
   })
 
-  it('abre o modal com TODOS os exercícios sinalizados já marcados', () => {
+  it('lista o TREINO INTEIRO, com os sinalizados já marcados', () => {
+    // Mudou em 07/09/2026. O modal listava só `exIdxs` (os exercícios que o motor
+    // acusou), e não havia como alcançar os demais: descarga é decisão sistêmica,
+    // e o que está progredindo é justamente o que mais acumula fadiga. No treino
+    // do dono isso deixou Remada curvada e Elevação lateral em carga cheia.
     renderBanner()
     fireEvent.click(screen.getByRole('button', { name: /Reduzir 15%/i }))
     expect(screen.getByText('Descarga do treino')).toBeTruthy()
     expect(screen.getByText('Supino reto')).toBeTruthy()
     expect(screen.getByText('Agachamento')).toBeTruthy()
-    // Só os sinalizados entram — o exercício 1 não estava em exIdxs.
-    expect(screen.queryByText('Remada curvada')).toBeNull()
+    expect(screen.getByText('Remada curvada')).toBeTruthy()
+    // …mas só os sinalizados nascem marcados, e o diagnóstico continua visível.
     expect(screen.getByRole('button', { name: /Aplicar em 2/i })).toBeTruthy()
+    // Texto EXATO do selo. O regex /sem progresso/i casava também com a frase do
+    // banner ("2 exercícios deste treino estão sem progresso…") e contava 3.
+    expect(screen.getAllByText('Sem progresso')).toHaveLength(2)
+  })
+
+  it('marcar todos alcança o exercício que o motor não sinalizou', async () => {
+    renderBanner()
+    fireEvent.click(screen.getByRole('button', { name: /Reduzir 15%/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Marcar todos/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar em 3/i }))
+    await waitFor(() => expect(applyDeloadToSession).toHaveBeenCalledWith([0, 1, 2], 0.15))
   })
 
   it('opt-out: desmarcar um exercício tira ele da aplicação', async () => {

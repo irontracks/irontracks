@@ -146,7 +146,12 @@ describe('cards de configuração do topo são de uma linha', () => {
 
   it('descarga do treino (modo ligado): frase no title, uma linha', () => {
     const src = semComentarios(readFileSync(join(process.cwd(), 'src/components/workout/SessionDeloadBanner.tsx'), 'utf8'))
-    const bloco = src.slice(src.indexOf('if (autoLoadEnabled) {'), src.indexOf('if (!sessionDeloadAlert || dispensado) return null'))
+    // Fatiado pelo que FICA: a declaração do toggle e a linha que a encerra.
+    // Antes ancorava em `if (autoLoadEnabled) {`, que deixou de existir em
+    // 07/09/2026 (o toggle passou a CONVIVER com o banner em vez de substituí-lo)
+    // — e aí `indexOf` devolvia -1 e o bloco vinha vazio. Quem avisou foi o
+    // `length > 200` logo abaixo; sem ele o guard teria ficado cego, verde e inútil.
+    const bloco = src.slice(src.indexOf('const toggleDoMotor ='), src.indexOf('if (!sessionDeloadAlert || dispensado)'))
     expect(bloco.length).toBeGreaterThan(200)
     expect(bloco).toMatch(/title=\{workoutDeloadEnabled/)
     expect(bloco).not.toMatch(/<div[^>]*>\s*\{workoutDeloadEnabled\s*\?\s*'Em dia ruim/)
