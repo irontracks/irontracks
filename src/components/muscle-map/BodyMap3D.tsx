@@ -13,7 +13,19 @@ type Props = {
   onSelect?: (id: MuscleId) => void
   onUnavailable: () => void
 }
-type Ready = { viewer: ModelViewerElement; colors: Awaited<ReturnType<typeof attachMuscleColors>> }
+type Ready = {
+  viewer: ModelViewerElement
+  colors: Awaited<ReturnType<typeof attachMuscleColors>>
+  initialCamera: { target: string; radius: number }
+}
+
+const resetCamera = async (ready: Ready, view: Props['view']) => {
+  ready.viewer.cameraTarget = ready.initialCamera.target
+  ready.viewer.cameraOrbit = `${view === 'front' ? 0 : 180}deg 90deg ${ready.initialCamera.radius}m`
+  await ready.viewer.updateComplete
+  ready.viewer.jumpCameraToGoal()
+  await ready.viewer.updateComplete
+}
 
 export default function BodyMap3D({ muscles, selected, view, onSelect, onUnavailable }: Props) {
   const host = useRef<HTMLDivElement>(null)
@@ -34,10 +46,10 @@ export default function BodyMap3D({ muscles, selected, view, onSelect, onUnavail
       await import('@google/model-viewer')
       if (cancelled) return
       viewer = document.createElement('model-viewer') as ModelViewerElement
-      viewer.setAttribute('alt', 'Mapa muscular 3D. Arraste para girar; use pinça ou roda do mouse para aproximar.')
+      viewer.setAttribute('alt', 'Mapa muscular 3D. Toque ou clique para focar uma região; gire com um dedo e use dois dedos para aproximar e mover.')
       viewer.setAttribute('camera-controls', '')
-      viewer.setAttribute('disable-pan', '')
       viewer.setAttribute('camera-orbit', '0deg 90deg 105%')
+      viewer.setAttribute('camera-target', 'auto auto auto')
       viewer.setAttribute('min-camera-orbit', 'auto 40deg 75%')
       viewer.setAttribute('max-camera-orbit', 'auto 130deg 160%')
       viewer.setAttribute('field-of-view', '30deg')
@@ -47,11 +59,25 @@ export default function BodyMap3D({ muscles, selected, view, onSelect, onUnavail
       viewer.addEventListener('load', async () => {
         try {
           if (!viewer || cancelled) return
+          viewer.cameraTarget = 'auto auto auto'
+          viewer.cameraOrbit = '0deg 90deg 105%'
+          await viewer.updateComplete
+          viewer.jumpCameraToGoal()
+          await viewer.updateComplete
           const attached = await attachMuscleColors(viewer)
           if (cancelled) { attached.dispose(); return }
           colors = attached
+          const target = viewer.getCameraTarget()
+          const orbit = viewer.getCameraOrbit()
           window.clearTimeout(timeout)
-          setReady({ viewer, colors: attached })
+          setReady({
+            viewer,
+            colors: attached,
+            initialCamera: {
+              target: `${target.x}m ${target.y}m ${target.z}m`,
+              radius: orbit.radius,
+            },
+          })
         } catch (error) { fail(error) }
       }, { once: true })
       container.appendChild(viewer)
@@ -73,7 +99,7 @@ export default function BodyMap3D({ muscles, selected, view, onSelect, onUnavail
   }, [ready, muscles, selected, onUnavailable])
 
   useEffect(() => {
-    if (ready) ready.viewer.cameraOrbit = `${view === 'front' ? 0 : 180}deg 90deg 105%`
+    if (ready) void resetCamera(ready, view)
   }, [ready, view])
 
   return <div className="flex min-h-0 flex-1 flex-col">
@@ -81,8 +107,8 @@ export default function BodyMap3D({ muscles, selected, view, onSelect, onUnavail
       <div ref={host} className="h-full w-full" />
       {!ready && <p role="status" className="absolute inset-0 flex items-center justify-center text-sm text-neutral-400">Carregando manequim 3D…</p>}
     </div>
-    <p className="shrink-0 py-2 text-center text-xs text-neutral-400">Arraste para girar · Pinça ou roda para aproximar</p>
-    <button type="button" className="mb-2 min-h-11 w-full shrink-0 rounded-lg border border-neutral-700 text-sm text-neutral-200" onClick={() => { if (ready) ready.viewer.cameraOrbit = `${view === 'front' ? 0 : 180}deg 90deg 105%` }}>Enquadrar</button>
+    <p className="shrink-0 py-2 text-center text-xs text-neutral-400">Toque para focar · 1 dedo gira · 2 dedos aproximam e movem · No PC, Shift + arrastar move</p>
+    <button type="button" className="mb-2 min-h-11 w-full shrink-0 rounded-lg border border-neutral-700 text-sm text-neutral-200" onClick={() => { if (ready) void resetCamera(ready, view) }}>Enquadrar</button>
     {onSelect && <label className="block text-xs text-neutral-400">Selecionar músculo
       <select className="mt-1 min-h-11 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-2 text-base text-white" value={selected || ''} onChange={event => { const id = MUSCLE_GROUPS.find(muscle => muscle.id === event.target.value)?.id; if (id) onSelect(id) }}>
         <option value="" disabled>Selecione uma região</option>
