@@ -47,13 +47,29 @@ export const detectSessionDeload = (logs: unknown): SessionDeload => {
   for (const [key, log] of Object.entries(logs)) {
     if (!isRec(log) || !isRec(log.deload)) continue
     const d = log.deload
-    // A redução pode vir pronta (`reductionPct`) ou ser derivada dos pesos.
+    // A redução vem dos PESOS primeiro; `reductionPct` é só o plano.
+    //
+    // Sintoma (MK, sessão de 07/09/2026): 5 dos 7 exercícios tinham
+    // `reductionPct` divergente da diferença real entre `originalWeight` e
+    // `suggestedWeight` — o pullover anunciava 30 % e gravava 35 → 35 kg, ou
+    // seja, zero. Causa: o piso do exercício e a grade montável da máquina
+    // limitam o quanto dá pra descer, e o percentual continuava sendo o
+    // teórico, calculado antes desse ajuste.
+    //
+    // Confiar no percentual tinha duas consequências: `avgReductionPct` saía
+    // inflado, e a série entrava como descarga mesmo sem ter descarregado —
+    // fazendo `pickUsableHistory` DESCARTAR do motor de carga uma sessão em
+    // carga cheia, que era justamente o melhor sinal disponível.
+    //
+    // Os pesos são o fato; o percentual é a intenção. Quando os dois pesos
+    // estão presentes, eles decidem. `reductionPct` só entra como fallback,
+    // para logs antigos gravados sem os pesos.
     const pct = (() => {
-      const direto = num(d.reductionPct)
-      if (direto > 0 && direto < 1) return direto
       const de = num(d.originalWeight)
       const para = num(d.suggestedWeight)
-      if (de > 0 && para > 0 && para < de) return 1 - para / de
+      if (de > 0 && para > 0) return para < de ? 1 - para / de : 0
+      const direto = num(d.reductionPct)
+      if (direto > 0 && direto < 1) return direto
       return 0
     })()
     if (pct <= 0) continue

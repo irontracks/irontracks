@@ -123,6 +123,64 @@ describe('sessão de descarga — detectada a partir dos logs', () => {
     expect(d.avgReductionPct).toBeCloseTo(0.2, 3)
   })
 
+  // GUARD DE CLASSE — a redução vem dos PESOS, nunca do `reductionPct` anunciado.
+  //
+  // Sintoma real (MK, 07/09/2026): 5 de 7 exercícios gravaram `reductionPct`
+  // divergente dos pesos, porque o piso e a grade da máquina limitam a descida e
+  // o percentual seguia sendo o teórico. Uma série de 35 → 35 kg entrava como
+  // descarga de 30 %, inflava `avgReductionPct` e — pior — fazia o motor de carga
+  // descartar do histórico uma sessão que foi em carga CHEIA.
+  //
+  // Não basta testar o caso do pullover: qualquer divergência entre percentual e
+  // pesos precisa ser decidida pelos pesos.
+  describe('guard: percentual anunciado nunca ganha dos pesos', () => {
+    const so = (deload: Record<string, unknown>) => detectSessionDeload({ '0-0': { done: true, deload } })
+
+    it('peso não mudou → não é descarga, mesmo anunciando 30 %', () => {
+      const d = so({ originalWeight: 35, suggestedWeight: 35, reductionPct: 0.3 })
+      expect(d.applied).toBe(false)
+      expect(d.setsCount).toBe(0)
+    })
+
+    it('redução real menor que a anunciada → vale a real', () => {
+      // Caso do crucifixo invertido: anunciou 23,8 %, entregou 53,5 → 51,5.
+      const d = so({ originalWeight: 53.5, suggestedWeight: 51.5, reductionPct: 0.238 })
+      expect(d.avgReductionPct).toBeCloseTo(1 - 51.5 / 53.5, 3)
+      expect(d.avgReductionPct).toBeLessThan(0.05)
+    })
+
+    it('redução real maior que a anunciada → vale a real', () => {
+      const d = so({ originalWeight: 100, suggestedWeight: 60, reductionPct: 0.05 })
+      expect(d.avgReductionPct).toBeCloseTo(0.4, 3)
+    })
+
+    it('peso subiu → não é descarga', () => {
+      expect(so({ originalWeight: 80, suggestedWeight: 90, reductionPct: 0.2 }).applied).toBe(false)
+    })
+
+    it('fallback: sem os dois pesos, o percentual ainda vale', () => {
+      expect(so({ reductionPct: 0.2 }).avgReductionPct).toBeCloseTo(0.2, 3)
+      expect(so({ originalWeight: 100, reductionPct: 0.2 }).avgReductionPct).toBeCloseTo(0.2, 3)
+    })
+
+    // Regressão com os dados REAIS da sessão de 07/09/2026 (conta djmkapple).
+    // Só chest press (84 → 60,5) e peck deck (77 → 63) descarregaram de fato.
+    it('sessão real de 07/09/2026: conta 2 exercícios, não 7', () => {
+      const mk = (o: number, s: number, pct: number) => ({ done: true, deload: { originalWeight: o, suggestedWeight: s, reductionPct: pct } })
+      const d = detectSessionDeload({
+        '0-0': mk(84, 60.5, 0.2824),      // chest press   — real
+        '1-0': mk(77, 63, 0.1824),        // peck deck     — real
+        '4-0': mk(53.5, 51.5, 0.2375),    // crucifixo inv — quase nada
+        '3-0': mk(35, 35, 0.3),           // pullover      — zero
+        '7-0': mk(37.5, 37.5, 0.25),      // tríceps corda — zero
+      })
+      expect(d.exerciseIdxs).toEqual([0, 1, 4])
+      expect(d.setsCount).toBe(3)
+      // Com o bug, a média era ~0,25 (o percentual anunciado de todos).
+      expect(d.avgReductionPct).toBeLessThan(0.2)
+    })
+  })
+
   it('sessão normal não é descarga', () => {
     expect(isDeloadSession({ logs: { '0-0': { weight: '100', reps: '10', done: true } } })).toBe(false)
   })
