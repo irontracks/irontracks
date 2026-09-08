@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, CalendarDays } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import type { UnknownRecord } from './types';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
@@ -27,6 +27,10 @@ export default function SessionDeloadBanner() {
     applyDeloadToSession,
     workoutDeloadEnabled,
     toggleWorkoutDeload,
+    deloadCycleStatus,
+    deloadCycleDaysRemaining,
+    startDeloadCycle,
+    endDeloadCycle,
   } = useWorkoutContext() as unknown as {
     exercises: UnknownRecord[];
     autoLoadEnabled: boolean;
@@ -36,6 +40,10 @@ export default function SessionDeloadBanner() {
     applyDeloadToSession: (exIdxs: number[], overridePct?: number) => Promise<void>;
     workoutDeloadEnabled: boolean;
     toggleWorkoutDeload: () => void;
+    deloadCycleStatus: 'inactive' | 'active' | 'ends_today';
+    deloadCycleDaysRemaining: number;
+    startDeloadCycle: (durationDays: number) => void;
+    endDeloadCycle: () => void;
   };
 
   const [aplicando, setAplicando] = React.useState(false);
@@ -50,6 +58,9 @@ export default function SessionDeloadBanner() {
   // Dispensar é só para esta montagem do treino — não persiste. Se o treino for
   // reaberto e o quadro continuar, o aviso volta (o dado não mudou).
   const [dispensado, setDispensado] = React.useState(false);
+  // Escolha da duração do ciclo. Atalhos de toque único pelo mesmo motivo dos
+  // percentuais logo abaixo: mão suada na academia não mira slider.
+  const [escolhendoDuracao, setEscolhendoDuracao] = React.useState(false);
   // Antes de qualquer `return null` deste componente: hook atrás de condicional
   // faz o React contar hooks a menos no re-render (o teste do banner pegou).
   const deloadModalRef = useFocusTrap(!!sessionDeloadModal, () => setSessionDeloadModal(null));
@@ -77,6 +88,88 @@ export default function SessionDeloadBanner() {
   // hoje" de dentro do aviso de cada card — que nunca foi gated —, ou seja, ele
   // tinha de decidir oito vezes, exercício por exercício. Era exatamente o que
   // este banner nasceu para evitar.
+  /**
+   * CICLO de descarga — a SEMANA, não a sessão.
+   *
+   * Nasceu de um relato do dono em 08/09/2026: ele aplicou descarga numa segunda
+   * dizendo que ia "até sexta", e não havia onde guardar esse "até sexta". Cada
+   * sessão era um evento isolado — o app não sabia que estava no meio de uma
+   * descarga, não voltava sozinho à carga cheia e não tinha como avisar que
+   * acabava hoje.
+   *
+   * Uma linha só, e só quando há o que dizer: o topo do treino é espaço nobre
+   * (auditoria de 06/09/2026 — dois cards de configuração empurravam o primeiro
+   * "Concluir" para 66% da tela).
+   */
+  // Testa pelo lado POSITIVO: `!== 'inactive'` dava "em ciclo" quando o status
+  // chega `undefined` (contexto sem a chave), e o app anunciaria uma semana de
+  // descarga que não existe.
+  const emCiclo = deloadCycleStatus === 'active' || deloadCycleStatus === 'ends_today';
+  /**
+   * Quando MOSTRAR: em ciclo, sempre — estar numa semana de descarga muda como
+   * ler cada carga do dia, e some com a dúvida "por que o peso caiu?". Fora do
+   * ciclo, só com a carga automática ligada, que é onde o assunto descarga já
+   * está em tela. Uma linha permanente a mais no topo de TODO treino custa o
+   * espaço nobre que a auditoria de 06/09/2026 mediu.
+   */
+  const mostrarCiclo = emCiclo || autoLoadEnabled;
+  const linhaDoCiclo = !mostrarCiclo ? null : (
+    <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-1">
+      <div className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+        {emCiclo
+          ? deloadCycleStatus === 'ends_today'
+            ? 'Semana de descarga · último dia'
+            : `Semana de descarga · faltam ${deloadCycleDaysRemaining} dias`
+          : 'Semana de descarga'}
+      </div>
+      {emCiclo ? (
+        <button
+          type="button"
+          onClick={endDeloadCycle}
+          aria-label="Encerrar a semana de descarga agora"
+          className="shrink-0 tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
+        >
+          Encerrar
+        </button>
+      ) : escolhendoDuracao ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          {[3, 5, 7].map((dias) => (
+            <button
+              key={dias}
+              type="button"
+              onClick={() => {
+                startDeloadCycle(dias);
+                setEscolhendoDuracao(false);
+              }}
+              aria-label={`Descarga de ${dias} dias`}
+              className="tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
+            >
+              {dias}d
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setEscolhendoDuracao(false)}
+            aria-label="Cancelar a escolha de duração"
+            className="tap-44 inline-flex h-8 items-center rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 text-[11px] font-bold uppercase tracking-wide text-neutral-400 transition-colors active:scale-95"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEscolhendoDuracao(true)}
+          aria-label="Iniciar uma semana de descarga"
+          className="shrink-0 tap-44 inline-flex h-8 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 text-[11px] font-bold uppercase tracking-wide text-neutral-400 transition-colors active:scale-95"
+        >
+          <CalendarDays size={15} className="opacity-70" />
+          Iniciar
+        </button>
+      )}
+    </div>
+  );
+
   const toggleDoMotor = autoLoadEnabled ? (
       // UMA linha, como o toggle da carga automática logo acima. A frase que
       // explicava ("Em dia ruim, o app pode aliviar…") foi para o `title`: os
@@ -111,7 +204,14 @@ export default function SessionDeloadBanner() {
       </div>
   ) : null;
 
-  if (!sessionDeloadAlert || dispensado) return toggleDoMotor;
+  const cabecalho = (
+    <>
+      {linhaDoCiclo}
+      {toggleDoMotor}
+    </>
+  );
+
+  if (!sessionDeloadAlert || dispensado) return cabecalho;
 
   const pctSugerido = Math.round(sessionDeloadAlert.suggestedPct * 100);
   const pct = pctEscolhida ?? pctSugerido;
@@ -169,7 +269,7 @@ export default function SessionDeloadBanner() {
 
   return (
     <>
-      {toggleDoMotor}
+      {cabecalho}
       <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

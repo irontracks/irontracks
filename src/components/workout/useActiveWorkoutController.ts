@@ -1,6 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { logError } from '@/lib/logger';
+import { createDeloadCycle, getDeloadCycleStatus, getDeloadCycleDaysRemaining } from '@/utils/deload/cycle';
 import { triggerHaptic } from '@/utils/native/irontracksNative';
 // Note: useWorkoutTicker is no longer called here — it lives in WorkoutTimerProvider.
 // The controller no longer re-renders every second, only on user interaction.
@@ -447,6 +448,37 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!workoutDeloadKey) return
     propsRef.current?.onToggleWorkoutDeload?.(workoutDeloadKey, workoutDeloadOff.has(workoutDeloadKey))
   }, [workoutDeloadKey, workoutDeloadOff]);
+
+  /**
+   * CICLO de descarga — a semana, não a sessão.
+   *
+   * O toggle acima diz se o motor PODE aliviar este treino; o ciclo diz que o
+   * usuário está numa semana de descarga declarada, com fim marcado. São coisas
+   * diferentes e convivem.
+   *
+   * Fim automático de propósito (decisão do dono, 08/09/2026): encerramento
+   * manual obrigatório significa que esquecer deixa o app preso em descarga, e
+   * `pickUsableHistory` descarta sessão de deload do motor de carga — o
+   * esquecimento custaria o histórico bom.
+   */
+  const deloadCycleStatus = useMemo(
+    () => getDeloadCycleStatus((settings as Record<string, unknown> | null)?.autoLoadDeloadCycle),
+    [settings],
+  );
+  const deloadCycleDaysRemaining = useMemo(
+    () => getDeloadCycleDaysRemaining((settings as Record<string, unknown> | null)?.autoLoadDeloadCycle),
+    [settings],
+  );
+
+  const startDeloadCycle = useCallback((durationDays: number) => {
+    const cycle = createDeloadCycle(durationDays);
+    if (!cycle) return;
+    propsRef.current?.onSetDeloadCycle?.(cycle);
+  }, []);
+
+  const endDeloadCycle = useCallback(() => {
+    propsRef.current?.onSetDeloadCycle?.(null);
+  }, []);
 
   const toggleExerciseDeload = useCallback((exIdx: number) => {
     const ex = exercises?.[exIdx];
@@ -958,6 +990,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deloadOffKeys,
     workoutDeloadEnabled,
     toggleWorkoutDeload,
+    deloadCycleStatus,
+    deloadCycleDaysRemaining,
+    startDeloadCycle,
+    endDeloadCycle,
     toggleExerciseDeload,
     currentExerciseIdx,
     setCurrentExerciseIdx,
@@ -1078,6 +1114,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
     deloadOffKeys, toggleExerciseDeload,
     workoutDeloadEnabled, toggleWorkoutDeload,
+    deloadCycleStatus, deloadCycleDaysRemaining, startDeloadCycle, endDeloadCycle,
     sessionDeloadAlert, sessionDeloadModal, setSessionDeloadModal, applyDeloadToSession,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,

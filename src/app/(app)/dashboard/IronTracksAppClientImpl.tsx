@@ -1497,6 +1497,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             userSettingsApi?.updateSetting?.('autoLoadDeloadOffWorkouts', next)
                                             void userSettingsApi?.save?.({ autoLoadDeloadOffWorkouts: next })
                                         }}
+                                        onSetDeloadCycle={(cycle) => {
+                                            // `null` encerra o ciclo. Sem merge: o ciclo é um objeto só,
+                                            // e meia-vida de ciclo antigo misturado com novo seria pior
+                                            // que não ter ciclo nenhum.
+                                            userSettingsApi?.updateSetting?.('autoLoadDeloadCycle', cycle)
+                                            void userSettingsApi?.save?.({ autoLoadDeloadCycle: cycle })
+                                        }}
                                         onSavePlateSetup={(counts: Record<string, number>, barWeightKg: number) => {
                                             userSettingsApi?.updateSetting?.('plateInventory', counts)
                                             userSettingsApi?.updateSetting?.('barWeightKg', barWeightKg)
