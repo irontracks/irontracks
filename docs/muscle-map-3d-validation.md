@@ -24,9 +24,17 @@ O seletor de regiões mantém acesso aos detalhes. Falhas no módulo, modelo ou 
 - Servidor de produção local em localhost:3007: tela de login correta e GLB retorna HTTP 200 `model/gltf-binary`.
 - Componente React real, em harness isolado com dados explicitamente sintéticos: peitoral a 100%, dorsais a 50%, panturrilhas a 10%, mudança frente/costas e limpeza das cores sem remontar a malha conferidos visualmente. Telemetria do harness usa a interface Sentry de navegador; o app mantém @sentry/nextjs.
 
+## Correção CSP após validação autenticada
+
+O teste isolado não reproduzia a CSP do dashboard. Model Viewer importava estaticamente Meshopt, que inicializava WASM mesmo sem uso; o GLTFLoader também fazia fetch da textura embutida via blob:, fora do connect-src permitido.
+
+Corrigido sem mudar CSP: alias exato de Webpack para Meshopt não suportado e textura externa `reference-atlas.png` no mesmo domínio. O GLB deixou de duplicar os bytes do atlas; `scripts/prepare-muscle-glb.mjs` reproduz essa conversão após exportar no Blender. O tamanho de GLB informado acima se refere à versão anterior embutida.
+
+Novo build aprovado, 731 arquivos / 7.894 testes, testes específicos contra importação WASM e textura embutida. Dashboard autenticado recarregado e 3D aberto com dados reais sob CSP de produção; nenhuma nova ocorrência de WebAssembly ou falha de textura após as duas correções. Erros históricos continuam no console da aba. Política de segurança e middleware intactos.
+
 ## Pendências antes de publicação
 
-- Login do usuário no build local para validar o dashboard com os dados reais e os dois períodos.
+- Validar a troca dos dois períodos no dashboard autenticado (a semana já foi inspecionada com dados reais).
 - Teste de toque/pinça em aparelho físico e inspeção visual de todas as regiões.
 - PR, CI e publicação não executados nesta etapa.
 - `npm audit` aponta uma vulnerabilidade moderada preexistente de @xmldom/xmldom, não introduzida pelo visualizador. Não houve atualização fora do escopo.

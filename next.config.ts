@@ -13,6 +13,13 @@ const comAnalisador = withBundleAnalyzer({
 })
 
 const nextConfig: NextConfig = {
+  webpack(config) {
+    // Model Viewer statically imports Meshopt, which instantiates WASM even
+    // for uncompressed GLBs. Our assets do not use this optional extension.
+    config.resolve.alias['three/examples/jsm/libs/meshopt_decoder.module.js$'] =
+      require.resolve('./src/lib/muscleMap/meshoptUnavailable.ts')
+    return config
+  },
   // Auditoria 01/09/2026: o header anunciava o framework em toda resposta de
   // produção. Não é vulnerabilidade — é reconhecimento de graça.
   poweredByHeader: false,
@@ -215,4 +222,3 @@ export default comAnalisador(withSentryConfig(nextConfig, {
     deleteSourcemapsAfterUpload: true,
   },
 }))
-
