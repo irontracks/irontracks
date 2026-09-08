@@ -2,7 +2,7 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Crown, Loader2, Sparkles, Wand2 } from 'lucide-react'
-import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
+import BodyMapInteractive from '@/components/muscle-map/BodyMapInteractive'
 import { MUSCLE_BY_ID, type MuscleId } from '@/utils/muscleMapConfig'
 import { getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { translateAiError } from '@/utils/ai/clientErrors'
@@ -509,9 +509,10 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 transition={{ duration: 0.25 }}
                 className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3 overflow-hidden"
               >
-                <BodyMapSvg
+                <BodyMapInteractive
                   view={view}
-                  muscles={musclesForView}
+                  muscles={state.data?.muscles || {}}
+                  musclesForView={musclesForView}
                   selected={selected}
                   gender={gender}
                   onSelect={(id) => {
