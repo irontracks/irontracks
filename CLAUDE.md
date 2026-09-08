@@ -639,6 +639,13 @@ legítimo é `back-delts_rear` no feminino, com 63,5%; o piso é 50%. Provado po
 mutação repondo o PNG defeituoso. Conferido na tela do app (simulador, conta de
 teste): antebraços acesos do cotovelo ao punho, mãos apagadas.
 
+**Visualizador 3D do mapa muscular — o alvo de zoom não é o centro anatômico (08/09/2026).**
+O vídeo `ScreenRecording_09-08-2026 14-34-59_1.MP4` mostrou o sintoma: ao aproximar, o enquadramento convergia para a pelve/virilha e não havia como levar o foco ao peito. A causa medida no `@google/model-viewer` 4.1.0 era `disable-pan` em `components/muscle-map/BodyMap3D.tsx`: ele desligava o `movePan` do gesto de dois dedos, então só o raio da câmera mudava e o alvo permanecia fixo. Não era defeito das cores, intensidades, GLB ou do modal.
+
+A regra que fica: mantenha `camera-controls`, `touch-action: none` e `overscroll-behavior: none`, mas não reintroduza `disable-pan`. Com pan habilitado, toque/clique reposiciona o alvo, dois dedos aproximam e deslocam, e no desktop Shift/Control/Cmd ou botão direito + arrastar faz pan. O texto de ajuda precisa explicar isso; se retirar `disable-pan` sem manter `touch-action: none`, o gesto pode voltar a rolar o dashboard.
+
+**Armadilha de verificação:** testar apenas o raio/zoom ou apenas a rotação deixa o bug passar. A validação precisa provar mudança do `cameraTarget` e retorno do enquadramento. Em 08/09/2026, no teste local, o alvo Y mudou de `0.8998758259801889` para `1.241529515060351` e o raio de `3.7248970800330103` para `2.953116475563555`; “Enquadrar” devolveu os dois valores exatamente. A pose inicial só pode ser capturada depois de `jumpCameraToGoal()` + `await updateComplete`; capturá-la durante o carregamento guarda uma câmera ainda em animação e faz o reset parecer quebrado.
+
 **Heatmap Treino × Nutrição:** o bucketing por dia vive em `lib/nutrition/correlationDays.ts` (função pura, dia sempre BRT). Antes a rota fazia `toISOString().slice(0,10)` — dia UTC —, então **todo treino depois das 21h BRT acendia o quadrado do dia seguinte** e o próprio "hoje" da grade virava amanhã. A rota não devolve mais `workout_calories`: era o literal `300` por sessão exibido como se fosse medição.
 
 **`MyDietPlan` — o posicionamento automático não pode vencer o usuário.** "Abre no dia de HOJE" roda no efeito que observa `days`, e os botões de dia já estão na tela nesse instante: quem tocasse num dia antes de o efeito rodar era devolvido para hoje em silêncio, e o swap ia para o índice errado. `positionedRef.current = true` é marcado no efeito **e no clique**. Guard varre os sete dias da semana.
