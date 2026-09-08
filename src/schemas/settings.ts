@@ -55,6 +55,27 @@ export const UserSettingsSchema = z
      * exercício desligado (ver useWorkoutAutoload).
      */
     autoLoadDeloadOffWorkouts: z.array(z.string()).default([]),
+    /**
+     * CICLO de descarga em andamento — a semana, não a sessão.
+     *
+     * Decisão do dono em 08/09/2026: a duração é escolhida na ATIVAÇÃO e vale
+     * para o período inteiro. Sem isto, cada sessão era um evento isolado e o
+     * app não sabia responder "estou no meio de uma descarga que vai até sexta"
+     * — nem voltava sozinho à carga cheia no fim.
+     *
+     * Datas são YYYY-MM-DD no calendário de São Paulo (ver `utils/deload/cycle`):
+     * "até sexta" é dia, não instante, e timestamp erraria a virada para quem
+     * treina de noite. `null` = nenhuma descarga em andamento.
+     */
+    autoLoadDeloadCycle: z
+      .object({
+        startDate: z.string(),
+        endDate: z.string(),
+        durationDays: z.number().int().min(1),
+        startedAt: z.string(),
+      })
+      .nullable()
+      .default(null),
     // ── Calculadora de anilhas ────────────────────────────────────────────────
     // Inventário real de anilhas do usuário: valor da anilha (kg, como string) →
     // quantidade de UNIDADES. Vazio = academia completa (DEFAULT_GYM_INVENTORY),
