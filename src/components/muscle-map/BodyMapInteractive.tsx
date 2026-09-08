@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import dynamic from 'next/dynamic'
 import BodyMapSvg from './BodyMapSvg'
+import BodyMap3DModal from './BodyMap3DModal'
 import type { MuscleMap3DState } from '@/lib/muscleMap/colors3d'
 import type { MuscleId } from '@/utils/muscleMapConfig'
 
@@ -17,18 +18,19 @@ type Props = {
 }
 
 export default function BodyMapInteractive({ muscles, musclesForView, ...props }: Props) {
-  const [mode, setMode] = useState<'2d' | '3d'>('2d')
+  const [is3dOpen, setIs3dOpen] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
-  const fail = useCallback(() => { setUnavailable(true); setMode('2d') }, [])
+  const fail = useCallback(() => { setUnavailable(true); setIs3dOpen(false) }, [])
   const supports3d = props.gender !== 'female'
   return <div>
     {supports3d && <div className="mb-3 flex justify-center gap-2" role="group" aria-label="Modo do mapa muscular">
-      <button type="button" aria-pressed={mode === '2d'} className="min-h-11 rounded-lg border border-neutral-700 px-4 text-sm text-neutral-200 aria-pressed:border-yellow-500 aria-pressed:text-yellow-500" onClick={() => setMode('2d')}>2D</button>
-      <button type="button" aria-pressed={mode === '3d'} className="min-h-11 rounded-lg border border-neutral-700 px-4 text-sm text-neutral-200 aria-pressed:border-yellow-500 aria-pressed:text-yellow-500" onClick={() => { setUnavailable(false); setMode('3d') }}>3D</button>
+      <button type="button" aria-pressed={!is3dOpen} className="min-h-11 rounded-lg border border-neutral-700 px-4 text-sm text-neutral-200 aria-pressed:border-yellow-500 aria-pressed:text-yellow-500" onClick={() => setIs3dOpen(false)}>2D</button>
+      <button type="button" aria-haspopup="dialog" aria-expanded={is3dOpen} className="min-h-11 rounded-lg border border-neutral-700 px-4 text-sm text-neutral-200 aria-expanded:border-yellow-500 aria-expanded:text-yellow-500" onClick={() => { setUnavailable(false); setIs3dOpen(true) }}>3D</button>
     </div>}
-    {mode === '3d' && supports3d
-      ? <BodyMap3D view={props.view} muscles={muscles} selected={props.selected} onSelect={props.onSelect} onUnavailable={fail} />
-      : <BodyMapSvg {...props} muscles={musclesForView} />}
+    <BodyMapSvg {...props} muscles={musclesForView} />
+    {is3dOpen && supports3d && <BodyMap3DModal onClose={() => setIs3dOpen(false)}>
+      <BodyMap3D view={props.view} muscles={muscles} selected={props.selected} onSelect={props.onSelect} onUnavailable={fail} />
+    </BodyMap3DModal>}
     {unavailable && <p role="status" className="mt-2 text-xs text-neutral-400">O 3D não carregou. Seu mapa continua disponível em 2D.</p>}
   </div>
 }
