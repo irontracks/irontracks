@@ -18,6 +18,25 @@ PBXPROJ="$PROJECT_ROOT/ios/App/App.xcodeproj/project.pbxproj"
 ARCHIVE_DIR="/tmp/irontracks-archives"
 EXPORT_OPTIONS="$ARCHIVE_DIR/ExportOptions.plist"
 
+# ─── 0a. Carrega SENTRY_* do .env.local ────────────────────────────────────
+# O `ios-submit.mjs` já lê esse arquivo; este não lia, então o token do Sentry
+# ficava invisível para o passo do dSYM e o release anunciava "ausente" com a
+# credencial ali do lado. Variável já exportada no shell VENCE o arquivo, mesma
+# precedência do ios-submit.mjs.
+if [ -f "$PROJECT_ROOT/.env.local" ]; then
+    while IFS= read -r linha || [ -n "$linha" ]; do
+        case "$linha" in
+            SENTRY_*=*)
+                chave="${linha%%=*}"
+                valor="${linha#*=}"
+                valor="${valor%\"}"; valor="${valor#\"}"
+                valor="${valor%\'}"; valor="${valor#\'}"
+                if [ -z "$(eval "echo \${$chave:-}")" ]; then export "$chave=$valor"; fi
+                ;;
+        esac
+    done < "$PROJECT_ROOT/.env.local"
+fi
+
 # ─── 0. O front vem de PRODUÇÃO? ──────────────────────────────────────────
 # ⚠️ A build 84 (1.21.3) foi arquivada, subiu ao TestFlight e chegou a
 # WAITING_FOR_REVIEW com server.url = http://localhost:3010. No iPhone o
