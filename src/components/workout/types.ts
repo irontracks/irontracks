@@ -88,6 +88,12 @@ export type ActiveWorkoutProps = {
   /** Liga/desliga a descarga do TREINO inteiro (chave = nome normalizado). */
   onToggleWorkoutDeload?: (workoutKey: string, nextEnabled: boolean) => void;
   /**
+   * Grava (ou limpa) o CICLO de descarga em `settings.autoLoadDeloadCycle`.
+   * `null` encerra. Ver `utils/deload/cycle` — a duração é escolhida na ativação
+   * e vale para a semana toda, não para a sessão.
+   */
+  onSetDeloadCycle?: (cycle: import('@/utils/deload/cycle').DeloadCycle | null) => void;
+  /**
    * Calculadora de anilhas: persiste o inventário do usuário em
    * settings.plateInventory / settings.barWeightKg. Mesmo padrão do onToggleAutoLoad
    * (updateSetting otimista + save), porque o sheet edita direto no toque do stepper.
