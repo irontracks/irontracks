@@ -114,7 +114,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
     inputRef, videoRef,
     mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
-    error, info, showSafeGuide,
+    error, info, publicado, showSafeGuide,
     template, setTemplate,
     saveImageUrl, setSaveImageUrl,
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
@@ -338,6 +338,7 @@ export default function MetricsStoryComposer({ open, onClose }: MetricsStoryComp
                   uploadProgress={uploadProgress}
                   error={error}
                   info={info}
+                  publicado={publicado}
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />

@@ -75,7 +75,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     inputRef, videoRef,
     mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
-    error, info, showSafeGuide,
+    error, info, publicado, showSafeGuide,
     template, setTemplate,
     saveImageUrl, setSaveImageUrl,
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
@@ -336,6 +336,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                   uploadProgress={uploadProgress}
                   error={error}
                   info={info}
+                  publicado={publicado}
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />
