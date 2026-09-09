@@ -63,9 +63,18 @@ describe('fiação no card de destaques', () => {
   )
 
   it('o card usa a classificação, não o sinal do número', () => {
-    expect(src).toMatch(/classificarVariacaoVolume\(volumeDelta\)/)
+    // O 2º argumento é obrigatório na fiação: sem ele a classificação nunca
+    // enxerga a descarga, e o card volta a pintar de vermelho a queda pedida.
+    expect(src).toMatch(/classificarVariacaoVolume\(volumeDelta,\s*emDeload\)/)
     // O ternário cru sobre o sinal é exatamente o bug que existia.
     expect(src).not.toMatch(/volumeDeltaAbs > 0\s*\n?\s*\?\s*'bg-green-500\/10/)
+  })
+
+  it('a descarga é ANUNCIADA, não só despintada', () => {
+    // Despintar sem dizer o motivo deixa a sessão indistinguível de uma sessão
+    // fraca quando lida no histórico semanas depois — que é quando se lê.
+    expect(src, 'o selo de descarga sumiu do painel').toMatch(/Descarga/)
+    expect(src).toMatch(/emDeload &&/)
   })
 
   it('existe um terceiro visual para o caso neutro', () => {
@@ -77,5 +86,41 @@ describe('fiação no card de destaques', () => {
   it('o rótulo do card vem da função, não é fixo', () => {
     expect(src).toMatch(/rotuloVariacaoVolume\(classe\)/)
     expect(src, 'rótulo fixo volta a mentir no caso neutro').not.toMatch(/>Volume vs anterior</)
+  })
+})
+
+describe('sessão de DESCARGA: queda pedida não é queda', () => {
+  /**
+   * Print do dono, 09/09/2026: treino inteiro em deload exibindo
+   * "−7.016 kg / −24,2%" em VERMELHO, ao lado de um PR alcançado. O app pintou
+   * de alarme exatamente o resultado que ele mandou o app produzir.
+   */
+  it('−24,2% em descarga sai do vermelho', () => {
+    expect(classificarVariacaoVolume(-24.2, true)).toBe('descarga')
+    expect(classificarVariacaoVolume(-24.2, false)).toBe('queda')
+  })
+
+  it('o rótulo diz a CAUSA, não só o sentido', () => {
+    // "abaixo da anterior" é verdade numa descarga e ainda assim engana:
+    // omite que a queda foi pedida.
+    expect(rotuloVariacaoVolume('descarga')).toBe('descarga planejada')
+  })
+
+  it('ALTA em descarga continua sendo alta', () => {
+    // Subir volume numa semana de descarga é informação real — esconder seria
+    // mentir na direção oposta.
+    expect(classificarVariacaoVolume(12, true)).toBe('alta')
+  })
+
+  it('a zona neutra não muda com a descarga', () => {
+    // O ruído de medição é o mesmo; a descarga só reclassifica a QUEDA.
+    for (const pct of [-2.9, -0.8, 0, 1, 2.9]) {
+      expect(classificarVariacaoVolume(pct, true)).toBe(classificarVariacaoVolume(pct, false))
+    }
+  })
+
+  it('sem o parâmetro, o comportamento é o de sempre', () => {
+    // Chamador antigo não muda de veredito por omissão.
+    expect(classificarVariacaoVolume(-24.2)).toBe('queda')
   })
 })
