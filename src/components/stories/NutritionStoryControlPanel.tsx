@@ -1,11 +1,12 @@
 'use client'
 
 import React from 'react'
-import { Palette, Crown, Download, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Crown, Download, Loader2, Palette } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import type { StoryTemplate } from './storyTemplates'
 import { useMedirPosicaoDasAcoes } from './useMedirPosicaoDasAcoes'
+import { StoryStatusMessages } from './StoryStatusMessages'
 
 interface NutritionStoryControlPanelProps {
   templates: StoryTemplate[]
@@ -27,13 +28,15 @@ interface NutritionStoryControlPanelProps {
   error: string
   info: string
   onPost: () => void
+  /** Já publicou nesta sessão do editor — o botão vira selo e trava. */
+  publicado?: boolean
   onShare: () => void
 }
 
 export function NutritionStoryControlPanel({
   templates, templateId, onSelectTemplate,
   showTrimmer, isVideo, videoDuration, trimRange, setTrimRange, previewTime, videoRef,
-  busy, busyAction, busySubAction, uploadProgress, error, info, onPost, onShare,
+  busy, busyAction, busySubAction, uploadProgress, error, info, publicado, onPost, onShare,
 }: NutritionStoryControlPanelProps) {
   const { acoes: acoesRef, estilo: estiloRef } = useMedirPosicaoDasAcoes('nutricao')
   return (
@@ -122,21 +125,7 @@ export function NutritionStoryControlPanel({
 
       <div className="flex-1 hidden lg:block" />
 
-      {/* Mensagens */}
-      <AnimatePresence mode="wait">
-        {info && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-emerald-500" />
-            <p className="text-xs font-bold text-emerald-200">{info}</p>
-          </motion.div>
-        )}
-        {error && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-red-950/40 border border-red-900/50 flex items-center gap-3">
-            <AlertCircle size={18} className="text-red-400" />
-            <p className="text-xs font-bold text-red-200">{error}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <StoryStatusMessages info={info} error={error} />
 
       {/* Ações — barra FIXA no rodapé em mobile, igual ao painel de treino.
           ⚠️ A correção de 01/09 (relato do Diogo) só alcançou o
@@ -148,14 +137,21 @@ export function NutritionStoryControlPanel({
         <div className="relative group max-lg:flex-1">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
           <button
-            onClick={onPost} disabled={busy}
+            onClick={onPost} disabled={busy || !!publicado}
             aria-label="Postar story no IronTracks" aria-busy={busyAction === 'post'}
             className="relative h-14 w-full rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:via-amber-300 hover:to-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all active:scale-[0.97]"
           >
             {busyAction === 'post' ? (
               <><Loader2 className="animate-spin" size={18} /><span>{busySubAction === 'processing' ? 'PROCESSANDO...' : 'ENVIANDO...'}</span></>
             ) : (
+              publicado ? (
+                  // A tela não fecha mais depois de postar (pedido do dono), então o
+                  // botão precisa dizer que o trabalho já foi feito — senão o mesmo
+                  // toque distraído que antes era impossível vira story duplicado.
+                  <><CheckCircle2 size={18} strokeWidth={2.5} /><span>PUBLICADO</span></>
+              ) : (
               <><Crown size={18} strokeWidth={2.5} /><span>POSTAR NO IRONTRACKS</span></>
+              )
             )}
           </button>
         </div>

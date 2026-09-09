@@ -59,7 +59,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     inputRef, videoRef,
     mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
-    error, info, showSafeGuide, setShowSafeGuide,
+    error, info, publicado, showSafeGuide, setShowSafeGuide,
     layout, livePositions, setLivePositions,
     template, setTemplate, templates,
     draggingKey, saveImageUrl, setSaveImageUrl,
@@ -438,6 +438,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                   uploadProgress={uploadProgress}
                   error={error}
                   info={info}
+                  publicado={publicado}
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />

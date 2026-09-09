@@ -151,3 +151,66 @@ describe('a rolagem alcança o fim do painel', () => {
         expect(conteúdo).toMatch(/min-h-full/)
     })
 })
+
+/**
+ * Relato do dono, 09/09/2026 — dois defeitos no mesmo editor:
+ *
+ *  1. "clico em postar, ele posta mas sai dessa tela; caso eu queira salvar vou
+ *     ter que abrir o story de novo e editar tudo novamente";
+ *  2. "quando clico em salvar ele não avisa nada; você pode pensar que não
+ *     aconteceu nada e clicar mais vezes, e cada clicada salva uma foto".
+ *
+ * O segundo é a outra metade do defeito de 01/09 (relato do Diogo): a barra de
+ * ações virou `fixed`, mas a MENSAGEM continuou no fluxo do painel, abaixo da
+ * dobra. O aviso existia e nascia fora da vista.
+ */
+describe('publicar não descarta a arte, e salvar avisa', () => {
+    const hook = ler('src/components/stories/useStoryComposer.ts')
+    const toast = ler('src/components/stories/StoryStatusMessages.tsx')
+
+    it('publicar NÃO fecha o editor', () => {
+        const executavel = hook.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+        // O `setTimeout(onClose, 1000)` é exatamente o que apagava o trabalho de
+        // quem também queria a imagem salva — o editor não guarda rascunho.
+        expect(executavel, 'o editor voltou a se fechar sozinho após postar')
+            .not.toMatch(/setTimeout\(\s*\(\)\s*=>\s*onClose/)
+    })
+
+    it('publicar marca o estado, senão a tela aberta vira story duplicado', () => {
+        expect(hook).toMatch(/setPublicado\(true\)/)
+    })
+
+    for (const [nome, arquivo] of [
+        ['treino', 'src/components/stories/StoryControlPanel.tsx'],
+        ['nutrição/cardio/métricas', 'src/components/stories/NutritionStoryControlPanel.tsx'],
+    ] as const) {
+        const src = ler(arquivo)
+
+        it(`o painel de ${nome} trava o POSTAR depois de publicado`, () => {
+            expect(src, 'dá para publicar duas vezes').toMatch(/disabled=\{busy \|\| !!publicado\}/)
+            expect(src).toMatch(/PUBLICADO/)
+        })
+
+        it(`o painel de ${nome} usa o toast único, não uma cópia`, () => {
+            expect(src).toMatch(/<StoryStatusMessages/)
+            const executavel = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+            expect(executavel, 'voltou a desenhar a própria caixa de status')
+                .not.toMatch(/text-emerald-200/)
+        })
+    }
+
+    it('em mobile o aviso é FIXO acima da barra de ações', () => {
+        // A barra é `max-lg:fixed … bottom-0 z-[2600]`. Um toast no fluxo do
+        // painel nasce abaixo da dobra — foi assim que "salvo!" ficou invisível.
+        expect(toast).toMatch(/max-lg:fixed/)
+        expect(toast).toMatch(/max-lg:bottom-\[calc\(88px\+env\(safe-area-inset-bottom\)\)\]/)
+        const z = toast.match(/max-lg:z-\[(\d+)\]/)
+        expect(z, 'o toast precisa declarar z-index').toBeTruthy()
+        expect(Number(z![1]), 'o toast ficou ATRÁS da barra de ações').toBeGreaterThan(2600)
+    })
+
+    it('o aviso é anunciado por leitor de tela', () => {
+        expect(toast).toMatch(/role="status"/)
+        expect(toast).toMatch(/aria-live="polite"/)
+    })
+})
