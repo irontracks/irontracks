@@ -18,6 +18,8 @@ import {
 } from '../helpers/reconcileEditedExercises';
 import type { ConfirmFn } from '@/contexts/DialogContext';
 import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino';
+import type { EditExerciseDraft } from '../helpers/editExerciseDraft';
+import type { BlocoDeCardio } from '@/components/ExerciseEditor/CardioBlocosEditor';
 
 const MAX_EXTRA_SETS_PER_EXERCISE = 50;
 const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
@@ -40,9 +42,9 @@ interface ExerciseCrudDeps {
   setDeferredExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
   linkedWeightExercises: Set<number>;
   setLinkedWeightExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
-  editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
-  setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }) => void;
-  setEditExerciseOriginal: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null) => void;
+  editExerciseDraft: EditExerciseDraft | null;
+  setEditExerciseDraft: (v: EditExerciseDraft) => void;
+  setEditExerciseOriginal: (v: EditExerciseDraft | null) => void;
   persistToPlan: boolean;
   setPersistToPlan: (v: boolean) => void;
   editExerciseHasChanges: boolean;
@@ -374,7 +376,22 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const transitionTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.transitionTime ?? (ex as Record<string, unknown>)?.transition_time);
       const transitionTime = typeof transitionTimeNum === 'number' && transitionTimeNum > 0 ? String(transitionTimeNum) : '';
 
-      const snapshot = { name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime };
+      // Cardio edita BLOCOS (tempo/velocidade/inclinação por bloco), e eles moram
+      // nas séries. Sem trazê-los para o rascunho, o modal rápido só saberia
+      // dizer "1 bloco" sem deixar mexer — que era o estado até 09/09/2026.
+      const blocos = method === 'Cardio'
+        ? Array.from({ length: setsCount }, (_, i) => {
+          const sd = isObject(sdArrRaw[i]) ? (sdArrRaw[i] as UnknownRecord) : {};
+          const dur = Number(sd.durationSeconds);
+          const bloco: BlocoDeCardio = {
+            durationSeconds: Number.isFinite(dur) && dur > 0 ? dur : null,
+            advanced_config: (sd.advanced_config ?? sd.advancedConfig ?? null) as BlocoDeCardio['advanced_config'],
+          };
+          return bloco;
+        })
+        : undefined;
+
+      const snapshot = { name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime, blocos };
       setEditExerciseDraft(snapshot);
       setEditExerciseOriginal(snapshot);
       setPersistToPlan(false);
@@ -403,10 +420,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     const restParsed = parseTrainingNumber(editExerciseDraft?.restTime);
     const restTime = typeof restParsed === 'number' && Number.isFinite(restParsed) && restParsed > 0 ? restParsed : null;
     const method = String(editExerciseDraft?.method || 'Normal').trim() || 'Normal';
-    const isUnilateral = !!(editExerciseDraft as Record<string, unknown>)?.isUnilateral;
-    const sideRestParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.sideRestTime);
+    const isUnilateral = !!editExerciseDraft?.isUnilateral;
+    const sideRestParsed = parseTrainingNumber(editExerciseDraft?.sideRestTime);
     const sideRestTime = typeof sideRestParsed === 'number' && sideRestParsed > 0 ? sideRestParsed : null;
-    const transitionParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.transitionTime);
+    const transitionParsed = parseTrainingNumber(editExerciseDraft?.transitionTime);
     const transitionTime = typeof transitionParsed === 'number' && transitionParsed > 0 ? transitionParsed : null;
 
     try {
@@ -421,6 +438,24 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       // com método inalterado herda o advanced_config. Ver helpers/editedSetDetails.
       const prevMethod = String(exRaw?.method || 'Normal').trim() || 'Normal';
       const nextSetDetails = editedSetDetails(sdArr, desiredSets, method !== prevMethod) as WorkoutSetDetail[];
+
+      // Blocos de cardio: o rascunho é a verdade sobre tempo/velocidade/inclinação
+      // de cada bloco. Escrevemos POR CIMA do resultado do `editedSetDetails` (que
+      // já resolveu quantidade e herança de método) em vez de num segundo caminho
+      // de persistência — é a armadilha do `planDays` neste repo: builder paralelo
+      // não deixa de gravar um campo, ele APAGA o que já estava lá.
+      const blocosDraft = Array.isArray(editExerciseDraft?.blocos) ? editExerciseDraft.blocos : null;
+      if (method === 'Cardio' && blocosDraft) {
+        for (let i = 0; i < nextSetDetails.length; i += 1) {
+          const b = isObject(blocosDraft[i]) ? (blocosDraft[i] as UnknownRecord) : null;
+          if (!b) continue;
+          nextSetDetails[i] = {
+            ...(nextSetDetails[i] as UnknownRecord),
+            durationSeconds: b.durationSeconds ?? null,
+            advanced_config: b.advanced_config ?? null,
+          } as WorkoutSetDetail;
+        }
+      }
 
       nextExercises[idx] = {
         ...exRaw,

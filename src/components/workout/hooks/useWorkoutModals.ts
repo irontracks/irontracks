@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { draftOrderKeys } from '@/lib/workoutReorder';
 import type { UnknownRecord } from '../types';
+import type { EditExerciseDraft } from '../helpers/editExerciseDraft';
 
 type PostCheckinDraft = { rpe: string; satisfaction: string; soreness: string; notes: string };
 type InputRefMap = Record<string, Array<HTMLInputElement | null>>;
@@ -93,7 +94,7 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
     // ---- Edit exercise ----
     const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
     const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
-    const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }>(() => ({
+    const [editExerciseDraft, setEditExerciseDraft] = useState<EditExerciseDraft>(() => ({
         name: '',
         sets: '3',
         restTime: '60',
@@ -102,7 +103,7 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
         sideRestTime: '',
         transitionTime: '',
     }));
-    const [editExerciseOriginal, setEditExerciseOriginal] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null>(null);
+    const [editExerciseOriginal, setEditExerciseOriginal] = useState<EditExerciseDraft | null>(null);
     const [persistToPlan, setPersistToPlanRaw] = useState<boolean>(false);
     // true depois que o USUÁRIO mexeu no toggle "Atualizar plano" nesta abertura
     // do modal — o auto-ligado abaixo nunca passa por cima de escolha explícita.
