@@ -58,6 +58,7 @@ import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
 import { readCheckinSatisfaction, readCheckinSleepHours } from '@/utils/checkin/metrics'
 import { useMuscleMapWeek } from '@/hooks/useMuscleMapWeek'
 import WorkoutFinishCelebration from '@/components/workout/WorkoutFinishCelebration'
+import { buildCheckinRecommendations, sessaoEmDeload } from '@/lib/workout/checkinRecommendations';
 
 type AnyObj = Record<string, unknown>
 
@@ -478,51 +479,17 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         }
         return local;
     })();
-    const checkinRecommendations = (() => {
-        const toNumberOrNull = (v: unknown) => {
-            try {
-                const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
-                return Number.isFinite(n) ? n : null;
-            } catch {
-                return null;
-            }
-        };
-        const recs: string[] = [];
-        const preEnergy = toNumberOrNull(preCheckin?.energy);
-        const preSoreness = toNumberOrNull(preCheckin?.soreness);
-        const preTime = toNumberOrNull(preCheckin?.timeMinutes);
-        const postRpe = toNumberOrNull(postCheckin?.rpe);
-        const postSatisfaction = toNumberOrNull(postCheckin?.satisfaction);
-        const postSoreness = toNumberOrNull(postCheckin?.soreness);
-
-        if ((preSoreness != null && preSoreness >= 7) || (postSoreness != null && postSoreness >= 7)) {
-            recs.push('Dor alta: reduzir volume/carga 20–30% e priorizar técnica + mobilidade.');
-        }
-        if (preEnergy != null && preEnergy <= 2) {
-            recs.push('Energia baixa: mantenha o treino mais curto, evite falha e foque em recuperação (sono/estresse).');
-        }
-        if (postRpe != null && postRpe >= 9) {
-            recs.push('RPE alto: reduza um pouco a intensidade e aumente descanso entre séries.');
-        }
-        if (
-            postRpe != null
-            && postRpe >= 9
-            && (
-                (preSoreness != null && preSoreness >= 7)
-                || (postSoreness != null && postSoreness >= 7)
-                || (postSatisfaction != null && postSatisfaction <= 3)
-            )
-        ) {
-            recs.push('Sinais de fadiga: considere 5–7 dias de deload (−10–20% carga ou −1 série por exercício).');
-        }
-        if (postSatisfaction != null && postSatisfaction <= 2) {
-            recs.push('Satisfação baixa: revise seleção de exercícios e meta da sessão para manter consistência.');
-        }
-        if (preTime != null && preTime > 0 && preTime < 45) {
-            recs.push('Pouco tempo: use um treino “mínimo efetivo” (menos exercícios e mais foco).');
-        }
-        return recs;
-    })();
+    /**
+     * Em DESCARGA o conselho muda de conteúdo — ver `lib/workout/checkinRecommendations`.
+     * O dono recebeu "RPE alto: reduza a intensidade" numa sessão inteira de
+     * deload (09/09/2026): a regra lia só os check-ins e nunca o que a sessão
+     * fez com a carga.
+     */
+    const checkinRecommendations = buildCheckinRecommendations({
+        preCheckin,
+        postCheckin,
+        emDeload: sessaoEmDeload(safeSession?.logs),
+    });
     const workoutTitleRaw = String(session?.workoutTitle || '').trim();
     const workoutTitleMain = (() => {
         const m = workoutTitleRaw.match(/^\s*.+?\s*-\s*(.+)$/);
