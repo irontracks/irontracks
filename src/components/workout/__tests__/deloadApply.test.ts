@@ -311,20 +311,47 @@ describe('buildDeloadPatches — usa a grade real da máquina', () => {
     expect(plan.patches[0].patch.weight).toBe('57')
   })
 
-  it('o piso vale ACIMA da grade: degrau distante demais não fura os 40 %', () => {
-    // Máquina de passo LARGO (30 em 30). Pedindo 35 % sobre 100, o alvo é 65 e o
-    // degrau existente abaixo dele é 40 — dentro da tolerância do grid, logo o
-    // snap ACEITARIA. Mas 40 é uma redução de 60 %, o dobro do que o app
-    // anunciou. O piso vence a grade: volta ao passo cego, em 65.
+  it('degrau que fura o piso cede ao pino de CIMA, não ao número inventado', () => {
+    // Máquina de passo LARGO. Pedindo 35 % sobre 100, o alvo é 65; o degrau
+    // abaixo é 40 (−60 %, o dobro do que o app anunciou) e o piso o rejeita.
     //
-    // A primeira versão deste caso usava [5,10,15,20,100] e passava verde com a
-    // guarda REMOVIDA — a tolerância do próprio grid já barrava aquele salto, e
-    // o caminho real nunca era exercitado. Pego pelo `npm run mutar`.
+    // Até 09/09/2026 isso voltava ao passo cego e gravava 65 — um peso que
+    // aquele aparelho NÃO tem. Hoje sobe para 70, que existe e ainda reduz.
+    // Decisão do dono: pino real vale mais que a porcentagem exata, e a redução
+    // gravada é a EFETIVA, então a tela não mente sobre o quanto caiu.
     const sets: DeloadSetInput[] = [
       { key: '0-0', log: { weight: '100', weightSource: 'user' }, plannedWeight: 100, suggestion: null, cfg: null },
     ]
     const plan = apply(sets, { ratio: 0.65, knownWeights: [10, 40, 70, 100] })
-    expect(plan.patches[0].patch.weight).toBe('65')
+    expect(plan.patches[0].patch.weight).toBe('70')
+    expect(plan.patches[0].patch.deload).toMatchObject({ reductionPct: 0.3 })
+  })
+
+  it('o caso REAL da Cadeira extensora do dono: 70, nunca 64', () => {
+    // Pinos medidos na conta oficial em 09/09/2026 (janela de 6 sessões).
+    // 104 × 0,62 = 64,5; piso de 40 % = 62,4. Degrau abaixo: 57 (−45 %, fura).
+    // Degrau acima: 70 (−32,7 %, dentro da faixa 20–40 % do próprio slider).
+    const sets: DeloadSetInput[] = [
+      { key: '0-0', log: { weight: '104', weightSource: 'user' }, plannedWeight: 104, suggestion: null, cfg: null },
+    ]
+    const plan = apply(sets, {
+      ratio: 0.62,
+      baseWeight: 104,
+      knownWeights: [50, 57, 70, 80, 104],
+    })
+    expect(plan.patches[0].patch.weight).toBe('70')
+  })
+
+  it('o pino de cima só entra se ainda REDUZIR', () => {
+    // Alvo alto e grade esparsa: o degrau acima é a própria carga (ou mais).
+    // Subir ali não seria descarga nenhuma — segue o passo cego.
+    const sets: DeloadSetInput[] = [
+      { key: '0-0', log: { weight: '100', weightSource: 'user' }, plannedWeight: 100, suggestion: null, cfg: null },
+    ]
+    const plan = apply(sets, { ratio: 0.85, knownWeights: [10, 20, 30, 100] })
+    // alvo 85, degrau abaixo 30 (fura o piso de 60), degrau acima 100 = a
+    // referência: não reduz. Resta o arredondamento cego.
+    expect(plan.patches[0].patch.weight).toBe('85')
   })
 
   it('sem grade confiável, mantém o arredondamento de 0,5 kg', () => {

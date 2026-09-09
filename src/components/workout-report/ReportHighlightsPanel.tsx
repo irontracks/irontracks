@@ -15,6 +15,8 @@ interface ReportHighlightsPanelProps {
   setCompletionPct: number
   setsCompleted: number
   setsPlanned: number
+  /** A sessão aplicou descarga? Muda o julgamento da queda de volume. */
+  emDeload?: boolean
 }
 
 export function ReportHighlightsPanel({
@@ -27,12 +29,25 @@ export function ReportHighlightsPanel({
   setCompletionPct,
   setsCompleted,
   setsPlanned,
+  emDeload = false,
 }: ReportHighlightsPanelProps) {
   if (!(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0) || setCompletionPct > 0)) return null
 
   return (
     <div className="mb-8 p-4 rounded-2xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-neutral-900/80">
-      <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3">⚡ Destaques da sessão</div>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">⚡ Destaques da sessão</div>
+        {/* O selo responde "por que os números caíram?" antes de o usuário
+            perguntar. Sem ele, a sessão de descarga fica indistinguível de uma
+            sessão ruim quando lida semanas depois, no histórico — e é aí que a
+            leitura acontece. Neutro de propósito: descarga não é conquista nem
+            alarme, e gastar dourado aqui esvaziaria a ação primária. */}
+        {emDeload && (
+          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-800/80 border border-neutral-700 rounded-lg px-2 py-1">
+            ↓ Descarga
+          </div>
+        )}
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {prCount > 0 && (
           <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
@@ -76,7 +91,9 @@ export function ReportHighlightsPanel({
             mesma grandeza. O limiar e o raciocínio estão em
             utils/report/volumeVariation.ts. */}
         {volumeDeltaAbs !== 0 && currentVolume > 0 && (() => {
-          const classe = classificarVariacaoVolume(volumeDelta)
+          const classe = classificarVariacaoVolume(volumeDelta, emDeload)
+          // `descarga` cai no NEUTRO junto com `estavel`: a queda foi pedida,
+          // então não é alarme — e também não é vitória, o que descarta o verde.
           const caixa =
             classe === 'alta' ? 'bg-green-500/10 border-green-500/30'
               : classe === 'queda' ? 'bg-red-500/10 border-red-500/30'

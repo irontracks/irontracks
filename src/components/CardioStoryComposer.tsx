@@ -64,7 +64,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     inputRef, videoRef,
     mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
-    error, info, showSafeGuide,
+    error, info, publicado, showSafeGuide,
     template, setTemplate,
     saveImageUrl, setSaveImageUrl,
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
@@ -262,6 +262,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                   uploadProgress={uploadProgress}
                   error={error}
                   info={info}
+                  publicado={publicado}
                   onPost={postToIronTracks}
                   onShare={shareImage}
                 />

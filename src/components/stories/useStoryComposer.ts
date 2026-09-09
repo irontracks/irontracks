@@ -145,6 +145,19 @@ export function useStoryComposer({
     const [isExporting, setIsExporting] = useState(false)
     const [error, setError] = useState('')
     const [info, setInfo] = useState('')
+    /**
+     * Já publicou nesta sessão do editor?
+     *
+     * Nasceu junto com a decisão de NÃO fechar a tela após postar (pedido do
+     * dono, 09/09/2026): "ele posta mas sai dessa tela; caso eu queira salvar
+     * vou ter que abrir o story de novo e editar tudo outra vez". Ficar na tela
+     * é o certo — publicar e baixar são coisas diferentes que se quer fazer com
+     * a MESMA arte —, mas ficar sem marca abriria a porta para publicar duas
+     * vezes com um toque distraído, e o dedup do servidor não cobre isso: o
+     * `publishClientIdRef` é zerado no sucesso justamente para que uma
+     * publicação DELIBERADA seguinte funcione.
+     */
+    const [publicado, setPublicado] = useState(false)
     const [showSafeGuide, setShowSafeGuide] = useState(true)
     const [layout, setLayout] = useState('bottom-row')
     const [template, setTemplateState] = useState<StoryTemplate>(() => resolveTemplate(initialTemplateId))
@@ -1132,9 +1145,14 @@ export function useStoryComposer({
             const createJson = await createResp.json().catch((): null => null)
             if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
             publishClientIdRef.current = null // sucesso → próxima publicação tem chave nova
-            setInfo('Publicado no IronTracks!')
+            setPublicado(true)
+            setInfo('Publicado no IronTracks! Você pode salvar a imagem antes de sair.')
             try { window.dispatchEvent(new Event('irontracks:stories:refresh')) } catch { }
-            try { window.setTimeout(() => onClose?.(), 1000) } catch { }
+            // ⚠️ NÃO fechar aqui. Até 09/09/2026 havia um `setTimeout(onClose, 1000)`
+            // e ele custava ao usuário refazer a arte inteira quando ele também
+            // queria a imagem salva — o editor não guarda rascunho. Quem sai é o
+            // usuário, pela seta de voltar.
+
         } catch (err: unknown) {
             logError('error', err)
             setError(String(getErrorMessage(err) || '').trim() || 'Falha ao publicar story.')
@@ -1147,7 +1165,7 @@ export function useStoryComposer({
         // state
         selectedFile, mediaKind, backgroundUrl, backgroundImage,
         busy, busyAction, busySubAction, uploadProgress, isExporting,
-        error, info, showSafeGuide, setShowSafeGuide,
+        error, info, publicado, showSafeGuide, setShowSafeGuide,
         layout, livePositions, setLivePositions,
         template, setTemplate, templates: STORY_TEMPLATES,
         draggingKey, saveImageUrl, setSaveImageUrl,
