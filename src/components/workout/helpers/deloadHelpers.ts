@@ -33,7 +33,7 @@ import {
     DELOAD_REDUCTION_MIN,
     DELOAD_REDUCTION_MAX,
 } from '../utils';
-import { learnWeightGrid, snapToLearnedGrid } from '@/utils/autoload/machineGrid';
+import { learnWeightGrid, snapToLearnedGrid, pinoAcimaDoAlvo } from '@/utils/autoload/machineGrid';
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 
@@ -262,7 +262,16 @@ export function buildDeloadPatches(input: {
         // histórico esparso o degrau abaixo pode estar MUITO longe, e o app
         // entregaria uma redução que nunca anunciou. Furou, volta ao passo cego.
         const snapUsavel = snapped != null && snapped > 0 && snapped >= floor ? snapped : null;
-        const nextWeight = snapUsavel ?? roundToStep(target, WEIGHT_ROUND_STEP);
+        // Furou o piso: o degrau de baixo reduz mais do que o produto anuncia. Antes
+        // de cair no arredondamento cego, o pino imediatamente ACIMA do alvo — ele
+        // reduz menos que o pedido, mas é carga que a máquina TEM. Medido em
+        // 09/09/2026 na Cadeira extensora do dono (pinos 50·57·70·80·104): o app
+        // gravava 64, um número que aquele aparelho não oferece, tendo 70 disponível
+        // dentro da faixa de 20–40 % do slider. A redução gravada é a EFETIVA, então
+        // a tela continua dizendo a verdade sobre o quanto caiu.
+        const acima = snapUsavel == null ? pinoAcimaDoAlvo(target, grid) : null;
+        const acimaUsavel = acima != null && acima > 0 && acima < reference ? acima : null;
+        const nextWeight = snapUsavel ?? acimaUsavel ?? roundToStep(target, WEIGHT_ROUND_STEP);
         // Nada a reduzir: não grava marca de descarga numa série que não mudou.
         // Gravar era o que fazia o relatório, o PDF e o Coach IA afirmarem uma
         // descarga que não houve — e ainda tirava a sessão da média de referência.
