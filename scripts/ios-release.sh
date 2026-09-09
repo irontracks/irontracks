@@ -18,6 +18,25 @@ PBXPROJ="$PROJECT_ROOT/ios/App/App.xcodeproj/project.pbxproj"
 ARCHIVE_DIR="/tmp/irontracks-archives"
 EXPORT_OPTIONS="$ARCHIVE_DIR/ExportOptions.plist"
 
+# ─── 0. O front vem de PRODUÇÃO? ──────────────────────────────────────────
+# ⚠️ A build 84 (1.21.3) foi arquivada, subiu ao TestFlight e chegou a
+# WAITING_FOR_REVIEW com server.url = http://localhost:3010. No iPhone o
+# WKWebView não alcança a máquina de dev: o app abre e fica numa TELA PRETA —
+# sem crash, sem erro, só o backgroundColor do próprio config.
+#
+# O guard de CI (capacitorServerUrlProducao.test.ts) não alcança este caso: o
+# arquivo estava modificado e NÃO commitado, então nenhum PR o viu. Quem
+# arquiva é este script, e é aqui que a verificação precisa morar.
+CAP_CONFIG="$PROJECT_ROOT/ios/App/App/capacitor.config.json"
+SERVER_URL=$(grep -A2 '"server"' "$CAP_CONFIG" | grep '"url"' | sed -E 's/.*"url"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
+if [[ ! "$SERVER_URL" =~ ^https:// ]] || echo "$SERVER_URL" | grep -qiE 'localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.[0-9]+\.|172\.(1[6-9]|2[0-9]|3[01])\.'; then
+    echo "❌ ABORTADO: o app carregaria o front de '$SERVER_URL'."
+    echo "   Isso vira TELA PRETA no aparelho (foi a build 84)."
+    echo "   Corrija com:  npx cap sync   (sem CAPACITOR_SERVER_URL no ambiente)"
+    exit 1
+fi
+echo "==> Front de produção: $SERVER_URL"
+
 # ─── 1. Bump build number ──────────────────────────────────────────────────
 CURRENT_BUILD=$(grep -m1 "CURRENT_PROJECT_VERSION" "$PBXPROJ" | grep -oE '[0-9]+' | head -1)
 if [ -n "${1:-}" ]; then
@@ -79,6 +98,34 @@ xcodebuild archive \
     -archivePath "$ARCHIVE_PATH" \
     -allowProvisioningUpdates \
     | tail -5
+
+# ─── 3b. dSYM para o Sentry ────────────────────────────────────────────────
+# ⚠️ Sem isto TODO issue nativo iOS chega ao Sentry com os frames <redacted> —
+# não é falha de um evento, é permanente. Foi o que tornou o App Hang de
+# 09/09/2026 (build 82) impossível de diagnosticar: 26 frames, nenhum legível.
+#
+# O `uploadSymbols` do ExportOptions.plist logo abaixo NÃO serve para isto:
+# ele manda símbolos para a APPLE, não para o Sentry.
+#
+# Condicional ao token, como o next.config.ts já faz com os sourcemaps — mas
+# RUIDOSO quando ele falta. Falha silenciosa aqui é justamente o que deixou o
+# Sentry nativo decorativo por meses.
+SENTRY_CLI="$PROJECT_ROOT/node_modules/.bin/sentry-cli"
+if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+    echo "⚠️  SENTRY_AUTH_TOKEN ausente — dSYM NÃO enviado."
+    echo "    Os crashes/hangs nativos desta build chegarão ilegíveis (<redacted>)."
+elif [ ! -x "$SENTRY_CLI" ]; then
+    echo "⚠️  sentry-cli não encontrado em node_modules — dSYM NÃO enviado."
+else
+    echo "==> Enviando dSYM ao Sentry..."
+    # `|| true`: o release não pode morrer porque a telemetria falhou. O aviso
+    # acima já denuncia o caso em que o token falta; aqui a falha é de rede.
+    SENTRY_ORG="${SENTRY_ORG:-irontracks-company}" \
+    SENTRY_PROJECT="${SENTRY_PROJECT:-javascript-nextjs}" \
+    "$SENTRY_CLI" debug-files upload \
+        --include-sources \
+        "$ARCHIVE_PATH/dSYMs" || echo "⚠️  Upload de dSYM falhou — build segue."
+fi
 
 # ─── 4. Export + upload to App Store Connect ───────────────────────────────
 echo "==> Uploading to App Store Connect..."

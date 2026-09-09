@@ -36,6 +36,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 // Auto crash + breadcrumbs
                 options.attachStacktrace = true
                 options.enableAutoSessionTracking = true
+
+                // ── App Hang ────────────────────────────────────────────────
+                // O default do sentry-cocoa é V1 com 2000 ms, e ele reporta
+                // também hang NÃO-FATAL: main thread ocupada, app vivo. Num app
+                // que carrega o front de um servidor remoto isso dispara no cold
+                // start comum — a telemetria deste app mede FCP p95 = 2883 ms,
+                // ou seja, o boot normal já cruza o limiar sozinho.
+                //
+                // O V2 distingue travamento REAL (main thread completamente
+                // bloqueada) do resto, e desliga o V1 por conta própria. Com
+                // enableReportNonFullyBlockingAppHangs = false sobra só o que é
+                // de fato um app congelado na mão do usuário.
+                options.enableAppHangTrackingV2 = true
+                options.enableReportNonFullyBlockingAppHangs = false
             }
         }
 
