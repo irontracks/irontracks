@@ -32,15 +32,27 @@
 /** Abaixo disto, em módulo, a diferença é ruído de medição — não tendência. */
 export const LIMIAR_RUIDO_PCT = 3
 
-export type VariacaoVolume = 'alta' | 'estavel' | 'queda'
+export type VariacaoVolume = 'alta' | 'estavel' | 'queda' | 'descarga'
 
 /**
  * @param pct variação percentual (ex.: -0.8 para queda de 0,8%)
+ * @param emDeload a sessão aplicou descarga? (`lib/workout/checkinRecommendations`)
+ *
+ * ⚠️ **Queda em sessão de DESCARGA não é queda — é o plano dando certo.**
+ * Relato do dono em 09/09/2026, com print: treino inteiro em deload exibindo
+ * "−7.016 kg / −24,2%" em VERMELHO, ao lado de um PR alcançado. O app pintou de
+ * alarme exatamente o resultado que ele mandou o app produzir.
+ *
+ * É a mesma classe do defeito que criou este módulo (vermelho para −0,8%), e
+ * por isso a correção mora aqui e não numa exceção na tela: o julgamento sobre
+ * a variação é DESTE arquivo. Alta em descarga continua sendo alta — subir
+ * volume numa semana de descarga é informação real, e escondê-la seria mentir
+ * na direção oposta.
  */
-export function classificarVariacaoVolume(pct: number): VariacaoVolume {
+export function classificarVariacaoVolume(pct: number, emDeload = false): VariacaoVolume {
   if (!Number.isFinite(pct)) return 'estavel'
   if (pct >= LIMIAR_RUIDO_PCT) return 'alta'
-  if (pct <= -LIMIAR_RUIDO_PCT) return 'queda'
+  if (pct <= -LIMIAR_RUIDO_PCT) return emDeload ? 'descarga' : 'queda'
   return 'estavel'
 }
 
@@ -48,5 +60,8 @@ export function classificarVariacaoVolume(pct: number): VariacaoVolume {
 export function rotuloVariacaoVolume(classe: VariacaoVolume): string {
   if (classe === 'alta') return 'acima da anterior'
   if (classe === 'queda') return 'abaixo da anterior'
+  // Diz a CAUSA, não só o sentido: "abaixo da anterior" numa descarga é
+  // verdade e ainda assim engana, porque omite que a queda foi pedida.
+  if (classe === 'descarga') return 'descarga planejada'
   return 'em linha com a anterior'
 }

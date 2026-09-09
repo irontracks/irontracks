@@ -485,10 +485,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
      * deload (09/09/2026): a regra lia só os check-ins e nunca o que a sessão
      * fez com a carga.
      */
+    /** A sessão aplicou descarga? Lido dos logs — ver `sessaoEmDeload`. */
+    const emDeload = sessaoEmDeload(safeSession?.logs);
     const checkinRecommendations = buildCheckinRecommendations({
         preCheckin,
         postCheckin,
-        emDeload: sessaoEmDeload(safeSession?.logs),
+        emDeload,
     });
     const workoutTitleRaw = String(session?.workoutTitle || '').trim();
     const workoutTitleMain = (() => {
@@ -676,6 +678,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     setCompletionPct={setCompletionPct}
                     setsCompleted={setsCompleted}
                     setsPlanned={setsPlanned}
+                    emDeload={emDeload}
                 />
 
                 {reportMeta && (
