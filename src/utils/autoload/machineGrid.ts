@@ -126,3 +126,31 @@ export function snapToLearnedGrid(target: number, grid: WeightGrid | null | unde
 
   return target - candidate <= step * SNAP_TOLERANCE_FACTOR ? candidate : null
 }
+
+/**
+ * Menor degrau conhecido ACIMA do alvo.
+ *
+ * Contraparte de `snapToLearnedGrid`, e existe por um caso medido em 09/09/2026:
+ * quando o degrau de BAIXO fura o piso de redução, o chamador voltava ao
+ * arredondamento cego e entregava um peso que a máquina não tem. Na Cadeira
+ * extensora do dono (pinos 50 · 57 · 70 · 80 · 104) uma descarga de 38 % sobre
+ * 104 pede 64: o degrau abaixo é 57 (−45 %, fura o teto de 40 %) e o de cima é
+ * 70 (−32,7 %, dentro da faixa que o próprio slider anuncia). O app escrevia
+ * **64**, que não existe naquele aparelho.
+ *
+ * NÃO tem a tolerância de passo do snap para baixo, e a diferença é deliberada:
+ * lá a distância grande significa BURACO no histórico e descer seria inventar uma
+ * regressão; aqui subir só encurta a redução, e o chamador já mede e grava a
+ * redução EFETIVA — ninguém é enganado sobre o quanto caiu. Um pino real com
+ * redução menor vale mais que um número inventado com a redução exata.
+ *
+ * Devolve null quando não há grid ou quando o alvo já está acima de tudo que se
+ * conhece (aí quem responde é a extrapolação do `snapToLearnedGrid`).
+ */
+export function pinoAcimaDoAlvo(target: number, grid: WeightGrid | null | undefined): number | null {
+  if (!grid || !Number.isFinite(target) || target <= 0) return null
+  for (const v of grid.values) {
+    if (v > target + 1e-9) return v
+  }
+  return null
+}
