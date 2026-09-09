@@ -15,7 +15,15 @@ import { join } from 'node:path'
  * entrada estava fechada.
  */
 const SRC = join(__dirname, '..', '..', '..')
-const editor = readFileSync(join(SRC, 'components/ExerciseEditor/CardioFields.tsx'), 'utf8')
+/**
+ * A mecânica dos blocos vive em UM arquivo desde 09/09/2026 — antes disso ela
+ * morava dentro do `CardioFields`, e o modal rápido do lápis do card (a porta
+ * que a mão alcança no meio do treino) não tinha blocos nenhum: o dono
+ * perguntou "cadê, foi regressão?" tendo a feature no ar havia dias.
+ */
+const editor = readFileSync(join(SRC, 'components/ExerciseEditor/CardioBlocosEditor.tsx'), 'utf8')
+const campos = readFileSync(join(SRC, 'components/ExerciseEditor/CardioFields.tsx'), 'utf8')
+const modal = readFileSync(join(SRC, 'components/workout/Modals.tsx'), 'utf8')
 const card = readFileSync(join(SRC, 'components/workout/ExerciseCard.tsx'), 'utf8')
 const kcal = readFileSync(join(SRC, 'utils/calories/cardioKcal.ts'), 'utf8')
 
@@ -27,7 +35,7 @@ describe('o editor escreve em TODOS os blocos, não só no primeiro', () => {
         // NENHUMA escrita dentro de `atualizarBloco` use índice fixo.
         const ini = editor.indexOf('const atualizarBloco')
         expect(ini, 'a função que grava o bloco sumiu').toBeGreaterThan(-1)
-        const fim = editor.indexOf('const totalMinutos', ini)
+        const fim = editor.indexOf('const adicionarBloco', ini)
         const corpo = editor.slice(ini, fim)
 
         const escritas = [...corpo.matchAll(/onUpdateSetDetail\(\s*([^,]+),/g)].map(m => m[1].trim())
@@ -53,8 +61,33 @@ describe('o editor escreve em TODOS os blocos, não só no primeiro', () => {
     })
 
     it('o tempo total vira soma, não um segundo campo digitável', () => {
-        expect(editor).toMatch(/totalMinutos/)
-        expect(editor).toMatch(/emBlocos \?/)
+        expect(campos).toMatch(/totalMinutosDosBlocos/)
+        expect(campos).toMatch(/emBlocos \?/)
+    })
+})
+
+describe('as DUAS superfícies de cardio oferecem blocos — pela mesma fonte', () => {
+    /**
+     * O defeito de 09/09/2026 não foi código faltando: era a feature existir só
+     * na tela que ninguém abre no meio do treino. Guard de CLASSE — superfície
+     * que edite cardio precisa MONTAR o editor único, e reimplementá-lo reprova.
+     */
+    for (const [nome, src] of [['editor completo', campos], ['modal rápido do card', modal]] as const) {
+        it(`${nome} monta o CardioBlocosEditor`, () => {
+            expect(src, `${nome} não oferece blocos ao usuário`).toMatch(/<CardioBlocosEditor/)
+        })
+
+        it(`${nome} não reimplementa a mecânica do bloco`, () => {
+            const executavel = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+            expect(executavel, `${nome} tem cópia de adicionarBloco`).not.toMatch(/const adicionarBloco/)
+            expect(executavel, `${nome} tem cópia de removerBloco`).not.toMatch(/const removerBloco/)
+        })
+    }
+
+    it('o modal rápido esconde o que não existe em cardio', () => {
+        // Sets (o nº de blocos manda), unilateral e tempo de troca não têm
+        // sentido numa esteira — deixá-los é oferecer um controle que mente.
+        expect(modal).toMatch(/ehCardio/)
     })
 })
 

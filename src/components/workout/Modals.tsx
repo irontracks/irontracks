@@ -11,7 +11,8 @@ import { CheckinScale } from './CheckinScale';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 
-import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types';
+import type { Workout as EditorWorkout, SetDetail } from '@/components/ExerciseEditor/types';
+import { CardioBlocosEditor } from '@/components/ExerciseEditor/CardioBlocosEditor';
 
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 import { moveDraftItem } from '@/lib/workoutReorder';
@@ -145,6 +146,16 @@ export default function Modals() {
   const deloadRef = useFocusTrap(!!deloadModal, () => setDeloadModal(null));
   const addExerciseRef = useFocusTrap(!!addExerciseOpen, () => setAddExerciseOpen(false));
   const editExerciseRef = useFocusTrap(!!editExerciseOpen, () => { setEditExerciseOpen(false); setEditExerciseIdx(null); });
+
+  /**
+   * Cardio muda o QUE se edita, não só o rótulo: sai "Sets" (quem manda é o nº
+   * de blocos), saem unilateral e tempo de troca (uma esteira não tem lado
+   * esquerdo), e entram os blocos de tempo/velocidade/inclinação.
+   */
+  const ehCardio = String(editExerciseDraft?.method ?? '') === 'Cardio';
+  const blocosDoDraft: SetDetail[] = Array.isArray(editExerciseDraft?.blocos)
+    ? (editExerciseDraft.blocos as SetDetail[])
+    : [];
   const organizeRef = useFocusTrap(!!organizeOpen, requestCloseOrganize);
 
   return (
@@ -523,18 +534,23 @@ export default function Modals() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="edit-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Sets</label>
-                  <input
-                    id="edit-exercise-sets"
-                    inputMode="decimal"
-                    value={String(editExerciseDraft?.sets ?? '')}
-                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
-                    placeholder="3"
-                  />
-                </div>
-                <div>
+                {/* Em cardio quem manda na contagem é o número de BLOCOS, logo
+                    abaixo. Um campo "Sets" ao lado seria um segundo número para
+                    o mesmo fato, e eles divergiriam no primeiro ajuste. */}
+                {!ehCardio && (
+                  <div>
+                    <label htmlFor="edit-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Sets</label>
+                    <input
+                      id="edit-exercise-sets"
+                      inputMode="decimal"
+                      value={String(editExerciseDraft?.sets ?? '')}
+                      onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
+                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                      placeholder="3"
+                    />
+                  </div>
+                )}
+                <div className={ehCardio ? 'col-span-2' : ''}>
                   <label htmlFor="edit-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Descanso (s)</label>
                   <input
                     id="edit-exercise-rest"
@@ -568,7 +584,38 @@ export default function Modals() {
                 </select>
               </div>
 
-              {/* Unilateral toggle */}
+              {/* ── BLOCOS DE CARDIO ────────────────────────────────────
+                  "30 min de esteira" costuma ser 5 a 4 km/h, 10 a 5 e 15 a 6. A
+                  capacidade existe desde o #1063, mas morava só no editor
+                  completo — e no meio do treino a mão vai no lápis do CARD, que
+                  abre este modal. Em 09/09/2026 o dono procurou aqui e concluiu
+                  que era regressão. Mesmo componente das duas telas. */}
+              {ehCardio && (
+                <div className="pt-1">
+                  <CardioBlocosEditor
+                    sempreMostrarCampos
+                    setDetails={blocosDoDraft}
+                    onUpdateSetDetail={(i, patch) => setEditExerciseDraft((prev) => {
+                      const atuais = Array.isArray(prev?.blocos) ? [...(prev.blocos as SetDetail[])] : [];
+                      while (atuais.length <= i) atuais.push({} as SetDetail);
+                      atuais[i] = { ...(atuais[i] ?? {}), ...patch } as SetDetail;
+                      return { ...prev, blocos: atuais };
+                    })}
+                    onUpdateSetsCount={(total) => setEditExerciseDraft((prev) => {
+                      const atuais = Array.isArray(prev?.blocos) ? [...(prev.blocos as SetDetail[])] : [];
+                      // Encurtar é o caso do "Remover": o editor já compactou o
+                      // conteúdo, aqui só cortamos a cauda. Sem isso o bloco
+                      // removido voltaria ao reabrir o modal.
+                      const proximos = atuais.slice(0, Math.max(1, total));
+                      while (proximos.length < total) proximos.push({} as SetDetail);
+                      return { ...prev, blocos: proximos, sets: String(total) };
+                    })}
+                  />
+                </div>
+              )}
+
+              {/* Unilateral toggle — cardio não tem lado esquerdo e direito. */}
+              {!ehCardio && (
               <div className="flex items-center justify-between gap-3 py-0.5">
                 <div>
                   <div className="text-sm font-black text-white">Exercício Unilateral</div>
@@ -584,8 +631,10 @@ export default function Modals() {
                   <span className={`absolute top-1 left-0 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${editExerciseDraft?.isUnilateral ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
+              )}
 
-              {/* Side rest + transition time */}
+              {/* Side rest + transition time — nenhum dos dois existe em cardio. */}
+              {!ehCardio && (
               <div className="grid grid-cols-2 gap-3">
                 {editExerciseDraft?.isUnilateral && (
                   <div>
@@ -612,6 +661,7 @@ export default function Modals() {
                   />
                 </div>
               </div>
+              )}
             </div>
 
             {/* Persist to plan toggle — only shown when draft differs from original */}

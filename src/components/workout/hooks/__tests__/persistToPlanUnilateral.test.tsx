@@ -16,8 +16,9 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWorkoutModals } from '@/components/workout/hooks/useWorkoutModals'
+import type { EditExerciseDraft } from '../../helpers/editExerciseDraft';
 
-type Draft = { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }
+type Draft = EditExerciseDraft
 
 const SNAPSHOT: Draft = { name: 'Chest press máquina', sets: '4', restTime: '180', method: 'Normal', isUnilateral: false, sideRestTime: '', transitionTime: '' }
 
