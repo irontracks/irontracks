@@ -740,7 +740,7 @@ inglesa, `arroz com frango` perdeu o frango. Chave marcada como `generic` passou
 a exigir **casamento da frase inteira** — e SÓ ela: chave normal
 (`arroz cozido`, `strogonoff`) continua casando na cabeça, que é o que faz
 "frango GRELHADO" e "esfirra de frango COM requeijão" funcionarem (ver a nota do
-`matchesAtHead`, mais abaixo). As duas regras convivem por desenho. Os 7.400 testes estavam verdes o tempo
+`matchesAtHead` — ver "Histórico de REFEIÇÕES"). As duas regras convivem por desenho. Os 7.400 testes estavam verdes o tempo
 todo: quem achou foi um script de quinze frases comuns. **Mudança que altera
 RESULTADO precisa de medição com entrada real, não de suíte verde.**
 
@@ -1347,6 +1347,16 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 7. **Casando com a REFERÊNCIA, não com a seção referida** — `toContain('Fase 3½')` passou verde com a fase inteira renomeada, porque outro parágrafo do mesmo arquivo dizia "a Fase 3½ decidiu". Em documento, mire no TÍTULO (`^### Fase 3½`); e quando o padrão aparece mais de uma vez, **assere dentro do BLOCO** daquela seção, não no arquivo todo — senão apagar a regra de um lugar passa despercebido porque ela existe em outro. Medido por mutação em 25/08/2026, nos guards do próprio `/documentar`.
 8. **LARGO DEMAIS — o oposto do cego, e igualmente inútil** (27/08/2026). Guard que acusa uso CORRETO é afrouxado na primeira semana, e aí não protege mais nada. Três tentativas minhas na mesma sessão, todas descartadas depois de medir: `font-mono text-xs` (para achar painel de stack) acusou volume tabular, percentual de som e coluna de tabela; `text-red-* + font-mono` acusou o contador de créditos esgotados, o cronômetro em overtime e o painel **admin** de erros, onde a stack é o produto; `red-` no arquivo das dobras acusou a validação de formulário. A conclusão que ficou: **a combinação de classes não identifica o defeito — o que identifica é ONDE ela aparece.** Restrinja o guard ao escopo (as superfícies de erro, as funções de status) em vez de abrir exceção para cada uso legítimo; allowlist com seis entradas é o papel de parede que este repo já aprendeu a não construir.
 
+## `docs/historico/` — o changelog que saiu daqui
+
+Podado em 10/09/2026 pelo `/enxugar`: **3.959 → 3.154 linhas (−20%)**, de ≈69,1k
+para ≈56,7k tokens **por turno**. Nada foi apagado — sete seções que eram
+narrativa de PRs foram para `docs/historico/`, e o que ficou aqui é a regra viva
+de cada uma.
+
+Abra o arquivo de lá só quando precisar do detalhe da apuração (quem achou, em
+que ordem, quais PRs). Para decidir o que fazer, o que está AQUI basta.
+
 ## Comandos deste repo — leia o protocolo antes de improvisar
 
 `.claude/` está no `.gitignore`, então **o protocolo mora em `docs/` e o comando
@@ -1565,93 +1575,37 @@ Custaram meia hora cada e vão custar de novo se a nota não disser:
   é margem estilística, não requisito. **A régua certa é o fundo MAIS CLARO**
   (depth-3), não o `#0a0a0a`.
 
-## Sessão de design 13–14/08/2026 — 21 PRs, e as 5 lições que custaram caro
+## Design — as lições que custaram caro
 
-Sequência completa: #783 → #803. O menu inteiro, o Painel de Controle, as cinco
-abas, e uma reversão. **Leia as lições antes de mexer em qualquer coisa visual.**
+Registro completo (21 PRs, #783 → #803): `docs/historico/2026-08-sessao-design.md`.
 
-### ⚠️ FUNDO: já quebrei isto uma vez. Não repita.
+⚠️ **FUNDO: já quebrei isto uma vez.** O shell do dashboard usa `bg-depth-2`
+(`#151514`), escolhido por medição: ele dá chão 1,072 para card 3%; `#0a0a0a` dá
+**1,051**, quase nenhuma separação. Levei o shell para `#0a0a0a` "por
+consistência" e o dono reportou **"ficou todo preto"**. O erro não foi de
+medição, foi de LEITURA — comparei 1,048 contra 1,063 e li "praticamente igual".
+**Antes de mexer em fundo: olhe o número ABSOLUTO, não a diferença entre dois.**
 
-O shell do dashboard usa **`bg-depth-2` (#151514)**, e o valor foi escolhido por
-medição, não por gosto:
+**A Nutrição NÃO vive dentro do shell** — `NutritionOverlay` é `fixed z-[25]` por
+cima, com fundo próprio. Corrigir o contêiner não corrige quem está por cima
+dele.
 
-| fundo | chão p/ card 3% | salto ao sair da aba |
-|---|---|---|
-| `#171717` (era) | 1,075 | 1,104 |
-| **`#151514` (é)** | **1,072** | **1,083** |
-| `#0a0a0a` | 1,051 | 1,000 |
+**Pendência ≠ métrica: "isso some quando alguém trabalha?"** Aluno em risco some
+quando o coach age; "25 alunos sem professor" (47% da base) não some nunca — é
+característica, não fila. Bloco de alerta que sempre tem item deixa de ser lido.
 
-O PR #798 levou o shell para `#0a0a0a` "por consistência com o body" e o dono
-reportou: **"ficou todo preto"**. Revertido no #801. O erro não foi de medição —
-foi de LEITURA: comparei 1,048 contra 1,063, li "praticamente igual" e ignorei
-que **1,048 é quase nenhuma separação**. O fundo mais claro era o CHÃO que
-sustentava os cards, e eu tirei o chão achando que tirava uma inconsistência.
+**PR de uma coisa só.** O #798 misturou mudança de fundo com correção de guard;
+o revert levou as duas, e o guard voltou a acusar um hex citado em comentário.
 
-**Antes de mexer em fundo: olhe o número absoluto, não a diferença entre dois.**
-E mostre no aparelho ANTES de mergear.
+**Corrigir uma tela não é corrigir a classe.** O e-mail alheio (em 9 de 58
+perfis o `display_name` É o e-mail) foi corrigido só na lista de Conversas; ele
+vazava também no ranking, comunidade, chat, story e `alt` do avatar. Ratchet em
+`nomeAlheioNasSociais.test.ts` cobre as 5 superfícies sociais — telas
+administrativas ficam FORA de propósito.
 
-### A Nutrição NÃO vive dentro do shell
-
-`NutritionOverlay` é `fixed … z-[25]` POR CIMA do shell, com fundo próprio. Por
-isso o #802 (que arrumou o shell) não a alcançou, e ela ficou sendo a única aba
-preta até o #803. **Corrigir o contêiner não corrige quem está por cima dele** —
-ao mexer no fundo das abas, a Nutrição é um segundo lugar a tocar.
-
-### Pendência ≠ métrica: "isso some quando alguém trabalha?"
-
-O bloco **PRECISA DE VOCÊ** (#794) abre o Painel com o que exige decisão. Pus
-"25 alunos sem professor" ali e o dono viu no print: são **26 de 55 (47%)**, 7
-deles há mais de 90 dias. Não é fila — é a característica de quem treina sozinho.
-Como alerta ficaria aceso para sempre, e bloco que sempre tem item deixa de ser
-lido (#795). Virou métrica, colada ao total que divide (#796).
-
-**O teste, que não dá para automatizar:** aluno em risco some quando o coach age;
-solicitação some quando você aprova; "sem professor" não some nunca.
-
-### Revert de PR misto leva junto o que não tinha nada a ver
-
-O #798 continha a mudança de fundo E uma correção do guard de paleta (ignorar hex
-em comentário). O #801 reverteu tudo — e o guard voltou a acusar o `#171717`
-citado no comentário que documenta a medição. Reaplicado no #802. **PR de uma
-coisa só.**
-
-### E-mail alheio: corrigir uma tela não é corrigir a classe
-
-O #791 aplicou `publicDisplayName` só na lista de Conversas. A pergunta do dono
-("isso está no app todo?") revelou que o mesmo `display_name` — que em **9 dos 58
-perfis É o e-mail** — chegava cru no RANKING, na comunidade, no chat, no story e
-no `alt` do avatar (#793). Ratchet em `nomeAlheioNasSociais.test.ts` cobre as 5
-superfícies sociais. **Telas administrativas ficam FORA de propósito**: professor
-e admin precisam ver o e-mail do aluno.
-
-### O que mais entrou (resumo)
-
-- **Notificações por FUNÇÃO** (#792): 23 tipos em 5 funções (ação · conquista ·
-  aviso · lembrete · social). `tipo(icone, rótulo, função)` não deixa escolher
-  matiz. Guard limita "ação" a 6 RÓTULOS distintos (subiu de 4 em 27/08, quando
-  os pedidos de acesso/cadastro entraram) — **se tudo vira ação, nada é ação**.
-- **Degustação** (#797): o histórico diz o que está VALENDO, não o que foi dado.
-  Calcular por `created_at + days` seria inventar fato — um usuário tem 3
-  entitlements simultâneos. A verdade é `user_entitlements.valid_until`, e quem
-  resolve é a ROTA.
-- **Scroll lateral do Painel** (#800): `-mx-4` dos chips + contêiner sem
-  `overflow-x-hidden` = a página inteira deslizava. **Quem sangra precisa de
-  alguém que segure.** Só 1 dos 11 contêineres similares tem sangria — não saí
-  travando os outros.
-- **Feed repetia o nome** (#803): título + `${nome} bateu PR:` na mensagem. Não dá
-  para tirar na origem (a string alimenta o push); o corte é de exibição e
-  condicional.
-
-### Estado ao fim da sessão
-
-- `djmkbrasil` está com **`role = admin`** (pedido do dono, permanente). Valor
-  anterior: `teacher`.
-- **22 guards** de design/a11y. 5326 testes.
-- Débito que ficou congelado, não resolvido: **677 pontos de peso 900 em texto
-  miúdo**, 54 corpos de 9px, 29 gradientes inline de CTA.
-- Tentei atacar o peso 900 por script e a regex **colapsou JSX em 73 arquivos**
-  (revertido antes do commit). Não sai por varredura: cada ponto é a pergunta
-  "qual é o elemento primário deste bloco?".
+**Notificações por FUNÇÃO, não por evento** (ação · conquista · aviso · lembrete
+· social). O guard limita "ação" a 6 RÓTULOS distintos: **se tudo vira ação, nada
+é ação.**
 
 ## Varredura do MENU — 9 PRs, 13/08/2026 (etapa FECHADA)
 
@@ -2046,253 +2000,68 @@ FERRAMENTA de verificação do agente (ver a tela para decidir o próximo toque)
 mas o resultado se relata em TEXTO — número do banco, estado do elemento, o que
 funcionou. Imagem é o input mais caro que existe e o dono não quer recebê-la.
 
-## Percorrer o app inteiro acha o que a suíte verde não acha (15/08/2026)
+## Percorrer o app acha o que a suíte verde não acha
 
-Teste de 10 passos pedido pelo dono (abrir → treinar → editar no meio → sair →
-voltar → deletar → adicionar → métodos avançados → respeitar TODOS os descansos
-→ finalizar), rodado no simulador de ponta a ponta. A suíte estava 100% verde e
-mesmo assim o passo 10 **travou**: com o descanso rolando, a barra do
-`RestTimerOverlay` cobria o `WorkoutFooter` e o botão **Finalizar era
-inalcançável** — para terminar o treino era preciso esperar ou pular o descanso.
+Registro completo: `docs/historico/2026-08-teste-exploratorio.md`.
 
-**A lição que dói: eu tinha "corrigido" essa MESMA classe no dia anterior.** O
-PR #833 portou os 19 overlays de modal para cima da barra, e escrevi um guard —
-que varria só os três arquivos de modais. O rodapé principal, que sofre do
-mesmo defeito pelo mesmo motivo, ficou de fora, e o guard passou verde com o bug
-vivo. **Guard que varre a lista dos arquivos que eu já conhecia não é guard de
-classe: é guard da instância com cara de classe.** A pergunta certa ao escrever
-guard continua sendo "onde ele NÃO olha?".
+⚠️ **A lição que dói: guard que varre "os arquivos que eu já conhecia" não é
+guard de classe — é guard da instância com cara de classe.** O PR #833 portou 19
+overlays para cima da barra do descanso e o guard varria só os três arquivos de
+modais; o rodapé principal, com o mesmo defeito pelo mesmo motivo, ficou de fora
+e o FINALIZAR virou inalcançável durante o descanso. **A pergunta ao escrever
+guard é "onde ele NÃO olha?"** (protocolo em `docs/skill-guard.md`).
 
-**Sobreposição no rodapé não se resolve com z-index.** Modal versus barra: dá
-para empilhar em z (o modal cobre a tela toda, a barra fica atrás). Duas BARRAS
-de rodapé disputam o mesmo espaço físico — quem estiver por cima esconde a
-outra, qualquer que seja o z. A saída é geométrica: o `RestTimerOverlay` publica
-a altura real da sua barra em `--it-rest-bar-h` (medida por `ResizeObserver`,
-porque ela muda com safe-area e com o botão AUTO) e o `WorkoutFooter` posiciona
-`bottom` por essa variável, com fallback `0px`. Guard em
-`__tests__/rodapeAcimaDoDescanso.test.ts`; **barra fixa NOVA no rodapé do treino
-ativo reprova em `barrasDoRodapeTreino.test.ts` até declarar como convive com o
-descanso.**
+**Sobreposição no rodapé não se resolve com z-index.** Modal × barra dá para
+empilhar; duas BARRAS disputam o mesmo espaço físico. A saída é geométrica: o
+`RestTimerOverlay` publica a altura real em `--it-rest-bar-h` (via
+`ResizeObserver`) e o `WorkoutFooter` posiciona `bottom` por ela. Guards em
+`rodapeAcimaDoDescanso.test.ts` e `barrasDoRodapeTreino.test.ts` — **barra fixa
+NOVA no rodapé do treino reprova até declarar como convive com o descanso**.
 
-**jsdom não tem `ResizeObserver`** — usar direto derrubou 3 testes de cardio e,
-no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
-componente sempre com `typeof X !== 'undefined'`; a medição inicial já cobre o
-caso comum e o observer é só para mudança em voo.
+⚠️ **jsdom não tem `ResizeObserver`** — API de browser moderna em componente
+sempre com `typeof X !== 'undefined'`.
 
-**Prove por mutação com `npm run mutar` — não à mão.**
+**O que o app fez CERTO no teste** (não reinvestigar como bug): recusou concluir
+Drop-set com uma etapa só e Cluster com bloco vazio; preservou sessão, edição e
+cronômetro ao sair e voltar; perguntou "só hoje / pra sempre" ao deletar.
 
-```bash
-npm run mutar -- src/lib/x.ts "a >= b" "a > b" -- npx vitest run src/lib/__tests__/x.test.ts
-```
+**Que modelo roda teste exploratório:** Opus — e não pela execução, pelo
+JULGAMENTO. Nenhum dos três defeitos estava no roteiro. Não repita o roteiro
+antigo: aqueles três já são Playwright no CI. O que paga Opus é caminho NOVO.
 
-Ele aplica, roda, **restaura do conteúdo** e exige vermelho. As três armadilhas
-do jeito manual somem por construção, e as três já morderam aqui:
+## As lições do teste de 10 passos (16/08/2026)
 
-1. **`git checkout` apaga trabalho não commitado.** Aconteceu em 15/08, de novo
-   em 25/08 — com a regra escrita neste arquivo — e **três vezes em 27/08**. O
-   sintoma engana: os testes seguintes passam VERDES (o import quebrado derruba
-   outra coisa, ou a mutação nem chega a existir) e você conclui "provado" sobre
-   um arquivo que voltou no tempo. O script restaura da CÓPIA em memória, então
-   rascunho não commitado sobrevive.
-2. **A mutação pode não ser aplicada.** Um `sed`/`replace` que não casa devolve
-   o arquivo intacto, o teste passa, e "provado por mutação" vira mentira em
-   silêncio — em 25/08 duas mutações morreram em erro de aspas e o "14 passed"
-   parecia prova. O script confere a substituição ANTES de rodar e aborta.
-3. **Verde com o bug reposto não gritava.** Agora é saída 1 com "GUARD FALSO: o
-   teste passou COM a mutação aplicada" — e a regra que segue é a de sempre:
-   corrija o TESTE, nunca o afrouxe.
+Registro completo: `docs/historico/2026-08-ux-teste-10-passos.md`. **Três das
+quatro frentes mudaram de diagnóstico ao ler o código** — vale como método.
 
-Que ler não bastava, ficou provado: a nota anterior *avisava* sobre o `git
-checkout` e a armadilha pegou o autor do aviso três vezes num dia. Decisões em
-`decidirAplicar`/`interpretarResultado`, travadas em `src/__tests__/mutarDecide.test.ts`.
-
-**Automação do simulador — o que custou toque errado:** as coordenadas são
-PONTOS (440×956 no 17 Pro Max), não pixels do screenshot; um toque convertido de
-px caiu no botão "Duplicar" e criou exercício fantasma no rascunho.
-**O screenshot vem em ~920×1963 px, então o fator é ÷2,09** — ler a coordenada
-na imagem e enviá-la crua é o erro natural, e ele é SILENCIOSO: um `x` acima de
-440 está fora da tela e mesmo assim a ferramenta responde `Tapped at (460, 706)`
-com sucesso. Em 27/08/2026 isso consumiu uma investigação inteira ("o WebView
-parou de aceitar toque"), com o app, a janela do Simulator e o device
-interrogados e inocentados nessa ordem, **com esta regra já escrita aqui**.
-Diagnóstico em 5 segundos: toque aceito e tela idêntica ⇒ confira se `x < 440`
-antes de suspeitar de qualquer outra coisa. O backspace
-(`\b`) NÃO chega ao campo: para limpar, long-press no texto → o iOS seleciona →
-digitar substitui. E a autocorreção do iOS renomeia o que você digita ("Drop
-teste" virou "Frio teste", "Bi A" virou "Vi A") — nomes de teste devem ser
-palavras que o corretor não toca, senão a conferência por nome falha.
-
-**O que o app fez CERTO no teste** (não reinvestigar como se fosse bug):
-recusou concluir Drop-set com uma etapa só ("defina pelo menos 2") e Cluster com
-bloco vazio; preservou sessão, edição e cronômetro ao sair e voltar; perguntou
-"só hoje / pra sempre" ao deletar exercício; e sobreviveu a uma pausa de horas
-no meio do treino sem perder log nem tempo.
-
-**Achado de UX que ficou aberto (não é bug):** nos campos numéricos do editor
-(Sets/Reps/RPE), digitar INSERE no cursor em vez de substituir — "2" com "1"
-digitado vira "12". Contorno: long-press → selecionar → digitar. A correção
-seria selecionar o conteúdo ao focar.
-
-## As 4 correções de UX do teste de 10 passos (16/08/2026)
-
-O teste manual gerou quatro frentes. **Três delas mudaram de diagnóstico ao ler
-o código** — vale mais como método do que como changelog.
-
-### Sessão esquecida: o defeito NÃO era o tempo inflar
-
-Meu diagnóstico inicial ("o treino contou 616:03 e ninguém perguntou nada")
-estava errado na causa. O tempo já tinha DUAS defesas —
-`computeRecoveryPauseMs` no mount e o listener de `visibilitychange`, ambos
-descontando gap acima de `LONG_GAP_MS` (20 min), escritos por causa de um "bug
-do treino de 4h" anterior. **Não reimplementar isso.**
-
-A lacuna real era outra e mais séria: **o `localStorage` não expirava NADA**,
-enquanto o IndexedDB — a outra metade do mesmo snapshot — expira em 24 h
-(`MAX_SESSION_AGE_MS`). E é o `localStorage` quem manda o app abrir no treino:
-`useLocalPersistence` decide a view, `useSessionSync` hidrata. Resultado: treino
-aberto na segunda reabre o app dentro dele na quarta, em silêncio; finalizar
-dali grava a sessão de segunda com a data de hoje, e a **duração alimenta a
-estimativa de calorias** (`getEpocFactor`), então o número falso chega ao
-relatório, ao PDF e à Nutrição.
-
-Hoje toda restauração passa por `lib/workout/restoreSessionGate.ts`, usado pelos
-DOIS hooks — com a regra escrita só num deles, o outro discordaria e a view
-abriria num treino que o estado recusou hidratar. Faixas: `fresh` (< 4 h),
-`stale` (4–24 h, avisa), `expired` (> 24 h, descarta). A idade é da **última
-atividade**, não da duração: quem treina 3 h com atividade recente segue fresh.
-Na dúvida (sem carimbo, relógio para trás, `savedAt` corrompido) o veredito é
-`fresh` — perder série registrada é irreversível, retomar sessão velha é só
-incômodo. Um guard cobra que os dois armazenamentos expirem no MESMO prazo,
-que é exatamente a divergência que causou o bug.
+⚠️ **O tempo do treino JÁ tem duas defesas** (`computeRecoveryPauseMs` no mount e
+o listener de `visibilitychange`, descontando gap acima de 20 min). **Não
+reimplementar.** A lacuna real era outra: o `localStorage` não expirava NADA
+enquanto o IndexedDB expira em 24 h — e é o `localStorage` que manda o app abrir
+no treino. Hoje toda restauração passa por `lib/workout/restoreSessionGate.ts`
+(`fresh` < 4 h · `stale` 4–24 h · `expired` > 24 h), usado pelos DOIS
+armazenamentos, com guard cobrando que expirem no mesmo prazo. Na dúvida o
+veredito é `fresh`: perder série registrada é irreversível.
 
 **Polaridade de diálogo destrutivo:** o `confirm` resolve `false` ao fechar por
-fora, então DESCARTAR é o `confirmText` (destrutivo) e continuar é o caminho do
-`false`. Invertido, um toque fora do modal apagaria as séries de um treino em
-andamento. Mesma lição já aprendida no rodapé do treino.
+fora, então DESCARTAR é o `confirmText` e continuar é o caminho do `false`.
+Invertido, um toque fora do modal apagaria um treino em andamento.
 
-### Autocorreção: o app tinha ZERO proteção, e a lista manual estava incompleta
+**Autocorreção: a fronteira é IDENTIFICADOR × TEXTO LIVRE.** `utils/ui/textFieldProps.ts`
+em 49 campos; em notas e chat a autocorreção AJUDA, e o guard cobra os dois
+sentidos. Duas lições de método: um subagente devolveu 38 campos e o guard achou
+16 que ele perdeu (resultado de subagente é insumo, não verdade); e **componente
+genérico não recebe a decisão** — a marca vai na CHAMADA.
 
-O teclado do iOS renomeia o que você digita — "Drop teste" virou "Frio teste",
-"Bi A" virou "Vi A" — porque nome de exercício não é palavra de dicionário. O
-app inteiro tinha **zero `autoCorrect`** e dois `spellCheck` soltos.
+**Conferência de carga (`weightOutlier.ts`): a referência é MEDIANA, e isso é o
+ponto.** Com o ÚLTIMO valor, um 200 digitado errado faria o 200 seguinte parecer
+normal — o detector ficaria cego logo após o primeiro erro. Fator 4×, folgado:
+progressão real anda em 2,5–10%, erro de digitação dá fator 5 a 10.
 
-Fonte única em `utils/ui/textFieldProps.ts` (nome próprio · código ·
-identificador sem forma de palavra), hoje em 49 campos. **A fronteira é
-IDENTIFICADOR × TEXTO LIVRE**: em notas, chat e descrição a autocorreção AJUDA,
-e o guard cobra os dois sentidos — identificador sem proteção reprova, e texto
-livre COM proteção também.
-
-Duas lições de método aqui:
-1. **Um subagente varreu e devolveu 38 campos; o guard achou 16 que ele
-   perdeu** — e um dos 38 estava errado (casou com uma mensagem de erro, não
-   com um input). Resultado de subagente é insumo, não verdade.
-2. **Componente genérico não recebe a decisão.** O `EditField` do
-   `VoiceWorkoutModal` serve o nome do exercício E o campo Notas; aplicar nele
-   desligaria o corretor justamente onde ele ajuda. A marca foi para a CHAMADA.
-
-### Descanso sem teto e conferência de carga
-
-O contador de "além do planejado" chegava a **"+286:32"** em verde, ocupando o
-rodapé (e empurrando o `WorkoutFooter` por `--it-rest-bar-h`). Agora desiste aos
-15 min de extra, pelo `onFinish` — que encerra SEM avançar série. **Cardio e
-prancha ficam de fora**: são timers de EXERCÍCIO, e encerrar uma corrida de
-40 min apagaria uma medição em andamento.
-
-A conferência de carga (`lib/workout/weightOutlier.ts`) entra no resumo que a
-finalização já mostra, **de propósito**: cobre os 14 métodos de série sem tocar
-em nenhum renderer. Fator 4×, folgado — progressão real anda em 2,5–10% e o
-autoload trava em +10%, enquanto erro de digitação dá fator 5 a 10. Limiar
-apertado vira ruído, e aviso que aparece à toa é ignorado inclusive quando está
-certo.
-
-**A referência é MEDIANA, e isso é o ponto do módulo.** Com o ÚLTIMO valor, um
-200 digitado errado na sessão passada faria o 200 de hoje parecer normal — o
-detector ficaria cego logo após o primeiro erro. A média sofre do mesmo mal, e o
-teste mede: 200 ÷ média 80,5 = 2,48, abaixo do limiar, o erro passaria.
-
-### ⚠️ O cronômetro do simulador CONGELA quando a janela perde o foco
-
-Custou 25 minutos de espera inútil e quase virou um "o teto não funciona".
-
-Ao tentar provar o teto de 15 min do descanso no aparelho, o contador andou
-**25 segundos em 8 minutos reais** — o ticker do WebView é estrangulado quando a
-janela do Simulator não está em foco no macOS. Nesse ritmo, esperar os 15 min do
-produto levaria mais de meia hora de relógio de parede.
-
-**Consequência prática:** qualquer invariante que dependa de TEMPO PASSAR
-(timeout, teto, expiração, auto-avanço) é impraticável de verificar por espera no
-simulador. Prove por teste + mutação e diga que a prova foi de código, não de
-tela — e não conclua "não funcionou" a partir de um contador que parece parado.
-
-O que É verificável no simulador continua sendo o de sempre: o que reage a TOQUE
-e a DIGITAÇÃO. A autocorreção, por exemplo, se prova em 30 segundos — digitar
-"Bi A Drop teste" num campo de nome e ler o que ficou lá.
-
-⚠️ **Animação não se PROVA no simulador — se prova no navegador.** O
-`screenshot` leva 2–3 s de ida-e-volta, então qualquer coisa mais curta que isso
-já terminou quando a foto sai. Em 05/09/2026 a celebração de fim de treino nunca
-apareceu em captura nenhuma — não por estar quebrada, e sim por latência.
-
-O que de fato funcionou, quatro vezes na mesma noite (centralização, perfil de
-crescimento e a entrada do véu duas vezes): **reproduzir os keyframes num HTML
-solto e AMOSTRAR o computed style** ao longo do tempo. Devolve número, não
-impressão, e responde em segundos.
-
-```js
-const escala = () => new DOMMatrixReadOnly(getComputedStyle(el).transform).a
-// amostre em marcos (0, 500, 900, 1500…) e leia a curva que sai
-```
-
-Foi assim que saíram "0,04 → 0,757 na metade → 1 sem passar de 1" e "véu em 0
-enquanto o relatório está sozinho na tela". Um caso de teste não pega isso:
-jsdom não computa animação.
-
-⚠️ **`recordVideo` NÃO substitui isso** — ele MOSTRA, não prova, porque o agente
-não assiste a vídeo. Serve para o dono ver, e só quando ele pedir (**print
-continua proibido** — regra de 15/08/2026):
-
-```bash
-xcrun simctl io <UDID> recordVideo --codec=h264 saida.mp4   # Ctrl-C encerra
-```
-
-Medido: 92 KB para 4 s.
-
-### O que ficou provado ONDE (não misturar as duas coisas)
-
-| correção | prova |
-|---|---|
-| autocorreção do teclado | **no aparelho** (texto digitado ficou intacto; no dia anterior virava "Vi A"/"Frio teste") + render + guard de classe |
-| sessão esquecida | teste + mutação (3 mutações, todas vermelhas) |
-| teto do descanso | teste + mutação — **prova de tela não fechada**, ver o congelamento acima |
-| conferência de carga | teste + mutação |
-
-### Mutação INVÁLIDA não prova guard fraco
-
-Ao provar o teste de render dos atributos de teclado, a primeira mutação
-(`autoCorrect` → `autocorrect`) **não derrubou o teste — e estava certo**: o
-React 19 normaliza os dois spellings para o mesmo atributo HTML, então não havia
-bug a introduzir. A mutação válida é REMOVER o atributo (derruba 3 de 4 casos).
-
-Antes de afrouxar um guard que "não pegou a mutação", confira se a mutação
-representa um defeito real. Guard que não falha com bug presente é guard falso;
-guard que não falha com uma mudança inócua está apenas correto.
-
-### Três erros meus que o ferramental pegou
-
-Registrados porque vão se repetir:
-
-1. **Hook depois de early return.** O efeito do teto entrou abaixo de
-   `if (!targetTime || dismissed) return null` — o ESLint travou, e um teste de
-   cardio já estava vermelho por isso. Componente grande esconde onde termina a
-   região dos hooks.
-2. **Guard fatiado a partir do IMPORT.** `indexOf('shouldAbandonRest')` casa
-   primeiro com a linha de import e arrasta o arquivo inteiro para dentro do
-   bloco medido — o guard passou a medir o `handleStart`, que legitimamente usa
-   `onStartRef`. Fatie pela CHAMADA (`/nome\s*\(\s*\{/`), nunca pelo nome solto.
-3. **Busca por `find` da primeira ocorrência.** Aplicar props procurando o
-   placeholder pegou uma string de mensagem de erro em vez do input. Ao editar
-   em massa, confira CADA ponto pelo que ele é, não pela primeira coincidência —
-   e feche com `next build`, que é o que de fato prova JSX íntegro.
+⚠️ **Mutação INVÁLIDA não prova guard fraco.** Trocar `autoCorrect` por
+`autocorrect` não derruba nada porque o React normaliza os dois. Antes de
+afrouxar um guard que "não pegou a mutação", confira se a mutação representa um
+defeito real.
 
 ## Que modelo roda o teste exploratório no simulador (16/08/2026)
 
@@ -2324,233 +2093,51 @@ literalmente o que aconteceu.
 **O que encarece não é o modelo, é a foto.** Screenshot é o input mais caro que
 existe; capturar só nos pontos de decisão corta a maior parte da conta.
 
-## Cobertura de teste: o que roda no CI hoje (15/08/2026)
+## Cobertura de teste e E2E — o que roda no CI
 
-O teste manual de 10 passos passou por cima de **5.476 testes verdes** (hoje
-5.582) e ainda
-achou três defeitos — porque nenhum deles ANDAVA pelo app. Estado atual, para
-ninguém remedir:
+Registro completo: `docs/historico/2026-08-cobertura-e-e2e.md`.
 
-| camada | roda no CI? | o que cobre |
+| camada | no CI? | cobre |
 |---|---|---|
-| Vitest unit/integração (5,6k) | **sim** | lógica, contratos, guards de classe |
-| Vitest de jornada (jsdom) | **sim** | contrato entre componentes (ex.: `jornadaDescansoRodape` — o descanso publica `--it-rest-bar-h`, o rodapé consome, some ao desmontar) |
-| Playwright público (29 testes) | **sim, desde 15/08** | páginas públicas carregam, protegidas redirecionam sem 500, árvore de acessibilidade íntegra |
-| Playwright autenticado (jornada, 4 testes) | **sim, desde 16/08** | percorre treino real em viewport mobile contra o preview da Vercel, sem expor chaves privadas de servidor |
-| `visual-regression` | **não, de propósito** | screenshot entre máquinas diferentes é flake por construção |
+| Vitest unit/integração | sim | lógica, contratos, guards de classe |
+| Vitest de jornada (jsdom) | sim | contrato ENTRE componentes |
+| Playwright público | sim | páginas carregam, protegidas redirecionam, árvore a11y |
+| Playwright autenticado (jornada) | sim | treino real, viewport mobile, contra o preview da Vercel |
+| `visual-regression` | **não, de propósito** | screenshot entre máquinas é flake por construção |
 
-**A jornada logada de UI já tem spec** (`e2e/authenticated-workout-journey.spec.ts`,
-15/08/2026): concluir série com o FINALIZAR alcançável durante o descanso,
-renomear no editor completo sem perder o foco, campo numérico substituindo, e
-sair/voltar preservando a sessão. O job do CI aponta para o **preview da Vercel
-do PR**, porque ali o dashboard já tem as variáveis privadas de servidor sem
-expor `SUPABASE_SERVICE_ROLE_KEY` ao repositório público. O gate exige as
-credenciais da conta de teste e `VERCEL_AUTOMATION_BYPASS_SECRET`. Os cinco
-secrets necessários estão configurados no GitHub. A primeira execução limpa foi
-o run `31926932133`: preview encontrado, **4/4 testes em 26,1 s**, sem retry nem
-flake. Continua fora: sanear `admin-protection` e `critical-api`, que falham por
-ambiente.
+⚠️ **Cinco jeitos de um E2E de UI passar VERDE com o bug presente** (todos
+medidos): viewport errada (o app é mobile — `390×844`) · superfície errada (o
+bug do teclado só existia em exercício ADICIONADO na hora) · asserção que o
+framework conserta (o Playwright re-resolve o locator; o que não sobrevive a
+remount é a IDENTIDADE do nó) · `hover` no lugar de `click({ trial: true })` ·
+estado que o próprio teste criou.
 
-### Escrever E2E de UI: cinco jeitos de passar VERDE com o bug presente
+⚠️ **A sessão de treino ativa é SINCRONIZADA PELO SERVIDOR** — `active_workout_sessions`
+sobrevive entre execuções do CI e é compartilhada por todos os clientes logados
+na conta de teste, inclusive um simulador esquecido aberto. **Antes de olhar o
+diff de um PR que falhou com "a lista de treinos precisa ter ao menos um card",
+consulte a tabela**: linha parada há minutos é resíduo, apague e re-rode.
 
-Todos medidos ao escrever aquele spec — cada um passou verde com o defeito
-reposto antes de o teste ser corrigido:
+```sql
+select started_at, updated_at, now() from active_workout_sessions
+where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
+```
 
-1. **Viewport errada.** A barra do descanso é centralizada (`max-w-md`); em
-   tela larga ela não cobre o FINALIZAR e o caso passa. O app é mobile —
-   `test.use({ viewport: { width: 390, height: 844 } })`.
-2. **Superfície errada.** O bug do teclado era no EDITOR COMPLETO e só em
-   exercício ADICIONADO na hora: exercício salvo tem `id` e a key já é estável;
-   no modal rápido de exercício o defeito nunca existiu.
-3. **Asserção que o framework conserta.** Conferir o VALOR digitado não pega
-   remount: o Playwright re-resolve o locator a cada tecla e o estado do React
-   repõe o texto. O que não sobrevive é a IDENTIDADE do nó
-   (`elementHandle` + `isConnected`).
-4. **`hover` no lugar de `click({ trial: true })`.** Hover move o mouse sem
-   exigir que o alvo receba o ponteiro — passa com outro elemento por cima.
-   O trial click roda todas as checagens de actionability sem clicar.
-5. **Estado que o teste mesmo criou.** Clicar num campo que já está focado não
-   dispara `focusin`; o caso do select-on-focus media um cenário inexistente
-   até o teste tirar o foco antes.
+`npm run sim:close` limpa isso automaticamente (hook `Stop`), mas o hook é local
+(`.claude/` está no `.gitignore`). Regra geral: **E2E que divide conta com gente
+de verdade precisa partir de estado que ele mesmo criou** — estado herdado é
+flake com cara de bug. O `ci.yml` tem `concurrency` e o describe da jornada usa
+`mode: 'default'` (não `'serial'`, que esconderia o segundo defeito atrás do
+primeiro); guard em `e2eContaCompartilhada.test.ts`.
 
-### ⚠️ A sessão de treino ativa é SINCRONIZADA PELO SERVIDOR — e o E2E divide a conta
+⚠️ **E2E pendurado é MUDO, e o silêncio LOCALIZA o defeito**: zero output ⇒ não
+passou do `globalSetup`, onde o `actionTimeout: 0` não tem quem o segure. Três
+tetos, e a ORDEM é o que dá diagnóstico: `globalTimeout` (8 min) < step (10) <
+job (30). Guard em `e2eTetoDeTempo.test.ts`.
 
-Custou um CI vermelho num PR que só mexia em `.md`, e o diagnóstico começou
-errado duas vezes.
-
-`active_workout_sessions` (tabela, com `state` jsonb) guarda a sessão em
-andamento **no servidor**, para o treino continuar de outro aparelho. Ou seja:
-ela **sobrevive entre execuções do CI** e é compartilhada por TODOS os clientes
-logados na conta de teste — inclusive um simulador esquecido aberto.
-
-Foi o que houve em 16/08/2026: deixei o app aberto no simulador com
-`djmkbrasil`, ele seguiu reescrevendo essa linha por horas, e cada escrita
-voltava por **realtime** para o navegador do CI. O `fill('42')` do Playwright
-era desfeito pelo estado remoto (o teste esperava `42` e encontrava `40`, o
-peso da minha tela) e o re-render constante impedia o botão "Voltar" de ficar
-`stable` — o caso morria em `locator.click: Test timeout`.
-
-**Nada disso era bug do app**: é o sync multi-dispositivo funcionando como
-projetado. Era contaminação de ambiente.
-
-Duas hipóteses minhas que a verificação derrubou, nesta ordem — as duas
-plausíveis, as duas erradas:
-1. "É a documentação" — não, o step que falhou foi o E2E logado.
-2. "A sessão do simulador vive só no armazenamento local, não alcança o CI" —
-   **falso**, e é justamente o ponto: ela vai para o banco.
-
-Só a consulta ao `active_workout_sessions` (com `state->'logs'`) fechou o caso:
-o log `0-1` com peso 84 era, literalmente, o que estava na minha tela.
-
-**O que fica:**
-- **Isso é AUTOMÁTICO desde 25/08/2026** (pedido do dono): `npm run sim:close`
-  (`scripts/sim-close-workout.mjs`) encerra o app em todo simulador ligado e
-  apaga a sessão ativa da conta de TESTE. Ele roda sozinho como hook `Stop`
-  — ou seja, ao fim de cada resposta —, configurado em `.claude/settings.json`.
-  ⚠️ **O `.claude/` está no `.gitignore`**, então o hook é local desta máquina:
-  em outro clone existe o script mas não o gatilho. O `user_id` é literal e a
-  conta oficial (`djmkapple`) é conferida e recusada; nada mais no banco é
-  tocado (medido: apagou 1 linha da conta de teste e preservou as 4 de
-  usuários reais).
-
-  ⚠️ **Ele NUNCA tinha limpado o banco rodando de um worktree** — corrigido em
-  27/08/2026. O script lia `.env.local` ao lado de si mesmo, e worktree não tem
-  esse arquivo (está no `.gitignore`, não é copiado): `lerEnv` voltava vazio e a
-  função saía com `return null` **em silêncio**. Como este repo trabalha em
-  worktrees, o hook rodava a cada resposta sem fazer nada. Só apareceu quando
-  uma órfã de 33 min derrubou o E2E de um PR que só mexia em `.md`. Hoje ele
-  procura também na raiz do checkout principal (`git rev-parse
-  --git-common-dir`) e AVISA quando não acha credencial, em vez de sair mudo.
-
-  Duas portas para mexer no banco: **simulador ligado** (encerra o app e limpa)
-  ou **sessão da conta de teste parada há mais de 30 min**, mesmo sem simulador
-  — porque desligar o simulador depois de abrir um treino deixava a órfã para
-  sempre. A segunda porta é segura porque olha só a conta de TESTE e exige tempo
-  parado: treino real com pausa longa acontece na conta OFICIAL, que o script
-  recusa.
-- Ao terminar de mexer no simulador com a conta de teste, **encerre o app** —
-  app aberto continua escrevendo. E confira a tabela:
-  ```sql
-  select started_at, updated_at, (state->'logs'->'0-0'->>'weight') as peso_s1
-  from active_workout_sessions
-  where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
-  ```
-- O spec da jornada agora **DESCARTA** a sessão preexistente em vez de
-  reaproveitá-la. Reaproveitar herda logs que o teste não escreveu — o caso
-  deixa de medir o que diz medir.
-- Regra geral: **teste E2E que divide conta com gente de verdade precisa partir
-  de estado que ele mesmo criou.** Estado herdado é flake com cara de bug.
-- **O sintoma nem sempre aparece dentro do treino.** Em 22/08/2026 a jornada
-  morreu no `INICIAR TREINO` do DASHBOARD, com `element is not stable` — o
-  botão não parava de se mover, porque o estado remoto seguia chegando e
-  re-renderizando. Parecia regressão do PR (que mexia em renderers de série) e
-  não era: o clique nem chegava perto do código alterado. **Antes de investigar
-  o diff, re-rode o job**; passou de primeira no rerun, sem tocar em nada.
-- **O CONCORRENTE nem sempre é humano — pode ser o outro run do seu próprio PR
-  (24/08/2026, PR #910).** O #909 falhou com "a lista de treinos precisa ter ao
-  menos um card" e o rerun passou. Não era flake sem causa: **nenhum workflow
-  do repo declarava `concurrency`**, então dois commits da MESMA branch com 2
-  minutos de diferença geravam dois runs vivos ao mesmo tempo. Medido com
-  precisão de segundos — o E2E do run que passou ocupou 16:37:42→16:38:11 e o
-  do que falhou 16:37:54→16:40:13, **17 s de sobreposição**, com a sessão ativa
-  nascendo às 16:37:58, dentro deles. Um run chamava `descartarSessao()` na
-  sessão que o outro tinha acabado de abrir.
-
-  Hoje o `ci.yml` tem `concurrency` + `cancel-in-progress: true` (o run
-  obsoleto morre) e o describe da jornada tem `mode: 'default'` — sem ele,
-  `fullyParallel: true` com `workers: 2` punha dois dos quatro casos em voo na
-  mesma conta. **`'default'` e não `'serial'`**: os dois rodam em ordem num
-  worker só, mas o `serial` PULA os casos seguintes quando um falha, e
-  esconderia um segundo defeito atrás do primeiro. Guard de classe em
-  `src/__tests__/e2eContaCompartilhada.test.ts` — spec NOVO que abra sessão de
-  treino reprova até declarar o modo.
-
-  **A correção foi provada no mundo real, não só por guard:** dois pushes na
-  mesma branch com 28 s de diferença, e o run anterior apareceu `cancelled`.
-
-- **A sessão órfã é a causa MAIS COMUM de "a lista de treinos precisa ter ao
-  menos um card" — e ela não é do PR (26/08/2026).** Aconteceu três vezes num
-  dia (#937 duas vezes, #940 uma), e nas três a investigação começou pelo diff
-  do PR, que não tinha nada a ver. Um deles chegou a ser DIVIDIDO em dois para
-  bisseccionar um culpado que não existia — e a metade separada passou.
-
-  O mecanismo: a limpeza (`descartarSessao`) é feita pela UI, e é justamente
-  quando um caso FALHA que a página fica no estado que o derrubou (modal
-  aberto, hidratação pela metade, botão que não estabiliza). O descarte tem
-  menos chance de funcionar exatamente quando é mais necessário, a linha de
-  `active_workout_sessions` fica no servidor, e o PRÓXIMO run abre o app DENTRO
-  de um treino — sem card nenhum no dashboard.
-
-  **Antes de olhar o diff, consulte a tabela.** Se houver linha parada há mais
-  de alguns minutos, é resíduo: apague e re-rode.
-
-  ```sql
-  select started_at, updated_at, now() from active_workout_sessions
-  where user_id = '6cb619ba-1484-41f2-b60c-b67aaea06307';
-  ```
-
-  Hoje o spec **avisa** quando não conseguiu descartar (o `.catch(() => {})` que
-  embrulhava isso tornava a órfã invisível) e tenta uma última vez no
-  `afterAll`, com PÁGINA NOVA — fora do estado que derrubou o caso. Guard em
-  `src/__tests__/e2eLimpaSessaoAtiva.test.ts`. O que ele trava não é "a limpeza
-  funciona" (depende da UI, e o teste não garante), e sim que ela **não falha
-  em silêncio**.
-
-  ⚠️ **Fica um risco residual conhecido:** `concurrency` agrupa por `ref`, então
-  dois PRs DIFERENTES rodando ao mesmo tempo ainda dividem a conta. Não foi
-  tratado porque exigiria extrair o E2E logado para um job próprio com grupo
-  global — e o histórico deste repo é de PRs sequenciais. Se voltar a falhar com
-  dois PRs abertos em paralelo, é essa a correção, e o diagnóstico é o mesmo:
-  compare as janelas dos steps de E2E com
-  `gh api repos/.../actions/runs/<id>/attempts/1/jobs`.
-
-### ⚠️ E2E pendurado é MUDO — e nada no CI pode herdar as 6 h (31/08/2026)
-
-Segunda ocorrência da mesma classe: em 18/08 o step do E2E logado ficou 46 min
-sem imprimir nada (causa: `fetch` sem timeout, corrigida) e em 31/08 ficou
-**6 horas** — o teto padrão do GitHub —, queimando o runner e travando TODO o
-repositório, porque enquanto o step pendura nenhum PR fecha. O rerun do mesmo
-commit passou em 9,3 min: é intermitente.
-
-**Silêncio total NÃO significa "travou logo no começo" por acaso — ele
-LOCALIZA o defeito.** Com `--reporter=github` o reporter do GitHub não escreve
-em stdio (`printsToStdio() → false`); o "Running N tests" que aparece no CI vem
-do reporter `dot` que o Playwright acrescenta quando nenhum outro imprime, e
-ele fala no `onBegin`. A ordem das tasks do runner é **globalSetup → load →
-onBegin**. Zero output ⇒ não passou do globalSetup.
-
-⚠️ **O `actionTimeout` do Playwright é `0` — sem limite.** Dentro de um teste
-quem segura isso é o `timeout` do teste; o **globalSetup não tem teste nenhum**,
-então `page.fill`/`page.click` esperavam para sempre (um botão de submit que
-nunca fica acionável basta). `chromium.launch()` **não** era o problema: já tem
-30 s de default. E `browser.close()` não aceita `timeout`, só `reason`.
-
-Hoje há três defesas, e a ORDEM é o que dá diagnóstico: `globalTimeout`
-(8 min, playwright.config — o ÚNICO teto que alcança o globalSetup, porque o
-deadline do run é calculado antes da primeira task) **<** `timeout-minutes` do
-step (10) **<** do job (30). Quem dispara primeiro é o único que explica o
-motivo; o teto do GitHub só mata. Guard em `__tests__/e2eTetoDeTempo.test.ts`,
-que cobra job/step sem teto e a ordem entre os três.
-
-### Armadilhas de ambiente (custaram mais que o spec)
-
-- **A porta 3000 pode ter OUTRO projeto.** Com `reuseExistingServer`, o
-  Playwright testa o app errado em silêncio — a suíte rodou inteira contra a
-  tela de login de outro produto. Use `PLAYWRIGHT_PORT`.
-- **`globalSetup` roda junto com a subida do servidor**: sem esperar o app
-  responder, o login falha, o storage state não é criado e TODOS os testes
-  autenticados morrem com `Error reading storage state`, que não diz a causa.
-- **`secrets` NÃO existe em `if:` de step.** Usar ali derruba o workflow
-  INTEIRO antes de rodar qualquer passo ("workflow file issue", run
-  31918472665) — inclusive typecheck e testes. Leia para `env` no nível do job.
-  Guard varre isso em `ciE2ePublicoLigado.test.ts`.
-- **`npm run dev` não aguenta a suíte**: o app chega a mostrar "Não foi
-  possível carregar o app" depois de algumas execuções. Rode contra o build
-  (`CI=1 PLAYWRIGHT_CI_SERVER=1`), que é o que o CI faz.
-
-**jsdom não tem `ResizeObserver`** — usar direto derrubou 3 testes de cardio e,
-no aparelho, seria a tela inteira do descanso caindo. API de browser moderna em
-componente sempre com `typeof X !== 'undefined'`.
+**Armadilhas de ambiente:** a porta 3000 pode ter OUTRO projeto · `secrets` NÃO
+existe em `if:` de step (derruba o workflow inteiro) · `npm run dev` não aguenta
+a suíte, rode contra o build.
 
 ## Campo numérico SELECIONA ao focar (15/08/2026)
 
@@ -2573,209 +2160,61 @@ fora por construção. `NumericInput` e os campos de série (`useInputField`,
 `selectOnFocus` **true por padrão**) também selecionam explicitamente; **notas**
 é a exceção declarada. Opt-out por `data-no-select-on-focus`.
 
-## Teste no simulador iOS (o agente verifica sozinho, não o dono)
-**Regra fixa: o agente testa no simulador — não pede pro dono virar QA.**
+## Teste no simulador iOS — o agente verifica sozinho, não o dono
 
-**Caminho do editor de Story** (leva tempo achar às cegas): menu do avatar → **Histórico** → abrir um treino → botão **STORY** no topo. O ícone de compartilhar do card de treino é export PDF/JSON, não é o composer.
+**As armadilhas (coordenadas em pontos, build que desloga, teclado em inglês,
+animação que não se prova por screenshot) estão em `docs/skill-tela.md`** — rode
+`/tela`. Registro completo da apuração: `docs/historico/2026-08-simulador-ios.md`.
 
-**⚠️ DUAS CONTAS, E CONFUNDI-LAS JÁ PRODUZIU UM BUG INEXISTENTE.** Confirmado com o
-dono em 09/08/2026 — **o simulador está logado em `djmkbrasil@gmail.com`, a conta de
-TESTE**. (Esta linha já afirmou o contrário; a conta do simulador MUDA, então trate
-como pista datada e **confirme antes de comparar tela × banco**.)
+O que precisa estar AQUI porque é fato do projeto, não procedimento:
 
-**Reconfirmado em 10/08/2026, e some com a dúvida em 5 s:** o SIMULADOR mostrava 6
-treinos A–F, "Complete seu perfil 20%" e meta 2000 kcal (= teste); no mesmo dia, o
-print do IPHONE do dono trazia 2279/2676 kcal (= oficial). Ou seja: **simulador =
-teste, aparelho do dono = oficial** — quando ele mandar um screenshot, ele NÃO é da
-mesma conta que você está vendo.
+⚠️ **DUAS CONTAS, e confundi-las já produziu um bug inexistente.** Ler a tela de
+uma contra o banco da outra INVERTE a conclusão — custou uma investigação de RLS
+atrás de fantasma em 09/08/2026.
 
-**Escrever na conta de teste é LIBERADO — inclusive finalizar treino** (decisão do
-dono, 11/08/2026: "djmkbrasil é só para testes"). A regra antiga mandava sempre
-descartar; ela existia porque se acreditava que finalizar poluiria o histórico do
-dono, e isso é falso — o histórico dele está na `djmkapple`. A trava custava as
-telas que só existem DEPOIS do treino: relatório, PDF, story e o autoload
-recalculando a carga. Nada disso era verificável.
-
-Continua valendo, e não é detalhe:
-- **A conta oficial (`djmkapple`) segue intocável.** Nenhuma escrita, nunca.
-- **A conta de teste vive no banco de PRODUÇÃO**, então treino finalizado pode
-  aparecer no feed da comunidade para usuários reais. Não é motivo para não
-  finalizar; é motivo para não fazer 20 seguidos nem inventar PR absurdo.
-- **Limpar depois continua sendo boa educação**, não obrigação: apagar a sessão de
-  teste evita que o histórico da conta vire lixo e que o autoload aprenda de
-  números inventados.
-
-### A conta de teste foi ESPELHADA na oficial em 11/08/2026
-
-Decisão do dono, para acabar com "o print dele mostra uma coisa e o simulador
-outra". O que foi copiado de `djmkapple` → `djmkbrasil`:
-
-| | Copiado? | Observação |
-|---|---|---|
-| Templates de treino | **sim** (5, 39 exercícios, 128 séries) | os 6 antigos (A–F) foram **arquivados**, não apagados |
-| Sessões concluídas | **12 mais recentes** | o bastante para autoload/deload lerem histórico de verdade |
-| Meta de nutrição | **sim** (2676 kcal) | |
-| Perfil / objetivo / fase | **sim** | antropometria, `fitnessGoal`, `nutritionPhase`, `autoLoad`, `plateInventory` |
-| Plano alimentar | **sim**, desde 31/08/2026 | "Dieta Semanal MK", 7 dias / 41 refeições, clonada como plano PRÓPRIO (editável) |
-| Avaliações corporais + fotos | **não** | dado corporal e arquivos no storage; o ganho não paga |
-| Resto do histórico (117 sessões) | **não** | 1,5 MB de JSON, e faria a conta de teste aparecer no **ranking e na comunidade** com 2,4 M kg falsos |
-| Telefone, cidade, academia, notificações, feature flags | **não** | na época, `featureTeamworkV2` ligaria uma feature sem tabelas; hoje nem a flag existe (#436) nem a feature está desligada (#859) |
-
-**Os IDs dos clones são determinísticos** — `md5(<id de origem> || ':clone-teste-v1')::uuid`.
-Isso torna a cópia idempotente (rodar de novo não duplica) e o rollback exato:
-
-```sql
--- desfaz o clone inteiro e devolve os templates A–F
-with c as (select md5(id::text||':clone-teste-v1')::uuid nid from workouts
-           where user_id='d04bfcef-54ea-4360-9e3d-e174a9ace503')
-delete from workouts w where w.user_id='6cb619ba-1484-41f2-b60c-b67aaea06307'
-  and w.id in (select nid from c);
-update workouts set archived_at=null
- where user_id='6cb619ba-1484-41f2-b60c-b67aaea06307' and is_template;
-```
-
-**⚠️ O espelho ENVELHECE.** É uma foto de 11/08/2026, não uma sincronização: nada
-mantém as duas contas iguais. Mudou treino ou meta na conta oficial depois dessa
-data e elas divergem de novo — agora com cara de sincronizadas, que é pior.
-**A regra de confirmar qual conta está na tela continua valendo**; o espelho só
-reduz a frequência do problema.
-
-| | `djmkbrasil` (TESTE, no simulador) | `djmkapple` (OFICIAL, o dono treina nela) |
+| | `djmkbrasil` (TESTE, no simulador) | `djmkapple` (OFICIAL, o dono treina) |
 |---|---|---|
 | `user_id` | `6cb619ba-1484-41f2-b60c-b67aaea06307` | `d04bfcef-54ea-4360-9e3d-e174a9ace503` |
-| Templates ativos | 5 (SEG/TER/QUA/QUI/SEX) + 6 arquivados | 5 (SEG/TER/QUA/QUI/SEX) |
-| Sessões concluídas | **13** (12 clonadas + 1 vazia antiga) | **129** |
-| Meta em `nutrition_goals` | 2676 kcal | 2676 kcal · P208 C295 G74 |
-| Plano alimentar ativo | Dieta Semanal MK (clone, 31/08) | Dieta Semanal MK (original) |
-| Fase / perfil | CUT, perfil preenchido | CUT, perfil completo |
+| como identificar | chip **ARQUIVADOS (6)** na lista | sem arquivados |
+| sessões | ~13 | 129+ |
 
-**Como identificar rápido, agora que as telas são parecidas:** a de teste tem o
-chip **"ARQUIVADOS (6)"** na lista de treinos e um histórico de 13 sessões; a
-oficial não tem arquivados e tem 129. O aviso "Complete seu perfil" **não serve
-mais** — sumiu da conta de teste quando o perfil foi copiado. O peso do check-in
-nunca serviu.
+**Escrever na conta de teste é liberado, inclusive finalizar treino** (decisão do
+dono, 11/08/2026) — sem isso, relatório, PDF, story e o recálculo do autoload não
+eram verificáveis por ninguém. **A oficial é intocável, sempre.** A de teste vive
+no banco de PRODUÇÃO, então treino finalizado pode aparecer no feed da comunidade.
 
-**O erro concreto, para não se repetir:** em 09/08/2026 um agente leu "0kg levantados"
-e "Meta: 2000 kcal" na tela do simulador, consultou o banco de `djmkapple` (2,4 M kg,
-2676 kcal) e concluiu que havia dois bugs graves. **Não havia nenhum**: a conta de teste
-tem 1 sessão vazia e zero metas salvas, então os dois números estavam CERTOS. Custou uma
-investigação inteira de RLS, RPC e policies atrás de fantasma. Ler a tela de uma conta
-contra o banco de outra não é imprecisão — inverte a conclusão.
+⚠️ **O espelho ENVELHECE.** A conta de teste foi espelhada na oficial em
+11/08/2026 (5 templates, 12 sessões, meta, perfil, plano alimentar); nada
+sincroniza depois disso. Clones têm id determinístico
+`md5(<id origem> || ':clone-teste-v1')`, o que torna a cópia idempotente e o
+rollback exato.
 
-**A página `/dashboard/nutrition` NÃO é alcançável dentro do app nativo.** A aba NUTRIÇÃO do dashboard abre o `NutritionOverlay`, que é outro componente; o `VipHub` até tem `router.push('/dashboard/nutrition')`, mas só quando `onOpenNutrition` não é passado — e no dashboard ele é. A página é a superfície WEB. Mexeu nela? A conferência visual pelo simulador não existe: valide pelo overlay (irmão que exibe os mesmos números) ou pelos dados, e **diga que a prova foi numérica, não visual**.
+**Caminho do editor de Story** (leva tempo achar às cegas): menu do avatar →
+Histórico → abrir um treino → botão **STORY** no topo. O ícone de compartilhar
+do card é export PDF/JSON, não o composer.
 
-**A suíte verde não vê o que só existe na TELA — dois casos em 27/08/2026, com
-6.7 mil testes passando.** (1) A Central de Notificações ganhou navegação e os
-cards continuavam inertes: o `.map()` que monta a lista reconstrói cada item
-campo a campo e não copiava `metadata`, então o destino nunca era encontrado. A
-lista fica IDÊNTICA — some só o clique. (2) A tela de login passou a exibir
-"V6DC5E30D" no lugar de "v1.21", porque a correção deu precedência a
-`NEXT_PUBLIC_APP_VERSION`, que na Vercel é o SHA do commit (é o buster de cache
-do service worker, nunca a versão pública).
+**Apontar o simulador para o dev local:** `npm run sim:local [porta]` /
+`sim:prod` / `sim:status`. Hot reload funciona; termine sempre com `sim:prod`.
+Em local é preciso LOGAR de novo — e o agente não digita senha.
 
-O padrão dos dois: **o guard media a ponta certa e a fiação errada** — o
-componente isolado estava correto, o dado é que não chegava nele. Depois de
-mexer em algo que aparece, abra a tela; e para o que a tela não alcança (a
-página web da nutrição), diga que a prova foi numérica.
-
-**Teste de canvas NÃO prova rendering.** jsdom não implementa `canvas.getContext('2d')`, então `measureText`/matrizes caem em fallback e o teste passa verde com o desenho quebrado. Foi assim que a legenda do Story subiu com 23 guards verdes e o texto invisível no aparelho. Em qualquer coisa que DESENHE, o guard cobre o algoritmo e a fiação; o resultado na tela é conferência visual — declare o limite no próprio arquivo de teste.
-
-**REGRA DO DONO (03/08/2026): toda mudança que precise de verificação VISUAL termina
-no simulador iOS — abrir, navegar até a tela e conferir com screenshot.** Não vale
-entregar UI descrevendo o que deveria aparecer, nem substituir a conferência por
-mock/teste de render (eles provam comportamento, não o resultado na tela). **Device
-padrão: iPhone 17 Pro Max** — é o aparelho do dono; só usar outro se ele pedir.
-
-**O simulador aponta para onde você mandar — inclusive o `npm run dev` (19/08/2026).**
-`capacitor.config.ts` fixa `url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br'`,
-então o default continua sendo PRODUÇÃO. O que mudou é o custo de sair dele:
-
-```bash
-npm run dev          # servidor local na 3000 (deixe rodando)
-npm run sim:local    # aponta o simulador para http://localhost:3000 e relança
-npm run sim:prod     # devolve para produção ao terminar
-npm run sim:status   # para onde está apontando agora
-```
-
-⚠️ **A porta 3000 desta máquina NÃO é necessariamente o IronTracks (27/08/2026).**
-Medido: quem escuta `127.0.0.1:3000` é o `Instagram/mk-dashboard`, servido em
-standalone — e ele **respawna sozinho** segundos depois de ser derrubado (tem
-supervisor). Como o `npm run dev` daqui fixa `--port 3000`, os dois convivem em
-pilhas diferentes (um em IPv4, outro em `[::1]`) e o simulador pode carregar o
-app ERRADO sem nenhum aviso. Diagnóstico em duas linhas:
-
-```bash
-lsof -nP -iTCP:3000 -sTCP:LISTEN
-lsof -p <pid> | awk '$4=="cwd"{print $NF}'
-```
-
-Saída: subir este repo em outra porta (`npx next dev --webpack --port 3010`) e
-apontar o simulador para ela — **`sim:local` aceita porta ou URL inteira**:
-`npm run sim:local 3010`.
-
-`scripts/sim-server.mjs` reescreve o `server.url` do `capacitor.config.json` **dentro
-do bundle já instalado** (o bundle do simulador é um diretório no disco do Mac, sem
-assinatura para invalidar) e relança o app. Leva menos de um segundo: nada de
-`cap sync`, `out/` ou Xcode. **Hot reload funciona** — editar um `.tsx` aparece na
-tela do simulador em segundos, sem relançar (provado em 19/08 mudando um texto do
-LoginScreen).
-
-Isso muda o fluxo padrão: **verificação visual passa a ser ANTES do commit**. O
-caminho antigo (mergear → esperar deploy → olhar) custava PR + CI + deploy por
-rodada, e três correções seguidas de UI pagaram esse pedágio em 19/08.
-
-Duas coisas para não tropeçar:
-- **Em local você precisa LOGAR de novo.** `localhost:3000` é outra origem, então
-  cookie e storage não vêm de produção. O agente não digita senha — quem loga é o
-  dono, uma vez; a sessão fica no simulador enquanto ele estiver apontado para local.
-- **Termine com `npm run sim:prod`.** Esquecer deixa o app preso no seu localhost:
-  na próxima abertura, sem `npm run dev` no ar, ele não carrega.
-
-Continua valendo: `.app` já instalado serve para qualquer mudança **web/JS** — só
-código NATIVO (Swift/plugin) exige build nova. E, depois do merge, apontar para
-produção segue sendo a conferência final.
-
-⚠️ **O teclado do simulador corrige para o INGLÊS.** Medido em 25/08/2026:
-"peixe grelhado com batata doce" virou "Price grew Haro com Batista doce" e
-"cozido" virou "cozies". Some-se a isto que o campo de nome de refeição
-capitaliza cada palavra. **Digitar texto livre em português no simulador não
-prova nada** — para conferir a TELA, injete o dado na conta de teste por SQL;
-para conferir o MODELO de IA, chame a API direto. (Campos de identificador do
-app já desligam a autocorreção — ver `utils/ui/textFieldProps.ts`; o que sobra
-são os de texto livre, onde ela ajuda no aparelho real.)
-
-⚠️ **Copiar o container de dados entre simuladores NÃO leva a sessão logada**
-(testado nas duas direções em 01/09/2026): o cookie do WKWebView não mora no
-container do app. Deslogou o simulador, a conferência visual PARA — o agente não
-digita senha, e só o dono entra de novo. E o toque cego no menu do avatar é como
-isso acontece: "Sair" fica poucos pixels abaixo de "Configurações".
-
-**Acesso ao device é concedido pelo dono**, uma vez por aparelho, no link
-"Let Claude use it" do painel. Se `attach`/`launch` responder que falta permissão,
-peça — não fique tentando em loop.
-
-**O caminho do bundle MUDA a cada launch.** Pegue com
-`xcrun simctl get_app_container <UDID> com.irontracks.app`; não reaproveite o path
-de antes (falha com `No such file or directory`). Para copiar o app entre
-simuladores: `xcrun simctl install <UDID-destino> "$(xcrun simctl get_app_container
-<UDID-origem> com.irontracks.app)"`.
-
-Build p/ simulador (só quando precisar de código nativo novo):
+**Build para simulador** (só quando precisar de código NATIVO novo):
 ```bash
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
   -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath /tmp/itsim-dd \
   CODE_SIGNING_ALLOWED=NO build
 ```
-Depois instala o `.app` de `/tmp/itsim-dd/Build/Products/Debug-iphonesimulator/App.app`.
+⚠️ Com `CODE_SIGNING_ALLOWED=NO` a **Live Activity não renderiza** — é do build,
+não é regressão.
 
-**Finalizar treino no simulador é PERMITIDO desde 11/08/2026** — a conta do
-simulador é a de teste, e o histórico do dono não é tocado (ver a seção das duas
-contas). Sem isso, relatório, PDF, story e o recálculo do autoload não eram
-verificáveis por ninguém. Use o **X → Descartar** quando a sessão não interessa,
-e finalize quando o que você precisa ver está do outro lado. **A conta oficial
-continua sem escrita, sempre.**
+**A página `/dashboard/nutrition` NÃO é alcançável no app nativo** (a aba abre o
+`NutritionOverlay`, outro componente). Mexeu nela? Valide pelo overlay ou pelos
+dados, e **diga que a prova foi numérica, não visual**.
 
-**Limitação conhecida:** com `CODE_SIGNING_ALLOWED=NO` a extensão do widget não registra as `ActivityConfiguration` — o log mostra `activitykit … Fetched descriptors for content states: []` e **a Live Activity não renderiza no simulador**. Isso é do build, NÃO é regressão. Não tire conclusão sobre a Ilha Dinâmica a partir do simulador.
+⚠️ **A suíte verde não vê o que só existe na TELA** — dois casos em 27/08/2026
+com 6,7 mil testes passando: a Central de Notificações ganhou navegação e os
+cards continuavam inertes (o `.map()` não copiava `metadata`), e o login exibiu
+o SHA do commit no lugar da versão. O guard media a ponta certa e a fiação
+errada. **Depois de mexer em algo que aparece, abra a tela.**
 
 ## "Não funciona pra mim": medir antes de corrigir (01/09/2026)
 
@@ -3342,198 +2781,40 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
-## Histórico de REFEIÇÕES — o irmão do de treinos (25/08/2026, PRs #919, #921–#924)
+## Histórico de REFEIÇÕES — o irmão do de treinos
 
-Cinco entregas no mesmo dia, puxadas por relatos do dono no iPhone. (O #920, da
-mesma data, é outro assunto: o hook que fecha o treino ativo do simulador.)
+Registro completo: `docs/historico/2026-08-historico-refeicoes.md`.
 
-O que vale guardar é o método. **Os SINTOMAS relatados estavam todos certos** —
-"não aparece nada", "aparece numa linha só", "só abre a aba de nutrição". O que
-não se sustentou foi uma HIPÓTESE de causa ("abre por baixo da aba de
-nutrição"), e em dois casos quem decidiu o diagnóstico foi o BANCO, não a
-leitura do código: o dado gravado dizia o que a tela não podia inventar.
+**O molde tem dono — não copie o card do treino.** `HistorySummaryShell` (chassi
+do card de resumo), `SummaryAction` e `HistoryWeekDivider` são consumidos por
+treino E nutrição. Guard de classe em `historicoMesmoMolde.test.ts`: quem
+redesenhar o chassi reprova, e **cada card só pode ter UM `featured: true`**.
 
-### O molde tem dono — não copie o card do treino
+**Duas regras que já quebraram este app em outras telas:**
+- **O dia é a coluna `date`, NUNCA derivado de `created_at`** — refeição das
+  23h30 tem carimbo no dia seguinte em UTC.
+- **A hora sai de `created_at` com `timeZone` explícito.** ⚠️ O guard precisa das
+  DUAS metades: o caso comportamental só reprova onde o runner não está em BRT
+  (o CI); na máquina do dono passa verde com o `timeZone` removido, e forçar
+  `process.env.TZ` no topo do teste **não resolve** (o worker já subiu). Quem
+  fecha o buraco localmente é o source-guard.
 
-`components/history/HistorySummaryShell.tsx` (chassi do card de resumo: véu
-dourado, eyebrow, pílulas de janela, grade 2×4, linha de ações), `SummaryAction`
-(o botão dessa linha) e `HistoryWeekDivider` ("Semana de dd/mm"). Treino e
-nutrição consomem os três. Copiar o JSX era a saída barata e é a mesma deriva
-que já produziu 86 tons de cinza e três cálculos de semana aqui.
+**A IA de lançamento SEPARA os alimentos** desde 25/08/2026 — o prompt mandava
+"some tudo e retorne um único objeto", e o histórico virava uma linha só com
+`grams: 0`. Duas fronteiras que não podem cair: `itemsParaGravar` tem **fallback**
+(perder o lançamento porque o detalhe falhou troca incômodo por perda de dado) e
+**não desmontar preparo único** ("1 esfirra de frango com requeijão" é UM item).
 
-Guard de CLASSE em `components/history/__tests__/historicoMesmoMolde.test.ts`:
-quem redesenhar o chassi ou o divisor reprova, e **cada card só pode ter UM
-`featured: true`** (`docs/DESIGN_HIERARCHY.md`).
+⚠️ **O parser DESCONFIA quando sobra comida na linha.** `140g de atum … mais 70g
+de proteína de soja com 400ml de leite` devolvia **162 kcal** — o valor de comer
+só o atum. O match é pela CABEÇA do nome e ignora o resto, o que está certo para
+preparo ("frango GRELHADO") e prato composto. Hoje: `" mais "` é separador,
+**`" com "` NÃO é e não pode ser**, e sobra com quantidade *seguida de mais
+texto* derruba o match e devolve a linha para a IA. O "seguida de mais texto" foi
+medido: sem ele, `1 fatia de pão integral 50g` deixava de casar.
 
-⚠️ **O agrupamento semanal do histórico de TREINO contava a partir da SEGUNDA**
-— contra a regra domingo→sábado de 24/08. O guard `semanaComecaNoDomingo` não
-pegava porque o cálculo passava por uma variável intermediária (`dayOfWeek`) em
-vez de chamar `getDay()` na mesma expressão: **guard de forma erra quando a
-forma muda.** Corrigido nos dois; a fronteira agora sai de `weekRangeBrt`.
-
-### O card do dia abre as refeições daquele dia
-
-`lib/nutrition/dayMeals.ts` (puro) + `hooks/useNutritionDayMeals.ts` (busca sob
-demanda, cache por dia). Duas regras que já quebraram este app em outras telas:
-
-* **O dia é a coluna `date`, NUNCA derivado de `created_at`.** Uma refeição das
-  23h30 em São Paulo tem carimbo no dia seguinte em UTC.
-* **A hora sai de `created_at` com `timeZone` explícito.** Sem isso, o relatório
-  impresso num servidor em UTC diz que o café da manhã foi às 11h.
-
-⚠️ **O guard da hora precisa das DUAS metades.** O caso comportamental só
-reprova onde o runner não está em BRT (o CI, em UTC): na máquina do dono ele
-passa verde com o `timeZone` removido — medido. E **forçar `process.env.TZ` no
-topo do arquivo de teste NÃO resolve**: o worker do Vitest já subiu e o Node
-cacheia o fuso na primeira formatação (testado, sem efeito). Quem fecha o buraco
-localmente é o source-guard que exige o `timeZone` na chamada.
-
-**No PDF do período**, o detalhe por refeição tem teto de
-`MAX_DIAS_DETALHE_REFEICOES` (31 dias) — acima disso ele sai e o relatório
-**diz por quê**, no papel e na tela antes de exportar. Descobrir no arquivo que
-faltam as refeições custa um PDF inteiro.
-
-### "Clico no menu e não aparece nada" — não era z-index
-
-`historyOpen` nascia de `useState(Boolean(openHistoryOnMount))`, e valor inicial
-só vale na PRIMEIRA montagem. Com a aba de nutrição **já aberta** o
-`NutritionMixer` não remonta: o item "Histórico de refeições" do menu do avatar
-era um botão morto. O modal nunca chegava a ser pedido — a suspeita de "abre por
-baixo do overlay" era razoável e falsa.
-
-Hoje um efeito reage à prop **e o pedido é consumido** (`onHistoryOpened`): sem
-isso a flag ficaria presa em `true` e o segundo clique morreria igual. Guard em
-`__tests__/menuAbreHistorico.test.ts` — que **nasceu faltando**: a primeira
-mutação passou verde e revelou que nenhum teste cobria o caso.
-
-### A IA de lançamento passou a SEPARAR os alimentos
-
-O lançamento por texto tenta primeiro o resolvedor local (`resolveFood`), que já
-grava item a item com gramas; quando ele não reconhece a frase, cai em
-`/api/ai/nutrition-estimate` — e o prompt mandava, **literalmente, "Some tudo e
-retorne um único objeto"**. Resultado no histórico: "arroz branco cozido com
-filé de tilápia grelhada" numa linha só, `grams: 0`. Medido na conta do dono
-antes de mexer: **75 refeições com um item só contra 131 com dois ou mais**, e
-as de um item são justamente as que passaram pela IA.
-
-Hoje o prompt separa, estima a porção quando o usuário não diz, e o contrato vai
-na chamada (`nutritionEstimateGenerationConfig`, padrão do repo). Medido contra
-a API real: `180g Arroz branco cozido (234 kcal)` + `140g Filé de tilápia
-grelhada (136 kcal)`.
-
-**Duas fronteiras que não podem cair:**
-
-1. **`itemsParaGravar` tem fallback.** Sem itens válidos (ou com um item só, que
-   apenas repete a refeição e desalinha o total), grava o item único de sempre.
-   Perder o lançamento porque o detalhe falhou é trocar incômodo por perda de
-   dado. `items` fica FORA do `required` do responseSchema pelo mesmo motivo.
-2. **Não desmontar preparo único.** A primeira medição devolveu "1 esfirra de
-   frango com requeijão" como massa + frango + requeijão — o app desmontando o
-   que o usuário lançou como UM item. A regra está no prompt e tem guard.
-
-⚠️ **Refeição já gravada não muda.** O detalhe não existe no dado antigo, e
+⚠️ **Refeição já gravada não muda** — o detalhe não existe no dado antigo, e
 reprocessar com IA seria inventar sobre o passado.
-
-### O parser DESCONFIA quando sobra comida na linha (25/08/2026, PR #926)
-
-A frase acima ("o resolvedor local… quando ele não reconhece, cai na IA") estava
-certa e incompleta: o problema é o resolvedor **achar que reconheceu**.
-
-No chat da nutrição, `"140g de atum sólido ao natural mais 70g de proteína de
-soja com 400ml de leite desnatado"` devolvia **162 kcal — o mesmo valor de comer
-só o atum**. O match é pela CABEÇA do nome (`matchesAtHead`) e ignora o resto, o
-que está certo para modo de preparo ("frango GRELHADO") e para prato composto
-("esfirra de frango COM requeijão", que é UM item). O que ele não via era uma
-**segunda porção escondida na mesma linha** — e, como não sobrava
-`unknownLine`, a cascata do `resolveFood` (que só chama a IA quando sobra algo
-não reconhecido) considerava sucesso e respondia com confiança. Falha silenciosa
-com cara de acerto, oferecendo "Lançar no diário" com 1/3 das calorias.
-
-Duas mudanças, e a segunda é a que pega a CLASSE:
-
-1. **" mais " virou separador de item.** ⚠️ **" com " NÃO é, e não pode ser** —
-   ele liga o prato ao ingrediente, e separar reintroduz exatamente o bug que o
-   `matchesAtHead` existe para matar (39 kcal de requeijão no lugar de 224 da
-   esfirra).
-2. **Sobra com quantidade derruba o match** (`SOBRA_COM_QUANTIDADE`): casou a
-   cabeça mas restou número + unidade **seguido de mais texto**? A linha vira
-   `unknownLine` e a cascata segue. O parser não adivinha nada — admite que não
-   é o dono daquela linha.
-
-**O "seguido de mais texto" foi medido, não escolhido.** A primeira versão da
-regra derrubou `1 fatia de pão integral 50g` (74 kcal → desconhecido): ali o
-"50g" QUALIFICA a fatia, não abre comida nova. Comparação antes/depois em 12
-frases: a única diferença é o caso do bug.
-
-Verificado ponta a ponta contra Supabase e Gemini reais: a cascata desiste e a
-IA devolve **535 kcal · P73,5** (140g atum 155 · 70g soja 235 · 400g leite 145).
-
-**O aviso de peso é para o CHUTE, não para o dado.** O prompt do chat mandava,
-em toda resposta, "cite o PESO ASSUMIDO… se parecer irreal, peça o peso certo".
-A regra existe por um motivo real — o parser cai em 50g quando o alimento não
-declara peso por unidade, e "uma pizza grande" virava 133 kcal —, mas disparava
-também quando a pessoa tinha ESCRITO o peso: *"Comendo 140g de atum (que o app
-assumiu como 140g)…"*. Hoje `ParsedMealItem.assumedWeight` marca só o que o app
-converteu, e sem ele o prompt **proíbe** dizer que o app assumiu. Junto: proibido
-dizer "exatamente" sobre valor de tabela — "use exatamente estes números" é
-instrução de fidelidade e vazava como precisão de medição.
-
-**Duas armadilhas de verificação desta tarefa:**
-
-1. **Guard tautológico que a mutação pegou:** o `label` do item é a LINHA CRUA,
-   então procurar `/ovos/` no texto do rótulo passava verde mesmo com o
-   separador removido (um item só, rotulado com a frase inteira). O que prova
-   separação é a CONTAGEM de itens.
-2. **`gh pr merge --delete-branch` devolve para a `main` LOCAL, que fica atrás
-   do merge.** Rodar um script de verificação logo depois executa o código
-   ANTIGO — e o resultado parece regressão. Custou um "❌ o bug continua" que
-   era falso.
-
-   **Resolvido por construção: use `npm run pr:merge <n>`**
-   (`scripts/pr-merge.mjs`). Ele recusa mergear com `quality-check` fora de
-   "pass" (a regra que já foi violada em 10/08/2026, quando um `for … sleep;
-   done; gh pr merge` mergeou no vermelho) e, depois do merge, alinha a `main`
-   local com a origin. O `reset --hard` só acontece com a árvore limpa E o
-   conteúdo idêntico ao da origin — depois de um squash os hashes diferem, mas
-   a ÁRVORE é a mesma; havendo conteúdo local ausente na origin, ele para e
-   devolve a decisão para o humano. A regra mora em `decidirSync`, função pura,
-   travada em `src/__tests__/prMergeSync.test.ts`.
-
-### "Abrir o dia para editar" — o botão que prometia e entregava metade
-
-Trocar a data não bastava: a aba abre no TOPO e a lista de LANÇAMENTOS (única
-superfície onde se edita ou apaga uma refeição) fica no fim da página. Com o dia
-de HOJE, que é o caso comum, a tela não mudava nada.
-
-Hoje o botão troca a data, **rola até a âncora** (`entriesAnchorRef`) e **abre o
-editor**. As setas do `DateNavigator` continuam sem rolar, de propósito — ali o
-usuário passeia pelos dias olhando o resumo do topo, e arrastar a tela a cada
-toque sequestraria o gesto dele. Há guard para os dois lados.
-
-**O editor não pode abrir no instante do toque:** `handleDateChange` esvazia a
-lista, e ali os lançamentos ainda são os do dia anterior. O pedido fica pendente
-(`editarAoCarregar`) e é atendido quando `entries` chega — e some sozinho se a
-refeição não estiver mais lá, em vez de travar a tela. `abrirEditorDaEntry`
-expande o card **e** semeia o rascunho: sem expandir, o editor abriria dentro de
-um card fechado; sem rascunho, abriria vazio e salvar apagaria a refeição.
-
-Tocar numa REFEIÇÃO do card do histórico edita AQUELA (o id viaja no
-`onPickDate`); o botão do dia, sem id, abre a **mais recente**.
-
-### Três armadilhas de verificação que custaram tempo nesta sessão
-
-1. **O teclado do simulador está com dicionário em INGLÊS.** "peixe grelhado com
-   batata doce" virou "Price grew Haro com Batista doce"; "cozido" virou
-   "cozies". Digitar português no simulador não prova nada sobre texto livre —
-   para conferir TELA, injete o dado na conta de teste por SQL; para conferir
-   MODELO, chame a API direto.
-2. **Teste que mede estado transitório passa por sorte.** `findByRole` + assert
-   imediato num botão que nasce desabilitado quebrou no CI (mais lento) com o
-   código CORRETO. O que se espera é a TRANSIÇÃO: quem espera é `waitFor`.
-3. **Componente grande demais para montar pede source-guard.** `NutritionMixer`
-   exige Supabase, imports dinâmicos e ~20 props — um teste de render ali mede o
-   harness, não o app. O comportamento se prova no aparelho e o guard trava a
-   CAUSA (a forma do código) voltar. Diga isso no arquivo de teste.
 
 ## A semana do app começa no DOMINGO (24/08/2026) — e "treino" tem piso
 
@@ -3791,111 +3072,35 @@ já estava ligada no Supabase Auth. As duas vars da Upstash estão como
 valor do painel e dos logs de build, sem efeito em runtime. **Ainda com
 dono:** remoção do código Asaas (toca pagamentos — pede confirmação).
 
-## Auditoria 2026-08-13 — fechada em 14/08/2026 (PRs #805–#819)
+## Auditoria de segurança 2026-08-13 — o que sobrevive
 
-O relatório vive em `Relatorio/auditoria-ponta-a-ponta-2026-08-13.md`; a
-conferência achado-a-achado e as correções são a sessão de 14/08. **Fase 1
-completa + Fase 2 parcial.** Mapa do que subiu, para ninguém reinvestigar:
+Mapa completo dos PRs: `docs/historico/2026-08-auditoria-ponta-a-ponta.md`.
 
-| Achado | PR | Estado |
-|---|---|---|
-| SEC-06 bucket chat-media | #805 | rota `ensure-bucket` REMOVIDA (não tinha chamador) |
-| SEC-01 XSS relatório | #806 | escape na atribuição + guard 5 payloads × 5 campos |
-| SEC-02 delete sem conferir Auth | #807 | `deleteUser` verificado + `account_deleted`/`_delete_auth_failed` em audit_events |
-| SEC-03 catálogo LGPD | #808 | `lib/account/userDataCatalog.ts` dirige export E delete (ver abaixo) |
-| SEC-05 erro cru em resposta | #809 | `respondInternalError` (requestId) em 111 rotas + guard classe inteira — ⚠️ **reaberto e fechado em 01/09/2026**, ver abaixo |
-| SEC-04 SECURITY DEFINER | #811 | migrations APLICADAS `20260814095015/31`; advisors 41→16 WARN |
-| SEC-07/10/11 | #812 | connect-src + rate limit auto-reportável + npm audit 0 |
-| Mapa muscular VIP quebrado | #813 | `maxItems` aninhado estourava o Gemini (400 desde 10/08) |
-| SEC-08 guarda de origem | #814 | middleware, MODO RELATÓRIO (ver abaixo) |
-| Xcode Cloud sempre vermelho | #815–#819 | verde no run #1732 (ver abaixo) |
+⚠️ **O guard do SEC-05 era de FORMA e deixou passar a CLASSE.** Ele procurava só
+`getErrorMessage(` na resposta; a reabertura em 01/09/2026 achou **52 rotas**
+devolvendo erro cru por outras sintaxes (`e.message`, `String(e)`,
+`jsonError(400, dbErr.message)`), incluindo uma pública. Hoje o guard casa
+`.message` lido de QUALQUER variável de erro, com janela de parêntese balanceado
+— a janela fixa de 300 caracteres atravessava para o código seguinte. A primeira
+versão ampliada acusou 69 rotas que devolvem `{ message }` no payload (jeito nº 8).
 
-⚠️ **O guard SEC-05 era de FORMA e deixou passar a CLASSE (01/09/2026).** Ele
-procurava só `getErrorMessage(` na resposta; a auditoria achou **52 rotas**
-devolvendo a mesma coisa por outras sintaxes — `e.message`, `String(e)`,
-`const message = e instanceof Error ? e.message : String(e)` seguido de
-`error: message`, `jsonError(400, dbErr.message)`, `signErr?.message || '…'`.
-Rotas de usuário comum entre elas (`vip/chat`, `social/feed`, `rest/fire`,
-`nutrition/log-entry`), e uma pública (`auth/apple/preflight`, mensagem do
-Supabase num 400). Hoje o guard casa `.message` lido de QUALQUER variável de
-erro e `String(<erro>)`, e a janela é a chamada com parêntese balanceado — a
-janela fixa de 300 caracteres atravessava para o código seguinte e acusou um
-`String(error.message).includes('duplicate')` de condição. A primeira versão
-ampliada casava `.message` solto e acusou 69 rotas que devolvem `{ message }`
-no payload (jeito nº 8). Padrão para erro de BANCO/STORAGE em 400:
-`respondDbError(key, err)`; para o catch-all: `respondInternalError(key, e)`.
-
-**Duas janelas de observação ABERTAS — flags prontas, faltando só ligar:**
-1. ~~**CSP**~~ — **LIGADO em 27/08/2026**, com a polaridade invertida. Detalhes
-   na seção do middleware, que é onde este assunto mora.
-2. ~~**Guarda de origem (SEC-08)**~~ — **BLOQUEIA desde 01/09/2026**, com a
-   polaridade invertida como no CSP: o default é enforce e
-   `ORIGIN_GUARD_ENFORCE=false` na Vercel é o freio (env var, sem deploy). A
-   janela de relatório ficou 30+ dias com ZERO mismatches em `audit_events` e
-   ninguém virou a chave — com o default no lado seguro, o esquecimento
-   protege. Regra em `originGuardEnforcedFrom`; bearer/webhook/cron passam
-   SEMPRE. Função pura em `utils/security/originGuard.ts`.
-
-   ⚠️ **A janela NÃO EXISTIA até 29/08/2026, e esta nota prometia lê-la.** O
-   relato era só `console.error('[origin-guard]', …)`, ou seja runtime log da
-   Vercel — cuja retenção não passa de ~1 dia: buscar 7 dias responde que o
-   intervalo excede a retenção e 24 h volta vazio. `audit_events` não tinha
-   NENHUMA linha de origin. Ficaram 15 dias em modo relatório sem nada
-   observável, exatamente a lição que o CSP já tinha aprendido duas seções
-   acima (log expira e fica ilegível de onde se investiga; o banco não).
-
-   Hoje o mismatch também vai para `audit_events` via
-   `utils/security/originReport.ts` — dedupe por (tipo, origem, ROTA), teto de
-   10 linhas por instância, `waitUntil` para a instância não ser congelada
-   antes do envio, e **silêncio deliberado em toda falha**: isto roda no
-   middleware, e um throw ali vira 500 no site inteiro (com o app nativo
-   carregando o front deste servidor, levaria todos os aparelhos junto). A
-   escrita sai do middleware e não de uma rota — no CSP a rota existe porque
-   quem reporta é o NAVEGADOR; aqui quem detecta é o próprio servidor.
-
-   ```sql
-   select metadata->>'kind' as tipo, metadata->>'originHost' as origem,
-          metadata->>'path' as rota, count(*) as n, max(created_at) as ultimo
-   from audit_events where action = 'origin_guard_mismatch'
-   group by 1,2,3 order by 4 desc;
-   ```
-
-   **Espere alguns dias de tráfego real antes de decidir** — a tabela começou
-   vazia em 29/08.
+**Padrão:** erro de BANCO/STORAGE em 400 → `respondDbError(key, err)`; catch-all
+→ `respondInternalError(key, e)`.
 
 **Catálogo LGPD (`lib/account/userDataCatalog.ts`) — ler ANTES de mexer em
-export/delete de conta.** Fatos medidos que ele carrega: a maioria das
-tabelas CASCATEIA no `deleteUser`; `error_reports` é ON DELETE RESTRICT (sem
-o delete manual dela, a exclusão de quem já reportou erro FALHA — foi bug
-vivo); storage nunca cascateia; tabela nova sem decisão no catálogo reprova
-no guard — o vermelho é o pedido de decisão.
+export/delete de conta.** A maioria das tabelas CASCATEIA no `deleteUser`;
+`error_reports` é ON DELETE RESTRICT (sem o delete manual, excluir quem já
+reportou erro FALHA — foi bug vivo); storage nunca cascateia.
 
-⚠️ **Esse "reprova" depende de uma FOTO, e a foto envelhece (22/08/2026).** O
-guard compara o catálogo com `PROD_TABLES_SNAPSHOT`, uma lista fixa no arquivo
-de teste — ele não pergunta nada ao banco. Entre 14/08 e 22/08 passaram SEIS
-tabelas sem decisão nenhuma: as quatro do treino em equipe (#859) e as duas do
-import de ficha por foto (#881, que guarda IMAGEM do usuário), mais o bucket
-`workout-imports`. Todas cascateiam, então o delete nunca esteve quebrado — mas
-o EXPORT LGPD ignorava esses dados, porque a rota itera o catálogo. **Migration
-nova = re-rodar o SQL do cabeçalho do catálogo e comparar com o snapshot**, na
-mesma tarefa.
+⚠️ **Esse guard compara com uma FOTO (`PROD_TABLES_SNAPSHOT`), e a foto
+envelhece.** Entre 14/08 e 22/08 passaram SEIS tabelas sem decisão — o delete
+nunca quebrou, mas o EXPORT ignorava esses dados. **Migration nova = re-rodar o
+SQL do cabeçalho do catálogo e comparar com o snapshot, na mesma tarefa.**
 
-**Xcode Cloud — o workflow 'App | Default' (push na main, só Archive) ficou
-verde depois de 4 bloqueios em cadeia**, todos diagnosticados pela ASC API
-(a chave do repo lê builds/issues — não precisa do painel web):
-`ios/App/ci_scripts/ci_post_clone.sh` instala Node + `npm ci`, desliga as
-defaults `IDEPackage*` (o originHash do Package.resolved VARIA entre
-toolchains — lockfile commitado nunca satisfaz o runner) e roda o
-`patch-ios.mjs` com `env -u CI` — o patch SE PULA quando `CI` está setado
-(guarda para a Vercel) e o Xcode Cloud seta `CI=TRUE`. Guard:
-`src/__tests__/xcodeCloudCiScript.test.ts`.
-
-**Pendências com dono definido:** FCM sem env vars na Vercel → push Android
-mudo desde 24/07. ⚠️ **Medido em 29/08/2026: não é urgente** — não há usuário
-Android real (a conta da medição está na seção do funil). As 3 chaves seguem
-fora do repo: service account do Firebase, só o dono gera. Restante da auditoria não
-atacado: ~~ATS iOS (SEC-09)~~ — fechado em 01/09/2026 (1.21.2 build 81) —, E2E/SAST no CI,
-sprint de performance (PERF-01…08), `pg_trgm` fora do schema public.
+**Xcode Cloud:** `ios/App/ci_scripts/ci_post_clone.sh` instala Node, desliga as
+defaults `IDEPackage*` (o originHash do `Package.resolved` VARIA entre
+toolchains) e roda o `patch-ios.mjs` com `env -u CI` — o patch se pula quando
+`CI` está setado, e o Xcode Cloud seta `CI=TRUE`. Guard em `xcodeCloudCiScript.test.ts`.
 
 ## Auditoria de COBRANÇAS 2026-08-14 — fechada no mesmo dia (PRs #821–#828)
 
