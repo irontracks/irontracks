@@ -35,9 +35,20 @@ describe('Outras superfícies de séries (#3)', () => {
     expect(s).toContain('{m.meta} séries')
     expect(s).not.toContain('{m.meta} sets')
   })
-  it('MuscleTrend4wPanel usa "séries equivalentes"', () => {
-    const s = read('src/components/workout-report/MuscleTrend4wPanel.tsx')
-    expect(s).toContain('séries equivalentes')
+  /**
+   * ⚠️ Até 10/09/2026 este caso lia `MuscleTrend4wPanel.tsx` — um componente que
+   * NENHUMA tela renderizava desde que os dados de 4 semanas passaram a entrar
+   * no `MuscleTrendPanel` pela prop `series`. O guard testava código morto:
+   * garantia falsa, e ninguém percebeu porque ele ficava verde.
+   *
+   * Hoje mira no painel VIVO. Ele não escreve rótulo de unidade (a tabela é
+   * Músculo/Atual/Anterior/Δ), então o que se trava é o anglicismo em texto
+   * RENDERIZADO — a variável `sets` do `.map()` é interna e não conta.
+   */
+  it('MuscleTrendPanel não mostra "sets" ao usuário', () => {
+    const s = read('src/components/workout-report/MuscleTrendPanel.tsx')
     expect(s).not.toContain('sets equivalentes')
+    expect(s, 'rótulo em inglês na tela').not.toMatch(/>\s*sets\b/i)
+    expect(s, 'o painel vivo sumiu — reveja para onde os dados 4w vão').toContain('4 semanas')
   })
 })

@@ -55,7 +55,6 @@ const TETO_GRADIENTE_INLINE: Record<string, number> = {
   'src/components/settings/ReferralSection.tsx': 2,
   'src/components/settings/SettingsSections.tsx': 1,
   'src/components/settings/settingsShared.tsx': 1,
-  'src/components/ui/PremiumUI.tsx': 1,
   'src/components/update/UpdateAvailableBanner.tsx': 1,
   'src/components/vip/VipInsightsPanel.tsx': 1,
   'src/components/vip/VipPeriodizationPanel.tsx': 1,

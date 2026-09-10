@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useMemo, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { useAssessment } from '@/hooks/useAssessment'
 import { generateAssessmentPlanAi } from '@/actions/workout-actions'
@@ -27,7 +26,6 @@ import {
   buildAssessmentChartData,
   checkChartHasData,
   buildChartOptions,
-  CHART_OPTIONS,
 } from '@/components/assessment/assessmentChartData'
 
 // ────────────────────────────────────────────────────────────────
@@ -56,7 +54,6 @@ export type AiPlanEntry = {
 // ────────────────────────────────────────────────────────────────
 
 export function useAssessmentHistoryData(studentId?: string) {
-  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const { getStudentAssessments, deleteAssessment } = useAssessment()
 
