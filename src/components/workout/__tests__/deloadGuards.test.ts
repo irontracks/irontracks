@@ -81,8 +81,14 @@ describe('sessão de deload não conta como regressão para o motor (defeito 4)'
     setFailures: null,
   }
 
-  it('marca o item de histórico quando houve deload no exercício', () => {
-    expect(deloadSrc).toMatch(/isObject\(log\.deload\)\) hadDeload = true/)
+  it('marca o item de histórico quando houve deload REAL no exercício', () => {
+    // Até 08/09/2026 este guard exigia `isObject(log.deload)) hadDeload = true`
+    // — ou seja, travava o DEFEITO: bastava a marca existir. Uma série marcada
+    // como descarga mas treinada em carga cheia (pullover 35 → 35 kg anunciando
+    // 30 %, sessão de 07/09/2026) era descartada do motor por `pickUsableHistory`.
+    // A exigência agora é a forma CORRETA, e a antiga passa a reprovar.
+    expect(deloadSrc).toMatch(/isRealDeload\(log\.deload\)\) hadDeload = true/)
+    expect(deloadSrc).not.toMatch(/isObject\(log\.deload\)\) hadDeload = true/)
     expect(deloadSrc).toMatch(/deloadApplied: hadDeload \? true : undefined/)
   })
 

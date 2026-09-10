@@ -57,6 +57,7 @@ import {
   roundSuggestion,
   reducaoEhUtil,
 } from '../helpers/deloadHelpers';
+import { isRealDeload } from '@/utils/report/sessionDeload';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
@@ -257,7 +258,19 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             // gravado por applyDeloadToExercise e, até aqui, nunca era lido por
             // ninguém — então carga reduzida de propósito entrava no histórico como
             // treino normal.
-            if (isObject(log.deload)) hadDeload = true;
+            //
+            // ⚠️ A EXISTÊNCIA da marca não basta: exige redução REAL. Até
+            // 08/09/2026 bastava o objeto existir (`isObject(log.deload)`), e
+            // `pickUsableHistory` descarta do motor de carga toda sessão com
+            // `deloadApplied` — de propósito, para não punir quem descarrega.
+            // Medido na sessão de 07/09/2026 do dono: pullover (35 → 35 kg) e
+            // tríceps corda (37,5 → 37,5), treinados em carga CHEIA mas marcados
+            // como descarga de 30 % e 25 %, sumiam do histórico do motor. O
+            // melhor sinal disponível ia para o lixo.
+            //
+            // `isRealDeload` é a fonte única — os PESOS decidem; o percentual
+            // anunciado é só o plano (ver `utils/report/sessionDeload`).
+            if (isRealDeload(log.deload)) hadDeload = true;
             if (hasValues) {
               indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages, failed });
             }

@@ -38,6 +38,37 @@ export type SessionDeload = {
 
 const VAZIO: SessionDeload = { applied: false, setsCount: 0, exerciseIdxs: [], avgReductionPct: 0 }
 
+/**
+ * FONTE ÚNICA: quanto esta marca de deload REDUZIU de fato (0–1). Zero quando
+ * não reduziu nada.
+ *
+ * Virou função exportada porque a mesma pergunta era feita em DUAS pontas, e as
+ * duas erravam igual — bastava o objeto `deload` existir:
+ *
+ *  - aqui, em `detectSessionDeload` (corrigido em #1097);
+ *  - em `useWorkoutDeload`, no `hadDeload` que monta o `reportHistory`
+ *    (`if (isObject(log.deload)) hadDeload = true`) — e é ESSA que faz
+ *    `pickUsableHistory` descartar a sessão do motor de carga.
+ *
+ * A segunda é a que dói. Uma série marcada como descarga mas treinada em carga
+ * CHEIA (07/09/2026: pullover 35 → 35 kg anunciando 30 %) sumia do histórico do
+ * motor, que perdia justamente o melhor sinal para calcular a próxima carga.
+ */
+export const deloadReductionPct = (deload: unknown): number => {
+  if (!isRec(deload)) return 0
+  // Os PESOS decidem; `reductionPct` é só o plano. O piso do exercício e a grade
+  // montável da máquina limitam a descida, e o percentual seguia sendo o teórico.
+  const de = num(deload.originalWeight)
+  const para = num(deload.suggestedWeight)
+  if (de > 0 && para > 0) return para < de ? 1 - para / de : 0
+  const direto = num(deload.reductionPct)
+  if (direto > 0 && direto < 1) return direto
+  return 0
+}
+
+/** Esta marca de deload representa uma descarga REAL? */
+export const isRealDeload = (deload: unknown): boolean => deloadReductionPct(deload) > 0
+
 /** Resumo da descarga a partir do mapa de logs ("exIdx-setIdx" → log). */
 export const detectSessionDeload = (logs: unknown): SessionDeload => {
   if (!isRec(logs)) return VAZIO
@@ -46,32 +77,7 @@ export const detectSessionDeload = (logs: unknown): SessionDeload => {
   let somaReducao = 0
   for (const [key, log] of Object.entries(logs)) {
     if (!isRec(log) || !isRec(log.deload)) continue
-    const d = log.deload
-    // A redução vem dos PESOS primeiro; `reductionPct` é só o plano.
-    //
-    // Sintoma (MK, sessão de 07/09/2026): 5 dos 7 exercícios tinham
-    // `reductionPct` divergente da diferença real entre `originalWeight` e
-    // `suggestedWeight` — o pullover anunciava 30 % e gravava 35 → 35 kg, ou
-    // seja, zero. Causa: o piso do exercício e a grade montável da máquina
-    // limitam o quanto dá pra descer, e o percentual continuava sendo o
-    // teórico, calculado antes desse ajuste.
-    //
-    // Confiar no percentual tinha duas consequências: `avgReductionPct` saía
-    // inflado, e a série entrava como descarga mesmo sem ter descarregado —
-    // fazendo `pickUsableHistory` DESCARTAR do motor de carga uma sessão em
-    // carga cheia, que era justamente o melhor sinal disponível.
-    //
-    // Os pesos são o fato; o percentual é a intenção. Quando os dois pesos
-    // estão presentes, eles decidem. `reductionPct` só entra como fallback,
-    // para logs antigos gravados sem os pesos.
-    const pct = (() => {
-      const de = num(d.originalWeight)
-      const para = num(d.suggestedWeight)
-      if (de > 0 && para > 0) return para < de ? 1 - para / de : 0
-      const direto = num(d.reductionPct)
-      if (direto > 0 && direto < 1) return direto
-      return 0
-    })()
+    const pct = deloadReductionPct(log.deload)
     if (pct <= 0) continue
     setsCount += 1
     somaReducao += pct
