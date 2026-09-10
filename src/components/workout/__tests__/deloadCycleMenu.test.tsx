@@ -20,7 +20,7 @@ const semComentarios = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\
 
 describe('semana de descarga no menu do header', () => {
   it('o item existe no menu "…"', () => {
-    expect(semComentarios).toMatch(/Semana de descarga/)
+    expect(semComentarios).toMatch(/Semana de Deload/)
     expect(semComentarios).toMatch(/startDeloadCycle\?\.\(/)
     expect(semComentarios).toMatch(/endDeloadCycle\?\.\(\)/)
   })
@@ -31,7 +31,7 @@ describe('semana de descarga no menu do header', () => {
 
   it('em ciclo, o item vira encerrar', () => {
     expect(semComentarios).toMatch(/emCicloDeDescarga\s*\?/)
-    expect(semComentarios).toMatch(/Encerrar descarga/)
+    expect(semComentarios).toMatch(/Encerrar Deload/)
   })
 
   // O CORAÇÃO DO GUARD: nada que decida a descarga pode olhar para autoLoad.

@@ -247,8 +247,8 @@ export default function WorkoutHeader() {
                     >
                       <CalendarDays size={15} />
                       {emCicloDeDescarga
-                        ? `Encerrar descarga (${deloadCycleDaysRemaining}d)`
-                        : 'Semana de descarga'}
+                        ? `Encerrar Deload (${deloadCycleDaysRemaining}d)`
+                        : 'Semana de Deload'}
                     </button>
                     <div className="h-px bg-neutral-800" />
                     <button
@@ -386,13 +386,13 @@ export default function WorkoutHeader() {
       {descargaAberta && (
         <div
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center"
-          {...backdropProps(() => setDescargaAberta(false), 'Fechar semana de descarga')}
+          {...backdropProps(() => setDescargaAberta(false), 'Fechar semana de deload')}
         >
           <div
-            {...dialogProps('Semana de descarga')}
+            {...dialogProps('Semana de deload')}
             className="w-full max-w-md rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl"
           >
-            <div className="text-lg font-bold text-white">Semana de descarga</div>
+            <div className="text-lg font-bold text-white">Semana de Deload</div>
             <p className="mt-1 text-sm text-neutral-400">
               Por quantos dias? O app volta sozinho à carga cheia quando o prazo acabar — não
               precisa lembrar de desligar.

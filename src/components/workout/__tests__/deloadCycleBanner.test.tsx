@@ -40,14 +40,14 @@ describe('ciclo de descarga no banner', () => {
   // `deloadCycleMenu.test.tsx`). Este banner só mostra ciclo EM ANDAMENTO.
   it('sem ciclo, o banner não ocupa o topo', () => {
     const { container } = render(<SessionDeloadBanner />)
-    expect(container.textContent || '').not.toMatch(/semana de descarga/i)
+    expect(container.textContent || '').not.toMatch(/semana de deload/i)
   })
 
   it('em ciclo, mostra quantos dias faltam e deixa encerrar', () => {
     ctx = base({ deloadCycleStatus: 'active', deloadCycleDaysRemaining: 3 })
     render(<SessionDeloadBanner />)
     expect(screen.getByText(/faltam 3 dias/i)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /encerrar a semana de descarga/i }))
+    fireEvent.click(screen.getByRole('button', { name: /encerrar a semana de deload/i }))
     expect(endDeloadCycle).toHaveBeenCalled()
   })
 
@@ -83,7 +83,7 @@ describe('ciclo de descarga no banner', () => {
 
       ctx = base({ autoLoadEnabled, deloadCycleStatus: 'inactive' })
       const { container, unmount: u2 } = render(<SessionDeloadBanner />)
-      expect(container.textContent || '').not.toMatch(/semana de descarga/i)
+      expect(container.textContent || '').not.toMatch(/semana de deload/i)
       u2()
     }
   })
