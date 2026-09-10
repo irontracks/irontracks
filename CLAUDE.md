@@ -1347,6 +1347,23 @@ Todo guard deve ser provado por mutação (vermelho com o bug, verde sem). Padr�
 7. **Casando com a REFERÊNCIA, não com a seção referida** — `toContain('Fase 3½')` passou verde com a fase inteira renomeada, porque outro parágrafo do mesmo arquivo dizia "a Fase 3½ decidiu". Em documento, mire no TÍTULO (`^### Fase 3½`); e quando o padrão aparece mais de uma vez, **assere dentro do BLOCO** daquela seção, não no arquivo todo — senão apagar a regra de um lugar passa despercebido porque ela existe em outro. Medido por mutação em 25/08/2026, nos guards do próprio `/documentar`.
 8. **LARGO DEMAIS — o oposto do cego, e igualmente inútil** (27/08/2026). Guard que acusa uso CORRETO é afrouxado na primeira semana, e aí não protege mais nada. Três tentativas minhas na mesma sessão, todas descartadas depois de medir: `font-mono text-xs` (para achar painel de stack) acusou volume tabular, percentual de som e coluna de tabela; `text-red-* + font-mono` acusou o contador de créditos esgotados, o cronômetro em overtime e o painel **admin** de erros, onde a stack é o produto; `red-` no arquivo das dobras acusou a validação de formulário. A conclusão que ficou: **a combinação de classes não identifica o defeito — o que identifica é ONDE ela aparece.** Restrinja o guard ao escopo (as superfícies de erro, as funções de status) em vez de abrir exceção para cada uso legítimo; allowlist com seis entradas é o papel de parede que este repo já aprendeu a não construir.
 
+## ⚠️ `AGENTS.md` é PONTEIRO, não fonte
+
+Ele foi uma CÓPIA deste arquivo, parou em 23/08/2026 e passou a MENTIR: dizia
+"6 build configs" no release iOS (são **10**), não conhecia a armadilha da
+`MARKETING_VERSION` (dois ciclos de release perdidos, 31/07 e 22/08), nem a do
+worktree que quebra o archive, nem as duas contas do simulador — cuja confusão já
+produziu dois "bugs graves" que não existiam.
+
+Corrigido em 10/09/2026: hoje ele aponta para cá e carrega só as cinco regras que
+não podem depender de alguém seguir um link. **Se algum dia alguém copiar
+conteúdo para lá de novo, a divergência recomeça** — e cópia que mente é pior que
+ponteiro, porque o agente age sobre ela.
+
+Mesma razão pela qual todo protocolo de comando mora em `docs/` e não em
+`.claude/` (que está no `.gitignore`): lá ele some em outro clone e nunca passa
+por revisão de PR.
+
 ## Antes do /clear: `/documentar`
 
 O que sobrevive ao `/clear` é o que estiver no `CLAUDE.md` — a conversa some
