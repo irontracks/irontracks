@@ -2,7 +2,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
 import { isIosNative } from '@/utils/platform'
 import { logError, logWarn, logWarnRemote } from '@/lib/logger'
 import { registerBounce, getBounceStorage, clearBoundLoginMark, decideBootRedirect, type PingResult } from '@/lib/auth/bootBounce'
@@ -63,12 +62,6 @@ const friendlyAuthError = (raw: string): string => {
     return raw.length > 120 ? 'Ocorreu um erro inesperado. Por favor, tente novamente.' : raw
 }
 
-const shouldFallbackToWeb = (error: unknown) => {
-    const rec = (error && typeof error === 'object' ? (error as Record<string, unknown>) : {}) as Record<string, unknown>
-    const msg = String(rec.message ?? error ?? '').toLowerCase()
-    const code = String(rec.code ?? '')
-    return msg.includes('authorizationerror') || msg.includes('1000') || code === '1000'
-}
 
 const getOAuthHref = (provider: string) => {
     const safeProvider = String(provider || '').trim().toLowerCase() === 'apple' ? 'apple' : 'google'
@@ -99,7 +92,6 @@ const getCrefInputKey = (cref: string, fullName: string) =>
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useLoginScreen() {
-    const router = useRouter()
 
     const [isLoading, setIsLoading] = useState(() => {
         if (typeof window === 'undefined') return false
@@ -387,7 +379,7 @@ export function useLoginScreen() {
             setIsLoading(false)
             setErrorMsg(friendlyAuthError(rawMsg))
         }
-    }, [router])
+    }, [])
 
     const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
         e.preventDefault()
@@ -501,7 +493,7 @@ export function useLoginScreen() {
         } finally {
             if (!holdLoading) setIsLoading(false)
         }
-    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router, verifyEmailCref])
+    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, verifyEmailCref])
 
     // ── Primeiro acesso (aluno convidado) — OTP por email ──────────────────────
     // Passo 1: envia o código de 6 dígitos. shouldCreateUser cria a conta na hora (o trigger

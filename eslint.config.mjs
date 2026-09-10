@@ -89,24 +89,6 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
-  // ⚠️ `no-unused-vars` desligado aqui esconde UMA coisa só, e ela é conhecida:
-  // `shouldFallbackToWeb` (detecta o erro 1000 da Apple para cair no OAuth web)
-  // existe e NUNCA é chamada — hoje o caso vira só a mensagem "use e-mail e
-  // senha". Auditoria de 10/09/2026: pode ser decisão deliberada ou fallback
-  // pela metade; a chamada é do dono, e por isso a função não foi apagada.
-  //
-  // As outras seis mortas que esta exceção cobria foram REMOVIDAS na mesma
-  // auditoria (Capacitor e hashSha256 aqui; logWarn/logInfo, CHART_OPTIONS e
-  // router nos arquivos de avaliação, que saíram desta lista). Quando o
-  // `shouldFallbackToWeb` for decidido, **apague este bloco inteiro** — sem
-  // isso ele volta a ser papel de parede.
-  {
-    files: ["src/hooks/useLoginScreen.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-vars": "off",
-      "react-hooks/exhaustive-deps": "off",
-    },
-  },
   // a11y pré-existente nos arquivos tocados pelo fix de login iOS.
   // (o `no-unused-vars` saiu daqui em 10/09/2026 — não havia mais o que esconder)
   {

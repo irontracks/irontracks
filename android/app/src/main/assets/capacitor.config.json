@@ -5,6 +5,10 @@
 	"server": {
 		"url": "https://irontracks.com.br"
 	},
+	"backgroundColor": "#0a0a0a",
+	"ios": {
+		"backgroundColor": "#0a0a0a"
+	},
 	"plugins": {
 		"PushNotifications": {
 			"presentationOptions": [
