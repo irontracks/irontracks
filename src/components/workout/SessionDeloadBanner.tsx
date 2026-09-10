@@ -128,13 +128,13 @@ export default function SessionDeloadBanner() {
     <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1">
       <div className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-amber-300/90">
         {deloadCycleStatus === 'ends_today'
-          ? 'Semana de descarga · último dia'
-          : `Semana de descarga · faltam ${deloadCycleDaysRemaining} dias`}
+          ? 'Semana de Deload · último dia'
+          : `Semana de Deload · faltam ${deloadCycleDaysRemaining} dias`}
       </div>
       <button
         type="button"
         onClick={endDeloadCycle}
-        aria-label="Encerrar a semana de descarga agora"
+        aria-label="Encerrar a semana de deload agora"
         className="shrink-0 tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
       >
         Encerrar
