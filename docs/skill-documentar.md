@@ -146,14 +146,34 @@ grep -in "<palavra-chave da nota>" CLAUDE.md | head
 
 ### Fase 5½ — O orçamento do arquivo
 
-O `CLAUDE.md` é lido INTEIRO em toda sessão de toda tarefa. Em 25/08/2026 ele
-estava em 2.505 linhas; em **05/09/2026, 3.721** — **+49% em onze dias**, ordem
-de 68 mil tokens de custo fixo antes de qualquer trabalho começar. Ou seja: a
-Fase 5½ existe há semanas e **não está segurando nada**. Toda execução acrescenta
-e nenhuma poda de verdade.
+O `CLAUDE.md` é **reenviado inteiro a CADA turno**, não uma vez por sessão. A
+curva, medida:
 
-Se você está lendo isto numa execução do comando, trate a poda como parte do
-trabalho, não como bônus: entre no arquivo procurando o que a sua tarefa tornou
+| data | linhas | custo fixo por turno |
+|---|---|---|
+| 25/08/2026 | 2.505 | — |
+| 05/09/2026 | 3.721 | ≈68k tokens |
+| **10/09/2026** | **3.959** | **≈69,1k tokens** |
+
+**+58% em dezesseis dias.** Numa sessão de 60 turnos são ~4,1 milhões de tokens
+só de instrução, antes de qualquer trabalho.
+
+⚠️ **Esta fase existe há semanas e nunca segurou nada** — o arquivo só cresceu.
+Foi por isso que nasceu o **`/enxugar`** (`docs/skill-enxugar.md`) em 10/09/2026.
+A divisão de trabalho entre os dois é o que faz a conta fechar:
+
+| | `/documentar` (este) | `/enxugar` |
+|---|---|---|
+| quando | ao fim de uma sessão, antes do `/clear` | tarefa PRÓPRIA, PR próprio |
+| escopo | **poda pontual**: só o que ESTA tarefa tornou redundante ou falso | **poda estrutural**: varre o arquivo inteiro seção por seção |
+| saldo | pode crescer, se o que entrou vale | tem que ENCOLHER, e reporta o delta |
+
+**Não tente fazer a poda estrutural aqui.** Podar com atenção exige ler as 3.959
+linhas, e uma poda apressada no fim de uma sessão longa apaga a armadilha que ia
+te salvar semana que vem. Se você perceber que o arquivo precisa de faxina,
+**diga isso ao dono e ofereça o `/enxugar`** em vez de improvisar.
+
+O que É seu aqui: entrar no arquivo procurando o que a SUA tarefa tornou
 redundante ANTES de escrever o que ela acrescenta.
 
 Duas regras concretas:

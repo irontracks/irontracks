@@ -52,9 +52,35 @@ describe('protocolo do /documentar', () => {
     const i = doc.indexOf('### Fase 5½')
     expect(i, 'a fase do orçamento sumiu').toBeGreaterThan(-1)
     const bloco = doc.slice(i, doc.indexOf('### Fase 6', i))
-    expect(bloco).toMatch(/lido INTEIRO em toda sessão/)
+    // ⚠️ A âncora anterior era a frase "lido INTEIRO em toda sessão" — e ela
+    // estava FACTUALMENTE ERRADA: o arquivo é reenviado a cada TURNO, não uma
+    // vez por sessão, o que multiplica o custo pelo tamanho da conversa. Guard
+    // ancorado em frase trava a redação, inclusive quando a redação mente.
+    // Hoje ancora no que a fase precisa DIZER, não em como diz.
+    expect(bloco, 'o custo por turno sumiu do protocolo').toMatch(/turno/i)
     expect(bloco, 'sem destino, "nota longa" não sai do CLAUDE.md').toMatch(/docs\/<assunto>\.md/)
     expect(bloco).toMatch(/tornou redundante e apague/)
+  })
+
+  /**
+   * `/documentar` ADICIONA e `/enxugar` PODA. Se este protocolo não apontar para
+   * o outro, a Fase 5½ volta a ser o que era: um parágrafo que pede poda e que
+   * nenhuma execução cumpre — o arquivo cresceu 58% em 16 dias sob a vigência
+   * dela.
+   */
+  it('manda o trabalho de faxina para o /enxugar em vez de improvisar', () => {
+    const i = doc.indexOf('### Fase 5½')
+    const bloco = doc.slice(i, doc.indexOf('### Fase 6', i))
+    expect(bloco, 'o protocolo não conhece o /enxugar').toMatch(/\/enxugar/)
+
+    // ⚠️ Asserir no BLOCO não serve: "pontual" e "estrutural" aparecem duas
+    // vezes cada aqui, então apagar um lado da tabela passava VERDE (medido por
+    // mutação). É o jeito nº 7 de guard falso — casar a referência em vez da
+    // seção referida. A fronteira mora na LINHA da tabela; é nela que se assere.
+    const linhaEscopo = bloco.split('\n').find((l) => /^\|\s*escopo\s*\|/.test(l))
+    expect(linhaEscopo, 'a linha que divide o escopo entre os dois comandos sumiu').toBeTruthy()
+    expect(linhaEscopo!, 'falta o lado PONTUAL (o que é desta fase)').toMatch(/pontual/i)
+    expect(linhaEscopo!, 'falta o lado ESTRUTURAL (o que é do /enxugar)').toMatch(/estrutural/i)
   })
 
   /**
