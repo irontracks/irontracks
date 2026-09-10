@@ -3594,6 +3594,17 @@ sustentam** — não gaste sessão com elas antes de reler:
    (`apple.review@irontracks.com.br`) e um professor com 0 sessões. O último
    token foi visto em **22/07/2026**. Configurar o FCM hoje entregaria push para
    **zero usuários reais**.
+
+   **Remedido em 09/09/2026** (o monitor da Vercel reacende isto todo dia): o
+   quadro é o MESMO — Android 5 tokens / 4 contas / último visto 22/07; iOS **32
+   tokens em 18 contas**, com atividade no dia. E os "8 erros de runtime" do
+   monitor NÃO são falha engolida: `sendPushToAllPlatforms` dispara APNs e FCM em
+   `Promise.all`, e `sendFcmToUsers` **nunca lança** — sem credencial ele registra
+   o `logError` e devolve lista vazia. O push iOS sai normal; o 200 está certo.
+   ⚠️ Antes de tratar "FCM ausente" como incidente, é isto que se mede — não o
+   log. E vale silenciar o alerta: aviso que acende todo dia sem que nada mude é
+   o mesmo padrão que o app já corrigiu no bloco PRECISA DE VOCÊ ("bloco que
+   sempre tem item deixa de ser lido").
 2. **A dívida do 2º branch do bootstrap** (usuário sem template recebe "qualquer
    workout", com o `notes` inteiro) é real e hoje afeta **UMA pessoa**: dos 39
    sem template, só 1 tem sessões — 6 sessões, ~6,8 kB de `notes` cada. O
