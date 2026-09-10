@@ -66,7 +66,6 @@ const NAO_E_JANELA: Record<string, string> = {
   'components/ExerciseEditor/EditorHeader.tsx': 'é um MENU (role="menu"), semântica própria — dialog seria errado',
   'components/workout/WorkoutFinishCelebration.tsx':
     'celebração TRANSITÓRIA de fim de treino — some sozinha em ~2,4s e usa role="status"/aria-live; dialog prenderia o foco num aviso que já passou',
-  'components/ui/PremiumUI.tsx': 'ModalOverlay sem nenhum consumidor no repo (código morto, verificado)',
 }
 
 /** Janelas de verdade que ainda não têm a semântica. SÓ ENCOLHE. */

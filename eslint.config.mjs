@@ -74,8 +74,6 @@ const eslintConfig = defineConfig([
   {
     files: [
       "src/components/dashboard/RecoveryScore.tsx",
-      "src/components/dashboard/nutrition/VoiceInput.tsx",
-      "src/components/social/GymPresenceCard.tsx",
       "src/components/vip/WorkoutHeatMap.tsx",
       "src/components/workout/HeartRateMonitor.tsx",
       // useIsIosNative intentionally sets state in useEffect — this is the
@@ -91,7 +89,17 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
-  // Pre-existing unused-var warnings in useLoginScreen (Capacitor dynamic imports pattern).
+  // ⚠️ `no-unused-vars` desligado aqui esconde UMA coisa só, e ela é conhecida:
+  // `shouldFallbackToWeb` (detecta o erro 1000 da Apple para cair no OAuth web)
+  // existe e NUNCA é chamada — hoje o caso vira só a mensagem "use e-mail e
+  // senha". Auditoria de 10/09/2026: pode ser decisão deliberada ou fallback
+  // pela metade; a chamada é do dono, e por isso a função não foi apagada.
+  //
+  // As outras seis mortas que esta exceção cobria foram REMOVIDAS na mesma
+  // auditoria (Capacitor e hashSha256 aqui; logWarn/logInfo, CHART_OPTIONS e
+  // router nos arquivos de avaliação, que saíram desta lista). Quando o
+  // `shouldFallbackToWeb` for decidido, **apague este bloco inteiro** — sem
+  // isso ele volta a ser papel de parede.
   {
     files: ["src/hooks/useLoginScreen.ts"],
     rules: {
@@ -99,16 +107,15 @@ const eslintConfig = defineConfig([
       "react-hooks/exhaustive-deps": "off",
     },
   },
-  // Pre-existing unused-var and a11y warnings in files touched by the iOS login fix.
+  // a11y pré-existente nos arquivos tocados pelo fix de login iOS.
+  // (o `no-unused-vars` saiu daqui em 10/09/2026 — não havia mais o que esconder)
   {
     files: [
-      "src/components/CoachChatModal.tsx",
       "src/components/assessment/AssessmentButton.tsx",
       "src/components/assessment/AssessmentHeader.tsx",
       "src/hooks/useAssessmentHistoryData.ts",
     ],
     rules: {
-      "@typescript-eslint/no-unused-vars": "off",
       "jsx-a11y/control-has-associated-label": "off",
       "jsx-a11y/click-events-have-key-events": "off",
       "jsx-a11y/no-static-element-interactions": "off",

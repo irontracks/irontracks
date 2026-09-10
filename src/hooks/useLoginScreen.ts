@@ -12,14 +12,11 @@ import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/uti
 import { sha256Hex } from '@/utils/auth/appleNonce'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
-let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
 type AppleAuthorizeOptions = { clientId: string; scopes: string; state?: string; nonce?: string }
 type AppleAuthorizeResponse = { response: { identityToken?: string; email?: string; givenName?: string; familyName?: string } }
 let SignInWithApple: { authorize: (opts: AppleAuthorizeOptions) => Promise<AppleAuthorizeResponse> } | null = null
 if (typeof window !== 'undefined') {
     try {
-        const cap = require('@capacitor/core')
-        if (cap?.Capacitor) Capacitor = cap.Capacitor
         const appleSignIn = require('@capacitor-community/apple-sign-in')
         if (appleSignIn?.SignInWithApple) SignInWithApple = appleSignIn.SignInWithApple
     } catch { }
@@ -40,14 +37,6 @@ const randomString = (length: number) => {
     return out
 }
 
-const hashSha256 = async (value: string) => {
-    try {
-        if (typeof window === 'undefined' || !window.crypto?.subtle) return ''
-        const data = new TextEncoder().encode(value)
-        const digest = await window.crypto.subtle.digest('SHA-256', data)
-        return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
-    } catch { return '' }
-}
 
 const isWhitelistError = (raw: string): boolean => {
     const m = raw.toLowerCase()

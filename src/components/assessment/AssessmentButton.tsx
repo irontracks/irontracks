@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
