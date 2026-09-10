@@ -1358,6 +1358,8 @@ custou caro:
 | `/irmaos` | antes de mexer em algo que tem superfície irmã | `docs/skill-irmaos.md` |
 | `/guard` | ao travar um invariante (exige `npm run mutar` vermelho) | `docs/skill-guard.md` |
 | `/tela` | conferência visual no simulador | `docs/skill-tela.md` |
+| `/auditoria` | varredura de código morto | `docs/skill-auditoria.md` |
+| `/design` | revisão de design | `docs/skill-design.md` |
 | `/documentar` | destilar a sessão antes do `/clear` | `docs/skill-documentar.md` |
 | `/enxugar` | podar este arquivo (≈68k tokens por turno) | `docs/skill-enxugar.md` |
 | `/planejamento` | Opus planeja, Sonnet executa | `docs/skill-planejamento.md` |
@@ -1368,6 +1370,19 @@ Agente `auditor-de-classe` (sonnet, `docs/agents/`): varre uma CLASSE pelos DOIS
 ⚠️ **`/documentar` ADICIONA, `/enxugar` PODA.** Rodar só o primeiro faz este
 arquivo crescer para sempre — e em 09/09/2026 ele já custava **≈68.600 tokens em
 CADA turno** (3.922 linhas), o maior custo fixo da sessão.
+
+### ⚠️ `AGENTS.md` é PONTEIRO, não fonte
+
+Ele foi uma CÓPIA deste arquivo, parou em 23/08/2026 e passou a MENTIR: dizia
+"6 build configs" no release iOS (são **10**), não conhecia a armadilha da
+`MARKETING_VERSION` (dois ciclos de release perdidos, 31/07 e 22/08), nem a do
+worktree que quebra o archive, nem as duas contas do simulador — cuja confusão já
+produziu dois "bugs graves" que não existiam.
+
+Corrigido em 10/09/2026: hoje ele aponta para cá e carrega só as cinco regras que
+não podem depender de alguém seguir um link. **Se algum dia alguém copiar
+conteúdo para lá de novo, a divergência recomeça** — e cópia que mente é pior que
+ponteiro, porque o agente age sobre ela.
 
 ## Antes do /clear: `/documentar`
 
