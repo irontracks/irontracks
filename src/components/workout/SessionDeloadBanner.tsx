@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown, CalendarDays } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import type { UnknownRecord } from './types';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
@@ -29,7 +29,6 @@ export default function SessionDeloadBanner() {
     toggleWorkoutDeload,
     deloadCycleStatus,
     deloadCycleDaysRemaining,
-    startDeloadCycle,
     endDeloadCycle,
   } = useWorkoutContext() as unknown as {
     exercises: UnknownRecord[];
@@ -42,7 +41,6 @@ export default function SessionDeloadBanner() {
     toggleWorkoutDeload: () => void;
     deloadCycleStatus: 'inactive' | 'active' | 'ends_today';
     deloadCycleDaysRemaining: number;
-    startDeloadCycle: (durationDays: number) => void;
     endDeloadCycle: () => void;
   };
 
@@ -58,9 +56,6 @@ export default function SessionDeloadBanner() {
   // Dispensar é só para esta montagem do treino — não persiste. Se o treino for
   // reaberto e o quadro continuar, o aviso volta (o dado não mudou).
   const [dispensado, setDispensado] = React.useState(false);
-  // Escolha da duração do ciclo. Atalhos de toque único pelo mesmo motivo dos
-  // percentuais logo abaixo: mão suada na academia não mira slider.
-  const [escolhendoDuracao, setEscolhendoDuracao] = React.useState(false);
   // Antes de qualquer `return null` deste componente: hook atrás de condicional
   // faz o React contar hooks a menos no re-render (o teste do banner pegou).
   const deloadModalRef = useFocusTrap(!!sessionDeloadModal, () => setSessionDeloadModal(null));
@@ -106,67 +101,44 @@ export default function SessionDeloadBanner() {
   // descarga que não existe.
   const emCiclo = deloadCycleStatus === 'active' || deloadCycleStatus === 'ends_today';
   /**
-   * Quando MOSTRAR: em ciclo, sempre — estar numa semana de descarga muda como
-   * ler cada carga do dia, e some com a dúvida "por que o peso caiu?". Fora do
-   * ciclo, só com a carga automática ligada, que é onde o assunto descarga já
-   * está em tela. Uma linha permanente a mais no topo de TODO treino custa o
-   * espaço nobre que a auditoria de 06/09/2026 mediu.
+   * Quando MOSTRAR: só COM ciclo ativo.
+   *
+   * Até 10/09/2026 a condição era `emCiclo || autoLoadEnabled`, e isso tinha
+   * dois defeitos que só apareceram com o dono usando:
+   *
+   *  1. Ele treina com a carga automática DESLIGADA. Sem ciclo ativo e sem
+   *     autoload, os dois lados do `||` eram falsos — a linha nunca era
+   *     desenhada e o botão "Iniciar" ficava INALCANÇÁVEL. Para ligar um ciclo
+   *     era preciso já ter um ciclo. Ele procurou o controle no app e não achou.
+   *  2. Com autoload ligado e nenhum ciclo, a linha ociosa aparecia no topo de
+   *     TODO treino só oferecendo "Iniciar" — exatamente o gasto de espaço nobre
+   *     que a auditoria de 06/09/2026 mediu.
+   *
+   * O erro de fundo foi de premissa: tratei descarga-de-SEMANA como assunto da
+   * carga automática. Não é. O toggle "Descarga do treino" abaixo pertence ao
+   * motor (sem motor ligado não há o que configurar), mas o ciclo é uma decisão
+   * do atleta — ele declarou "essa semana é deload" numa segunda, sem nenhum
+   * alerta do app. Por isso o INICIAR mudou de lugar: virou item do menu "…" do
+   * header (`WorkoutHeader`), alcançável em qualquer estado e sem custo de tela.
+   *
+   * Aqui fica só o que precisa ser VISTO: a faixa de ciclo em andamento, que
+   * muda como se lê a carga do dia inteiro.
    */
-  const mostrarCiclo = emCiclo || autoLoadEnabled;
-  const linhaDoCiclo = !mostrarCiclo ? null : (
-    <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-1">
-      <div className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-neutral-400">
-        {emCiclo
-          ? deloadCycleStatus === 'ends_today'
-            ? 'Semana de descarga · último dia'
-            : `Semana de descarga · faltam ${deloadCycleDaysRemaining} dias`
-          : 'Semana de descarga'}
+  const linhaDoCiclo = !emCiclo ? null : (
+    <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1">
+      <div className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-amber-300/90">
+        {deloadCycleStatus === 'ends_today'
+          ? 'Semana de descarga · último dia'
+          : `Semana de descarga · faltam ${deloadCycleDaysRemaining} dias`}
       </div>
-      {emCiclo ? (
-        <button
-          type="button"
-          onClick={endDeloadCycle}
-          aria-label="Encerrar a semana de descarga agora"
-          className="shrink-0 tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
-        >
-          Encerrar
-        </button>
-      ) : escolhendoDuracao ? (
-        <div className="flex shrink-0 items-center gap-1.5">
-          {[3, 5, 7].map((dias) => (
-            <button
-              key={dias}
-              type="button"
-              onClick={() => {
-                startDeloadCycle(dias);
-                setEscolhendoDuracao(false);
-              }}
-              aria-label={`Descarga de ${dias} dias`}
-              className="tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
-            >
-              {dias}d
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setEscolhendoDuracao(false)}
-            aria-label="Cancelar a escolha de duração"
-            className="tap-44 inline-flex h-8 items-center rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 text-[11px] font-bold uppercase tracking-wide text-neutral-400 transition-colors active:scale-95"
-          >
-            ✕
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setEscolhendoDuracao(true)}
-          aria-label="Iniciar uma semana de descarga"
-          className="shrink-0 tap-44 inline-flex h-8 items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-2.5 text-[11px] font-bold uppercase tracking-wide text-neutral-400 transition-colors active:scale-95"
-        >
-          <CalendarDays size={15} className="opacity-70" />
-          Iniciar
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={endDeloadCycle}
+        aria-label="Encerrar a semana de descarga agora"
+        className="shrink-0 tap-44 inline-flex h-8 items-center rounded-lg border border-amber-500/50 bg-amber-500/15 px-2.5 text-[11px] font-bold uppercase tracking-wide text-amber-300 transition-colors active:scale-95"
+      >
+        Encerrar
+      </button>
     </div>
   );
 

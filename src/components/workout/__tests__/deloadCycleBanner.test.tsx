@@ -10,7 +10,6 @@ import SessionDeloadBanner from '../SessionDeloadBanner'
  * (07/09/2026) e não havia onde guardar esse "até sexta". Cada sessão era um
  * evento isolado.
  */
-const startDeloadCycle = vi.fn()
 const endDeloadCycle = vi.fn()
 
 let ctx: Record<string, unknown>
@@ -27,23 +26,21 @@ const base = (extra: Record<string, unknown> = {}) => ({
   toggleWorkoutDeload: () => {},
   deloadCycleStatus: 'inactive',
   deloadCycleDaysRemaining: 0,
-  startDeloadCycle,
   endDeloadCycle,
   ...extra,
 })
 
 beforeEach(() => {
-  startDeloadCycle.mockClear()
   endDeloadCycle.mockClear()
   ctx = base()
 })
 
 describe('ciclo de descarga no banner', () => {
-  it('sem ciclo, oferece iniciar e grava a duração escolhida', () => {
-    render(<SessionDeloadBanner />)
-    fireEvent.click(screen.getByRole('button', { name: /iniciar uma semana de descarga/i }))
-    fireEvent.click(screen.getByRole('button', { name: /descarga de 5 dias/i }))
-    expect(startDeloadCycle).toHaveBeenCalledWith(5)
+  // O INICIAR não mora mais aqui — foi para o menu "…" do header (ver
+  // `deloadCycleMenu.test.tsx`). Este banner só mostra ciclo EM ANDAMENTO.
+  it('sem ciclo, o banner não ocupa o topo', () => {
+    const { container } = render(<SessionDeloadBanner />)
+    expect(container.textContent || '').not.toMatch(/semana de descarga/i)
   })
 
   it('em ciclo, mostra quantos dias faltam e deixa encerrar', () => {
@@ -68,15 +65,27 @@ describe('ciclo de descarga no banner', () => {
     render(<SessionDeloadBanner />)
     expect(screen.queryByText(/faltam/i)).toBeNull()
     expect(screen.queryByText(/último dia/i)).toBeNull()
-    expect(screen.getByRole('button', { name: /iniciar uma semana de descarga/i })).toBeTruthy()
   })
 
-  // Fora do ciclo, a linha só existe onde o assunto descarga já está em tela.
-  // O topo do treino é espaço nobre (auditoria de 06/09/2026).
-  it('sem carga automática e sem ciclo, não ocupa o topo', () => {
-    ctx = base({ autoLoadEnabled: false })
-    const { container } = render(<SessionDeloadBanner />)
-    expect(container).toBeEmptyDOMElement()
+  // GUARD DA CORREÇÃO DE 10/09/2026. A condição era `emCiclo || autoLoadEnabled`.
+  // O dono treina com a carga automática DESLIGADA: sem ciclo e sem autoload, os
+  // dois lados eram falsos, a linha sumia e o "Iniciar" — que vivia aqui — ficava
+  // INALCANÇÁVEL. Para começar um ciclo era preciso já ter um.
+  //
+  // Hoje a faixa depende SÓ do ciclo, e por isso a carga automática não muda nada
+  // sobre ela: ligada ou desligada, o que decide é haver ciclo.
+  it('a carga automática não decide mais se o ciclo aparece', () => {
+    for (const autoLoadEnabled of [true, false]) {
+      ctx = base({ autoLoadEnabled, deloadCycleStatus: 'active', deloadCycleDaysRemaining: 2 })
+      const { unmount } = render(<SessionDeloadBanner />)
+      expect(screen.getByText(/faltam 2 dias/i)).toBeTruthy()
+      unmount()
+
+      ctx = base({ autoLoadEnabled, deloadCycleStatus: 'inactive' })
+      const { container, unmount: u2 } = render(<SessionDeloadBanner />)
+      expect(container.textContent || '').not.toMatch(/semana de descarga/i)
+      u2()
+    }
   })
 
   it('mas em ciclo aparece mesmo sem carga automática', () => {
