@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, Home, MoreHorizontal, Pause, Pencil, Play, Satellite, UserPlus, X } from 'lucide-react';
+import { CalendarDays, Clock, GripVertical, Home, MoreHorizontal, Pause, Pencil, Play, Satellite, UserPlus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Carregado sob demanda: só quem toca em "Treinar em casa" paga por ele.
@@ -13,6 +13,7 @@ import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
 import { stripDayPrefix } from '@/lib/workout/workoutTitle'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import { backdropProps, dialogProps } from '@/utils/a11y/backdrop';
 import { logError, logWarn } from '@/lib/logger';
 
 export default function WorkoutHeader() {
@@ -33,12 +34,38 @@ export default function WorkoutHeader() {
     openCardioGps,
     confirm,
     cancelWorkout,
-  } = useWorkoutContext();
+    deloadCycleStatus,
+    deloadCycleDaysRemaining,
+    startDeloadCycle,
+    endDeloadCycle,
+  } = useWorkoutContext() as unknown as ReturnType<typeof useWorkoutContext> & {
+    deloadCycleStatus?: 'inactive' | 'active' | 'ends_today';
+    deloadCycleDaysRemaining?: number;
+    startDeloadCycle?: (durationDays: number) => void;
+    endDeloadCycle?: () => void;
+  };
 
   // "Hoje treino em casa": adapta o treino inteiro pelo grafo de substituição
   // (ver `lib/workout/adaptarAmbiente.ts`). Mora no menu "…" porque é ação de
   // sessão, não de exercício — a troca de UM exercício continua no card dele.
   const [adaptarAberto, setAdaptarAberto] = React.useState(false);
+  /**
+   * SEMANA DE DESCARGA — mora aqui, e não no banner do topo, porque é decisão do
+   * ATLETA, não configuração do motor de carga.
+   *
+   * Até 10/09/2026 o "Iniciar" vivia no `SessionDeloadBanner`, atrás da condição
+   * `emCiclo || autoLoadEnabled`. O dono treina com a carga automática
+   * DESLIGADA: sem ciclo e sem autoload, os dois lados eram falsos e o botão
+   * ficava inalcançável — para começar um ciclo era preciso já ter um. Ele
+   * procurou o controle no app e não achou.
+   *
+   * No menu ele custa ZERO espaço enquanto não é usado (ninguém vê menu
+   * fechado), o que também resolve a outra ponta: a linha ociosa que aparecia no
+   * topo de todo treino com autoload ligado, contra a regra de espaço nobre da
+   * auditoria de 06/09/2026.
+   */
+  const [descargaAberta, setDescargaAberta] = React.useState(false);
+  const emCicloDeDescarga = deloadCycleStatus === 'active' || deloadCycleStatus === 'ends_today';
   const { elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
 
   // Pausa em equipe transmite ao parceiro; sozinho congela o cronômetro local.
@@ -206,6 +233,23 @@ export default function WorkoutHeader() {
                       <Home size={15} />
                       Treinar em casa
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Em ciclo o item ENCERRA direto: não há o que escolher,
+                        // e obrigar a abrir um seletor para depois cancelar seria
+                        // um toque a mais para a ação mais óbvia.
+                        if (emCicloDeDescarga) endDeloadCycle?.();
+                        else setDescargaAberta(true);
+                        setOverflowOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors border-t border-neutral-800"
+                    >
+                      <CalendarDays size={15} />
+                      {emCicloDeDescarga
+                        ? `Encerrar descarga (${deloadCycleDaysRemaining}d)`
+                        : 'Semana de descarga'}
+                    </button>
                     <div className="h-px bg-neutral-800" />
                     <button
                       type="button"
@@ -335,6 +379,49 @@ export default function WorkoutHeader() {
           exercicios={(exercises ?? []).map((e) => String((e as { name?: unknown })?.name ?? '').trim()).filter(Boolean)}
           aoTrocar={(indice, nome) => swapExerciseName(indice, nome)}
         />
+      )}
+
+      {/* Escolha da duração. Atalhos de toque único, como os percentuais do
+          banner de descarga: mão suada na academia não mira slider. */}
+      {descargaAberta && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center"
+          {...backdropProps(() => setDescargaAberta(false), 'Fechar semana de descarga')}
+        >
+          <div
+            {...dialogProps('Semana de descarga')}
+            className="w-full max-w-md rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl"
+          >
+            <div className="text-lg font-bold text-white">Semana de descarga</div>
+            <p className="mt-1 text-sm text-neutral-400">
+              Por quantos dias? O app volta sozinho à carga cheia quando o prazo acabar — não
+              precisa lembrar de desligar.
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[3, 5, 7].map((dias) => (
+                <button
+                  key={dias}
+                  type="button"
+                  onClick={() => {
+                    startDeloadCycle?.(dias);
+                    setDescargaAberta(false);
+                  }}
+                  aria-label={`Descarga de ${dias} dias`}
+                  className="tap-44 rounded-xl border border-amber-500/50 bg-amber-500/15 px-3 py-3 text-sm font-black text-amber-300 transition-colors active:scale-95"
+                >
+                  {dias} dias
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDescargaAberta(false)}
+              className="mt-3 w-full rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2.5 text-sm font-black text-neutral-400 transition-colors active:scale-95"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
