@@ -369,6 +369,59 @@ describe('source-guard: a RPC não pode ganhar chave nova', () => {
         expect(fora(chavesDoJsonb(sql), permitidas)).toEqual([])
     })
 
+    /**
+     * ⚠️ O buraco que este caso fecha, medido no aparelho em 11/09/2026.
+     *
+     * A allowlist acima só PERMITE a chave — ela nunca EXIGIU nada. O PR #1126
+     * acrescentou `duration_seconds` à allowlist e aos oito builders e cinco
+     * SELECTs, e esqueceu a RPC: o campo passou a ser gravado e nunca chegava
+     * ao app. Resultado na tela: cardio com duração planejada abria com o campo
+     * TEMPO vazio e o Iniciar desabilitado — a feature inteira morta, com a
+     * suíte verde e a allowlist "atualizada".
+     *
+     * Campo por-série que o app LÊ do plano tem TRÊS pontas (escrita, SELECTs,
+     * RPC) e as três somem sozinhas e em silêncio. Aqui mora a terceira.
+     *
+     * Cada um precisa aparecer nos TRÊS ramos da função (templates do usuário,
+     * qualquer workout, template do professor) — esquecer um ramo entrega o
+     * campo só para parte da base, que é pior que não entregar para ninguém.
+     */
+    const CAMPOS_POR_SERIE_QUE_A_RPC_DEVE_EMITIR = ['per_set_method', 'duration_seconds']
+    const RAMOS_DA_RPC = 3
+
+    it.each(CAMPOS_POR_SERIE_QUE_A_RPC_DEVE_EMITIR)(
+        'a RPC emite %s nos três ramos, e por concatenação condicional',
+        (campo) => {
+            const sql = readFileSync(join(dir, arquivo as string), 'utf8')
+            // Só o SQL executável: o cabeçalho de comentários desta migration
+            // cita os campos, e casar com ele é o jeito nº 2 de guard falso.
+            const executavel = sql.slice(Math.max(0, sql.indexOf('CREATE OR REPLACE FUNCTION')))
+            const condicional = new RegExp(
+                `CASE WHEN s\\.${campo} IS NULL THEN '\\{\\}'::jsonb\\s*ELSE jsonb_build_object\\('${campo}', s\\.${campo}\\) END`,
+                'g',
+            )
+            const achados = [...executavel.matchAll(condicional)].length
+            expect(
+                achados,
+                `${campo} precisa sair por concatenação condicional nos ${RAMOS_DA_RPC} ramos ` +
+                `(achei ${achados}). Esquecer um ramo entrega o campo só para parte da base.`,
+            ).toBe(RAMOS_DA_RPC)
+
+            // ⚠️ Contar só o CASE acima passava VERDE com a chave emitida TAMBÉM
+            // de forma incondicional — `npm run mutar` pegou este guard falso.
+            // O par `'campo', s.campo` só pode existir DENTRO da concatenação:
+            // uma ocorrência a mais significa `"campo": null` em toda série de
+            // uma rota com orçamento de payload travado por teste.
+            const qualquerPar = new RegExp(`'${campo}',\\s*s\\.${campo}`, 'g')
+            const pares = [...executavel.matchAll(qualquerPar)].length
+            expect(
+                pares,
+                `${campo} aparece ${pares}× como par direto, esperado ${RAMOS_DA_RPC} (só dentro do CASE). ` +
+                `Emitir a chave sempre custa bytes em TODA série de uma rota quente.`,
+            ).toBe(RAMOS_DA_RPC)
+        },
+    )
+
     it('o extrator detecta chave nova (auto-teste — guard que não pega é guard falso)', () => {
         const sqlSabotado = `
       jsonb_build_object(
