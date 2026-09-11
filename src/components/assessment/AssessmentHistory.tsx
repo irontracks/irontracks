@@ -540,7 +540,14 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
             Só renderizamos quando há studentId — `onAddBia` no header
             também depende dele. Após salvar, a página recarrega pra puxar
             o novo registro com o pareamento já feito. */}
-        {studentId && (
+        {/* `quickBiaOpen &&` além do `studentId &&`: o modal já devolvia `null`
+            fechado, mas o `useAssessment()` dele rodava antes — um
+            `supabase.auth.getUser()` de rede por montagem da aba Avaliações, e
+            era o SEGUNDO da mesma tela (o `useAssessmentHistoryData` já chama o
+            mesmo hook). Varredura de classe de 10/09/2026. O `AnimatePresence`
+            do componente está DEPOIS do `if (!isOpen) return null`, então nunca
+            houve animação de saída para preservar. */}
+        {studentId && quickBiaOpen && (
           <QuickBIAModal
             isOpen={quickBiaOpen}
             studentId={studentId}

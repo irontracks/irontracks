@@ -153,7 +153,7 @@ export default function NutritionHistoryModal({ open, userId, todayDate, goals, 
   }, [open, userId, periodo, chave])
 
   const diasJanela = periodo?.dias ?? 0
-  const { marcados, erro: erroMarcas, alternar } = useNutritionDayFlags(userId, periodo?.inicio ?? null, periodo?.fim ?? null)
+  const { marcados, erro: erroMarcas, alternar } = useNutritionDayFlags(userId, periodo?.inicio ?? null, periodo?.fim ?? null, open)
 
   // A MESMA função calcula a média com e sem os dias marcados — duas contas
   // para o mesmo número é como nasce divergência entre a tela e o exportado.

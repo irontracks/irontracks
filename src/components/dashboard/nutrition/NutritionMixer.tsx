@@ -969,15 +969,23 @@ export default function NutritionMixer({
       {/* ── Date Navigator ──────────────────────────────────────────────── */}
       <DateNavigator currentDate={currentDateKey} todayDate={todayDate} onDateChange={handleDateChange} onOpenHistory={() => setHistoryOpen(true)} />
 
-      {/* ── Histórico (lista de dias) ───────────────────────────────────── */}
-      <NutritionHistoryModal
-        open={historyOpen}
-        userId={userId}
-        todayDate={todayDate}
-        goals={safeGoals}
-        onPickDate={handlePickFromHistory}
-        onClose={() => setHistoryOpen(false)}
-      />
+      {/* ── Histórico (lista de dias) ─────────────────────────────────────
+          Montagem CONDICIONAL: o componente já devolvia `null` fechado, mas os
+          HOOKS dele rodavam antes disso — e o `useNutritionDayFlags` disparava
+          um SELECT em `nutrition_day_flags` a cada abertura da aba NUTRIÇÃO,
+          com o histórico fechado (varredura de classe, 10/09/2026). Nada muda
+          na tela: não há animação de saída, o `if (!open) return null` já
+          cortava o render. */}
+      {historyOpen && (
+        <NutritionHistoryModal
+          open={historyOpen}
+          userId={userId}
+          todayDate={todayDate}
+          goals={safeGoals}
+          onPickDate={handlePickFromHistory}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
 
       {/* ══ HERO — Calorie Ring + Summary ════════════════════════════════ */}
       <Card glow="bg-[radial-gradient(ellipse_at_top,_rgba(250,204,21,0.08),transparent_60%)]" className="p-5">
