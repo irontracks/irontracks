@@ -46,7 +46,19 @@ export default function ExerciseList() {
   const logs = useWorkoutLogs();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const prevCompletedRef = React.useRef<Set<number>>(new Set());
-  const prevDoneKeysRef = React.useRef<Set<string>>(new Set());
+  /**
+   * Séries concluídas vistas na passagem ANTERIOR.
+   *
+   * ⚠️ `null` (e não `new Set()`) é o ponto: `null` significa "ainda não tomei a
+   * baseline", e é isso que separa retomar um treino de concluir uma série.
+   * Nascendo vazio, a primeira passagem com sessão restaurada via N séries
+   * feitas contra zero anteriores e lia a primeira delas como recém-concluída —
+   * então o app rolava a tela e trocava o exercício atual sozinho, no caminho
+   * mais comum do app (sair do treino e voltar, ou relançar com sessão salva).
+   * A guarda `if (!newlyDone) return` não cobria: ela protege contra NENHUMA
+   * conclusão, não contra conclusão PREEXISTENTE.
+   */
+  const prevDoneKeysRef = React.useRef<Set<string> | null>(null);
 
   const groups = React.useMemo(() => buildExerciseGroups(exercises as unknown[]), [exercises]);
 
@@ -89,13 +101,22 @@ export default function ExerciseList() {
     for (const [k, v] of Object.entries(logsObj)) {
       if (v?.done) doneNow.add(k);
     }
-    // Detecta a série recém-concluída (presente agora, ausente antes)
-    let newlyDone: string | null = null;
-    for (const k of doneNow) {
-      if (!prevDoneKeysRef.current.has(k)) { newlyDone = k; break; }
-    }
+    const anterior = prevDoneKeysRef.current;
     prevDoneKeysRef.current = doneNow;
-    if (!newlyDone) return;
+
+    // Primeira passagem é BASELINE, não conclusão — ver o comentário do ref.
+    if (anterior === null) return;
+
+    const novas: string[] = [];
+    for (const k of doneNow) if (!anterior.has(k)) novas.push(k);
+
+    // Concluir é UMA série por toque: não existe caminho no app que marque duas
+    // de uma vez (conferido nos 5 renderers que escrevem `done: true`). Várias
+    // aparecendo juntas é hidratação do sync ou eco do Realtime — e semear a
+    // baseline no mount não basta sozinho, porque os logs podem chegar DEPOIS
+    // dele. Este é o segundo portão, e é o que cobre esse caso.
+    if (novas.length !== 1) return;
+    const newlyDone = novas[0];
 
     const dash = newlyDone.indexOf('-');
     if (dash === -1) return;
