@@ -21,6 +21,7 @@
  */
 
 import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+import { duracaoDaSerieField } from '@/lib/workout/duracaoDaSerieField'
 
 export const WORKOUT_BACKUP_VERSION = 2
 
@@ -96,6 +97,7 @@ const toBackupSet = (raw: unknown, idx: number, ex: Record<string, unknown>): Ba
     is_warmup: set_type === 'warmup',
     advanced_config: (s.advanced_config ?? s.advancedConfig) ?? null,
     ...perSetMethodField(s),
+    ...duracaoDaSerieField(s),
   }
 }
 
