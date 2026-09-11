@@ -480,6 +480,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     propsRef.current?.onSetDeloadCycle?.(null);
   }, []);
 
+  /**
+   * Liga/desliga o encadeamento automático dos blocos de cardio. Mora aqui (e
+   * não só nas Configurações) porque a decisão é do MOMENTO: quem monta um
+   * cardio de três blocos descobre que quer isso ao olhar os três, não semanas
+   * antes num menu. Mesmo caminho de persistência do autoLoad.
+   */
+  const toggleCardioAutoChain = useCallback((next: boolean) => {
+    propsRef.current?.onToggleCardioAutoChain?.(next);
+  }, []);
+
   const toggleExerciseDeload = useCallback((exIdx: number) => {
     const ex = exercises?.[exIdx];
     const name = String((ex as Record<string, unknown>)?.name || '').trim();
@@ -995,6 +1005,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     startDeloadCycle,
     endDeloadCycle,
     toggleExerciseDeload,
+    toggleCardioAutoChain,
     currentExerciseIdx,
     setCurrentExerciseIdx,
     deleteConfirmIdx,
@@ -1112,7 +1123,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
     deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
-    deloadOffKeys, toggleExerciseDeload,
+    deloadOffKeys, toggleExerciseDeload, toggleCardioAutoChain,
     workoutDeloadEnabled, toggleWorkoutDeload,
     deloadCycleStatus, deloadCycleDaysRemaining, startDeloadCycle, endDeloadCycle,
     sessionDeloadAlert, sessionDeloadModal, setSessionDeloadModal, applyDeloadToSession,

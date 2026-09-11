@@ -88,6 +88,11 @@ export type ActiveWorkoutProps = {
   /** Liga/desliga a descarga do TREINO inteiro (chave = nome normalizado). */
   onToggleWorkoutDeload?: (workoutKey: string, nextEnabled: boolean) => void;
   /**
+   * Encadeamento automático dos blocos de cardio (persiste em
+   * settings.cardioAutoChain). Mesmo padrão do onToggleAutoLoad.
+   */
+  onToggleCardioAutoChain?: (next: boolean) => void;
+  /**
    * Grava (ou limpa) o CICLO de descarga em `settings.autoLoadDeloadCycle`.
    * `null` encerra. Ver `utils/deload/cycle` — a duração é escolhida na ativação
    * e vale para a semana toda, não para a sessão.
