@@ -60,7 +60,18 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
     const [unread, setUnread] = useState(0)
     const [input, setInput] = useState('')
     const bottomRef = useRef<HTMLDivElement>(null)
-    const lastSeenCount = useRef(0)
+    /**
+     * Quantas mensagens já foram vistas. `null` = baseline ainda não tomada.
+     *
+     * ⚠️ Nascia `0`, e as mensagens SOBREVIVEM ao desmonte deste componente: o
+     * `chatMessages` mora no `useTeamBroadcast`, cujo provider vive no shell do
+     * dashboard — acima do `ActiveWorkout`, que é quem monta e desmonta este
+     * drawer. Então, numa dupla que já conversou, sair do treino e voltar fazia
+     * `newCount = N - 0` e reacendia o badge com TODAS as mensagens já lidas.
+     * O primeiro mount da sessão é inofensivo (broadcast é efêmero, lista
+     * vazia); a exposição é a REMONTAGEM.
+     */
+    const lastSeenCount = useRef<number | null>(null)
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -71,11 +82,15 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
 
     // Track unread messages when drawer is closed
     useEffect(() => {
+        const visto = lastSeenCount.current
+        lastSeenCount.current = chatMessages.length
+        // Primeira passagem é BASELINE: o que já estava na lista quando este
+        // drawer montou não é mensagem nova — ver o comentário de lastSeenCount.
+        if (visto === null) return
         if (!open) {
-            const newCount = chatMessages.length - lastSeenCount.current
+            const newCount = chatMessages.length - visto
             if (newCount > 0) setUnread(n => n + newCount)
         }
-        lastSeenCount.current = chatMessages.length
     }, [chatMessages, open])
 
     const handleOpen = () => {

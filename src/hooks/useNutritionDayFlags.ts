@@ -29,7 +29,19 @@ type Estado = {
 
 const VAZIO: ReadonlySet<string> = new Set<string>()
 
-export function useNutritionDayFlags(userId: string | undefined, inicio: string | null, fim: string | null) {
+/**
+ * @param ativo a superfície que consome está ABERTA? Sem isto o SELECT saía com
+ *   o histórico fechado: o `NutritionHistoryModal` é montado sem condicional
+ *   (`<NutritionHistoryModal open={x} …/>`), e este hook roda antes do
+ *   `if (!open) return null` do componente — hooks vêm primeiro. O efeito
+ *   principal do MESMO modal sempre teve `if (!open …) return`; o hook irmão
+ *   não tinha nada. Medido na varredura de classe de 10/09/2026.
+ *
+ *   O chamador também passou a montar condicionalmente. Os dois existem: montar
+ *   condicionalmente resolve HOJE, o parâmetro resolve se alguém voltar a
+ *   montar sempre — e é ele que dá para testar por comportamento.
+ */
+export function useNutritionDayFlags(userId: string | undefined, inicio: string | null, fim: string | null, ativo = true) {
   const chave = `${String(userId || '')}|${inicio ?? ''}|${fim ?? ''}`
   const [estado, setEstado] = useState<Estado>({ chave: '', marcados: VAZIO, erro: '' })
   // Resultado de OUTRO intervalo não vale para este: enquanto o novo não
@@ -38,7 +50,7 @@ export function useNutritionDayFlags(userId: string | undefined, inicio: string 
 
   useEffect(() => {
     const uid = String(userId || '').trim()
-    if (!uid || !inicio || !fim) return
+    if (!ativo || !uid || !inicio || !fim) return
     let cancelado = false
 
     void (async () => {
@@ -64,7 +76,7 @@ export function useNutritionDayFlags(userId: string | undefined, inicio: string 
 
     return () => { cancelado = true }
     // `chave` cobre userId+intervalo; os três estão nas deps por clareza.
-  }, [userId, inicio, fim, chave])
+  }, [userId, inicio, fim, chave, ativo])
 
   const marcados = atual?.marcados ?? VAZIO
 
