@@ -37,6 +37,19 @@ export const EVENTOS_TREINO = {
   midiaAnexar: 'workout_set_media_attach',
   /** Mandou um exercício para depois. */
   exercicioAdiar: 'workout_exercise_defer',
+  /**
+   * A voz do cardio tentou falar. `resultado` diz o que ACONTECEU, não o que
+   * foi pedido — 'iniciou' é a única prova de som; 'nao_comecou' significa que
+   * o WebView aceitou e engoliu. Um por exercício, não por marco: o que se quer
+   * medir é "a voz funciona neste aparelho?", e isso a primeira fala responde.
+   */
+  vozDoCardio: 'workout_cardio_voice',
+  /**
+   * Um bloco de cardio começou SOZINHO. `reconstruido` separa o encadeamento ao
+   * vivo da conclusão deduzida depois de o app acordar — se a segunda for a
+   * maioria, o desenho está errado para o uso real.
+   */
+  blocoAutomatico: 'workout_cardio_chain',
 } as const
 
 export type EventoTreino = (typeof EVENTOS_TREINO)[keyof typeof EVENTOS_TREINO]

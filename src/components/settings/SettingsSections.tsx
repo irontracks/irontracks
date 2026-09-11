@@ -451,14 +451,22 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
                 {cardioVozIntervaloMin > 0 && (
                     <button
                         type="button"
-                        onClick={() => { if (!falar(fraseDoMarco(cardioVozIntervaloMin))) setVozMuda(true) }}
+                        onClick={() => {
+                            setVozMuda(false)
+                            // O aviso sai do DESFECHO, não do retorno de speak():
+                            // aceitar o pedido e engolir a fala é justamente o
+                            // modo de falha que este botão existe para revelar.
+                            falar(fraseDoMarco(cardioVozIntervaloMin), {
+                                aoResolver: (r) => setVozMuda(r !== 'iniciou'),
+                            })
+                        }}
                         className="w-full text-center text-[12px] font-bold text-yellow-500 py-1 active:scale-95 transition-transform"
                     >
                         Testar a voz agora
                     </button>
                 )}
                 {vozMuda && (
-                    <div className="text-xs text-amber-300/90 font-bold">Este aparelho não tem síntese de voz — a opção não terá efeito aqui.</div>
+                    <div className="text-xs text-amber-300/90 font-bold">A voz não saiu neste aparelho — confira o volume e o interruptor de silencioso. Se continuar, a opção não terá efeito aqui.</div>
                 )}
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Notificar ao terminar</div><div className="text-xs text-neutral-400">Mostra notificação do navegador (se permitido).</div></div>
