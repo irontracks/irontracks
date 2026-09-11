@@ -3,7 +3,7 @@ import React from 'react'
 import { setTopWeightReps, setBestE1rm, setVolume, isNonWorkingSet, nonWorkingSetLabel } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
-import { isCardioExercise, getCardioSummary } from '@/utils/report/cardioSummary'
+import { isCardioExercise, getCardioSummary, getCardioSummaries, totalMinutosDeCardio } from '@/utils/report/cardioSummary'
 import { ReportSetMediaRow } from '@/components/workout-report/ReportSetMediaRow'
 import type { SetMediaView } from '@/lib/workout/setMediaView'
 
@@ -256,12 +256,17 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
             </div>
             {isCardio ? (
                 (() => {
-                    // Pega o log da 1ª série de cardio com dado (tempo/velocidade/…).
-                    let summary = getCardioSummary(obj, null)
+                    // TODOS os blocos. ⚠️ Até 11/09/2026 isto parava no 1º log com
+                    // dado (`break`) — com a esteira em BLOCOS (#1063), dois terços
+                    // de uma sessão de 30 min não apareciam. Mesma fonte única do
+                    // PDF (`getCardioSummaries`), senão os dois divergem.
+                    const logsDoCardio: unknown[] = []
                     for (let sIdx = 0; sIdx < Math.max(1, setsCount); sIdx++) {
-                        const lg = sessionLogs[`${exIdx}-${sIdx}`]
-                        if (lg && typeof lg === 'object') { summary = getCardioSummary(obj, lg); break }
+                        logsDoCardio.push(sessionLogs[`${exIdx}-${sIdx}`])
                     }
+                    const blocos = getCardioSummaries(obj, logsDoCardio)
+                    const totalMin = totalMinutosDeCardio(blocos)
+                    const itensDe = (summary: ReturnType<typeof getCardioSummary>) => {
                     const items: Array<{ label: string; value: string }> = []
                     if (summary.timeMin != null) items.push({ label: 'Tempo', value: `${summary.timeMin} min` })
                     if (summary.speedKmh) items.push({ label: 'Velocidade', value: `${summary.speedKmh} km/h` })
@@ -271,15 +276,39 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                     if (summary.isHIT && summary.hitWorkSec != null && summary.hitRestSec != null) {
                         items.push({ label: 'HIT', value: `${summary.hitWorkSec}s / ${summary.hitRestSec}s${summary.hitRounds != null ? ` × ${summary.hitRounds}` : ''}` })
                     }
-                    if (items.length === 0) {
+                        return items
+                    }
+
+                    if (!blocos.length || blocos.every((b) => itensDe(b).length === 0)) {
                         return <div className="py-3 text-sm text-neutral-400">Cardio concluído.</div>
                     }
-                    return (
+
+                    const grade = (items: Array<{ label: string; value: string }>) => (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1">
                             {items.map((it) => (
                                 <div key={it.label} className="rounded-lg bg-neutral-900/60 border border-neutral-800 px-3 py-2">
                                     <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">{it.label}</div>
                                     <div className="text-base font-bold text-neutral-100 mt-0.5">{it.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+
+                    if (blocos.length === 1) return grade(itensDe(blocos[0]))
+
+                    return (
+                        <div className="py-1">
+                            {/* Com mais de um bloco o total precisa ser dito: três linhas
+                                soltas não somam 30 min na cabeça de ninguém. */}
+                            {totalMin != null && (
+                                <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black pb-1">
+                                    {blocos.length} blocos · {totalMin} min no total
+                                </div>
+                            )}
+                            {blocos.map((b, i) => (
+                                <div key={i} className="mb-1">
+                                    <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black pt-1">Bloco {i + 1}</div>
+                                    {grade(itensDe(b))}
                                 </div>
                             ))}
                         </div>

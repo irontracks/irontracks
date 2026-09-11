@@ -92,6 +92,13 @@ const CHAVES_SERIE = new Set([
     // ver a migration), então o payload de quem nunca usou o seletor é byte a
     // byte o de antes.
     'per_set_method',
+    // Duração de CADA bloco de cardio (11/09/2026). Decisão consciente de campo
+    // novo em rota quente, e o custo foi medido antes: `smallint` nulo na
+    // esmagadora maioria das séries — só cardio em blocos o preenche, e o app
+    // tem 6 exercícios de esteira no total. O ganho é o oposto de cosmético:
+    // sem esta coluna na LEITURA, o tempo de cada bloco voltava `null` do banco
+    // e era APAGADO no save seguinte (ver `lib/workout/duracaoDaSerieField`).
+    'duration_seconds',
 ])
 
 /** Marcadores de sessão logada — o bootstrap serve plano, não histórico. */
@@ -316,7 +323,7 @@ describe('source-guard: SELECTs da rota são conjuntos fechados', () => {
 
     it('sets: só as colunas conhecidas (+ embed de workout_id)', () => {
         expect(colunasDe('advanced_config')).toEqual([
-            'advanced_config', 'exercise_id', 'exercises!inner(workout_id)', 'id',
+            'advanced_config', 'duration_seconds', 'exercise_id', 'exercises!inner(workout_id)', 'id',
             'is_warmup', 'per_set_method', 'reps', 'rpe', 'set_number', 'weight',
         ])
     })

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { unilateralPersistFields } from '@/lib/workout/unilateralPersistFields'
 import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+import { duracaoDaSerieField } from '@/lib/workout/duracaoDaSerieField'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 /**
@@ -113,6 +114,7 @@ export function buildTeacherExercisesPayload(exercises: unknown): TeacherExercis
                     set_type: setType,
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
                     ...perSetMethodField(sObj),
+                    ...duracaoDaSerieField(sObj),
                 })
             }
             return {

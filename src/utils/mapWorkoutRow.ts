@@ -54,6 +54,11 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                             // chegaria à tela: a hidratação é o único caminho entre
                             // `sets` e o card.
                             per_set_method: s?.per_set_method ?? s?.perSetMethod ?? null,
+                            // ⚠️ A duração é a SEGUNDA ponta do campo por série: sem
+                            // ela aqui, o bloco de cardio volta do banco sem tempo e o
+                            // editor reescreve `null` no próximo save. Ver
+                            // `lib/workout/duracaoDaSerieField`.
+                            durationSeconds: s?.duration_seconds ?? s?.durationSeconds ?? null,
                         }
                     }
                 )

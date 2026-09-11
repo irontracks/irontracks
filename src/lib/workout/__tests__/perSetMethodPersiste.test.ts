@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+import { duracaoDaSerieField } from '@/lib/workout/duracaoDaSerieField'
 
 describe('perSetMethodField — fonte única', () => {
     it('camelCase (estado do app) vence snake_case (linha do banco)', () => {
@@ -90,6 +91,51 @@ describe('guard de classe — quem monta linha de SÉRIE passa pela fonte única
             .map((f) => path.relative(SRC, f))
         expect(faltando, 'use perSetMethodField — a RPC recria as séries e apaga o que não vier no payload').toEqual([])
     })
+
+    /**
+     * ⚠️ A DURAÇÃO é irmã do método, na coluna ao lado — e ela ficou de fora dos
+     * OITO builders desde sempre.
+     *
+     * Medido em 11/09/2026 na conta do dono: a Esteira do "QUI · Lower B" tinha
+     * três blocos com `{speed: 4|5|6}` no template e `duration_seconds` NULL nos
+     * três, enquanto a sessão daquele dia registrava 300s, 600s e 900s. A
+     * velocidade sobrevivia porque viaja dentro de `advanced_config` (que É
+     * copiado) e o TEMPO de cada bloco se perdia — um cardio de 30 minutos
+     * voltava ao plano como três blocos sem duração.
+     *
+     * Mesmo detector, porque é exatamente o mesmo conjunto de builders.
+     */
+    it('builder que monta série sem duracaoDaSerieField reprova', () => {
+        const faltando = builders
+            .filter((f) => !/duracaoDaSerieField\s*\(/.test(stripComments(readFileSync(f, 'utf8'))))
+            .map((f) => path.relative(SRC, f))
+        expect(faltando, 'use duracaoDaSerieField — sem ele o tempo de cada bloco de cardio é APAGADO a cada save').toEqual([])
+    })
+})
+
+describe('duracaoDaSerieField — fonte única', () => {
+    it('camelCase (estado do app) vence snake_case (linha do banco)', () => {
+        expect(duracaoDaSerieField({ durationSeconds: 300, duration_seconds: 900 }))
+            .toEqual({ duration_seconds: 300 })
+    })
+
+    it('lê a linha do banco quando é só o que existe', () => {
+        expect(duracaoDaSerieField({ duration_seconds: 600 })).toEqual({ duration_seconds: 600 })
+    })
+
+    it('zero e negativo viram null — "bloco de zero segundo" não é "sem duração"', () => {
+        expect(duracaoDaSerieField({ durationSeconds: 0 })).toEqual({ duration_seconds: null })
+        expect(duracaoDaSerieField({ durationSeconds: -5 })).toEqual({ duration_seconds: null })
+        expect(duracaoDaSerieField({})).toEqual({ duration_seconds: null })
+        expect(duracaoDaSerieField(null)).toEqual({ duration_seconds: null })
+    })
+
+    it('os três blocos da sessão real sobrevivem', () => {
+        const blocos = [{ durationSeconds: 300 }, { durationSeconds: 600 }, { durationSeconds: 900 }]
+        expect(blocos.map(duracaoDaSerieField)).toEqual([
+            { duration_seconds: 300 }, { duration_seconds: 600 }, { duration_seconds: 900 },
+        ])
+    })
 })
 
 /**
@@ -131,5 +177,19 @@ describe('guard de classe — todo SELECT de série que lê advanced_config lê 
     it('select de série sem per_set_method reprova', () => {
         const faltando = selects.filter((s) => !/\bper_set_method\b/.test(s.trecho)).map((s) => s.file)
         expect(faltando, 'o campo existe no banco e some na leitura — a série volta a aparecer como Normal').toEqual([])
+    })
+
+    /**
+     * A duração tem as MESMAS duas pontas. Medido em 11/09/2026: os quatro
+     * SELECTs liam `advanced_config` e `per_set_method` e ignoravam
+     * `duration_seconds` — então o bloco de cardio voltava do banco sem tempo, e
+     * o editor reescrevia `null` no save seguinte. O dado era apagado pela
+     * própria leitura.
+     */
+    it('select de série sem duration_seconds reprova', () => {
+        const faltando = selects
+            .filter((s) => !/\bduration_seconds\b/.test(s.trecho))
+            .map((s) => s.file)
+        expect(faltando, 'o tempo de cada bloco de cardio some na leitura e é apagado no próximo save').toEqual([])
     })
 })

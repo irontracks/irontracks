@@ -40,7 +40,7 @@ const hydrateWorkouts = async (
     try {
       const { data } = await supabase
         .from('sets')
-        .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, per_set_method')
+        .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, per_set_method, duration_seconds')
         .in('exercise_id', exerciseIds)
         .order('set_number', { ascending: true })
         .limit(20000)

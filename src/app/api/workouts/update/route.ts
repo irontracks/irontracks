@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+import { duracaoDaSerieField } from '@/lib/workout/duracaoDaSerieField'
 import { respondInternalError } from '@/utils/api/internalError'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
@@ -43,6 +44,7 @@ const buildExercisesPayload = (workout: unknown) => {
           is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
           advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
           ...perSetMethodField(s),
+          ...duracaoDaSerieField(s),
         })
       }
       return {

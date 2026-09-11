@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 import { perSetMethodField } from '@/lib/workout/perSetMethodField'
+import { duracaoDaSerieField } from '@/lib/workout/duracaoDaSerieField'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import type { ActionResult } from '@/types/actions'
@@ -69,6 +70,7 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
                     set_type: setType,
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
                     ...perSetMethodField(sObj),
+                    ...duracaoDaSerieField(sObj),
                 })
             }
             return {

@@ -273,7 +273,7 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         id, user_id, created_by, name, notes, archived_at, sort_order, created_at,
         exercises (
           id, name, notes, video_url, rest_time, cadence, method, "order",
-          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config, per_set_method )
+          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config, per_set_method, duration_seconds )
         )
       `)
       .eq('id', id)
@@ -301,6 +301,7 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
           weight: s.weight,
           isWarmup: !!s.is_warmup,
           advancedConfig: (s.advanced_config as AdvancedConfig | AdvancedConfig[] | null) ?? null,
+          durationSeconds: (s as { duration_seconds?: number | null }).duration_seconds ?? null,
         }))
         const nonEmptyReps = setDetails.map((s) => s.reps).filter((r): r is string => typeof r === 'string' && r.trim() !== '')
         const defaultReps = isCardio ? '20' : '10'
