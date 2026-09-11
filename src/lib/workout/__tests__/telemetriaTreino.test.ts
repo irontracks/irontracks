@@ -30,6 +30,8 @@ const PONTOS: Array<[chave: string, arquivo: string]> = [
   ['serieConcluida', 'components/workout/useActiveWorkoutController.ts'],
   ['notaAbrir', 'components/workout/useActiveWorkoutController.ts'],
   ['exercicioAdiar', 'components/workout/useActiveWorkoutController.ts'],
+  ['vozDoCardio', 'components/workout/CardioSetInput.tsx'],
+  ['blocoAutomatico', 'components/workout/CardioSetInput.tsx'],
   ['trocaAplicar', 'components/workout/hooks/useWorkoutExerciseCrud.ts'],
   ['descansoIniciar', 'components/workout/RestTimerOverlay.tsx'],
   ['metodoDaSerie', 'components/workout/set-renderers/SetMethodPicker.tsx'],

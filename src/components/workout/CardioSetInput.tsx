@@ -14,6 +14,7 @@ import {
   segundosJaFeitos,
 } from '@/lib/workout/vozDoCardio'
 import { falar } from '@/lib/voz'
+import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino'
 
 type Props = {
   ex: UnknownRecord
@@ -89,6 +90,25 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
     return segundosJaFeitos(anteriores)
   })()
   const ultimoMarcoRef = useRef<number>(0)
+  // A telemetria da voz é UMA por exercício: o que se mede é "fala neste
+  // aparelho?", e a primeira tentativa já responde. Um evento por marco viraria
+  // ruído — trinta linhas por cardio de meia hora.
+  const jaReportouVozRef = useRef(false)
+
+  /** Fala e, na primeira vez do exercício, registra o DESFECHO (não o pedido). */
+  const falarComRelato = useCallback((texto: string) => {
+    if (jaReportouVozRef.current) { falar(texto); return }
+    jaReportouVozRef.current = true
+    falar(texto, {
+      aoResolver: (resultado, detalhe) => {
+        rastrearTreino(EVENTOS_TREINO.vozDoCardio, {
+          resultado,
+          detalhe: detalhe || undefined,
+          intervaloMin: vozIntervaloMin,
+        })
+      },
+    })
+  }, [vozIntervaloMin])
 
   const plannedDurationSec =
     log.durationSeconds != null && Number.isFinite(Number(log.durationSeconds))
@@ -175,6 +195,9 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
         // foi medido com alguém olhando — ver o aviso âmbar mais abaixo.
         ...(reconstruido ? { autoChainReconstruido: true } : {}),
       })
+      if (reconstruido) {
+        rastrearTreino(EVENTOS_TREINO.blocoAutomatico, { bloco: setIdx + 1, reconstruido: true })
+      }
       // Carimba o próximo bloco: é ele quem decide o que fazer com o horário.
       if (autoChainOn && temProximoBloco) {
         updateLog(proximaKey, { autoStartAtMs: proximoBlocoComecaEmMs(fimMs, restTime) })
@@ -194,7 +217,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
     },
     [
       key, updateLog, speed, incline, isTreadmill, restTime, startTimer, maybeCollapseIfLastSet,
-      autoChainOn, temProximoBloco, proximaKey,
+      autoChainOn, temProximoBloco, proximaKey, setIdx,
     ],
   )
 
@@ -209,8 +232,11 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
     setIsRunning(true)
     // Só anuncia o bloco quando ele trocou SOZINHO. Quem tocou em "Iniciar"
     // acabou de ler na tela o que vem — repetir em voz alta é ruído.
+    if (automatico) {
+      rastrearTreino(EVENTOS_TREINO.blocoAutomatico, { bloco: setIdx + 1, reconstruido: false })
+    }
     if (automatico && vozLigada) {
-      falar(fraseDoBloco({
+      falarComRelato(fraseDoBloco({
         numero: setIdx + 1,
         duracaoSegundos: targetSeconds,
         velocidade: speed,
@@ -232,7 +258,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
         setIsRunning(false)
       },
     })
-  }, [targetSeconds, startTimer, key, name, commitLog, vozLigada, setIdx, speed, isTreadmill])
+  }, [targetSeconds, startTimer, key, name, commitLog, vozLigada, setIdx, speed, isTreadmill, falarComRelato])
 
   const handleStart = useCallback(() => {
     if (Date.now() - lastToggleRef.current < 400) return
@@ -317,10 +343,10 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
       const marco = marcoDeVozMinutos(total, vozIntervaloMin, ultimoMarcoRef.current)
       if (marco == null) return
       ultimoMarcoRef.current = marco
-      falar(fraseDoMarco(marco))
+      falarComRelato(fraseDoMarco(marco))
     }, 1000)
     return () => clearInterval(id)
-  }, [vozLigada, isRunning, vozIntervaloMin, segundosDosBlocosAnteriores])
+  }, [vozLigada, isRunning, vozIntervaloMin, segundosDosBlocosAnteriores, falarComRelato])
 
   const handleStop = useCallback(() => {
     if (Date.now() - lastToggleRef.current < 400) return
