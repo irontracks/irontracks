@@ -14,7 +14,7 @@ import {
 import { setTopWeightReps, setTotalReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
-import { isCardioExercise, getCardioSummary, type CardioSummary } from '@/utils/report/cardioSummary'
+import { isCardioExercise, getCardioSummaries, totalMinutosDeCardio, type CardioSummary } from '@/utils/report/cardioSummary'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { sessionKcalInputs, isSessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
@@ -268,17 +268,22 @@ export function buildReportData(
 
     const showProgression = sets.some((s) => !!s?.progression)
 
-    // Cardio: pega o resumo (tempo/velocidade/…) do 1º log com dado — a tabela de
-    // carga/reps não se aplica (e o log moderno de cardio nem tem weight/reps).
+    // Cardio: TODOS os blocos (tempo/velocidade/…) — a tabela de carga/reps não
+    // se aplica (o log moderno de cardio nem tem weight/reps).
+    //
+    // ⚠️ Até 11/09/2026 isto parava no 1º log com dado (`break`). Com um bloco
+    // só estava certo; desde a esteira em BLOCOS (#1063), dois terços de uma
+    // sessão de 30 min sumiam do relatório. Ver `getCardioSummaries`.
     const isCardio = isCardioExercise(exObj)
-    let cardio: CardioSummary | null = null
+    let cardios: CardioSummary[] = []
     if (isCardio) {
-      cardio = getCardioSummary(exObj, null)
+      const logsDoCardio: unknown[] = []
       for (let sIdx = 0; sIdx < Math.max(1, setsPlanned); sIdx++) {
-        const lg = sessionLogs[`${exIdx}-${sIdx}`]
-        if (isRecord(lg)) { cardio = getCardioSummary(exObj, lg); break }
+        logsDoCardio.push(sessionLogs[`${exIdx}-${sIdx}`])
       }
+      cardios = getCardioSummaries(exObj, logsDoCardio)
     }
+    const cardio: CardioSummary | null = cardios[0] ?? null
 
     return {
       name: String(exObj?.name || '').trim(),
@@ -291,6 +296,7 @@ export function buildReportData(
       caloriesKcal: 0,
       isCardio,
       cardio,
+      cardios,
       sets,
     }
   })
@@ -719,6 +725,31 @@ export function buildReportHTML(
     return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:4px 0">${cells}</div>`
   }
 
+  /**
+   * Todos os blocos, um card por bloco.
+   *
+   * ⚠️ Com MAIS DE UM bloco o cabeçalho muda: aparece "Bloco N" e o tempo TOTAL.
+   * Sem isso, três linhas de "Tempo 5 min · 10 min · 15 min" soltas não dizem
+   * que são partes de um mesmo cardio de 30 minutos.
+   */
+  const cardioBlocosHtml = (blocos: CardioSummary[]): string => {
+    if (!blocos.length) return cardioBlockHtml(null)
+    if (blocos.length === 1) return cardioBlockHtml(blocos[0])
+
+    const total = totalMinutosDeCardio(blocos)
+    const cabecalho = total != null
+      ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#facc15;font-weight:800;padding:2px 0 6px">
+           ${blocos.length} blocos &middot; ${total} min no total
+         </div>`
+      : ''
+    const corpo = blocos.map((b, i) =>
+      `<div style="margin-bottom:6px">
+         <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#a3a3a3;font-weight:800;padding:2px 0">Bloco ${i + 1}</div>
+         ${cardioBlockHtml(b)}
+       </div>`).join('')
+    return `<div style="padding:2px 0">${cabecalho}${corpo}</div>`
+  }
+
   const exercisesHtml = (Array.isArray(reportData?.exercises) ? reportData.exercises : []).map((ex, exIdx) => {
     const sets = Array.isArray(ex?.sets) ? ex.sets : []
     const isCardio = !!(ex as { isCardio?: unknown })?.isCardio
@@ -787,7 +818,7 @@ export function buildReportHTML(
             ${kcal > 0 ? `<span class="meta-pill" style="color:#fbbf24">~${escapeHtml(kcal.toLocaleString('pt-BR'))} kcal</span>` : ''}
           </div>
         </div>
-        ${isCardio ? cardioBlockHtml((ex as { cardio?: CardioSummary | null })?.cardio ?? null) : `
+        ${isCardio ? cardioBlocosHtml((ex as { cardios?: CardioSummary[] })?.cardios ?? []) : `
         <div class="table-wrap">
           <table>
             <thead>
