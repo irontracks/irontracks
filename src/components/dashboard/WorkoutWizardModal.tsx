@@ -274,11 +274,28 @@ export default function WorkoutWizardModal(props: Props) {
   /** Último erro visto: distingue desistência de fracasso do produto. */
   const lastErrorRef = React.useRef<string>('')
   const outcomeRef = React.useRef<'pending' | 'manual' | 'draft_used' | 'drafts_saved'>('pending')
+  /**
+   * O wizard chegou a ser ABERTO nesta montagem?
+   *
+   * ⚠️ Sem isto, o efeito de abandono dispara no MOUNT: o modal é montado sem
+   * condicional pelo dashboard (`<WorkoutWizardModal isOpen={...} />`, não
+   * `{aberto && <WorkoutWizardModal/>}`), então na primeira renderização
+   * `isOpen` é false e `outcomeRef` ainda é 'pending' — as duas guardas passam
+   * e o app grava um abandono de um wizard que ninguém abriu.
+   *
+   * Medido em produção em 10/09/2026: **1.207 dos 1.213 eventos
+   * `wizard_abandoned` (99,5%)** estavam no passo 0 com `interagiu: false`, e o
+   * maior emissor era a conta de teste. Contra-prova: uma conta registrava 128
+   * abandonos com ZERO `wizard_open`. O evento que deveria medir o gargalo de
+   * ativação — o maior problema do produto — era ruído.
+   */
+  const foiAbertoRef = React.useRef(false)
 
   useEffect(() => { if (step > deepestStepRef.current) deepestStepRef.current = step }, [step])
 
   useEffect(() => {
     if (!isOpen) return
+    foiAbertoRef.current = true
     deepestStepRef.current = 0
     outcomeRef.current = 'pending'
     hasStartedRef.current = false
@@ -312,6 +329,9 @@ export default function WorkoutWizardModal(props: Props) {
   // instrumentação antiga não conseguia sequer formular.
   useEffect(() => {
     if (isOpen) return
+    // Fechado E nunca aberto = é o MOUNT, não um abandono. Esta é a guarda que
+    // faltava; ver o comentário de `foiAbertoRef`.
+    if (!foiAbertoRef.current) return
     if (outcomeRef.current !== 'pending') return
     // ⚠️ Abrir e fechar na etapa 0 TAMBÉM conta — a guarda que descartava esse
     // caso escondia justamente o mais comum. Medido em 30/08/2026: 53 aberturas
