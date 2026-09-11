@@ -139,6 +139,11 @@ else
     echo "==> Enviando dSYM ao Sentry..."
     # `|| true`: o release não pode morrer porque a telemetria falhou. O aviso
     # acima já denuncia o caso em que o token falta; aqui a falha é de rede.
+    # ⚠️ `javascript-nextjs` está CERTO — não "corrija" para um slug com cara de
+    # iOS. O app nativo e o site dividem o mesmo projeto (id 4511127085842432, o
+    # mesmo do DSN em Sentry.xcconfig), e é lá que estão as releases `ios@…`.
+    # Conferido pela API em 10/09/2026, depois de o nome me levar a investigar
+    # um "dSYM no projeto errado" que não existia.
     SENTRY_ORG="${SENTRY_ORG:-irontracks-company}" \
     SENTRY_PROJECT="${SENTRY_PROJECT:-javascript-nextjs}" \
     "$SENTRY_CLI" debug-files upload \
