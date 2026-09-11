@@ -1103,8 +1103,13 @@ inclui `**/*.ts`, então o build está checando os ~457 arquivos de teste". Medi
 `tsconfig.build.json` excluindo testes não resolve nada.
 
 **Onde a memória vai:** build local completo = 47 s e pico de 2,6 GB — e local
-NÃO sobe sourcemaps, porque `SENTRY_AUTH_TOKEN` não existe fora da Vercel
-(`next.config` desabilita quando falta o token). Lá o upload de centenas de
+não subia sourcemaps, porque `SENTRY_AUTH_TOKEN` não existia fora da Vercel
+(`next.config` desabilita com `disable: !process.env.SENTRY_AUTH_TOKEN`).
+⚠️ **Essa premissa CAIU em 09/09/2026**: o #1106 pôs o token no `.env.local`,
+que o Next carrega sozinho — então `npm run build` daqui passou a gerar E subir
+sourcemaps ao Sentry. A medição de 2,6 GB é anterior a isso; refaça antes de
+comparar com a Vercel, e saiba que todo build local agora gasta quota de
+release. Lá o upload de centenas de
 `.js.map` roda antes do `tsc`, e é a soma que estoura o container. Por isso o OOM
 não reproduz na máquina local.
 
@@ -2275,6 +2280,35 @@ que manter a sessão de áudio ativa já roubou o foco do Spotify uma vez. A out
 saída, *critical alert*, exige entitlement especial da Apple. **A solução em
 vigor é o usuário desligar o silencioso durante o treino.**
 
+## Sentry: UM projeto para o app inteiro — e o nome engana (10/09/2026)
+
+`javascript-nextjs` (org `irontracks-company`, **id 4511127085842432**) recebe
+web E nativo. O id é o mesmo do DSN em `ios/App/App/Sentry.xcconfig`, as
+releases `ios@<versão>.<build>` estão lá, e é para lá que o `ios-release.sh`
+manda os dSYMs — 16 debug files (`App`, `IronTracksWidgets`,
+`NotificationService`, Watch, Capacitor) enviados em 09/09. **Não existe
+projeto separado de iOS.**
+
+O `Sentry.xcconfig.example` dizia "Projects → irontracks-ios", que **não
+existe**, e essa linha sozinha me fez concluir que o dSYM ia para o projeto
+errado — hipótese inteira sobre uma nota falsa, derrubada quando a API mostrou
+os dois ids iguais. Guard em `__tests__/sentryProjetoUnico.test.ts`: as três
+fontes do slug (next.config, ios-release.sh, xcconfig.example) precisam
+concordar, e o id também.
+
+⚠️ **Ler issue/evento daqui NÃO dá**: o token do `.env.local` é de upload (403
+em `/issues/`), e o MCP do Sentry vive caindo. O que responde sem token:
+`/api/0/organizations/irontracks-company/releases/` (escopo de release) — foi
+ele que provou a identidade do projeto. Para stack trace, ou o dono cola do
+painel, ou é preciso um token com `event:read`.
+
+**App Hang: a régua mudou na build 84.** O #1104 trocou para V2 com
+`enableReportNonFullyBlockingAppHangs = false`, porque o V1 a 2000 ms reportava
+o boot normal (FCP p95 = 2883 ms) como hang. "App Hanging **Fully Blocked**" é
+a régua nova — app de fato congelado. Evento com "(N frames não exibidos)" é a
+UI colapsando frames de sistema, **não** falta de símbolo: os dSYMs estão lá,
+basta expandir no painel.
+
 ## Descanso do treino — ações nativas chegam ATRASADAS
 
 `REST_DONE` ("Iniciar Serie") e `SKIP_REST` ("Pular Descanso") são botões da notificação de tela bloqueada e ENCERRAM o descanso. **O iOS enfileira essas ações quando o app está suspenso** e as entrega quando ele acorda — depois de o usuário já ter concluído a série seguinte. Resultado relatado em treino: "aperto concluir e vai direto pro tempo de treino", intermitente e sempre na 1ª série do exercício (a que vem logo após o descanso anterior).
@@ -2286,7 +2320,7 @@ Guarda em `useNativeTimerActions`: ação nativa não encerra descanso com menos
 ## ⚠️ Live Activity (Ilha Dinâmica + tela bloqueada) — ZONA DE NÃO MEXER
 **Esta área já quebrou 12+ vezes, sempre EM SILÊNCIO.** Antes de tocar em qualquer coisa aqui, rode `npx vitest run src/hooks/__tests__/liveActivityRegressionGuards.test.ts` e `src/utils/native/__tests__/liveActivityDiag.test.ts`. Se um guard falhar, você está reintroduzindo uma regressão conhecida — **corrija o código, não afrouxe o teste.** (Esta linha citava um `liveActivityTelemetry.test.ts` que NUNCA existiu no repo — conferido em 04/08/2026.)
 
-**A telemetria daqui vai para DOIS lugares, e o segundo existe por um motivo prático.** `reportLiveActivityFailure` manda ao Sentry (tags `area:live-activity`, `activitiesEnabled`, `nativeError`) e `reportLiveActivityToAudit` grava em `audit_events` (`action = 'live_activity_start_failed'`). O Sentry sozinho não bastou: em 04/08/2026 a LA sumiu do iPhone do dono e o diagnóstico travou porque **o token do Sentry não existe no repo nem no ambiente local** — a pista estava lá e era ilegível de onde se investiga. Consulta:
+**A telemetria daqui vai para DOIS lugares, e o segundo existe por um motivo prático.** `reportLiveActivityFailure` manda ao Sentry (tags `area:live-activity`, `activitiesEnabled`, `nativeError`) e `reportLiveActivityToAudit` grava em `audit_events` (`action = 'live_activity_start_failed'`). O Sentry sozinho não bastou: em 04/08/2026 a LA sumiu do iPhone do dono e o diagnóstico travou porque **não havia como LER o Sentry de onde se investiga** — a pista estava lá e era ilegível. Continua valendo em 10/09/2026, por outro motivo: desde o #1106 existe `SENTRY_AUTH_TOKEN` no `.env.local`, mas ele é de **upload** (escopo de release/debug-files) e responde **403 em issues e eventos**. Para ler o painel daqui é preciso um token com `event:read`. Consulta:
 
 ```sql
 select created_at, metadata->>'stage', metadata->>'nativeError',

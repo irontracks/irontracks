@@ -11,8 +11,11 @@ produção um dia sem atualizar — e o app nativo carrega o front do servidor,
 então isso segura TODOS os usuários, não só a web.
 
 Onde a memória vai: o upload de sourcemaps do Sentry e o `tsc` no mesmo
-container. Por isso não reproduz local, onde `SENTRY_AUTH_TOKEN` não existe e os
-sourcemaps nem são gerados.
+container. Não reproduzia local porque `SENTRY_AUTH_TOKEN` não existia aqui e os
+sourcemaps nem eram gerados — ⚠️ **premissa vencida desde 09/09/2026**, quando o
+#1106 pôs o token no `.env.local` (que o Next carrega sozinho). Hoje o build
+local também gera e sobe sourcemaps; a medição antiga não serve mais de
+contraste.
 
 Está versionado no repo, e não como env var no painel, para o ajuste sobreviver
 a quem recriar o projeto na Vercel.
