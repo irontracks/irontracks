@@ -173,6 +173,19 @@ export const UserSettingsSchema = z
     restTimerTickCountdown: z.boolean().default(true),
     restTimerAutoStart: z.boolean().default(false),
     restTimerDefaultSeconds: z.number().default(90),
+    /**
+     * Cardio com vários blocos encadeia sozinho: terminou um, o próximo começa
+     * (depois do descanso configurado, se houver) sem ninguém tocar na tela.
+     * Default OFF — o encadeamento conclui blocos por carimbo de tempo, e ligar
+     * isso para quem não pediu mudaria como o treino é gravado.
+     */
+    cardioAutoChain: z.boolean().default(false),
+    /**
+     * De quantos em quantos MINUTOS a voz anuncia o tempo durante o cardio.
+     * `0` = desligada (default). O tempo falado é o do exercício inteiro,
+     * somando os blocos — ver `lib/workout/vozDoCardio.ts`.
+     */
+    cardioVozIntervaloMin: z.number().default(0),
     autoRestTimerWhenMissing: z.boolean().default(false),
     programTitleStartDay: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).default('monday'),
     // Ajuste de meta calórica em dias de descanso (consumido por nutrition/page + NutritionOverlay).

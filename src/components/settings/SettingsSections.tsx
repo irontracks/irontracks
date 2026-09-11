@@ -6,6 +6,8 @@ import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } f
 import { createClient } from '@/utils/supabase/client'
 import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 import { resolveGymPermissionOutcome } from '@/lib/gps/gymPermissionOutcome'
+import { INTERVALOS_DE_VOZ_MIN, fraseDoMarco } from '@/lib/workout/vozDoCardio'
+import { falar } from '@/lib/voz'
 
 // ── Perfil ───────────────────────────────────────────────────────────────────
 interface SettingsProfileSectionProps extends SettingsSectionProps {
@@ -423,6 +425,11 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
     const restTimerRepeatMaxSeconds = Math.max(10, Math.min(900, Number(draft?.restTimerRepeatMaxSeconds ?? 180) || 180))
     const restTimerRepeatMaxCount = Math.max(1, Math.min(120, Number(draft?.restTimerRepeatMaxCount ?? 60) || 60))
     const restTimerAutoStart = Boolean(draft?.restTimerAutoStart ?? false)
+    const cardioAutoChain = Boolean(draft?.cardioAutoChain ?? false)
+    const cardioVozIntervaloMin = Math.max(0, Number(draft?.cardioVozIntervaloMin ?? 0) || 0)
+    // O teste da voz é o único jeito de o usuário saber se o aparelho dele fala:
+    // `vozDisponivel()` mente em parte dos WebViews (a API existe e nada sai).
+    const [vozMuda, setVozMuda] = useState(false)
     return (
         <SectionCard>
             <SectionHeader icon={Timer} label="Timer" />
@@ -431,6 +438,28 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
                     <div><div className="text-sm font-bold text-white">START automático</div><div className="text-xs text-neutral-400">Inicia a próxima série ao terminar o descanso.</div></div>
                     <ToggleSwitch checked={restTimerAutoStart} onChange={() => setValue('restTimerAutoStart', !restTimerAutoStart)} />
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-bold text-white">Blocos de cardio em sequência</div><div className="text-xs text-neutral-400">Terminou um bloco, o próximo começa sozinho.</div></div>
+                    <ToggleSwitch checked={cardioAutoChain} onChange={() => setValue('cardioAutoChain', !cardioAutoChain)} />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-bold text-white">Voz no cardio</div><div className="text-xs text-neutral-400">Anuncia o tempo somando todos os blocos. Só com a tela ligada.</div></div>
+                    <select value={String(cardioVozIntervaloMin)} onChange={(e) => setValue('cardioVozIntervaloMin', Number(e.target.value))} className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white" aria-label="Intervalo da voz no cardio">
+                        {INTERVALOS_DE_VOZ_MIN.map((v) => <option key={v} value={String(v)}>{v === 0 ? 'Desligada' : `A cada ${v} min`}</option>)}
+                    </select>
+                </div>
+                {cardioVozIntervaloMin > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => { if (!falar(fraseDoMarco(cardioVozIntervaloMin))) setVozMuda(true) }}
+                        className="w-full text-center text-[12px] font-bold text-yellow-500 py-1 active:scale-95 transition-transform"
+                    >
+                        Testar a voz agora
+                    </button>
+                )}
+                {vozMuda && (
+                    <div className="text-xs text-amber-300/90 font-bold">Este aparelho não tem síntese de voz — a opção não terá efeito aqui.</div>
+                )}
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Notificar ao terminar</div><div className="text-xs text-neutral-400">Mostra notificação do navegador (se permitido).</div></div>
                     <ToggleSwitch checked={restTimerNotify} onChange={() => setValue('restTimerNotify', !restTimerNotify)} />

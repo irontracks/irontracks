@@ -1473,6 +1473,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             userSettingsApi?.updateSetting?.('autoLoad', v)
                                             void userSettingsApi?.save?.({ autoLoad: v })
                                         }}
+                                        onToggleCardioAutoChain={(v: boolean) => {
+                                            userSettingsApi?.updateSetting?.('cardioAutoChain', v)
+                                            void userSettingsApi?.save?.({ cardioAutoChain: v })
+                                        }}
                                         onToggleExerciseDeload={(exKey: string, nextEnabled: boolean) => {
                                             const cur = Array.isArray(userSettingsApi?.settings?.autoLoadDeloadOff)
                                                 ? (userSettingsApi.settings.autoLoadDeloadOff as string[])
