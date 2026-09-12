@@ -6,7 +6,6 @@ import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
 import { apiAdmin } from '@/lib/api';
-import { StudentSetMediaSection } from './StudentSetMediaSection';
 
 export const StudentVideosTab: React.FC = () => {
     const { alert } = useDialog();
@@ -204,7 +203,6 @@ export const StudentVideosTab: React.FC = () => {
                     })}
                 </div>
             )}
-            <StudentSetMediaSection studentUserId={String(selectedStudent.user_id || '')} />
         </div>
     );
 };

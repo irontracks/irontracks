@@ -33,8 +33,6 @@ export const EVENTOS_TREINO = {
   metodoDaSerie: 'workout_set_method_change',
   /** Abriu o campo de observação de uma série. */
   notaAbrir: 'workout_set_note_open',
-  /** Anexou foto/vídeo à série. */
-  midiaAnexar: 'workout_set_media_attach',
   /** Mandou um exercício para depois. */
   exercicioAdiar: 'workout_exercise_defer',
   /**

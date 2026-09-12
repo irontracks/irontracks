@@ -27,12 +27,17 @@ import {
   USER_PREFIX_BUCKETS,
 } from '@/lib/account/userDataCatalog'
 
-/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — 24/08/2026 */
+/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — re-medido em 12/09/2026 (112 tabelas) */
 const PROD_TABLES_SNAPSHOT = [
   'access_requests', 'active_workout_sessions', 'admin_emails', 'app_payments', 'app_plans',
-  'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events', 'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
+  'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events',
+  // ⚠️ Achado ao re-rodar o SQL em 12/09/2026: cópia de nutrition_custom_foods
+  // deixada pelo dedupe de 07/09 — estava no banco e fora desta foto.
+  'backup_dedup_custom_foods_2026_09_07',
+  'body_photo_assessment_photos', 'body_photo_assessments', 'cardio_tracks',
   'client_error_events', 'coach_inbox_states', 'cron_secrets', 'daily_nutrition_logs', 'device_push_tokens', 'direct_channels',
   'direct_messages', 'error_reports', 'exercise_alias_jobs', 'exercise_aliases', 'exercise_canonical',
+  'exercise_chat_messages', 'exercise_chat_summaries',
   'exercise_execution_submissions', 'exercise_library', 'exercise_muscle_maps', 'exercise_substitutions',
   'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'invites', 'lab_exam_files',
   'lab_exams', 'lab_result_markers', 'lab_results', 'live_activity_push_tokens', 'marketplace_payments',

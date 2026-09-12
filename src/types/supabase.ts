@@ -1028,6 +1028,89 @@ export type Database = {
         }
         Relationships: []
       }
+      exercise_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          exercise_index: number
+          exercise_name: string
+          id: string
+          media_kind: string | null
+          media_mime: string | null
+          media_path: string | null
+          role: string
+          session_started_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          exercise_index: number
+          exercise_name: string
+          id?: string
+          media_kind?: string | null
+          media_mime?: string | null
+          media_path?: string | null
+          role: string
+          session_started_at: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          exercise_index?: number
+          exercise_name?: string
+          id?: string
+          media_kind?: string | null
+          media_mime?: string | null
+          media_path?: string | null
+          role?: string
+          session_started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exercise_chat_summaries: {
+        Row: {
+          created_at: string
+          exercise_index: number
+          exercise_name: string
+          id: string
+          session_started_at: string
+          summary: string
+          user_id: string
+          workout_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          exercise_index: number
+          exercise_name: string
+          id?: string
+          session_started_at: string
+          summary: string
+          user_id: string
+          workout_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          exercise_index?: number
+          exercise_name?: string
+          id?: string
+          session_started_at?: string
+          summary?: string
+          user_id?: string
+          workout_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_chat_summaries_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercise_execution_submissions: {
         Row: {
           created_at: string

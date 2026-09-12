@@ -97,27 +97,43 @@ vi.mock('@/utils/guards', () => ({
 // `.maybeSingle()`/`.single()` são terminais; o chain também é thenable (resolve
 // { data: [] }) para as queries que terminam em `.limit(...)` ou `.delete().eq(...)`.
 type InsertResult = { data: unknown; error: unknown }
+type UpdateCall = { table: string; payload: Record<string, unknown>; filters: Array<[string, unknown]> }
+
 function makeSupabase(config: {
   user?: { id: string; email?: string } | null
   insertResults?: InsertResult[]
   idempotencyLookup?: { data: unknown }
+  /** Linha de `active_workout_sessions` — é dela que sai o carimbo da sessão. */
+  activeSession?: { started_at: string } | null
 }) {
   const insertPayloads: Array<Record<string, unknown>> = []
+  const updateCalls: UpdateCall[] = []
   const insertResults = config.insertResults ?? [{ data: { id: 'new-id', created_at: 't0' }, error: null }]
   let insertCall = 0
 
-  const from = vi.fn(() => {
+  const from = vi.fn((table?: unknown) => {
+    const tabela = String(table ?? '')
     const state = { didInsert: false, lookupByKey: false }
+    // Mesma referência entregue ao registro do UPDATE: os `.eq()` que vêm DEPOIS
+    // do `.update()` (que é como o supabase-js se escreve) caem aqui dentro.
+    const filters: Array<[string, unknown]> = []
     const chain: Record<string, unknown> = {}
     for (const m of ['select', 'eq', 'gte', 'lte', 'order', 'limit', 'delete']) {
       chain[m] = vi.fn((...args: unknown[]) => {
-        if (m === 'eq' && args[0] === 'finish_idempotency_key') state.lookupByKey = true
+        if (m === 'eq') {
+          filters.push([String(args[0]), args[1]])
+          if (args[0] === 'finish_idempotency_key') state.lookupByKey = true
+        }
         return chain
       })
     }
     chain.insert = vi.fn((payload: Record<string, unknown>) => {
       insertPayloads.push(payload)
       state.didInsert = true
+      return chain
+    })
+    chain.update = vi.fn((payload: Record<string, unknown>) => {
+      updateCalls.push({ table: tabela, payload, filters })
       return chain
     })
     const resolve = () => {
@@ -127,6 +143,7 @@ function makeSupabase(config: {
         return r
       }
       if (state.lookupByKey) return config.idempotencyLookup ?? { data: null }
+      if (tabela === 'active_workout_sessions') return { data: config.activeSession ?? null }
       return { data: null }
     }
     chain.maybeSingle = vi.fn(async () => resolve())
@@ -141,7 +158,7 @@ function makeSupabase(config: {
       data: { user: config.user === undefined ? { id: 'user-1', email: 'a@b.com' } : config.user },
     })),
   }
-  return { from, auth, insertPayloads }
+  return { from, auth, insertPayloads, updateCalls }
 }
 
 const baseSession = (over: Record<string, unknown> = {}) => ({
@@ -322,8 +339,81 @@ describe('anti-backdate — data gravada é clampada em [30 dias atrás, agora]'
 // SOURCE-GUARDs — asseguram que os ramos de proteção seguem no fonte
 // (defesa contra remoção acidental do código de integridade).
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Invariante 6 — o resumo da IA por exercício ganha o treino que acabou de nascer
+//
+// A linha de `exercise_chat_summaries` é escrita DURANTE a sessão, sem
+// `workout_id` (o treino ainda não existe). Se este carimbo não acontecer, o
+// resumo fica órfão: o relatório consulta por treino e não acha nada — e o
+// aluno perde exatamente o que pediu para levar. Falha silenciosa, do tipo que
+// nenhuma tela denuncia.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('carimbo do resumo da IA por exercício', () => {
+  const carimbo = (sb: { updateCalls: UpdateCall[] }) =>
+    sb.updateCalls.find((u) => u.table === 'exercise_chat_summaries')
+
+  it('liga os resumos DAQUELA sessão ao treino gravado (user + session_started_at)', async () => {
+    const sb = await setSupabase({ activeSession: { started_at: '2026-09-12T10:00:00.000Z' } })
+    h.body = { session: baseSession(), idempotencyKey: 'KEY-CHAT' }
+
+    const res = await callPost()
+
+    expect(res.status).toBe(200)
+    const u = carimbo(sb)
+    expect(u, 'sem este UPDATE o resumo fica órfão e o relatório não o acha').toBeTruthy()
+    expect(u?.payload.workout_id).toBe('new-id')
+    // Os dois filtros importam: sem `user_id` seria escrita em linha alheia;
+    // sem `session_started_at` carimbaria conversa de OUTRO treino do mesmo dia.
+    expect(u?.filters).toContainEqual(['user_id', 'user-1'])
+    expect(u?.filters).toContainEqual(['session_started_at', '2026-09-12T10:00:00.000Z'])
+  })
+
+  it('replay idempotente NÃO carimba de novo (a 1ª gravação já ligou)', async () => {
+    const { cacheSetNx } = await import('@/utils/cache')
+    vi.mocked(cacheSetNx).mockResolvedValueOnce(false)
+    const { env } = await import('@/utils/env')
+    env.upstash.restUrl = 'https://x.upstash.io'
+    env.upstash.restToken = 'tok'
+
+    const sb = await setSupabase({
+      idempotencyLookup: { data: { id: 'existing-1', created_at: 't1' } },
+      activeSession: { started_at: '2026-09-12T10:00:00.000Z' },
+    })
+    h.body = { session: baseSession(), idempotencyKey: 'KEY-CHAT-DUP' }
+
+    const res = await callPost()
+
+    expect(res.__body.idempotent).toBe(true)
+    expect(carimbo(sb)).toBeUndefined()
+  })
+
+  it('sem sessão ativa (sem carimbo possível) não escreve nada — e finaliza normalmente', async () => {
+    const sb = await setSupabase({ activeSession: null })
+    h.body = { session: baseSession(), idempotencyKey: 'KEY-CHAT-SEM' }
+
+    const res = await callPost()
+
+    expect(res.status).toBe(200)
+    expect(res.__body.ok).toBe(true)
+    // Carimbar sem a chave da sessão marcaria resumos de qualquer sessão do user.
+    expect(carimbo(sb)).toBeUndefined()
+  })
+})
+
 describe('source-guard — ramos de integridade presentes em route.ts', () => {
   const src = readFileSync('src/app/api/workouts/finish/route.ts', 'utf8')
+
+  it('lê o `started_at` da sessão ANTES de apagar a linha que o guarda', () => {
+    // A ordem é a armadilha: o delete de `active_workout_sessions` vem logo em
+    // seguida, e ler depois dele devolveria null PARA SEMPRE — carimbo nenhum,
+    // sem erro nenhum. O teste de comportamento acima não pega isso (o mock não
+    // apaga de verdade), por isso o guard é de ORDEM no fonte.
+    const leitura = src.indexOf("select('started_at')")
+    const apagar = src.indexOf(".from('active_workout_sessions').delete()")
+    expect(leitura, 'a leitura do carimbo da sessão sumiu').toBeGreaterThan(-1)
+    expect(apagar, 'o delete da sessão ativa sumiu').toBeGreaterThan(-1)
+    expect(leitura, 'ler o started_at DEPOIS do delete devolve null sempre').toBeLessThan(apagar)
+  })
 
   it('mantém o 503 fail-closed quando Upstash não está configurado', () => {
     expect(src).toMatch(/upstashConfigured/)

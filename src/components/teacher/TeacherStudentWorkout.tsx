@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Activity, Dumbbell, Loader2, RefreshCw, Zap } from 'lucide-react'
 import { useAdminPanel } from '@/components/admin-panel/AdminPanelContext'
@@ -116,6 +116,26 @@ export function TeacherStudentWorkout() {
     })
   }, [patchStudentSession])
 
+  // ⚠️ A sessão desenhada aqui é do ALUNO — este componente monta o MESMO
+  // <ActiveWorkout> do treino próprio, e por baixo dele o MESMO <ExerciseCard>.
+  // Sem a marca, tudo que pertence ao DONO da sessão aparece para o professor;
+  // hoje é a conversa de IA por exercício, que é privada do aluno por requisito
+  // explícito. Não basta faltar `startedAt`: ele EXISTE no estado sincronizado
+  // do aluno (é o que o professor recebe), então o discriminador funcional não
+  // barra nada aqui. Ver lib/workout/exerciseChatThread.
+  //
+  // A marca fica SÓ no objeto que vai ao componente: `handleUpdateSession`
+  // espalha `prev.state` (a linha crua vinda do banco) e os chamadores mandam
+  // sempre patch parcial, então ela nunca é gravada de volta na linha do aluno
+  // — se fosse, o aluno é que perderia o botão no próprio treino.
+  const sessaoDoAlunoMarcada = useMemo(
+    () => ({
+      ...((session?.state ?? {}) as unknown as Record<string, unknown>),
+      ehDeOutraPessoa: true,
+    }),
+    [session?.state],
+  )
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -203,7 +223,7 @@ export function TeacherStudentWorkout() {
 
       {isControlling && (
         <ActiveWorkout
-          session={session.state as unknown as Record<string, unknown>}
+          session={sessaoDoAlunoMarcada}
           user={selectedStudent as unknown as { id?: string }}
           onUpdateLog={handleUpdateLog}
           onUpdateSession={handleUpdateSession}

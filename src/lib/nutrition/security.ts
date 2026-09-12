@@ -22,8 +22,15 @@ export function sanitizeFoodName(raw: unknown): string {
 /**
  * Sanitize free-text user input before sending to AI model.
  * Strips prompt-injection patterns and limits length.
+ *
+ * `maxLen` existe porque o teto não é propriedade da SANITIZAÇÃO, é do
+ * contrato de quem chama: a nutrição aceita 500 caracteres e o chat de IA por
+ * exercício aceita 1000 (rota `api/ai/exercise-chat`). Sem o parâmetro, a
+ * alternativa era uma segunda cópia desta lista de padrões — e lista de
+ * injection duplicada envelhece em silêncio no lado que ninguém lembra de
+ * atualizar. O padrão continua 500: nenhum chamador existente muda.
  */
-export function sanitizeAiInput(raw: unknown): string {
+export function sanitizeAiInput(raw: unknown, maxLen = 500): string {
   let str = String(raw ?? '').trim()
   if (!str) return ''
 
@@ -49,7 +56,7 @@ export function sanitizeAiInput(raw: unknown): string {
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 500)                    // strict length cap for AI input
+    .slice(0, Math.max(1, maxLen))    // strict length cap for AI input
 }
 
 /**

@@ -15,13 +15,10 @@ import { respondDbError } from '@/utils/api/dbError'
 import { buildPostCheckinRow } from './postCheckinRow'
 import { buildUserSnapshot, type ProfileFacts } from '@/lib/user/snapshot'
 import { env } from '@/utils/env'
-import { waitUntil } from '@vercel/functions'
-import { collectSetMediaFromLogs } from '@/lib/workout/setMedia'
-import { analyzeSetMediaForWorkout } from '@/lib/workout/setMediaAnalysis'
 
-// A análise da mídia das séries roda em `waitUntil` DEPOIS da resposta; um
-// vídeo pela Files API do Gemini leva dezenas de segundos e a instância não
-// pode ser congelada antes de a resposta chegar ao banco.
+// A finalização faz várias leituras (sessão anterior, 14 dias de histórico,
+// perfil) antes de gravar — teto folgado para não cair no meio da gravação de
+// um treino, que é irrecuperável para o usuário.
 export const maxDuration = 120
 
 const LogEntrySchema = z
@@ -278,6 +275,25 @@ export async function POST(request: Request) {
 
     if (error) return respondDbError('workouts:finish:insert', error)
 
+    // O chat de IA por exercício grava com o carimbo da SESSÃO
+    // (`active_workout_sessions.started_at`) — o treino ainda não existia. Leia
+    // o carimbo ANTES do delete abaixo: depois dele a chave some do banco e não
+    // há como ligar os resumos a este treino.
+    let sessionStartedAt: string | null = null
+    try {
+      const { data: ativa, error: leituraErr } = await supabase
+        .from('active_workout_sessions')
+        .select('started_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      // O supabase-js NÃO lança em erro de LEITURA — devolve `{ error }`. Sem
+      // olhar, a falha vira `sessionStartedAt = null`, o UPDATE abaixo é pulado
+      // e os resumos ficam órfãos PARA SEMPRE (a linha da sessão já foi apagada
+      // no passo seguinte): perda de dado silenciosa, sem nada no log.
+      if (leituraErr) logError('api:workouts:finish:active-session-started-at', leituraErr)
+      sessionStartedAt = ativa?.started_at ? String(ativa.started_at) : null
+    } catch (e) { logWarn('workouts/finish', 'Failed to read active session started_at', e) }
+
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
     } catch (e) { logWarn('workouts/finish', 'Failed to delete active_workout_sessions', e) }
@@ -296,38 +312,22 @@ export async function POST(request: Request) {
       } catch (e) { logWarn('workouts/finish', 'Failed to persist structured post-checkin', e) }
     }
 
-    await notifyWorkoutFinished(user.id, saved?.id ? String(saved.id) : null, sessionObj)
-    // Foto/vídeo anexados às séries: as linhas de `workout_set_media` nasceram
-    // no upload SEM workout_id (o treino ainda não existia). Aqui elas ganham o
-    // treino, o nome do exercício e a observação da série, e a IA responde em
-    // segundo plano (`waitUntil`) — a finalização não espera o Gemini. Só na
-    // primeira gravação: o replay idempotente já fez isso.
-    if (!idempotent && saved?.id) {
-      try {
-        const midias = collectSetMediaFromLogs(sessionObj?.logs)
-        if (midias.length > 0) {
-          const admin = createAdminClient()
-          const exercisesArr = Array.isArray(sessionObj?.exercises) ? sessionObj.exercises : []
-          for (const m of midias) {
-            const exObj = exercisesArr[m.exerciseIndex]
-            const exName = exObj && typeof exObj === 'object' ? String((exObj as Record<string, unknown>).name ?? '').trim() : ''
-            await admin.from('workout_set_media')
-              .update({
-                workout_id: String(saved.id),
-                exercise_index: m.exerciseIndex,
-                set_index: m.setIndex,
-                exercise_name: exName || null,
-                question: m.question ? String(m.question).slice(0, 500) : null,
-              })
-              .eq('id', m.id)
-              .eq('user_id', user.id)
-          }
-          const workoutId = String(saved.id)
-          waitUntil(analyzeSetMediaForWorkout(admin, user.id, workoutId).catch((e) => logError('api:workouts:finish:set-media-analyze', e)))
-        }
-      } catch (e) { logWarn('workouts/finish', 'Failed to link set media', e) }
+    // Resumo da IA por exercício: a linha de `exercise_chat_summaries` nasceu
+    // durante a sessão SEM `workout_id` (o treino ainda não existia). Um UPDATE
+    // por sessão carimba todas de uma vez — sem ele o relatório não tem como
+    // achá-las e o aluno perde o que pediu para levar. Só na primeira gravação:
+    // o replay idempotente já carimbou. `error` é conferido porque o supabase-js
+    // NÃO lança em falha de escrita — e falhar calado aqui some com o texto.
+    if (!idempotent && saved?.id && sessionStartedAt) {
+      const { error: carimboErr } = await supabase
+        .from('exercise_chat_summaries')
+        .update({ workout_id: String(saved.id) })
+        .eq('user_id', user.id)
+        .eq('session_started_at', sessionStartedAt)
+      if (carimboErr) logError('api:workouts:finish:exercise-chat-summaries', carimboErr)
     }
 
+    await notifyWorkoutFinished(user.id, saved?.id ? String(saved.id) : null, sessionObj)
     // Limpar os caches de listagem de histórico e dashboard ao finalizar o treino
     try {
       await Promise.all([
