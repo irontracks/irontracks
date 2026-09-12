@@ -29,6 +29,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { respondDbError } from '@/utils/api/dbError'
 import { respondInternalError } from '@/utils/api/internalError'
+import { parseJsonBody } from '@/utils/zod'
 import {
   buildReportHistoryFromWorkouts,
   REPORT_HISTORY_LIMIT,
@@ -91,17 +92,12 @@ export async function POST(
     const acesso = await verificarAcesso(req, userId)
     if (!acesso.ok) return acesso.response
 
-    let corpo: unknown
-    try {
-      corpo = await req.json()
-    } catch {
-      return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 })
-    }
-    const parsed = QuerySchema.safeParse(corpo)
-    if (!parsed.success) {
-      return NextResponse.json({ ok: false, error: 'invalid body' }, { status: 400 })
-    }
-    const { exercicios, series } = parsed.data
+    // `parseJsonBody` e não `req.json()`: é a regra do repo (guard em
+    // scripts/no-direct-req-json.test.ts) — ele centraliza o 400 de corpo
+    // inválido e a validação Zod numa forma só.
+    const parsedBody = await parseJsonBody(req, QuerySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { exercicios, series } = parsedBody.data!
 
     // As MESMAS 80 sessões que o app do aluno lê. Ler mais aqui faria o professor
     // ver um "última vez" que a tela do aluno não conhece.
