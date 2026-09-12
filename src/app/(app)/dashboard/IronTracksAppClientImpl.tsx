@@ -1439,9 +1439,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             {view === 'active' && activeSession && (
                                 <SectionErrorBoundary section="Treino Ativo" fullScreen onReset={() => setView('dashboard')}>
-                                    {/* Teacher control consent banner — shown above the workout when a teacher requests control */}
+                                    {/* Consentimento do professor — fica ABAIXO do header do treino ativo.
+                                        Antes era `top: max(env(safe-area-inset-top), 56px)`, ou seja, o topo
+                                        ABSOLUTO da tela: a mesma faixa que o header ocupa. Com fundo de 12%
+                                        de opacidade o header vazava por baixo, os dois textos se sobrepunham
+                                        e os botões Aceitar/Recusar caíam em cima dos do header — num convite
+                                        real (12/09/2026) o toque errou o alvo e RECUSOU o controle.
+                                        `--it-workout-header-h` é publicada pelo WorkoutHeader (ResizeObserver,
+                                        já com a safe-area embutida); o fallback cobre o frame antes da
+                                        primeira medição e o caso de o header não estar montado. */}
                                     {controlNotice.controlStatus === 'requested' && controlNotice.controlledByName && (
-                                        <div className="fixed inset-x-0 z-[60]" style={{ top: 'max(env(safe-area-inset-top, 0px), 56px)' }}>
+                                        <div className="fixed inset-x-0 z-[60]" style={{ top: 'var(--it-workout-header-h, max(env(safe-area-inset-top, 0px), 56px))' }}>
                                             <StudentControlConsent
                                                 teacherName={controlNotice.controlledByName}
                                                 onAccept={controlNotice.accept}
