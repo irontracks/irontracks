@@ -2450,13 +2450,40 @@ servidor:** o conversor `notes → ReportHistory` (`lib/workout/reportHistoryFro
 Quatro source-guards que liam o hook seguiram o CÓDIGO para o arquivo novo, com
 as mesmas asserções.
 
-⚠️ **`toDateMs(undefined)` devolve 0, não `null`** — então `toDateMs(a) ??
-toDateMs(b)` NUNCA cai no segundo termo, e a sessão sai carimbada em 1970. É a
-mesma armadilha que `toNumber` já tinha documentada (`utils.ts:151`): a classe
-sobreviveu num segundo helper. Corrigido em `reportHistoryFromWorkouts`
-(helper local `dataOuNulo`); **sobraram nove cadeias iguais** em `useHistoryData`,
-`periodStats` e `useCheckins`. Medido: 703 sessões em produção, ZERO sem `date`
-— latente, não ativo.
+✅ **`toDateMs` devolve `null` para campo ausente — corrigido NA RAIZ em
+12/09/2026.** Até então ele convertia entrada não-data em `new Date(0)`, e 0 é
+finito e não é nullish: a cadeia `toDateMs(a) ?? toDateMs(b)` parava no PRIMEIRO
+termo e a sessão saía carimbada em 1970. Mesma armadilha do `toNumber`
+(`utils.ts:151`).
+
+⚠️ **A nota anterior dizia que "sobraram nove cadeias iguais" em
+`useHistoryData`, `periodStats` e `useCheckins` — e isso era FALSO.** Existem
+**TRÊS `toDateMs` homônimos** neste repo, e aquelas cadeias nunca usaram o
+defeituoso: `periodStats` e `HistoryList` importam o de
+`history/hooks/useHistoryData`, e `useCheckins` tem o seu, local — os dois já
+começavam com `if (!value) return null`. Medido por EXECUÇÃO, não por leitura:
+`raiz(undefined)` dava **0** enquanto `historico(undefined)` dava **null**. Quem
+usava o da raiz em cadeia era só o `reportHistoryFromWorkouts`, já blindado pelo
+`dataOuNulo` — hoje redundante, mantido de propósito.
+
+**A lição de método, que vale além deste caso:** o helper tem o MESMO NOME em
+três arquivos, então `grep 'toDateMs(...) ??'` devolve ocorrências que parecem a
+mesma coisa e não são. **Ao varrer uma classe pelo símbolo, confira de QUAL
+módulo cada chamador importa** — senão a lista de ocorrências vira lista de
+suspeitos inocentes, e o trabalho inteiro é gasto corrigindo o que já estava
+certo.
+
+Guard em `__tests__/dataAusenteNuncaEhZero.test.ts`, provado por TRÊS mutações:
+ele cobra o COMPORTAMENTO das três implementações (campo ausente → null), a
+FIAÇÃO da cadeia `??` inteira (as pontas passam isoladas), e DESCOBRE
+implementação nova varrendo `src/` — sem essa terceira metade ele seria a lista
+dos três que eu já conhecia, guard da instância com cara de classe. Guard de
+FORMA não serviria aqui: proibir a sintaxe `?? toDateMs(` acusaria o uso
+CORRETO, que é o majoritário (jeito nº 8).
+
+Fronteira medida no banco: das 703 sessões não-template, **2 estão sem
+`completed_at`** — o fallback da cadeia é exercitado em produção, não é caminho
+morto. Os 1.239 check-ins têm `created_at` em 100%.
 
 **Chrome neutro.** O verde era decoração (moldura, borda, ícone, título) E sinal
 de série concluída, com o mesmo hex e outro alpha. Hoje verde só onde

@@ -214,8 +214,8 @@ describe('toDateMs', () => {
   it('parses timestamp number', () => {
     expect(toDateMs(1705312800000)).toBe(1705312800000);
   });
-  it('returns 0 for null (falls to new Date(0) → epoch)', () => {
-    expect(toDateMs(null)).toBe(0);
+  it('returns null for null (nunca 0 — ver dataAusenteNuncaEhZero.test.ts)', () => {
+    expect(toDateMs(null)).toBeNull();
   });
   it('returns null for invalid date string', () => {
     expect(toDateMs('not-a-date')).toBeNull();
