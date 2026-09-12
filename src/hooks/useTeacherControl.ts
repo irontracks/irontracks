@@ -57,7 +57,18 @@ export interface UseTeacherControlResult {
   isSaving: boolean
   /** True when the student's session ended on the server (row was deleted) */
   sessionEnded: boolean
-  patchState: (updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession) => void
+  /**
+   * Aplica um patch no state do aluno.
+   *
+   * `imediato` pula o debounce de 800 ms. Vale para o que o aluno precisa ver
+   * AGORA — o descanso disparado pelo professor é o caso: quase um segundo de
+   * atraso num cronômetro que já está correndo do lado de cá é tempo que some
+   * do descanso dele.
+   */
+  patchState: (
+    updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession,
+    opts?: { imediato?: boolean },
+  ) => void
 }
 
 export function useTeacherControl(
@@ -213,7 +224,10 @@ export function useTeacherControl(
     finally { setIsSaving(false) }
   }, [studentUserId, getAuthHeaders])
 
-  const patchState = useCallback((updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession) => {
+  const patchState = useCallback((
+    updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession,
+    opts?: { imediato?: boolean },
+  ) => {
     // Compute the next state via setSession's pure updater (no side effects inside).
     // The useEffect above keeps sessionRef.current in sync with the rendered state,
     // so the setTimeout below reads the latest value reliably.
@@ -221,6 +235,19 @@ export function useTeacherControl(
 
     // Debounce: cancel pending save and schedule new one
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+
+    if (opts?.imediato) {
+      // ⚠️ NÃO dá para esperar o React: `sessionRef.current` só recebe o novo
+      // valor durante o render, e qualquer microtask/timeout roda antes disso —
+      // o flush sairia com o estado ANTERIOR e o descanso não iria junto com a
+      // série concluída. Aplicamos o MESMO updater sobre o ref e salvamos esse
+      // resultado. Exige updater PURO (o que ele já tem de ser para o
+      // setSession acima): efeito colateral aqui rodaria duas vezes.
+      const atual = sessionRef.current
+      if (atual) void flushSave(updater(atual))
+      return
+    }
+
     saveTimerRef.current = setTimeout(() => {
       const current = sessionRef.current
       if (current) flushSave(current)

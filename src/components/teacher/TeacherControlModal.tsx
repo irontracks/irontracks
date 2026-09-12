@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, Loader2, Gamepad2, Save, Plus, Minus, Check } from 'lucide-react'
 import { useTeacherControl } from '@/hooks/useTeacherControl'
+import { descansoAoConcluir, pularDescanso, descansoEmAndamento, segundosRestantes } from '@/lib/workout/descansoRemoto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession, Exercise } from '@/types/app'
 
@@ -41,6 +42,63 @@ function getLog(session: ActiveWorkoutSession | null, exIdx: number, setIdx: num
 
 const RPE_OPTS = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]
 
+/**
+ * Barra do descanso do ALUNO, vista e controlada pelo professor.
+ *
+ * Pedido do dono: "aparece pra mim também, e eu posso pular o descanso como se
+ * fosse ele — caso eu queira que naquela série não tenha tanto descanso".
+ *
+ * O contador vive aqui e não no modal inteiro de propósito: um ticker de 1 s no
+ * componente de cima re-renderizaria a lista inteira de exercícios a cada
+ * segundo — e esta tela acabou de sair de um bug de "pisca a cada 5 segundos".
+ */
+function BarraDeDescansoRemoto({
+  timerTargetTime,
+  onPular,
+}: {
+  timerTargetTime: unknown
+  onPular: () => void
+}) {
+  const [agora, setAgora] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!descansoEmAndamento(timerTargetTime, Date.now())) return
+    const id = setInterval(() => setAgora(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [timerTargetTime])
+
+  if (!descansoEmAndamento(timerTargetTime, agora)) return null
+
+  const faltam = segundosRestantes(timerTargetTime, agora)
+  const mm = Math.floor(faltam / 60)
+  const ss = faltam % 60
+
+  return (
+    <div
+      className="flex items-center gap-3 rounded-2xl px-3 py-2.5"
+      style={{ background: 'rgba(234,179,8,0.10)', border: '1px solid rgba(234,179,8,0.30)' }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[9px] font-black uppercase tracking-widest text-amber-300/80">
+          Descanso do aluno
+        </div>
+        <div className="font-mono font-black tabular-nums text-2xl leading-none text-amber-300 mt-0.5">
+          {mm}:{ss < 10 ? '0' : ''}{ss}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onPular}
+        className="tap-44 shrink-0 text-[12px] font-black px-3 py-2 rounded-xl active:scale-95 transition-transform"
+        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+        aria-label="Pular o descanso do aluno"
+      >
+        Pular descanso
+      </button>
+    </div>
+  )
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface TeacherControlModalProps {
@@ -58,13 +116,21 @@ function SetRow({
   setIdx,
   session,
   reps: defaultReps,
+  restTime,
+  temProxima,
   onPatch,
 }: {
   exIdx: number
   setIdx: number
   session: ActiveWorkoutSession | null
   reps: string | number | null
-  onPatch: (updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession) => void
+  /** Descanso configurado no exercício (s) — dispara no aparelho do aluno. */
+  restTime: unknown
+  temProxima: boolean
+  onPatch: (
+    updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession,
+    opts?: { imediato?: boolean },
+  ) => void
 }) {
   const log = getLog(session, exIdx, setIdx)
 
@@ -83,7 +149,42 @@ function SetRow({
     })
   }, [exIdx, setIdx, onPatch])
 
-  const toggleDone = () => update('done', !log.done)
+  /**
+   * Concluir a série e, quando for o caso, DISPARAR o descanso no aparelho do
+   * aluno (pedido do dono). O alvo do timer viaja no próprio state da sessão —
+   * o app dele aplica updates vindos de outro aparelho e a barra abre lá.
+   *
+   * ⚠️ `Date.now()` fica AQUI, no handler, e nunca dentro do updater: com o
+   * flush imediato o updater é aplicado duas vezes (uma para a UI, outra para
+   * o que vai ao servidor), e um relógio lido lá dentro daria dois instantes
+   * diferentes — o professor veria um descanso e o aluno, outro.
+   */
+  const toggleDone = () => {
+    const proximoDone = !log.done
+    const agoraMs = Date.now()
+    const descanso = proximoDone
+      ? descansoAoConcluir({
+        restTime,
+        key: `${exIdx}-${setIdx}`,
+        nextKey: temProxima ? `${exIdx}-${setIdx + 1}` : null,
+        agoraMs,
+      })
+      : null
+
+    onPatch(prev => {
+      const prevLog = isRecord(prev?.logs?.[`${exIdx}-${setIdx}`])
+        ? (prev.logs![`${exIdx}-${setIdx}`] as Record<string, unknown>)
+        : {}
+      const base = {
+        ...prev,
+        logs: {
+          ...(prev.logs ?? {}),
+          [`${exIdx}-${setIdx}`]: { ...prevLog, done: proximoDone },
+        },
+      }
+      return (descanso ? { ...base, ...descanso } : base) as ActiveWorkoutSession
+    }, { imediato: Boolean(descanso) })
+  }
 
   return (
     <div
@@ -253,6 +354,8 @@ function ExerciseCard({
         {Array.from({ length: setsCount }, (_, i) => (
           <SetRow
             key={i}
+            restTime={ex.restTime}
+            temProxima={i < setsCount - 1}
             exIdx={exIdx}
             setIdx={i}
             session={session}
@@ -384,6 +487,11 @@ export function TeacherControlModal({
             <p className="text-[10px] font-bold text-green-400/50 text-center uppercase tracking-widest">
               🎮 Você está no controle — todas as alterações são aplicadas ao aluno em tempo real
             </p>
+
+            <BarraDeDescansoRemoto
+              timerTargetTime={(session as unknown as { timerTargetTime?: unknown } | null)?.timerTargetTime}
+              onPular={() => patchState(prev => ({ ...prev, ...pularDescanso() }) as ActiveWorkoutSession, { imediato: true })}
+            />
 
             {exercises.map((ex, exIdx) => (
               <ExerciseCard
