@@ -15,6 +15,7 @@ import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
 import WorkoutHeader from './workout/WorkoutHeader';
 import ExerciseList from './workout/ExerciseList';
 import WorkoutExerciseRail from './workout/WorkoutExerciseRail';
+import { StudentControlConsent } from './teacher/StudentControlConsent';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
@@ -330,50 +331,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   }, [teamCtx, props])
 
 
-  /**
-   * Onde TERMINA a região fixa do topo, publicada em `--it-workout-topo-h`.
-   *
-   * INCIDENTE (12/09/2026, duas rodadas no aparelho): o banner de consentimento
-   * do professor é `fixed` e estava ancorado no topo ABSOLUTO da viewport —
-   * caía em cima do WorkoutHeader, com os botões Aceitar/Recusar empilhados
-   * sobre os do header. Num convite real o toque errou o alvo e RECUSOU.
-   *
-   * ⚠️ A primeira correção mediu a altura do HEADER e só mudou o bug de lugar:
-   * o banner desceu e passou a cobrir a TIRA de navegação (os números dos
-   * exercícios), porque `WorkoutExerciseRail` é IRMÃ do header e também vive
-   * fora do contêiner que rola. Medir um dos irmãos deixa o outro descoberto —
-   * e deixaria qualquer terceira faixa futura descoberta também.
-   *
-   * Por isso a régua é o CONTÊINER QUE ROLA: o `top` dele é, por construção,
-   * onde a região fixa do topo acaba, seja ela de uma, duas ou cinco faixas.
-   * Mesma ideia geométrica do `--it-rest-bar-h` no rodapé (duas barras não se
-   * resolvem com z-index; uma precisa saber onde a outra termina).
-   */
-  const conteudoRef = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    const el = conteudoRef.current;
-    const root = typeof document !== 'undefined' ? document.documentElement : null;
-    if (!el || !root) return;
-    const publish = () => {
-      root.style.setProperty('--it-workout-topo-h', `${Math.round(el.getBoundingClientRect().top)}px`);
-    };
-    publish();
-    // jsdom (e WebViews antigas) não têm ResizeObserver. A medição inicial cobre
-    // o caso comum; o observer é para a altura mudar em voo (a tira some sozinha
-    // em treino curto, o título quebra em duas linhas, a safe-area gira).
-    const RO = typeof ResizeObserver !== 'undefined' ? ResizeObserver : null;
-    const ro = RO ? new RO(publish) : null;
-    if (ro) ro.observe(el);
-    return () => {
-      ro?.disconnect();
-      root.style.removeProperty('--it-workout-topo-h');
-    };
-  });
-
-  // ⚠️ Fica ACIMA do `if (!session || !workout)`: hook depois de early return é
-  // erro de Rules of Hooks, e este componente é grande o bastante para esconder
-  // onde a região de hooks termina — armadilha que já mordeu aqui antes.
-
   if (!session || !workout) {
     return (
       <div aria-live="polite" className="min-h-screen bg-neutral-900 text-white p-6">
@@ -409,11 +366,24 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             serve. Ela se esconde sozinha em treino curto. */}
         <WorkoutExerciseRail />
 
+        {/* Consentimento do professor: NO FLUXO, entre a tira e o conteúdo.
+            Ele já foi `fixed` e cobriu, em rodadas sucessivas, o header, depois
+            a tira, depois o primeiro card da lista — faixa fixa SEMPRE flutua
+            sobre alguma coisa, e cada correção geométrica só mudava a vítima.
+            Aqui ela EMPURRA: nada fica escondido e não há geometria a acertar. */}
+        {props.controlConsent && (
+          <StudentControlConsent
+            teacherName={props.controlConsent.teacherName}
+            onAccept={props.controlConsent.onAccept}
+            onReject={props.controlConsent.onReject}
+          />
+        )}
+
         {/* Scrollable content — sits below the fixed header. overflow-x-hidden
             here as belt + suspenders: even if some descendant (an exercise
             card, the footer, a long copy line) overshoots the viewport width,
             it gets clipped instead of letting the modal pan side-to-side. */}
-        <div ref={conteudoRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/* #autoload: chavinha da carga automática — só aparece p/ perfis do beta
               (settings.autoLoadBeta, liberado via DB). Persiste em settings.autoLoad. */}
           {Boolean(props.settings?.autoLoadBeta) && (

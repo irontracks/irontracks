@@ -50,10 +50,6 @@ import { getTourSteps } from '@/utils/tourSteps'
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 const RestDayPromptCard = dynamic(() => import('@/components/dashboard/RestDayPromptCard'), { ssr: false, loading: () => null })
 const StudentWorkoutStartBanner = dynamic(() => import('@/components/teacher/StudentWorkoutStartBanner'), { ssr: false, loading: () => null })
-const StudentControlConsent = dynamic(
-    () => import('@/components/teacher/StudentControlConsent').then(m => ({ default: m.StudentControlConsent })),
-    { ssr: false, loading: () => null },
-)
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
@@ -1439,27 +1435,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             {view === 'active' && activeSession && (
                                 <SectionErrorBoundary section="Treino Ativo" fullScreen onReset={() => setView('dashboard')}>
-                                    {/* Consentimento do professor — fica ABAIXO de TODA a região fixa do topo.
-                                        Ele era `top: max(env(safe-area-inset-top), 56px)`, o topo ABSOLUTO da
-                                        tela, e caía em cima do WorkoutHeader: com fundo de 12% de opacidade os
-                                        dois textos se sobrepunham e os botões Aceitar/Recusar ficavam em cima
-                                        dos do header — num convite real (12/09/2026) o toque errou o alvo e
-                                        RECUSOU o controle.
-                                        ⚠️ A primeira correção mediu só o HEADER e apenas mudou o bug de lugar:
-                                        o banner passou a cobrir a TIRA de navegação, que é irmã do header.
-                                        `--it-workout-topo-h` é o `top` do contêiner que ROLA (publicado pelo
-                                        ActiveWorkout) — por construção, onde a região fixa acaba, seja ela de
-                                        uma ou de cinco faixas. O fallback cobre o frame antes da primeira
-                                        medição e o caso de o treino não estar montado. */}
-                                    {controlNotice.controlStatus === 'requested' && controlNotice.controlledByName && (
-                                        <div className="fixed inset-x-0 z-[60]" style={{ top: 'var(--it-workout-topo-h, max(env(safe-area-inset-top, 0px), 56px))' }}>
-                                            <StudentControlConsent
-                                                teacherName={controlNotice.controlledByName}
-                                                onAccept={controlNotice.accept}
-                                                onReject={controlNotice.reject}
-                                            />
-                                        </div>
-                                    )}
                                     <ActiveWorkout
                                         session={activeSession as Record<string, unknown>}
                                         user={user as AdminUser}
@@ -1470,6 +1445,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         onBack={() => setView('dashboard')}
                                         onStartTimer={handleStartTimer}
                                         isCoach={isCoach}
+                                        controlConsent={
+                                            controlNotice.controlStatus === 'requested' && controlNotice.controlledByName
+                                                ? {
+                                                    teacherName: controlNotice.controlledByName,
+                                                    onAccept: controlNotice.accept,
+                                                    onReject: controlNotice.reject,
+                                                }
+                                                : null
+                                        }
                                         onUpdateSession={(updates: unknown) =>
                                             setActiveSession((prev) => {
                                                 if (!prev) return prev

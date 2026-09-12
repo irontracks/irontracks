@@ -71,6 +71,15 @@ export type ActiveWorkoutProps = {
   onBack?: () => void;
   onStartTimer?: (seconds: number, context: unknown) => void;
   isCoach?: boolean;
+  /**
+   * Consentimento do professor, renderizado NO FLUXO entre a tira e o conteúdo.
+   *
+   * ⚠️ Ele já foi `fixed` e custou três rodadas de correção: caía em cima do
+   * header, depois da tira, depois do primeiro card da lista. Faixa `fixed`
+   * SEMPRE flutua sobre alguma coisa — no fluxo ela empurra, e não há geometria
+   * para acertar. Armadilha eliminada em vez de documentada.
+   */
+  controlConsent?: { teacherName: string; onAccept: () => Promise<void>; onReject: () => Promise<void> } | null;
   onUpdateSession?: (updates: UnknownRecord) => void;
   nextWorkout?: UnknownRecord | null;
   onEditWorkout?: () => void;
