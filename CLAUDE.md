@@ -2392,6 +2392,86 @@ PRECISA flutuar e quem cede é o rodapé (`--it-rest-bar-h`) — lá o guard cob
 como a barra nova convive; aqui ele cobra que NÃO exista faixa fixa ancorada
 por `top`.
 
+### O painel do professor, revisado ponta a ponta (12/09/2026, PR #1139)
+
+Seis achados depois de controlar um treino real. O que precisa sobreviver ao
+`/clear`:
+
+⚠️ **A barra do descanso é `sticky`, e `fixed` aqui é pior que em qualquer
+outro lugar.** Ela nascia no topo do contêiner rolável: concluir a série do 8º
+exercício abria o descanso FORA da tela, com o START inalcançável justamente
+enquanto o aluno esperava parado. O modal é um `motion.div` com `transform`, que
+vira containing block — uma faixa `fixed` ancoraria no modal e viajaria na
+animação. Junto vieram três geometrias que a versão ingênua erra: **o `py-4` do
+scroller tinha de sair** (padding no topo de contêiner que hospeda `sticky` vira
+FRESTA por onde o conteúdo rola à vista), a sangria `-mx-4` exige
+`overflow-x-hidden`, e o fundo precisa ser OPACO (translúcido deixa os cards
+legíveis por baixo do relógio).
+
+⚠️ **`getSetsCount` do painel era `Number(ex.sets) || 0`** e divergia do resto do
+app (`setsCountOfExercise` = `max(header, setDetails.length)`): série
+acrescentada no meio da sessão não aparecia para o professor.
+
+**O professor vê "da última vez"** — o mesmo watermark do aluno, que NÃO é
+`topWeight` nem a média: é `setWeights[setIdx]`, por série, arredondado por
+`roundSuggestion`. Rota nova `POST /api/teacher/student-history/[userId]`, que
+resume no SERVIDOR: a rota de admin devolve `notes` cru com teto de 200 sessões
+— medido, **1,9 MB** no aluno mais antigo, dentro de um modal aberto durante o
+treino.
+
+**A sugestão do MOTOR ficou de fora de propósito.** O gate (`autoLoadBeta &&
+autoLoad`) mora em `user_settings`, que é **self-only** — o professor não lê com
+cliente RLS —, e o número depende também da prontidão do check-in e do grid da
+máquina. Calcular sem esses insumos entregaria um peso DIFERENTE do que está na
+tela do aluno.
+
+⚠️ **Progresso é `done === true`, nunca `isLogDone`.** O painel grava
+`{ weight: '80' }` sem `done` e sem `weightSource`, e `isLogDone` trata log
+legado assim como FEITO: o contador subiria a cada carga digitada. E o tempo
+exibido é de PAREDE, rotulado "desde o início" — `pausedMs`/`recuperacaoMs` não
+viajam no state, e aproximar o desconto pelo último carimbo faria o cronômetro
+RECUAR quando o professor ficasse sem editar.
+
+⚠️ **O que o painel mostra é o que está ANOTADO, não o aluno ao vivo:** enquanto
+`control_status = 'active'`, o app do aluno para de escrever
+(`suppressLocalWrites`). Quem for prometer "ao vivo" ali precisa mexer no
+`useSessionSync`, que é caminho crítico da sessão de todo mundo.
+
+⚠️ **O rótulo do método lê o log CRU.** `getLog` do painel reconstrói o log campo
+a campo (done/weight/reps/rpe) e descarta `per_set_method` — justamente o campo
+que vence tudo na decisão. Montagem única em
+`components/workout/helpers/rotuloDoMetodoDaSerie.ts`, usada pelo card do aluno
+E pelo painel; prancha é decidida por NOME antes de tudo (o `resolveSetMethodLabel`
+não a conhece).
+
+**Duas peças saíram de dentro de hooks/componentes para poder ser reusadas pelo
+servidor:** o conversor `notes → ReportHistory` (`lib/workout/reportHistoryFromWorkouts.ts`,
+−257 linhas no `useWorkoutDeload`) e o parser de SST (`helpers/sstFromNotes.ts`).
+Quatro source-guards que liam o hook seguiram o CÓDIGO para o arquivo novo, com
+as mesmas asserções.
+
+⚠️ **`toDateMs(undefined)` devolve 0, não `null`** — então `toDateMs(a) ??
+toDateMs(b)` NUNCA cai no segundo termo, e a sessão sai carimbada em 1970. É a
+mesma armadilha que `toNumber` já tinha documentada (`utils.ts:151`): a classe
+sobreviveu num segundo helper. Corrigido em `reportHistoryFromWorkouts`
+(helper local `dataOuNulo`); **sobraram nove cadeias iguais** em `useHistoryData`,
+`periodStats` e `useCheckins`. Medido: 703 sessões em produção, ZERO sem `date`
+— latente, não ativo.
+
+**Chrome neutro.** O verde era decoração (moldura, borda, ícone, título) E sinal
+de série concluída, com o mesmo hex e outro alpha. Hoje verde só onde
+`log.done`; o modo é dito por agrupamento + rótulo no cabeçalho, que não rola. A
+faixa "VOCÊ ESTÁ NO CONTROLE" foi removida — era a QUARTA codificação do mesmo
+fato, na primeira dobra, o treino inteiro.
+
+⚠️ **`barrasDoTopoTreino.test.ts` virou guard de CLASSE**: varria só o shell e
+não enxergava este painel. Agora percorre as superfícies de treino — provado
+sabotando uma faixa `fixed` aqui.
+
+⚠️ **Rota nova = rodar `npm run test:smoke`.** O guard
+`scripts/no-direct-req-json.test.ts` (corpo por `parseJsonBody`, nunca
+`req.json()` direto) NÃO roda no `test:unit`: passou local e reprovou no CI.
+
 ## Descanso do treino — ações nativas chegam ATRASADAS
 
 `REST_DONE` ("Iniciar Serie") e `SKIP_REST` ("Pular Descanso") são botões da notificação de tela bloqueada e ENCERRAM o descanso. **O iOS enfileira essas ações quando o app está suspenso** e as entrega quando ele acorda — depois de o usuário já ter concluído a série seguinte. Resultado relatado em treino: "aperto concluir e vai direto pro tempo de treino", intermitente e sempre na 1ª série do exercício (a que vem logo após o descanso anterior).
