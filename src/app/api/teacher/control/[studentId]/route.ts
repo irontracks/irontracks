@@ -160,10 +160,14 @@ export async function POST(
       return NextResponse.json({ ok: true })
     }
 
-    // release
+    // release — serve para DOIS casos que o aluno vive de formas diferentes:
+    // encerrar um controle ATIVO (ele aceitou e o professor está anotando) e
+    // cancelar um pedido ainda PENDENTE (ele nem respondeu). Por isso lemos o
+    // `control_status` antes de limpar: avisar "o professor encerrou o controle
+    // do seu treino" a quem nunca aceitou nada é contar um fato que não houve.
     const { data: session, error: selErr } = await admin
       .from('active_workout_sessions')
-      .select('controlled_by')
+      .select('controlled_by, control_status')
       .eq('user_id', studentId)
       .maybeSingle()
 
@@ -181,13 +185,16 @@ export async function POST(
 
     if (error) return respondDbError('api:teacher:control:studentId', error)
 
+    const eraPedidoPendente = session.control_status === 'requested'
     await sendPushToAllPlatforms(
       [studentId],
-      '✅ Controle encerrado',
-      'O professor encerrou o controle do seu treino.',
-      { type: 'teacher_control_released', teacherId },
+      eraPedidoPendente ? '🎮 Pedido cancelado' : '✅ Controle encerrado',
+      eraPedidoPendente
+        ? 'O professor cancelou o pedido para controlar seu treino.'
+        : 'O professor encerrou o controle do seu treino.',
+      { type: 'teacher_control_released', teacherId, wasPending: eraPedidoPendente },
     )
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, wasPending: eraPedidoPendente })
   } catch (e: unknown) {
     return respondInternalError('api:teacher:control:[studentId]', e)
   }
