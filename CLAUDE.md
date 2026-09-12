@@ -493,21 +493,65 @@ vez no meu próprio código, no mesmo dia em que escrevi o guard. O teto não
 strippa comentário; reescrever o texto sem os dois tokens juntos na mesma
 linha resolveu.
 
-**Foto/vídeo na observação da série + IA na finalização (02/09/2026).** O
-aluno anexa nas observações (`SetMediaAttach`, UM componente para os dois
-renderers que têm notas: `normalSet` e `AdvancedSetRow`); a referência vai
-para o LOG (`log.media`, lida por `lib/workout/setMedia.ts`) e o arquivo para
-o bucket privado `set-media` via URL assinada (`set-media/prepare`). **A IA só
-roda na FINALIZAÇÃO** (`finish` → `waitUntil(analyzeSetMediaForWorkout)`,
-`maxDuration = 120`): a linha de `workout_set_media` nasce sem `workout_id` e é
-ligada ali. Foto = "é o aparelho certo?"; vídeo = "a execução está correta?";
-a observação escrita é a pergunta. Cota VIP `media_analysis` (booleana, teto
-20/dia) cobrada POR mídia; sem VIP/cota a linha fica `skipped` COM motivo — o
-histórico mostra o motivo, não uma falha. Resposta na tela do relatório, no
-PDF (só texto — URL assinada expira) e no painel do professor
-(`StudentSetMediaSection`, decisão do dono). Notificação `set_media_analyzed`,
-uma por treino. Vídeo > 15 MB vai pela Files API do Gemini (inline tem teto).
-Guards em `lib/workout/__tests__/setMedia.test.ts` (4 mutações).
+**Chat de IA por EXERCÍCIO (12/09/2026, PR #1142) — ele ABSORVEU a análise de
+foto/vídeo por série, que não existe mais.** Se você procurar `SetMediaAttach`,
+`lib/workout/setMedia.ts`, `setMediaAnalysis` ou as rotas `workouts/set-media/*`,
+elas foram REMOVIDAS (15 arquivos). A tabela `workout_set_media` e o bucket
+`set-media` continuam existindo: o bucket é reusado pelo chat, e a tabela guarda
+a única linha que a feature antiga produziu.
+
+O que o chat é: botão no card do exercício → conversa com a IA sobre AQUELE
+exercício (texto + foto/vídeo, botão "Enviar"). Ao sair, um card pergunta se
+aquilo entra no relatório; se sim, a IA escreve um RESUMO por exercício
+(`exercise_chat_summaries`), exibido na tela e no PDF com a cor da MÁQUINA.
+Rotas em `api/ai/exercise-chat` (+ `/prepare-media`, `/summary`), decisão pura
+em `lib/workout/exerciseChat.ts` e `exerciseChatThread.ts`.
+
+⚠️ **A conversa é do ALUNO, e isso está no BANCO.** `exercise_chat_messages` e
+`exercise_chat_summaries` têm RLS com policy só do dono — **nenhuma policy de
+professor**, ao contrário de `workout_set_media`, que tinha `is_teacher_of`.
+Quem acrescentar leitura de coach ali desfaz o pedido do dono, não "melhora" a
+feature.
+
+⚠️ **O botão não pode nascer no card do PARCEIRO.** O `ExerciseCard` é
+compartilhado por `ExerciseList` e pelo `PartnerExerciseOverlay` — o painel do
+professor tem um `ExerciseCard` HOMÔNIMO e LOCAL (o comentário que falava em
+"4 call sites, 2× teacher" estava errado e foi corrigido). Quem decide é
+`enderecoDaConversa(session)`: sem sessão própria não há endereço, e sem
+endereço não há conversa. A sessão sintética do overlay leva
+`ehDeOutraPessoa: true` **explícito** — só a ausência do carimbo barraria em
+SILÊNCIO, e no dia em que aquele objeto ganhar um `startedAt` o botão vazaria
+sem ninguém decidir.
+
+⚠️ **A âncora é o par (índice, nome), reconferido — não `id`, não só o nome,
+não `exIdx`.** As três falham sozinhas, e cada uma por um motivo diferente:
+`swapExerciseName` faz `{...ex, name, notes}`, então o **`id` SOBREVIVE à troca**
+(Supino vira Crucifixo com o mesmo id); só o **nome** colapsa duplicata (Bi-Set)
+e ressuscita conversa morta em A→B→A; **`exIdx` não é estável** (organizar,
+editar e remover remapeiam índice, cada um por conta). O padrão a copiar já
+existia: `gerarNotaDoExercicio` relê `estadoFrescoRef` e só grava se o PAR ainda
+bate. Trocou o nome → a conversa anterior NÃO é apagada, a tela diz que era
+sobre outro exercício (`nomeAnterior` no GET).
+
+⚠️ **A mídia entra UMA vez, e a defesa é ESTRUTURAL.** O `SELECT` da thread
+(`COLUNAS_DA_THREAD`) não traz `media_path` nem `media_mime`: sem o caminho não
+há o que reenviar. No prompt a mídia vira marca (`[enviou um vídeo]`). Reenviar
+o arquivo a cada turno multiplicaria o custo pelo número de perguntas — a chave
+Gemini é paga e é a mesma de produção. Histórico capado em 6 turnos.
+
+**Cota por tipo de turno:** mídia cobra `media_analysis` (a chave da feature
+absorvida, teto 20/dia), texto cobra `chat_daily`, e o gate de TIER
+(`limits.media_analysis`) vem antes — sem ele o plano free entraria pela cota de
+conversa. O `summary` NÃO cobra: é consequência de turnos já pagos.
+
+⚠️ **`utils/ai/mediaPart.ts` foi SALVO da remoção.** É o único lugar do repo que
+resolve vídeo grande no Gemini: inline até 15 MB, acima disso Files API **com
+poll até `ACTIVE`**. Sem o poll o modelo responde sobre arquivo ainda não
+processado, e a falha se parece com "a IA respondeu besteira" — não com erro.
+
+Guards em `exerciseChatCustoEPosse.test.ts` (SELECT trazendo o caminho, caminho
+de outro usuário, cota trocada, histórico sem teto) e nos dois de vazamento para
+o parceiro — seis mutações.
 
 **Dossiê semanal/mensal (02/09/2026)** — botão "Dossiê" no card de resumo do
 Histórico. Treino (`periodStats.ts`, a MESMA conta do relatório de período —
