@@ -209,16 +209,36 @@ sessão SEMPRE e só então pergunta; "Só neste treino" é o destaque, como em
 `lib/workout/plannedSetMethod.ts` grava nela. Leitura: `explicitSetMethod` —
 log (a escolha de hoje) vence plano (a permanente).
 
-⚠️ **Campo por série tem DUAS pontas, e cada uma some sozinha e em silêncio.**
+⚠️ **Campo por série tem TRÊS pontas, e cada uma some sozinha e em silêncio.**
 (1) **Escrita**: `save_workout_atomic` APAGA e reinsere as séries, então builder
 que não copia o campo não deixa de gravar — ele APAGA o que já estava lá. São
 **oito** (rota de update, ações de servidor, editor completo, sync
 professor→aluno, clone de admin, periodização, payload do professor, backup);
 fonte única em `lib/workout/perSetMethodField.ts`, com guard de classe — é a
-mesma armadilha do `unilateralPersistFields` e do `planDays`. (2) **Leitura**:
-quatro SELECTs listam colunas de `sets` uma a uma, e eu esqueci deles: o campo
-gravava certo no banco e a série voltava a desenhar Normal na sessão seguinte.
-O guard da escrita não olhava a leitura; hoje há um para cada.
+mesma armadilha do `unilateralPersistFields` e do `planDays`. (2) **Leitura por
+SELECT**: cinco SELECTs listam colunas de `sets` uma a uma, e eu esqueci deles:
+o campo gravava certo no banco e a série voltava a desenhar Normal na sessão
+seguinte. (3) **Leitura pela RPC do bootstrap**, que é o caminho NORMAL do app.
+
+⚠️ **Esta nota dizia "DUAS pontas" e a terceira custou um PR inteiro
+(12/09/2026).** O #1126 fechou escrita e SELECTs do `duration_seconds` e eu dei
+o campo por resolvido; na tela, todo cardio com duração planejada abria com o
+campo TEMPO **vazio** e o Iniciar **desabilitado** — a feature de blocos não
+funcionava. `get_dashboard_bootstrap` nunca emitiu o campo.
+
+⚠️ **E o guard não pegou porque ALLOWLIST NÃO É GUARD.** Eu mesmo acrescentei
+`duration_seconds` à allowlist do `bootstrapPayloadShape` no #1126 e tratei
+aquilo como cobertura da RPC. A allowlist só diz *quais chaves podem existir* —
+ela nunca exigiu nenhuma. Hoje há um caso que EXIGE cada campo por-série nos
+TRÊS ramos da função (templates do usuário · qualquer workout · template do
+professor): esquecer um ramo entrega o campo só para parte da base, que é pior
+que não entregar para ninguém.
+
+Por que urgia mesmo afetando pouca gente: só **2 exercícios de cardio em toda a
+base** tinham `duration_seconds` preenchido — justamente porque o campo vinha
+sendo apagado em toda gravação. Com o #1126 no ar, todo cardio salvo daqui em
+diante grava a duração, e a RPC viraria o gargalo para todos. Bomba-relógio
+armada pela correção anterior.
 
 ⚠️ **A migration da RPC do bootstrap no repo estava ATRÁS do banco.** O arquivo
 de `20260703213937` não tem `is_alternating`, que a função VIVA tem há tempos —
@@ -2033,6 +2053,11 @@ cronômetro ao sair e voltar; perguntou "só hoje / pra sempre" ao deletar.
 **Que modelo roda teste exploratório:** Opus — e não pela execução, pelo
 JULGAMENTO. Nenhum dos três defeitos estava no roteiro. Não repita o roteiro
 antigo: aqueles três já são Playwright no CI. O que paga Opus é caminho NOVO.
+**Sonnet** dá conta de regressão com roteiro fechado e critério objetivo; o que
+ele tende a não fazer é o passo lateral, parar num "isto está estranho" que
+ninguém mandou procurar. **Haiku não**: coordenada lida de imagem, sessão longa
+com estado acumulado e decisão visual a cada passo. (Julgamento sobre a natureza
+da tarefa, não medição — o mesmo roteiro não foi rodado em Sonnet para comparar.)
 
 ## As lições do teste de 10 passos (16/08/2026)
 
@@ -2067,36 +2092,6 @@ progressão real anda em 2,5–10%, erro de digitação dá fator 5 a 10.
 `autocorrect` não derruba nada porque o React normaliza os dois. Antes de
 afrouxar um guard que "não pegou a mutação", confira se a mutação representa um
 defeito real.
-
-## Que modelo roda o teste exploratório no simulador (16/08/2026)
-
-**Opus** — e não pela execução. Tocar, digitar e capturar tela qualquer modelo
-faz; o valor do teste de 10 passos esteve inteiro no JULGAMENTO.
-
-Nenhum dos três defeitos achados estava no roteiro. O passo 10 dizia "finalize o
-treino"; o botão não respondeu, e a decisão seguinte era **dar como feito ou
-desconfiar**. Os outros dois momentos que exigiram o mesmo: reconhecer que o
-guard escrito no dia ANTERIOR era falso (varria só os arquivos já conhecidos), e
-distinguir bug de acerto — o app recusou concluir Drop-set com uma etapa só, o
-que parece falha e é comportamento correto; reportar isso custaria uma
-investigação atrás de fantasma.
-
-- **Sonnet** dá conta de regressão com roteiro fechado e critério objetivo
-  ("toque aqui, confirme que aparece X"). O que ele tende a não fazer é o passo
-  lateral, parar num "isto está estranho" que ninguém mandou procurar.
-- **Haiku não**, para este caso: coordenada espacial lida de imagem, sessão longa
-  com estado acumulado e decisão visual a cada passo.
-- **Ressalva honesta:** isto é julgamento sobre a natureza da tarefa, não
-  medição — o mesmo roteiro não foi rodado em Sonnet para comparar.
-
-**Não repita o roteiro antigo com modelo nenhum.** Os três bugs daquele teste já
-são Playwright no CI (26 s, a cada PR). O que ainda paga Opus é EXPLORAR caminho
-novo: tela nunca percorrida, fluxo que mudou, método de série que ninguém rodou
-de ponta a ponta. Exploração acha o que 5.582 testes verdes não acham — foi
-literalmente o que aconteceu.
-
-**O que encarece não é o modelo, é a foto.** Screenshot é o input mais caro que
-existe; capturar só nos pontos de decisão corta a maior parte da conta.
 
 ## Cobertura de teste e E2E — o que roda no CI
 
@@ -2308,6 +2303,94 @@ o boot normal (FCP p95 = 2883 ms) como hang. "App Hanging **Fully Blocked**" é
 a régua nova — app de fato congelado. Evento com "(N frames não exibidos)" é a
 UI colapsando frames de sistema, **não** falta de símbolo: os dSYMs estão lá,
 basta expandir no painel.
+
+## Cardio em blocos: encadeamento automático e VOZ (12/09/2026)
+
+Pedido do dono: o app **fala** o tempo enquanto ele caminha, e um bloco de
+esteira emenda no seguinte sem ninguém tocar em Iniciar. Duas decisões dele que
+mudam o desenho: a voz anuncia **minutos, não quilômetros** (intervalo
+configurável), e o marco é o **total somado de TODOS os blocos** — não o do
+bloco da vez. Quem decide é `lib/workout/vozDoCardio.ts`, e `segundosJaFeitos`
+só conta bloco com `done === true`: somar o bloco em curso faria o marco dos 10
+minutos ser anunciado duas vezes, uma ao passar e outra ao concluir.
+
+⚠️ **`speechSynthesis.speak()` retorna `undefined` e não prova nada.** No
+WKWebView a fala pode nunca começar — sem erro, sem exceção, sem `onerror`. A
+primeira versão reportava sucesso no instante da chamada e a telemetria teria
+dito "funciona" com o app mudo. Hoje `lib/voz.ts` devolve o DESFECHO
+(`iniciou` · `sem_suporte` · `erro` · `nao_comecou`), decidido por `onstart`
+com espera de 3 s. Medido no aparelho: 68 vozes, 1 pt-BR, `onstart`/`onend`
+disparando; telemetria de produção com `workout_cardio_voice
+{resultado:"iniciou"}`.
+
+⚠️ **`Number('')` é 0** — e `numeroFalado('')` dizia "zero" no meio da frase.
+Saída antecipada antes da conversão.
+
+**O encadeamento é decisão pura** (`lib/workout/cardioChain.ts`,
+`decidirBlocoAutomatico` → `nada`/`aguardar`/`iniciar`/`concluir`/`expirado`),
+com o próximo bloco carimbado por INSTANTE (`autoStartAtMs`), nunca por
+duração. Duas folgas medidas: `TOLERANCIA_AO_VIVO_MS` (5 s) separa "ainda
+rolando" de "venceu enquanto eu não olhava", e `LIMITE_DE_RECONSTRUCAO_MS`
+(20 min) recusa reconstruir uma cadeia velha — o app ficou fechado, e emendar
+blocos retroativamente inventaria treino que ninguém fez. **O WKWebView
+congela com a tela bloqueada** (nenhum JS roda), então o efeito também escuta
+`visibilitychange` e rechega a cada 30 s.
+
+## Controle do professor sobre o treino do aluno (12/09/2026)
+
+O professor assume o treino em andamento e anota pelo aluno. O canal já
+existia: `timerTargetTime` e `timerContext` fazem parte do STATE da sessão, e o
+state inteiro viaja pelo Realtime — **escrever o alvo do timer no state É
+disparar o descanso no aparelho do aluno**, sem canal novo. Decisão pura em
+`lib/workout/descansoRemoto.ts`.
+
+⚠️ **O alvo é INSTANTE absoluto, não duração.** Mandar "180 s" obrigaria dois
+aparelhos com relógios diferentes a concordarem sobre quando a contagem
+começou; com instante, atraso de rede ENCURTA o descanso do aluno — o erro no
+lado seguro. E há piso de **6 s** (`MINIMO_PARA_DESCANSO_REMOTO_S`): abaixo da
+folga de 5 s do `sanitizeRestoredSession` o app do aluno entende "venceu
+enquanto eu estava fechado" e abre em modo silencioso, sem alarme. Melhor não
+prometer do que prometer mudo.
+
+⚠️ **Concluir a série EXISTIA e ninguém achava.** O dono controlou um treino
+real, preencheu peso/reps/RPE nas quatro séries e **nenhuma** ficou concluída —
+os quatro logs no banco, todos sem `done`. Concluir era tocar no NÚMERO da
+série: um toggle sem rótulo, sem affordance, sem coluna. Sem `done` a série não
+conta no volume, não alimenta o motor de carga e não aparece no relatório
+(`isLogDone`), ou seja, o professor anotava o treino inteiro e ele valia zero.
+**Capacidade escondida é capacidade ausente** — o guard trava a ação por NOME
+acessível, não pela existência do handler.
+
+⚠️ **A tela piscava a cada 5 s e a causa era IDENTIDADE de função.** Cada
+evento Realtime re-renderizava o `TeacherControlHost`, que criava uma
+`getAuthHeaders` nova; ela estava nas deps do efeito de carga do
+`useTeacherControl`, que reexecutava e chamava `setIsLoading(true)`. **O padrão
+certo já estava vinte linhas abaixo no mesmo arquivo** (ler a função por ref) —
+lapso, não desenho. Corrigido nas DUAS pontas, senão o próximo componente que
+passar função instável repete o defeito, e função instável é o default em React.
+
+⚠️ **Flush imediato não pode esperar o React.** O descanso vai com
+`{ imediato: true }` e o updater roda DUAS vezes (UI e servidor): `Date.now()`
+lido lá dentro daria dois instantes, e o professor veria um descanso e o aluno,
+outro — o relógio é lido no HANDLER. E `queueMicrotask` no flush não serve:
+roda antes do render e leria o estado anterior; o updater é aplicado sobre o
+ref.
+
+**Pedir controle tem volta.** "Assumir" virava "Aguardando" sem saída — um
+toque sem querer prendia o professor. O botão Cancelar usa a MESMA rota
+`release`, que lê `control_status` para escolher o texto ("🎮 Pedido cancelado"
+× "✅ Controle encerrado"); o X do banner some com pedido pendente, para não
+oferecer duas saídas com efeitos diferentes.
+
+⚠️ **Faixa `fixed` no topo do treino ativo SEMPRE cobre alguém — use o FLUXO.**
+Três correções geométricas no mesmo dia, cada uma só trocando a vítima: o
+banner de consentimento caiu sobre o `WorkoutHeader` (num convite REAL o toque
+errou o alvo e RECUSOU), depois sobre a TIRA de navegação (irmã do header,
+também fixa), depois sobre o primeiro card da lista. No fluxo ele EMPURRA e não
+há geometria a acertar. **É o oposto do rodapé**, onde a barra do descanso
+PRECISA flutuar e quem cede é o rodapé (`--it-rest-bar-h`) — lá o guard cobra
+como a barra nova convive; aqui ele cobra que NÃO exista faixa fixa ancorada
+por `top`.
 
 ## Descanso do treino — ações nativas chegam ATRASADAS
 
