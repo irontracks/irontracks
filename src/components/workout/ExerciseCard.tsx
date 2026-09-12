@@ -29,7 +29,9 @@ import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
 import { SetMethodPicker } from './set-renderers/SetMethodPicker';
-import { resolveSetMethodLabel, podeTrocarMetodoRapido, precisaCongelarMetodo, metodoParaCongelar, explicitSetMethod, plannedSetMethod } from './helpers/resolveSetMethod';
+import { podeTrocarMetodoRapido, precisaCongelarMetodo, metodoParaCongelar, explicitSetMethod } from './helpers/resolveSetMethod';
+import { parseSstFromNotes } from './helpers/sstFromNotes';
+import { rotuloDoMetodoDaSerie } from './helpers/rotuloDoMetodoDaSerie';
 import { PlankSetInput } from './PlankSetInput';
 import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
@@ -242,27 +244,10 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
     } catch { return false; }
   }, [ex?.name, exIdx, logs, reportHistory, setsCount]);
 
-  // Parse SST config from exercise description (e.g. "SST na última: Falha > 10s > Falha > 10s > Falha")
-  const parsedSSTConfig = (() => {
-    const notes = String(ex?.notes || '');
-    // Detect "SST na última" or "SST na Nª série" patterns
-    const lastMatch = /SST\s+na\s+(última|ult\.)/i.exec(notes);
-    const nthMatch = /SST\s+na\s+(\d+)[ªa°.]?\s*série/i.exec(notes);
-    if (!lastMatch && !nthMatch) return null;
-
-    // Parse the rest of the pattern after ":" to get mini count and rest time
-    const colonIdx = notes.indexOf(':');
-    const pattern = colonIdx >= 0 ? notes.slice(colonIdx + 1) : notes;
-    const restMatch = /(\d+)\s*s/i.exec(pattern);
-    const restSec = restMatch ? parseInt(restMatch[1]) : 10;
-    const miniCount = Math.max(2, (pattern.match(/Falha/gi) ?? []).length) || 3;
-
-    const targetSetIdx = nthMatch
-      ? parseInt(nthMatch[1]) - 1  // "SST na 3ª série" → index 2
-      : setsCount - 1;              // "SST na última" → last set
-
-    return { restSec, miniCount, targetSetIdx };
-  })();
+  // SST vindo da NOTA do exercício (e.g. "SST na última: Falha > 10s > Falha").
+  // O parser mora em `helpers/sstFromNotes` — o painel do professor precisa da
+  // MESMA decisão, e um segundo parser divergiria do que o card desenha.
+  const parsedSSTConfig = parseSstFromNotes(ex?.notes, setsCount);
 
   const renderSet = (setIdx: number) => {
     const plannedSet = getPlannedSet(ex, setIdx);
@@ -403,19 +388,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
    * `resolveSetMethodLabel`. Rotular por palpite seria pior que não rotular: o
    * app diria "Normal" numa série desenhada como DROP.
    */
-  const methodLabelOfSet = (setIdx: number): string => {
-    const plannedSet = getPlannedSet(ex, setIdx);
-    const cfg = getPlanConfig(ex, setIdx);
-    return resolveSetMethodLabel({
-      exerciseMethod: ex?.method,
-      log: getLog(`${exIdx}-${setIdx}`),
-      plannedConfig: plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null,
-      sstFromNotes: Boolean(parsedSSTConfig && setIdx === parsedSSTConfig.targetSetIdx),
-      plannedMethod: plannedSetMethod(plannedSet),
-      isClusterConfig: isClusterConfig(cfg),
-      isRestPauseConfig: isRestPauseConfig(cfg),
-    });
-  };
+  const methodLabelOfSet = (setIdx: number): string =>
+    /* A montagem dos insumos mora em `rotuloDoMetodoDaSerie` — o painel de
+       controle do professor precisa do MESMO rótulo, e uma segunda montagem
+       divergiria em silêncio (é o que o docstring de resolveSetMethod chama de
+       pior que não rotular). Aqui fica só a chamada. */
+    rotuloDoMetodoDaSerie(ex, setIdx, getLog(`${exIdx}-${setIdx}`), setsCount);
 
   /**
    * Antes de remover a série `removedIdx`, grava explicitamente o método que as

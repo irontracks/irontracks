@@ -71,10 +71,25 @@ describe('o shell não fixa faixas no topo do treino', () => {
      */
     const PODE_FLUTUAR_NO_TOPO: Array<{ trecho: string; porque: string }> = []
 
-    it('nenhum `fixed` ancorado por `top` no shell', () => {
-        const src = semComentarios(ler(SHELL))
-        const fixadosNoTopo = [...src.matchAll(/className="[^"]*\bfixed\b[^"]*"[^>]*style=\{\{\s*top:\s*([^}]+)\}\}/g)]
-            .map((m) => m[1].trim())
+    /**
+     * ⚠️ CLASSE, não instância. Até 12/09/2026 este caso lia SÓ o shell — e a
+     * mesma armadilha existe em toda superfície que hospeda o treino, incluindo
+     * o painel de controle do PROFESSOR (que é `motion.div` com `transform`,
+     * onde `fixed` ancora no modal em vez da viewport e viaja na animação).
+     * Guard que varre só os arquivos que eu já conhecia é guard da instância com
+     * cara de classe — a lição do PR #833.
+     */
+    const SUPERFICIES_DE_TREINO = [
+        SHELL,
+        ATIVO,
+        'src/components/teacher/TeacherControlModal.tsx',
+    ]
+
+    it('nenhum `fixed` ancorado por `top` nas superfícies de treino', () => {
+        const fixadosNoTopo = SUPERFICIES_DE_TREINO.flatMap((rel) =>
+            [...semComentarios(ler(rel)).matchAll(/className="[^"]*\bfixed\b[^"]*"[^>]*style=\{\{\s*top:\s*([^}]+)\}\}/g)]
+                .map((m) => `${rel}: ${m[1].trim()}`),
+        )
 
         const naoDeclarados = fixadosNoTopo.filter(
             (top) => !PODE_FLUTUAR_NO_TOPO.some((e) => top.includes(e.trecho)),

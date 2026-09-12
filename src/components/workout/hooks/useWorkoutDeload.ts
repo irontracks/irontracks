@@ -14,12 +14,8 @@ import type {
 import {
   isObject,
   toNumber,
-  safeJsonParse,
-  toDateMs,
   averageNumbers,
   extractLogWeight,
-  extractLogReps,
-  extractLogRpe,
   withTimeout,
   readReportCache,
   writeReportCache,
@@ -57,24 +53,13 @@ import {
   roundSuggestion,
   reducaoEhUtil,
 } from '../helpers/deloadHelpers';
-import { isRealDeload } from '@/utils/report/sessionDeload';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import type { ConfirmFn } from '@/contexts/DialogContext'
-import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone'
 import { learnWeightGrid, snapToLearnedGrid } from '@/utils/autoload/machineGrid'
 import { collectKnownWeights } from './useWorkoutAutoload'
-
-/**
- * Teto de treinos distintos guardados por exercício no cache de histórico.
- *
- * O corte por treino (ver `buildReportHistoryFromWorkouts`) multiplicaria o
- * tamanho do cache pelo número de treinos em que o exercício aparece. Quatro
- * cobre o caso real mais espalhado desta base (Crucifixo invertido vive em três)
- * e mantém o `localStorage` no mesmo patamar.
- */
-const MAX_TREINOS_POR_EXERCICIO = 4;
+import { buildReportHistoryFromWorkouts } from '@/lib/workout/reportHistoryFromWorkouts'
 
 interface UseWorkoutDeloadProps {
   session: WorkoutSession | null;
@@ -185,244 +170,6 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     reportHistoryUpdatedAtRef.current = Number(reportHistoryUpdatedAt || 0);
   }, [reportHistoryUpdatedAt]);
 
-  const buildExerciseHistoryEntryFromSessionLogs = useCallback(
-    (sessionObj: unknown, exIdx: number, meta: UnknownRecord): ReportHistoryItem | null => {
-      try {
-        const base = isObject(sessionObj) ? sessionObj : null;
-        if (!base) return null;
-        const logsObj: UnknownRecord = isObject(base.logs) ? (base.logs as UnknownRecord) : {};
-        // Coleta sets com índice para manter a ordenção correta. We also
-        // capture the raw drop_set.stages so the modal can show per-stage
-        // previous weights instead of a single averaged value.
-        const indexedSets: Array<{
-          setIdx: number;
-          weight: number | null;
-          reps: number | null;
-          rpe: number | null;
-          notes: string | null;
-          dropStages: Array<{ weight: number | null; reps: number | null }> | null;
-          failed: boolean;
-        }> = [];
-        let hadDeload = false;
-        Object.entries(logsObj).forEach(([key, value]) => {
-          try {
-            const parts = String(key || '').split('-');
-            const eIdx = Number(parts[0]);
-            const sIdx = Number(parts[1]);
-            if (!Number.isFinite(eIdx) || eIdx !== exIdx) return;
-            if (!Number.isFinite(sIdx)) return;
-            const log = isObject(value) ? value : null;
-            if (!log) return;
-            const weight = extractLogWeight(log);
-            // Unilateral grava reps/rpe por lado (L_reps/R_reps, L_rpe/R_rpe) — os
-            // extractors fazem o fallback pelos lados. Não inlinar com `??`: toNumber
-            // devolve 0 (não null) para campo ausente e o fallback nunca rodaria.
-            const reps = extractLogReps(log);
-            const rpe = extractLogRpe(log);
-            const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
-            // Preserve drop-set per-stage values for this set (if any).
-            const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
-            const dropStagesRaw = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : null;
-            const dropStages = dropStagesRaw && dropStagesRaw.length > 0
-              ? dropStagesRaw.map((s) => {
-                  const obj = isObject(s) ? (s as UnknownRecord) : {};
-                  const w = toNumber(obj.weight ?? null);
-                  const r = toNumber(obj.reps ?? null);
-                  return {
-                    weight: w != null && Number.isFinite(w) && w > 0 ? w : null,
-                    reps: r != null && Number.isFinite(r) && r > 0 ? r : null,
-                  };
-                })
-              : null;
-            const hasValues = weight != null || reps != null;
-            // Fonte única (lib/workout/isLogDone). A regra "prefill do motor não é
-            // série feita" NASCEU aqui e foi promovida para os outros seis lugares
-            // que respondiam a mesma pergunta — o relatório dizia 29/30 com uma
-            // série feita enquanto este hook já sabia descartar (06/09/2026).
-            const done = isLogDone(log);
-            if (!done && !hasValues) return;
-            // Descarta o PREFILL do próprio motor de carga: peso escrito por ele
-            // (weightSource 'auto'), sem nenhuma rep e sem conclusão explícita, é
-            // exercício PULADO — não treino executado. Sem esta guarda o prefill
-            // entrava no histórico (só o peso já satisfaz `hasValues`), o
-            // exercício virava um item com `setReps: null`, e na sessão seguinte
-            // o autoload lia esse item, não achava rep nenhuma e concluía "sem
-            // histórico" — auto-envenenamento. A regra mora em
-            // `lib/workout/isLogDone` (nasceu aqui; hoje é de todos).
-            if (isEnginePrefillOnly(log)) return;
-            // Série levada à falha. Aceita boolean e a string "true" (o log passa
-            // por serialização JSON em workouts.notes e volta como texto).
-            const failureRaw = log.failure ?? null;
-            const failed = failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true';
-            // Marca a sessão como "teve deload neste exercício". O campo `deload` é
-            // gravado por applyDeloadToExercise e, até aqui, nunca era lido por
-            // ninguém — então carga reduzida de propósito entrava no histórico como
-            // treino normal.
-            //
-            // ⚠️ A EXISTÊNCIA da marca não basta: exige redução REAL. Até
-            // 08/09/2026 bastava o objeto existir (`isObject(log.deload)`), e
-            // `pickUsableHistory` descarta do motor de carga toda sessão com
-            // `deloadApplied` — de propósito, para não punir quem descarrega.
-            // Medido na sessão de 07/09/2026 do dono: pullover (35 → 35 kg) e
-            // tríceps corda (37,5 → 37,5), treinados em carga CHEIA mas marcados
-            // como descarga de 30 % e 25 %, sumiam do histórico do motor. O
-            // melhor sinal disponível ia para o lixo.
-            //
-            // `isRealDeload` é a fonte única — os PESOS decidem; o percentual
-            // anunciado é só o plano (ver `utils/report/sessionDeload`).
-            if (isRealDeload(log.deload)) hadDeload = true;
-            if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages, failed });
-            }
-          } catch { }
-        });
-
-        if (!indexedSets.length) return null;
-        // Ordena por índice de série para preservar progressão correta
-        indexedSets.sort((a, b) => a.setIdx - b.setIdx);
-        const sets = indexedSets.map(s => ({ weight: s.weight, reps: s.reps }));
-        const weightList = sets
-          .map((s) => s.weight)
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
-        const repsList = sets
-          .map((s) => s.reps)
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
-        const avgWeight = averageNumbers(weightList);
-        const avgReps = averageNumbers(repsList);
-        const totalVolume = sets.reduce((acc, s) => {
-          const w = Number(s.weight ?? 0);
-          const r = Number(s.reps ?? 0);
-          if (!Number.isFinite(w) || !Number.isFinite(r)) return acc;
-          if (w <= 0 || r <= 0) return acc;
-          return acc + w * r;
-        }, 0);
-        const topWeight = weightList.length ? Math.max(...weightList) : null;
-        if (!avgWeight && !avgReps && !totalVolume) return null;
-        const ts =
-          toDateMs(base.date) ??
-          toDateMs(base.completed_at) ??
-          toDateMs(base.completedAt) ??
-          toDateMs(meta.date) ??
-          toDateMs(meta.created_at) ??
-          Date.now();
-        // Treino de origem — ver `workoutKey` em ReportHistoryItem. Sem isto o
-        // histórico do exercício mistura treinos com cargas incomparáveis.
-        const workoutKey = normalizeExerciseKey(
-          String(meta.name ?? meta.workout_name ?? (base.workout as UnknownRecord | undefined)?.name ?? ''),
-        );
-        // Build per-set arrays indexed by setIdx (the index the consumer reads
-        // with `setWeights[setIdx]`). The previous version filtered out null/0
-        // values, which silently shifted later sets down — `setWeights[1]`
-        // could end up holding what was actually set 2's weight whenever set 1
-        // was logged without a value. Now we keep the slot as null and let the
-        // consumer fall back to its own placeholder logic.
-        const maxIdx = indexedSets.reduce((acc, s) => Math.max(acc, s.setIdx), -1);
-        const setsLen = maxIdx + 1;
-        const setWeights: (number | null)[] = Array(setsLen).fill(null);
-        const setReps: (number | null)[] = Array(setsLen).fill(null);
-        const setRpes: (number | null)[] = Array(setsLen).fill(null);
-        const setNotes: (string | null)[] = Array(setsLen).fill(null);
-        const dropSetStages: (Array<{ weight: number | null; reps: number | null }> | null)[] = Array(setsLen).fill(null);
-        const setFailures: (boolean | null)[] = Array(setsLen).fill(null);
-        const isPosNum = (v: number | null): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
-        for (const s of indexedSets) {
-          setWeights[s.setIdx] = isPosNum(s.weight) ? s.weight : null;
-          setReps[s.setIdx] = isPosNum(s.reps) ? s.reps : null;
-          setRpes[s.setIdx] = isPosNum(s.rpe) ? s.rpe : null;
-          setNotes[s.setIdx] = s.notes ?? null;
-          dropSetStages[s.setIdx] = s.dropStages ?? null;
-          setFailures[s.setIdx] = s.failed ? true : null;
-        }
-        const hasAnyWeight = setWeights.some(v => v !== null);
-        const hasAnyReps = setReps.some(v => v !== null);
-        const hasAnyRpe = setRpes.some(v => v !== null);
-        const hasAnyNote = setNotes.some(v => v !== null);
-        const hasAnyDropStages = dropSetStages.some(v => v !== null);
-        const hasAnyFailure = setFailures.some(v => v !== null);
-        return {
-          ts,
-          avgWeight: avgWeight ?? null,
-          avgReps: avgReps ?? null,
-          totalVolume: Number.isFinite(totalVolume) ? totalVolume : 0,
-          topWeight,
-          setsCount: sets.length,
-          setWeights: hasAnyWeight ? setWeights : null,
-          setReps: hasAnyReps ? setReps : null,
-          setRpes: hasAnyRpe ? setRpes : null,
-          setNotes: hasAnyNote ? setNotes : null,
-          dropSetStages: hasAnyDropStages ? dropSetStages : null,
-          setFailures: hasAnyFailure ? setFailures : null,
-          deloadApplied: hadDeload ? true : undefined,
-          workoutKey: workoutKey || undefined,
-        };
-      } catch (e) {
-        logError('hook:useWorkoutDeload.buildHistoryEntry', e);
-        return null;
-      }
-    },
-    [],
-  );
-
-  const buildReportHistoryFromWorkouts = useCallback(
-    (rows: unknown): ReportHistory => {
-      try {
-        const list: unknown[] = Array.isArray(rows) ? rows : [];
-        const next: ReportHistory = { version: 1, exercises: {} };
-        list.forEach((row) => {
-          const rowObj = isObject(row) ? row : null;
-          if (!rowObj) return;
-          const sessionObj = safeJsonParse(rowObj.notes);
-          if (!isObject(sessionObj)) return;
-          const rawExercises = (sessionObj as UnknownRecord).exercises;
-          const exercisesArr: unknown[] = Array.isArray(rawExercises) ? rawExercises : [];
-          if (!exercisesArr.length) return;
-          exercisesArr.forEach((ex, exIdx) => {
-            const exObj = isObject(ex) ? ex : null;
-            const name = String(exObj?.name || '').trim();
-            if (!name) return;
-            const key = normalizeExerciseKey(name);
-            if (!key) return;
-            const entry = buildExerciseHistoryEntryFromSessionLogs(sessionObj, exIdx, rowObj);
-            if (!entry) return;
-            const prev = next.exercises[key] ?? { name, items: [] };
-            next.exercises[key] = { name, items: [...prev.items, { ...entry, name }] };
-          });
-        });
-        Object.keys(next.exercises).forEach((key) => {
-          const ex = next.exercises[key];
-          const items: ReportHistoryItem[] = Array.isArray(ex?.items) ? ex.items : [];
-          const validos = items
-            .filter((it): it is ReportHistoryItem => !!it && typeof it.ts === 'number')
-            .sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
-          // Corta as últimas N sessões POR TREINO, não no total.
-          //
-          // O corte global vinha ANTES do filtro por `workoutKey`, então exercício
-          // que alterna entre dois treinos (Panturrilha do dono: SEG · Upper B e
-          // SEX · Pump) nunca juntava as DELOAD_HISTORY_MIN sessões do treino
-          // corrente — não gerava alerta e nunca era oferecido para descarga.
-          // Guardar 6 de cada resolve sem inchar o cache: o teto total continua.
-          const porTreino = new Map<string, ReportHistoryItem[]>();
-          for (const it of validos) {
-            const wk = String(it.workoutKey ?? '');
-            const lista = porTreino.get(wk) ?? [];
-            lista.push(it);
-            porTreino.set(wk, lista);
-          }
-          const ordered = [...porTreino.values()]
-            .flatMap((lista) => lista.slice(-DELOAD_HISTORY_SIZE))
-            .sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0))
-            .slice(-DELOAD_HISTORY_SIZE * MAX_TREINOS_POR_EXERCICIO);
-          next.exercises[key] = { ...ex, items: ordered };
-        });
-        return next;
-      } catch (e) {
-        logError('hook:useWorkoutDeload.buildReportHistory', e);
-        return { version: 1, exercises: {} };
-      }
-    },
-    [buildExerciseHistoryEntryFromSessionLogs],
-  );
-
   useEffect(() => {
     let cancelled = false;
     let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -500,7 +247,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     };
     // userId nas deps: trocar de conta precisa REBUSCAR o histórico, senão o novo
     // usuário fica com o estado do anterior em memória.
-  }, [supabase, buildReportHistoryFromWorkouts, userId]);
+  }, [supabase, userId]);
 
   // Watchdog: detect stale loading state and timeout (replaces old ticker dep)
   useEffect(() => {

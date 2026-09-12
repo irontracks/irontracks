@@ -27,6 +27,9 @@ import { loadDeloadHistory, saveDeloadHistory, appendDeloadAudit } from '../help
 import { pickUsableHistory } from '../hooks/useWorkoutAutoload'
 
 const deloadSrc = readFileSync(resolve(process.cwd(), 'src/components/workout/hooks/useWorkoutDeload.ts'), 'utf8')
+// O conversor de linhas de `workouts` em `ReportHistory` saiu do hook em
+// 12/09/2026: é função pura, e o painel do professor precisa do MESMO número.
+const historySrc = readFileSync(resolve(process.cwd(), 'src/lib/workout/reportHistoryFromWorkouts.ts'), 'utf8')
 
 /**
  * O comportamento da aplicação (weightSource, skip de concluída, referência de
@@ -87,9 +90,9 @@ describe('sessão de deload não conta como regressão para o motor (defeito 4)'
     // como descarga mas treinada em carga cheia (pullover 35 → 35 kg anunciando
     // 30 %, sessão de 07/09/2026) era descartada do motor por `pickUsableHistory`.
     // A exigência agora é a forma CORRETA, e a antiga passa a reprovar.
-    expect(deloadSrc).toMatch(/isRealDeload\(log\.deload\)\) hadDeload = true/)
-    expect(deloadSrc).not.toMatch(/isObject\(log\.deload\)\) hadDeload = true/)
-    expect(deloadSrc).toMatch(/deloadApplied: hadDeload \? true : undefined/)
+    expect(historySrc).toMatch(/isRealDeload\(log\.deload\)\) hadDeload = true/)
+    expect(historySrc).not.toMatch(/isObject\(log\.deload\)\) hadDeload = true/)
+    expect(historySrc).toMatch(/deloadApplied: hadDeload \? true : undefined/)
   })
 
   it('o motor pula a sessão de deload e usa o último treino normal', () => {

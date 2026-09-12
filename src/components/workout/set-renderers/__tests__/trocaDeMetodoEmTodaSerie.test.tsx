@@ -41,7 +41,21 @@ describe('o seletor de método vive FORA dos renderers', () => {
 
   it('o rótulo vem de resolveSetMethodLabel, não de um palpite', () => {
     // Rotular por `per_set_method` sozinho diria "Normal" numa série DROP.
-    expect(CARD).toMatch(/resolveSetMethodLabel\(/)
+    //
+    // ⚠️ A cadeia inteira, e não só o card: em 12/09/2026 a MONTAGEM dos sete
+    // insumos saiu do card para `helpers/rotuloDoMetodoDaSerie`, porque o painel
+    // de controle do professor precisa do mesmo rótulo e uma segunda montagem
+    // divergiria em silêncio. Travar só o card deixaria o helper livre para
+    // adivinhar — e é ele quem decide agora.
+    expect(CARD).toMatch(/rotuloDoMetodoDaSerie\(/)
+    const MONTAGEM = readFileSync(
+      join(process.cwd(), 'src/components/workout/helpers/rotuloDoMetodoDaSerie.ts'),
+      'utf8',
+    )
+    expect(MONTAGEM).toMatch(/resolveSetMethodLabel\(/)
+    // Prancha é decidida por NOME antes de tudo (o resolvedor não a conhece):
+    // sem esta linha o painel diria "Normal" numa prancha.
+    expect(MONTAGEM).toMatch(/isPlank\(/)
   })
 })
 
