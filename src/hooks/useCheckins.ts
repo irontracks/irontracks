@@ -16,7 +16,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 type AnyObj = Record<string, unknown>
 
-const toDateMs = (v: unknown): number | null => {
+/**
+ * Exportado para o guard de classe (`__tests__/dataAusenteNuncaEhZero.test.ts`)
+ * poder cobrar dele o mesmo contrato dos outros dois `toDateMs` do repo:
+ * entrada ausente devolve **null**, nunca 0 — senão a cadeia `??` abaixo
+ * pararia no primeiro termo e a janela do check-in nasceria em 1970.
+ */
+export const toDateMs = (v: unknown): number | null => {
   try {
     if (!v) return null
     const ms = new Date(v as string | number | Date).getTime()

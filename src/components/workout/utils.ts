@@ -92,10 +92,22 @@ export const toNumber = (v: unknown): number | null => {
 
 export const safeJsonParse = (raw: unknown): unknown => parseJsonWithSchema(raw, z.unknown())
 
+/**
+ * Data em milissegundos, ou `null`.
+ *
+ * ⚠️ Devolve **null, nunca 0**, para entrada ausente ou que não é data. Até
+ * 12/09/2026 ele convertia qualquer coisa não-data em `new Date(0)`, e 0 é
+ * finito: a cadeia `toDateMs(a) ?? toDateMs(b)` parava no PRIMEIRO termo e a
+ * data saía 01/01/1970. Mesma armadilha do `toNumber` logo acima.
+ *
+ * Os três helpers homônimos deste repo precisam concordar nesse conjunto de
+ * entradas — quem cobra é `src/__tests__/dataAusenteNuncaEhZero.test.ts`.
+ */
 export const toDateMs = (value: unknown): number | null => {
   try {
-    const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : 0;
-    const t = new Date(dateInput).getTime();
+    if (!value) return null;
+    if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) return null;
+    const t = new Date(value).getTime();
     return Number.isFinite(t) ? t : null;
   } catch {
     return null;
