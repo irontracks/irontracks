@@ -79,6 +79,30 @@ export function useTeacherControl(
   // cliente — evita comparar relógios de celulares diferentes (skew).
   const lastSeenUpdatedAtRef = useRef<number>(0)
 
+  /**
+   * Refs para o listener e para a CARGA lerem os valores mais recentes sem
+   * reagendar a cada mudança de identidade.
+   *
+   * ⚠️ INCIDENTE (12/09/2026, relatado pelo dono controlando um treino real):
+   * "a tela toda fica piscando a cada 5 segundos". A cadeia era esta:
+   *   1. o aluno (ou o próprio patch do professor) escreve na sessão;
+   *   2. o Realtime avisa o `useTeacherStudentSessions`, que faz
+   *      `setActiveMap(prev => ({ ...prev }))` — objeto NOVO sempre;
+   *   3. o `TeacherControlHost` re-renderiza e cria uma `getAuthHeaders` NOVA
+   *      (ela nascia no corpo do componente, sem useCallback);
+   *   4. essa identidade nova estava nas deps do efeito de CARGA abaixo, que
+   *      re-executava e chamava `setIsLoading(true)`;
+   *   5. a tela inteira do controle virava "carregando" e voltava. Piscava.
+   *
+   * O arquivo já tinha o padrão certo para o OUTRO efeito (ler por ref) — era
+   * lapso, não desenho. Hoje a carga depende só de `studentUserId`: função
+   * instável vinda de fora deixa de conseguir reiniciar a tela.
+   */
+  const studentUserIdRef = useRef(studentUserId)
+  const getAuthHeadersRef = useRef(getAuthHeaders)
+  useEffect(() => { studentUserIdRef.current = studentUserId }, [studentUserId])
+  useEffect(() => { getAuthHeadersRef.current = getAuthHeaders }, [getAuthHeaders])
+
   // Load the student's session on mount / when studentUserId changes
   useEffect(() => {
     if (!studentUserId) { setSession(null); return }
@@ -87,7 +111,7 @@ export function useTeacherControl(
 
     const load = async () => {
       try {
-        const headers = await getAuthHeaders()
+        const headers = await getAuthHeadersRef.current()
         const res = await fetch(`/api/teacher/student-session/${studentUserId}`, {
           headers: { 'Content-Type': 'application/json', ...headers },
         })
@@ -102,7 +126,9 @@ export function useTeacherControl(
     }
     load()
     return () => { cancelled = true }
-  }, [studentUserId, getAuthHeaders])
+    // Só `studentUserId`: a função de auth é lida por ref de propósito (ver a
+    // nota acima). Pô-la aqui é o que fazia a tela piscar.
+  }, [studentUserId])
 
   // Subscribe to Realtime for live updates from the student
   useEffect(() => {
@@ -222,13 +248,6 @@ export function useTeacherControl(
   // o request termine mesmo após o documento ser descarregado. Fallback é
   // fetch normal (best-effort).
   //
-  // Refs garantem que o listener leia os valores mais recentes sem
-  // reagendar a cada mudança.
-  const studentUserIdRef = useRef(studentUserId)
-  const getAuthHeadersRef = useRef(getAuthHeaders)
-  useEffect(() => { studentUserIdRef.current = studentUserId }, [studentUserId])
-  useEffect(() => { getAuthHeadersRef.current = getAuthHeaders }, [getAuthHeaders])
-
   useEffect(() => {
     if (typeof window === 'undefined') return
 

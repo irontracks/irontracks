@@ -113,12 +113,21 @@ export default function TeacherControlHost({
     return () => window.removeEventListener(OPEN_TEACHER_CONTROL_EVENT, onOpen)
   }, [myId, openFor])
 
-  if (!controlTarget || !supabase) return null
-
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  // ⚠️ `useCallback` não é enfeite aqui: sem ele esta função nascia a cada render
+  // do host, e o host re-renderiza a cada evento Realtime da sessão do aluno.
+  // A identidade nova descia até o efeito de carga do `useTeacherControl` e
+  // fazia a tela inteira do controle voltar para "carregando" — o "pisca a cada
+  // 5 segundos" relatado pelo dono. O hook agora lê a auth por ref (defesa dos
+  // dois lados), mas a função estável é a metade que impede o re-render inútil.
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    // O early return abaixo garante `supabase` no render, mas o hook precisa
+    // existir antes dele — daí a checagem aqui dentro.
+    if (!supabase) return {}
     const h = await getAdminAuthHeaders(supabase)
     return h.Authorization ? { Authorization: h.Authorization } : {}
-  }
+  }, [supabase])
+
+  if (!controlTarget || !supabase) return null
 
   return (
     <TeacherControlModal
