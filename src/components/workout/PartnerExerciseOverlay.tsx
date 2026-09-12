@@ -173,7 +173,13 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
 
     // ── Full WorkoutContext value ────────────────────────────────────────────
     const contextValue = useMemo(() => ({
-        session: { workout: fakeWorkout, logs: localLogs, ui: {} },
+        // ⚠️ `ehDeOutraPessoa` é o que mantém fora daqui tudo que pertence ao DONO
+        // da sessão — hoje, a conversa de IA por exercício (o card é o MESMO
+        // componente do treino próprio). Só a ausência de `startedAt` também
+        // barraria, mas em silêncio: no dia em que esta sessão sintética ganhar
+        // um carimbo de início, o botão vazaria para a tela do parceiro sem
+        // ninguém decidir isso. Ver lib/workout/exerciseChatThread.
+        session: { workout: fakeWorkout, logs: localLogs, ui: {}, ehDeOutraPessoa: true },
         workout: fakeWorkout,
         exercises: [exercise] as WorkoutExercise[],
         logs: localLogs,

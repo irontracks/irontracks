@@ -131,6 +131,18 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   exercise_muscle_maps: { mechanism: 'cascade', export: own(['user_id']) },
   exercise_alias_jobs: { mechanism: 'cascade', export: skip('fila técnica de normalização de nomes; o resultado está em exercise_aliases') },
   exercise_execution_submissions: { mechanism: 'cascade', export: own(['student_user_id']) },
+  // Chat de IA por exercício (12/09/2026). A conversa é PRIVADA do aluno — a
+  // RLS não tem policy de professor/admin de propósito —, mas privada para o
+  // coach não é privada para o TITULAR: é conteúdo escrito por ele, então vai
+  // inteiro no export LGPD. Cascateia pela FK para auth.users.
+  // `media_path` aponta para um arquivo no storage — e storage nunca cascateia.
+  // A lacuna NÃO existe: a mídia do chat sobe no bucket `set-media` (ver
+  // api/ai/exercise-chat/prepare-media, que reusa o bucket de propósito), e ele
+  // já está em USER_PREFIX_BUCKETS/BUCKET_DECISIONS com o prefixo userId
+  // varrido na exclusão. Bucket NOVO para mídia de chat é que precisaria entrar
+  // aqui — e por isso não se cria um.
+  exercise_chat_messages: { mechanism: 'cascade', export: own(['user_id'], 20000) },
+  exercise_chat_summaries: { mechanism: 'cascade', export: own(['user_id']) },
   // Foto/vídeo da observação da série (02/09/2026). Arquivos no bucket set-media (prefixo userId).
   workout_set_media: { mechanism: 'cascade', export: own(['user_id']) },
   exercise_videos: {
@@ -282,6 +294,18 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   mercadopago_webhook_events: { mechanism: 'none', reason: 'log operacional do provedor', export: skip('log operacional') },
   webhook_dead_letters: { mechanism: 'none', reason: 'fila operacional de reentrega', export: skip('fila operacional') },
   cron_secrets: { mechanism: 'none', reason: 'segredo de agendamento, sem titular', export: skip('config de infraestrutura') },
+  // ⚠️ Não é catálogo global: é CÓPIA de nutrition_custom_foods (23 linhas, 2
+  // usuários, com label_image_url) deixada pelo dedupe de 07/09/2026. Entrou no
+  // banco sem passar por aqui e o snapshot ficou cego para ela até 12/09/2026.
+  // Registrada como está HOJE: sem FK, sem RLS (advisor ERROR) e sem ninguém
+  // que a apague — ou seja, sobrevive à exclusão da conta. Drop (ou RLS +
+  // decisão de verdade) é do dono; não inventei um passo de delete novo numa
+  // rota de LGPD sem ele.
+  backup_dedup_custom_foods_2026_09_07: {
+    mechanism: 'retain',
+    reason: 'backup técnico datado do dedupe de alimentos (07/09/2026), sem FK e sem RLS — PENDENTE de drop pelo dono',
+    export: skip('cópia de nutrition_custom_foods, que já sai no export do titular'),
+  },
 }
 
 /**

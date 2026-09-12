@@ -39,6 +39,7 @@ import { logError, logInfo } from '@/lib/logger'
 import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
+import ExerciseChatButton from './ExerciseChatButton'
 import PlateCalculatorSheet from './PlateCalculatorSheet'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 import { resolveIncrement } from '@/utils/autoload/plateMath';
@@ -774,6 +775,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
             </button>
           ) : null}
           <AIExerciseSwap exerciseName={name} exerciseIndex={exIdx} />
+          {/* Tirar dúvida com a IA sobre ESTE exercício. Vizinho imediato da troca
+              de propósito: as duas são as ações de IA do card, e pô-las lado a
+              lado é o que torna a diferença entre elas legível (silhueta e cor
+              distintas, `aria-label` distintos). O componente se apaga sozinho
+              quando a sessão não é do dono — ver ExerciseChatButton. */}
+          <ExerciseChatButton exerciseName={name} exerciseIndex={exIdx} />
           <button
             type="button"
             onClick={async (e) => {
@@ -1112,15 +1119,22 @@ const ExerciseCardMemo = React.memo(ExerciseCardInner, arePropsEqual);
 // (é barato — só extrai o slice), mas o card pesado (ExerciseCardMemo) só re-renderiza quando
 // o slice DESTE exercício muda (via arePropsEqual). Antes, o ExerciseCardInner chamava
 // useWorkoutLogs() direto e o React.memo era inútil (context não respeita memo) -> todos os
-// cards re-renderizavam a cada tecla. Os 4 call sites (lista, partner overlay, 2× teacher)
-// seguem renderizando <ExerciseCard> sem mudança — o wrapper cuida dos logs internamente.
+// cards re-renderizavam a cada tecla. Os call sites seguem renderizando <ExerciseCard>
+// sem mudança — o wrapper cuida dos logs internamente.
+//
+// ⚠️ Esta nota dizia "4 call sites (lista, partner overlay, 2x teacher)" e estava FALSA —
+// medido em 12/09/2026 por grep nos importadores. São DOIS arquivos e TRÊS render sites:
+// `ExerciseList` (solo e dentro de grupo) e `PartnerExerciseOverlay`. O painel de controle
+// do professor desenha um `ExerciseCard` HOMÔNIMO e local (TeacherControlModal.tsx:499),
+// que não é este componente. A diferença importa: só um dos render sites é a sessão do
+// PRÓPRIO usuário, e é por isso que a conversa de IA se apaga sozinha no outro.
 function ExerciseCard({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
   const logs = useWorkoutLogs() as Record<string, Record<string, unknown>>;
   const logsSlice = pickExerciseLogSlice(logs, exIdx) as Record<string, Record<string, unknown>>;
   // "Fazer depois" precisa de um destino. O cálculo mora AQUI, no wrapper, e não
   // no card: ele já re-renderiza a cada tecla (é barato) e tem os logs de TODOS,
-  // enquanto o card só recebe a fatia dele. Fazendo assim, os quatro call sites
-  // (lista, overlay do parceiro, 2× painel do professor) seguem sem mudança.
+  // enquanto o card só recebe a fatia dele. Fazendo assim, os render sites
+  // (lista e overlay do parceiro) seguem sem mudança.
   const { exercises: todos, deferredExercises } = useWorkoutContext();
   const temDestinoAoAdiar = React.useMemo(() => {
     // Simula o adiamento antes de procurar o destino — é o que o controller faz

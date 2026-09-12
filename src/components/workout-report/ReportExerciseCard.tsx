@@ -4,14 +4,14 @@ import { setTopWeightReps, setBestE1rm, setVolume, isNonWorkingSet, nonWorkingSe
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
 import { isCardioExercise, getCardioSummary, getCardioSummaries, totalMinutosDeCardio } from '@/utils/report/cardioSummary'
-import { ReportSetMediaRow } from '@/components/workout-report/ReportSetMediaRow'
-import type { SetMediaView } from '@/lib/workout/setMediaView'
+import { ReportChatSummaryBlock } from '@/components/workout-report/ReportChatSummaryBlock'
+import type { ExerciseChatSummaryView } from '@/lib/workout/exerciseChatSummary'
 
 type AnyObj = Record<string, unknown>
 
 interface ReportExerciseCardProps {
-    /** Foto/vídeo anexados às séries deste treino, por chave "exIdx-setIdx" (com a resposta da IA). */
-    setMediaByKey?: Record<string, SetMediaView[]>
+    /** Resumo que a IA escreveu no chat DESTE exercício (ausente na maioria das sessões). */
+    chatSummary?: ExerciseChatSummaryView | null
     exercise: AnyObj
     exIdx: number
     sessionLogs: Record<string, unknown>
@@ -139,7 +139,7 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs, setMediaByKey }: ReportExerciseCardProps) => {
+export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs, chatSummary }: ReportExerciseCardProps) => {
     const obj = exercise
     const exName = String(obj?.name || '').trim()
     // Cardio (esteira/bike/…) não tem carga/reps/1RM — renderiza tempo/velocidade
@@ -410,17 +410,17 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                         </tr>
                                     )
                                 })()}
-                                {(() => {
-                                    const midias = setMediaByKey?.[`${exIdx}-${sIdx}`]
-                                    if (!Array.isArray(midias) || midias.length === 0) return null
-                                    return <ReportSetMediaRow key={`${sIdx}-media`} items={midias} colSpan={5} />
-                                })()}
                             </React.Fragment>
                         )
                     })}
                 </tbody>
             </table>
             )}
+            {/* Fora do `isCardio ? … : …` de propósito: quem pergunta à IA sobre a
+                esteira tem tanto direito ao resumo quanto quem pergunta sobre o
+                supino — e foi um early return que já escondeu o card do Diário de
+                Progresso de 57 dos 59 usuários. */}
+            <ReportChatSummaryBlock item={chatSummary} exerciseName={exName} />
         </div>
     )
 }
