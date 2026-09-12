@@ -61,6 +61,44 @@ export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: {
     finally { setBusy(null) }
   }, [])
 
+  /**
+   * Cancela um pedido de controle que ainda está PENDENTE.
+   *
+   * Pedido do dono (12/09/2026): "o professor pode clicar sem querer, aí ele
+   * fica sem ferramenta para cancelar". Era pior que só faltar o botão — com o
+   * pedido pendente o "Assumir" sumia e sobrava o X, que apenas ESCONDE o
+   * banner localmente: o `control_status` seguia `requested` no servidor e o
+   * aluno continuava com o convite na tela, sem ninguém para retirá-lo.
+   *
+   * A capacidade já existia na rota (`action: 'release'`, que limpa
+   * `controlled_by`/`control_status`); faltava o caminho do autor — o mesmo
+   * padrão que a observação por refeição já ensinou aqui: campo que alguém LÊ
+   * precisa de quem ESCREVE.
+   */
+  const cancelar = useCallback(async (userId: string) => {
+    setBusy(userId)
+    setErrors((p) => { const n = { ...p }; delete n[userId]; return n })
+    try {
+      const res = await fetch(`/api/teacher/control/${userId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'release' }),
+      })
+      const j = await res.json().catch((): null => null)
+      if (res.ok && j?.ok) {
+        // Volta ao estado "Deseja assumir o treino?": o professor pode pedir de
+        // novo sem precisar esperar o aluno reiniciar nada.
+        setRequested((p) => { const n = { ...p }; delete n[userId]; return n })
+      } else {
+        setErrors((p) => ({ ...p, [userId]: 'Não foi possível cancelar. Tente de novo.' }))
+      }
+    } catch (e) {
+      logError('StudentWorkoutStartBanner.cancelar', e)
+      setErrors((p) => ({ ...p, [userId]: 'Falha de conexão. Tente de novo.' }))
+    }
+    finally { setBusy(null) }
+  }, [])
+
   if (!alerts.length) return null
 
   return (
@@ -85,7 +123,17 @@ export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: {
                     : 'Deseja assumir o treino?'}
               </div>
             </div>
-            {!requested[a.userId] && (
+            {requested[a.userId] ? (
+              <button
+                type="button"
+                onClick={() => cancelar(a.userId)}
+                disabled={busy === a.userId}
+                className="text-[12px] font-black bg-neutral-800 text-neutral-200 border border-neutral-700 px-3 py-1.5 rounded-xl hover:bg-neutral-700 transition-colors shrink-0 active:scale-95 disabled:opacity-60 inline-flex items-center gap-1"
+              >
+                {busy === a.userId ? <Loader2 size={13} className="animate-spin" /> : null}
+                Cancelar
+              </button>
+            ) : (
               <button
                 type="button"
                 onClick={() => assumir(a.userId)}
@@ -96,14 +144,20 @@ export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: {
                 {errors[a.userId] ? 'Tentar de novo' : 'Assumir'}
               </button>
             )}
-            <button
-              type="button"
-              aria-label="Dispensar"
-              onClick={() => dismiss(a.userId)}
-              className="tap-44 h-7 w-7 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 flex items-center justify-center shrink-0"
-            >
-              <X size={15} />
-            </button>
+            {/* O X some enquanto o pedido está pendente, de propósito: ele só
+                esconde o banner daqui, e sair da tela com o pedido vivo deixa o
+                aluno com um convite que ninguém mais pode retirar. Com o pedido
+                no ar, a única saída é Cancelar — que resolve dos DOIS lados. */}
+            {!requested[a.userId] && (
+              <button
+                type="button"
+                aria-label="Dispensar"
+                onClick={() => dismiss(a.userId)}
+                className="tap-44 h-7 w-7 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 flex items-center justify-center shrink-0"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
         </div>
       ))}
