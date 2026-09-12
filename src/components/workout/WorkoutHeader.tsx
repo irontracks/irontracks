@@ -125,53 +125,9 @@ export default function WorkoutHeader() {
     return () => document.removeEventListener('mousedown', handler);
   }, [overflowOpen]);
 
-  /**
-   * Altura REAL do header publicada como `--it-workout-header-h`.
-   *
-   * INCIDENTE (12/09/2026): o banner de consentimento do professor ("Prof. X
-   * quer controlar seu treino") é `fixed` e era posicionado no topo ABSOLUTO da
-   * safe-area — a mesma faixa que este header ocupa. Como o banner tem fundo de
-   * 12% de opacidade, o header vazava por baixo dele: dois textos sobrepostos e
-   * os botões Aceitar/Recusar empilhados sobre os do header. Ao tentar aceitar
-   * um convite real no aparelho, o toque caiu no alvo errado e o convite foi
-   * RECUSADO.
-   *
-   * É a mesma classe do "FINALIZAR inalcançável durante o descanso": duas
-   * barras disputando a mesma faixa não se resolvem com z-index — quem está por
-   * cima esconde a outra qualquer que seja o z. A saída é geométrica, e é a
-   * mesma que o `RestTimerOverlay` já usa com `--it-rest-bar-h`, só que no topo.
-   *
-   * Publicamos o `bottom` do retângulo (e não a altura): é a distância do topo
-   * da viewport até o fim do header, já com a safe-area embutida — que é
-   * exatamente o `top` de quem precisa ficar ABAIXO dele.
-   */
-  const headerRef = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    const el = headerRef.current;
-    const root = typeof document !== 'undefined' ? document.documentElement : null;
-    if (!el || !root) return;
-    const publish = () => {
-      root.style.setProperty('--it-workout-header-h', `${Math.round(el.getBoundingClientRect().bottom)}px`);
-    };
-    publish();
-    // jsdom (e WebViews antigas) não têm ResizeObserver. A medição inicial já
-    // cobre o caso comum; o observer é só para a altura mudar em voo (safe-area,
-    // título que quebra em duas linhas). Sem a guarda, o header inteiro quebra
-    // nos testes — e no aparelho seria a tela do treino caindo.
-    const RO = typeof ResizeObserver !== 'undefined' ? ResizeObserver : null;
-    const ro = RO ? new RO(publish) : null;
-    if (ro) ro.observe(el);
-    return () => {
-      ro?.disconnect();
-      // Saiu do treino: quem lia a variável volta ao fallback.
-      root.style.removeProperty('--it-workout-header-h');
-    };
-  });
-
   return (
     <>
       <div
-        ref={headerRef}
         /**
          * `z-30`: o header é irmão do contêiner que rola e vem ANTES dele no DOM.
          * Sem z próprio, qualquer elemento posicionado da lista pinta por cima —

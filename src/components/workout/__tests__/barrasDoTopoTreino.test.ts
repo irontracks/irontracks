@@ -1,113 +1,126 @@
 /**
  * Guard de CLASSE das faixas fixas no TOPO do treino ativo.
  *
- * Irmão do `barrasDoRodapeTreino.test.ts`, e existe pela mesma razão — só que a
- * lição veio pelo outro lado da tela.
+ * Irmão do `barrasDoRodapeTreino.test.ts`, e nasceu da mesma lição pelo outro
+ * lado da tela.
  *
- * INCIDENTE (12/09/2026, medido no aparelho): o banner de consentimento do
- * professor ("Prof. X quer controlar seu treino") era `fixed` com
- * `top: max(env(safe-area-inset-top), 56px)` — o topo ABSOLUTO da viewport, que
- * é exatamente a faixa que o `WorkoutHeader` ocupa. Como o banner tem fundo de
- * 12% de opacidade, o header vazava por baixo: "Prof. MK quer controlar seu
- * treino" impresso por cima de "Upper B - Peito + Braços", e os botões
- * Aceitar/Recusar empilhados sobre os do header. Num convite REAL o toque caiu
- * no alvo errado e o controle foi RECUSADO — o aluno não tinha como mirar.
+ * INCIDENTE (12/09/2026, medido no aparelho com um convite REAL): o banner de
+ * consentimento do professor ("Prof. X quer controlar seu treino") é `fixed` e
+ * estava ancorado no topo ABSOLUTO da viewport — a faixa que o `WorkoutHeader`
+ * ocupa. Como ele tem fundo de 12% de opacidade, o header vazava por baixo: dois
+ * textos sobrepostos e os botões Aceitar/Recusar empilhados sobre os do header.
+ * O toque caiu no alvo errado e o controle foi RECUSADO.
  *
- * ⚠️ Isto NÃO se resolve com z-index. Duas faixas disputando o mesmo espaço
- * físico: quem fica por cima esconde a outra, qualquer que seja o z. A
- * convivência é geométrica — quem chega depois se posiciona ABAIXO do header,
- * pela altura REAL que ele publica em `--it-workout-header-h`.
+ * ⚠️ **A PRIMEIRA correção mediu a altura do HEADER e só mudou o bug de lugar.**
+ * O banner desceu e passou a cobrir a TIRA de navegação (os números dos
+ * exercícios) — `WorkoutExerciseRail` é IRMÃ do header e também vive fora do
+ * contêiner que rola. O dono viu na tela e disse "ainda está bugado".
  *
- * Este guard varre o treino ativo e o shell do dashboard atrás de qualquer
- * elemento fixado no topo e exige que ele declare como convive com o header.
- * Faixa nova = vermelho pedindo a decisão, não bug em produção.
+ * É por isso que este guard não se contenta em perguntar "usa a variável?" —
+ * essa pergunta passou VERDE com o bug vivo. Guard de FORMA não substitui a
+ * régua certa. O que ele exige é a FONTE da medida: `--it-workout-topo-h` tem
+ * de sair do `top` do CONTÊINER QUE ROLA, que é por construção onde a região
+ * fixa do topo acaba — de uma, de duas ou de cinco faixas. Medir um irmão
+ * qualquer deixa os outros descobertos, e foi exatamente o que aconteceu.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const raiz = process.cwd()
-
 const ler = (rel: string) => readFileSync(path.join(raiz, rel), 'utf8')
 
 /** Comentário não é código: sem isto o guard acusa a própria explicação (jeito nº 2). */
 const semComentarios = (src: string) =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
-const VARIAVEL = '--it-workout-header-h'
+const VARIAVEL = '--it-workout-topo-h'
+const ATIVO = 'src/components/ActiveWorkout.tsx'
+const SHELL = 'src/app/(app)/dashboard/IronTracksAppClientImpl.tsx'
 
-describe('o header publica a própria altura', () => {
-    const header = semComentarios(ler('src/components/workout/WorkoutHeader.tsx'))
+describe('a régua do topo sai do contêiner que ROLA', () => {
+    const ativo = semComentarios(ler(ATIVO))
 
-    it('mede o elemento real e publica a variável', () => {
-        expect(header).toMatch(/setProperty\(\s*['"`]--it-workout-header-h['"`]/)
-        // `bottom` e não `height`: é a distância do topo da viewport até o fim do
-        // header, já com a safe-area embutida — o `top` de quem vem depois.
-        expect(header).toMatch(/getBoundingClientRect\(\)\.bottom/)
+    it('publica a variável', () => {
+        expect(ativo).toMatch(/setProperty\(\s*['"`]--it-workout-topo-h['"`]/)
     })
 
-    it('devolve o topo ao sair do treino (senão a faixa fica com um vão para sempre)', () => {
-        expect(header).toMatch(/removeProperty\(\s*['"`]--it-workout-header-h['"`]/)
+    it('⚠️ mede o `top` do contêiner rolável — não a altura de um irmão do topo', () => {
+        // A medida é `top` (onde o conteúdo começa), nunca `height`/`bottom` de
+        // header ou tira: só o contêiner rolável inclui TODAS as faixas fixas.
+        expect(ativo).toMatch(/getBoundingClientRect\(\)\.top/)
+
+        // E o ref medido tem de estar no elemento que rola. Sem isto alguém pode
+        // apontar o mesmo ref para o header e o guard não perceberia — que é
+        // literalmente o defeito que esta rodada produziu.
+        const refDoConteudo = /ref=\{conteudoRef\}[^>]*className="[^"]*overflow-y-auto/
+        expect(
+            ativo,
+            'o ref medido precisa estar no contêiner com overflow-y-auto: medir um ' +
+            'irmão do topo (header OU tira) deixa o outro descoberto.',
+        ).toMatch(refDoConteudo)
     })
 
-    it('⚠️ guarda o ResizeObserver — jsdom não tem, e sem a guarda o header cai', () => {
-        expect(header).toMatch(/typeof ResizeObserver !== ['"`]undefined['"`]/)
+    it('devolve o topo ao sair do treino', () => {
+        expect(ativo).toMatch(/removeProperty\(\s*['"`]--it-workout-topo-h['"`]/)
+    })
+
+    it('⚠️ guarda o ResizeObserver — jsdom não tem, e sem a guarda a tela cai', () => {
+        expect(ativo).toMatch(/typeof ResizeObserver !== ['"`]undefined['"`]/)
+    })
+
+    it('nenhum irmão do topo publica a variável por conta própria', () => {
+        // Se o header (ou a tira) voltar a publicar, a medida deixa de incluir o
+        // outro e o bug volta inteiro. A régua é UMA só.
+        for (const rel of [
+            'src/components/workout/WorkoutHeader.tsx',
+            'src/components/workout/WorkoutExerciseRail.tsx',
+        ]) {
+            expect(
+                semComentarios(ler(rel)),
+                `${rel} não pode publicar ${VARIAVEL}: medir um irmão do topo é o ` +
+                `defeito que esta rodada já produziu — a tira ficou coberta.`,
+            ).not.toContain(`setProperty('${VARIAVEL}'`)
+        }
     })
 })
 
-describe('quem fica no topo do treino consome a altura do header', () => {
-    /**
-     * Arquivos varridos. O do shell entrou porque é onde o banner do professor
-     * mora — o guard do RODAPÉ aprendeu essa mesma lição em 24/08/2026, quando
-     * varria só `components/workout` e deixou passar uma barra que vivia em
-     * `app/(app)/dashboard`.
-     */
-    const ALVOS = [
-        'src/app/(app)/dashboard/IronTracksAppClientImpl.tsx',
-    ]
-
+describe('quem fica no topo do treino consome a régua', () => {
     /**
      * Faixas fixas no topo que NÃO precisam da variável, com o motivo.
-     * Lista vazia hoje — e ela não pode virar papel de parede: cada entrada
-     * nova é uma decisão de que aquele elemento pode cobrir o header.
+     * Nasce VAZIA, e não pode virar papel de parede: cada entrada é a decisão
+     * consciente de que aquele elemento pode cobrir o header e a tira.
      */
     const NAO_DISPUTA_O_TOPO: Array<{ trecho: string; porque: string }> = []
 
-    it.each(ALVOS)('%s: todo `fixed` ancorado no topo usa a variável', (rel) => {
-        const src = semComentarios(ler(rel))
-
-        // `style={{ top: ... }}` num elemento com `fixed` na mesma tag.
+    it('todo `fixed` ancorado no topo do shell usa a variável', () => {
+        const src = semComentarios(ler(SHELL))
         const fixadosNoTopo = [...src.matchAll(/className="[^"]*\bfixed\b[^"]*"[^>]*style=\{\{\s*top:\s*([^}]+)\}\}/g)]
             .map((m) => m[1].trim())
 
-        const semVariavel = fixadosNoTopo.filter((top) => {
-            if (top.includes(VARIAVEL)) return false
-            return !NAO_DISPUTA_O_TOPO.some((e) => top.includes(e.trecho))
-        })
+        const semRegua = fixadosNoTopo.filter((top) =>
+            !top.includes(VARIAVEL) && !NAO_DISPUTA_O_TOPO.some((e) => top.includes(e.trecho)),
+        )
 
         expect(
-            semVariavel,
-            `Elemento fixo no topo do treino sem \`${VARIAVEL}\`: ele vai cair EM CIMA do ` +
-            `WorkoutHeader (foi assim que o convite do professor virou impossível de aceitar). ` +
-            `Posicione por \`top: var(${VARIAVEL}, <fallback>)\` ou declare em NAO_DISPUTA_O_TOPO ` +
-            `dizendo por que pode cobrir o header.`,
+            semRegua,
+            `Elemento fixo no topo sem \`${VARIAVEL}\`: ele cai EM CIMA do header e da ` +
+            `tira de navegação (foi assim que o convite do professor virou impossível de ` +
+            `aceitar). Posicione por \`top: var(${VARIAVEL}, <fallback>)\` ou declare em ` +
+            `NAO_DISPUTA_O_TOPO dizendo por que pode cobri-los.`,
         ).toEqual([])
     })
 
-    it('o banner de consentimento do professor está fiado na variável', () => {
-        const shell = semComentarios(ler('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx'))
-        // Ancorado no que VAI FICAR (o componente e a variável), nunca na string
-        // que a correção apagou — jeito nº 6 da lista de guards falsos.
+    it('o banner de consentimento do professor está fiado na régua', () => {
+        const shell = semComentarios(ler(SHELL))
         // `<StudentControlConsent`, com o sinal de menor: sem ele o indexOf casa
-        // com o `dynamic(() => import(...))` lá no topo do arquivo e o guard mede
-        // a lista de imports em vez do JSX — falso positivo que este próprio
-        // teste pegou ao nascer.
+        // com o `dynamic(() => import(...))` no topo do arquivo e o guard mede a
+        // lista de imports em vez do JSX — falso positivo que este teste já teve.
         const i = shell.indexOf('<StudentControlConsent')
         expect(i, 'o banner de consentimento sumiu do shell').toBeGreaterThan(0)
-        const bloco = shell.slice(Math.max(0, i - 600), i)
         expect(
-            bloco,
-            'o banner voltou a se ancorar no topo absoluto da tela, em cima do header',
+            shell.slice(Math.max(0, i - 600), i),
+            'o banner voltou a se ancorar sem a régua do topo',
         ).toContain(VARIAVEL)
     })
 
