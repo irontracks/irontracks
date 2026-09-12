@@ -4,7 +4,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, Loader2, Gamepad2, Save, Plus, Minus, Check } from 'lucide-react'
 import { useTeacherControl } from '@/hooks/useTeacherControl'
-import { descansoAoConcluir, pularDescanso, descansoEmAndamento, segundosRestantes } from '@/lib/workout/descansoRemoto'
+import {
+  descansoAoConcluir,
+  pularDescanso,
+  descansoEmAndamento,
+  descansoNaTela,
+  iniciarSerieRemota,
+  segundosAlemDoPlanejado,
+  segundosRestantes,
+} from '@/lib/workout/descansoRemoto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession, Exercise } from '@/types/app'
 
@@ -55,45 +63,70 @@ const RPE_OPTS = [6, 7, 7.5, 8, 8.5, 9, 9.5, 10]
 function BarraDeDescansoRemoto({
   timerTargetTime,
   onPular,
+  onIniciar,
 }: {
   timerTargetTime: unknown
   onPular: () => void
+  onIniciar: () => void
 }) {
   const [agora, setAgora] = useState(() => Date.now())
+  const naTela = descansoNaTela(timerTargetTime)
 
   useEffect(() => {
-    if (!descansoEmAndamento(timerTargetTime, Date.now())) return
+    if (!naTela) return
     const id = setInterval(() => setAgora(Date.now()), 1000)
     return () => clearInterval(id)
-  }, [timerTargetTime])
+  }, [naTela, timerTargetTime])
 
-  if (!descansoEmAndamento(timerTargetTime, agora)) return null
+  // ⚠️ A barra vive enquanto o ALVO existir, não enquanto ele estiver no
+  // futuro. Com o auto-start desligado — que é como o dono treina — o descanso
+  // do aluno vence e a tela dele FICA aberta em tempo extra, esperando o START.
+  // Sumir no vencimento tirava o professor da tela exatamente no instante em
+  // que ele precisa agir; era o buraco que este pedido abriu.
+  if (!naTela) return null
 
-  const faltam = segundosRestantes(timerTargetTime, agora)
-  const mm = Math.floor(faltam / 60)
-  const ss = faltam % 60
+  const correndo = descansoEmAndamento(timerTargetTime, agora)
+  const segundos = correndo ? segundosRestantes(timerTargetTime, agora) : segundosAlemDoPlanejado(timerTargetTime, agora)
+  const mm = Math.floor(segundos / 60)
+  const ss = segundos % 60
+  const relogio = `${correndo ? '' : '+'}${mm}:${ss < 10 ? '0' : ''}${ss}`
 
   return (
     <div
-      className="flex items-center gap-3 rounded-2xl px-3 py-2.5"
+      className="flex flex-col gap-2.5 rounded-2xl px-3 py-2.5"
       style={{ background: 'rgba(234,179,8,0.10)', border: '1px solid rgba(234,179,8,0.30)' }}
     >
-      <div className="min-w-0 flex-1">
-        <div className="text-[9px] font-black uppercase tracking-widest text-amber-300/80">
-          Descanso do aluno
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[9px] font-black uppercase tracking-widest text-amber-300/80">
+            {correndo ? 'Descanso do aluno' : 'Descanso terminou'}
+          </div>
+          <div className="font-mono font-black tabular-nums text-2xl leading-none text-amber-300 mt-0.5">
+            {relogio}
+          </div>
         </div>
-        <div className="font-mono font-black tabular-nums text-2xl leading-none text-amber-300 mt-0.5">
-          {mm}:{ss < 10 ? '0' : ''}{ss}
-        </div>
+        <button
+          type="button"
+          onClick={onPular}
+          className="tap-44 shrink-0 text-[12px] font-black px-3 py-2 rounded-xl active:scale-95 transition-transform"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+          aria-label="Pular o descanso do aluno"
+        >
+          Pular descanso
+        </button>
       </div>
+
+      {/* START ▶ — o MESMO botão que o aluno tem na tela do descanso, com o
+          mesmo nome. É a ação primária (dourada): encerra o descanso e começa a
+          contagem da série. "Pular descanso" fica ao lado como o atalho que só
+          fecha, sem carimbar nada. */}
       <button
         type="button"
-        onClick={onPular}
-        className="tap-44 shrink-0 text-[12px] font-black px-3 py-2 rounded-xl active:scale-95 transition-transform"
-        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
-        aria-label="Pular o descanso do aluno"
+        onClick={onIniciar}
+        className="tap-44 w-full py-2.5 rounded-xl text-black font-black text-sm bg-gradient-to-r from-yellow-500 to-amber-400 shadow-lg shadow-yellow-900/30 active:scale-[0.98] transition-transform"
+        aria-label="Iniciar a série do aluno"
       >
-        Pular descanso
+        START ▶
       </button>
     </div>
   )
@@ -405,6 +438,21 @@ export function TeacherControlModal({
     }
   }, [studentUserId, getAuthHeaders, onClose])
 
+  /**
+   * START ▶ — encerra o descanso e inicia a contagem da série no aluno.
+   *
+   * ⚠️ `Date.now()` fica AQUI, fora do updater: com o flush imediato o updater
+   * roda duas vezes (uma para a UI, outra para o servidor) e um relógio lido lá
+   * dentro carimbaria dois instantes diferentes nos dois aparelhos.
+   */
+  const iniciarSerie = useCallback(() => {
+    const agoraMs = Date.now()
+    patchState(
+      prev => ({ ...prev, ...iniciarSerieRemota(prev, agoraMs) }) as ActiveWorkoutSession,
+      { imediato: true },
+    )
+  }, [patchState])
+
   const exercises = getExercises(session)
   const workoutTitle = String(
     (session?.workout as Record<string, unknown> | null)?.title ??
@@ -491,6 +539,7 @@ export function TeacherControlModal({
             <BarraDeDescansoRemoto
               timerTargetTime={(session as unknown as { timerTargetTime?: unknown } | null)?.timerTargetTime}
               onPular={() => patchState(prev => ({ ...prev, ...pularDescanso() }) as ActiveWorkoutSession, { imediato: true })}
+              onIniciar={iniciarSerie}
             />
 
             {exercises.map((ex, exIdx) => (

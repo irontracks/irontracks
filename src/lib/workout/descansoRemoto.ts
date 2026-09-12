@@ -100,3 +100,94 @@ export function segundosRestantes(timerTargetTime: unknown, agoraMs: number): nu
     if (!Number.isFinite(alvo) || alvo <= 0) return 0
     return Math.max(0, Math.ceil((alvo - Number(agoraMs)) / 1000))
 }
+
+/** Quanto o descanso já passou do planejado (0 enquanto ele ainda corre). */
+export function segundosAlemDoPlanejado(timerTargetTime: unknown, agoraMs: number): number {
+    const alvo = Number(timerTargetTime)
+    if (!Number.isFinite(alvo) || alvo <= 0) return 0
+    return Math.max(0, Math.round((Number(agoraMs) - alvo) / 1000))
+}
+
+/** Há um descanso na tela do aluno — correndo OU já vencido esperando o START. */
+export function descansoNaTela(timerTargetTime: unknown): boolean {
+    const alvo = Number(timerTargetTime)
+    return Number.isFinite(alvo) && alvo > 0
+}
+
+const ehObjeto = (v: unknown): v is Record<string, unknown> =>
+    v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const paraNumero = (v: unknown): number => {
+    const n = typeof v === 'number' ? v : Number(String(v ?? '').trim())
+    return Number.isFinite(n) ? n : 0
+}
+
+export interface SessaoParaInicioDeSerie {
+    logs?: unknown
+    ui?: unknown
+    timerContext?: unknown
+}
+
+export interface PatchDeInicioDeSerie {
+    timerTargetTime: null
+    timerContext: null
+    logs: Record<string, unknown>
+    ui: Record<string, unknown>
+}
+
+/**
+ * O START ▶ do professor — o mesmo botão que o aluno tem no fim do descanso.
+ *
+ * Pedido do dono (12/09/2026): "quando termina o descanso e não está no
+ * automático, precisa clicar no start para iniciar a contagem de tempo daquela
+ * série; eu preciso ter esse controle aqui". Sem ele o professor via o descanso
+ * zerar e não tinha como destravar o aluno de onde ele estava.
+ *
+ * ⚠️ Não basta limpar o timer (é o que `pularDescanso` faz). O START do aluno
+ * (`handleStartFromRestTimer`) faz TRÊS coisas, e as três somem se o professor
+ * só apagar o alvo: grava quanto o descanso REALMENTE durou na série que
+ * acabou, carimba o começo da PRÓXIMA série, e marca a execução em curso. O
+ * `restSeconds` e o `startedAtMs` alimentam a duração da sessão e a estimativa
+ * de calorias — perdê-los não dá erro nenhum, só um relatório mais pobre.
+ *
+ * Espelha o aluno também no que ele NÃO faz: série já concluída não é
+ * recarimbada, e sem `nextKey` (métodos que não anunciam a próxima) o START
+ * apenas encerra o descanso — inventar uma próxima série aqui criaria log de
+ * uma série que ninguém vai fazer.
+ *
+ * O relógio é parâmetro de propósito: com o flush imediato o updater roda duas
+ * vezes (UI e servidor), e um `Date.now()` lá dentro daria dois instantes
+ * diferentes — o mesmo cuidado do `descansoAoConcluir`.
+ */
+export function iniciarSerieRemota(
+    sessao: SessaoParaInicioDeSerie | null | undefined,
+    agoraMs: number,
+): PatchDeInicioDeSerie {
+    const ctx = ehObjeto(sessao?.timerContext) ? sessao.timerContext : {}
+    const logs: Record<string, unknown> = ehObjeto(sessao?.logs) ? { ...sessao.logs } : {}
+    const ui: Record<string, unknown> = ehObjeto(sessao?.ui) ? { ...sessao.ui } : {}
+    const agora = paraNumero(agoraMs)
+    if (agora <= 0) return { timerTargetTime: null, timerContext: null, logs, ui }
+
+    // A série que ACABOU: registra o descanso de verdade, não o planejado.
+    const prevKey = String(ctx.key ?? '').trim()
+    if (prevKey) {
+        const prevLog = ehObjeto(logs[prevKey]) ? { ...logs[prevKey] } : {}
+        const base = paraNumero(ctx.restStartedAtMs) || paraNumero(prevLog.completedAtMs)
+        if (base > 0) {
+            logs[prevKey] = { ...prevLog, restSeconds: Math.max(0, Math.round((agora - base) / 1000)) }
+        }
+    }
+
+    // A série que COMEÇA agora.
+    const nextKey = String(ctx.nextKey ?? '').trim()
+    if (nextKey) {
+        const nextLog = ehObjeto(logs[nextKey]) ? { ...logs[nextKey] } : {}
+        if (!nextLog.done) {
+            logs[nextKey] = { ...nextLog, startedAtMs: agora }
+            ui.activeExecution = { key: nextKey, startedAtMs: agora }
+        }
+    }
+
+    return { timerTargetTime: null, timerContext: null, logs, ui }
+}
