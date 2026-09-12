@@ -90,12 +90,83 @@ describe('o toggle grava `done` no log, sem apagar o que já foi anotado', () =>
             semComentarios,
             'concluir precisa ser um toggle sobre o estado atual — `update("done", true)` ' +
             'fixo impediria desfazer a série.',
-        ).toMatch(/const toggleDone = \(\) => update\('done', !log\.done\)/)
+        // ⚠️ Ancorado no INVARIANTE (alterna a partir do estado atual), não na
+        // sintaxe de hoje: a primeira versão exigia a linha exata
+        // `update('done', !log.done)` e morreu na refatoração que trouxe o
+        // descanso remoto — jeito nº 6 da lista de guards falsos.
+        ).toMatch(/const proximoDone = !log\.done/)
     })
 
     it('o patch preserva o log anterior — concluir não pode zerar peso e reps', () => {
         // `{ ...prevLog, [field]: value }`: sem o spread, marcar concluída
         // apagaria os números que o professor acabou de anotar.
+        // Duas formas convivem: o `update` genérico (peso/reps/RPE) e o
+        // `toggleDone`, que monta o patch por extenso para levar o descanso junto.
         expect(semComentarios).toMatch(/\{ \.\.\.prevLog, \[field\]: value \}/)
+        expect(
+            semComentarios,
+            'concluir precisa preservar o log: sem o spread, marcar a série apagaria ' +
+            'o peso e as reps que o professor acabou de anotar.',
+        ).toMatch(/\{ \.\.\.prevLog, done: proximoDone \}/)
+    })
+})
+
+describe('concluir DISPARA o descanso no aparelho do aluno', () => {
+    /**
+     * Pedido do dono: "quando eu colocar Concluir dispara o descanso pra ele, e
+     * aparece pra mim também, e eu posso pular o descanso como se fosse ele".
+     *
+     * `descansoRemoto.ts` passa verde sozinho com o botão desconectado — é o
+     * jeito nº 3 da lista de guards falsos ("cobrindo as pontas e não a
+     * fiação"). O que estes casos travam é o componente USAR a decisão.
+     */
+    it('o handler monta o patch do descanso pela fonte única', () => {
+        expect(semComentarios).toMatch(/descansoAoConcluir\(\{/)
+        expect(semComentarios, 'o descanso precisa sair do restTime do exercício').toMatch(/restTime,/)
+    })
+
+    it('o patch do descanso vai IMEDIATO, sem esperar o debounce', () => {
+        // 800 ms de atraso num cronômetro que já corre do lado do professor é
+        // tempo que some do descanso do aluno.
+        expect(semComentarios).toMatch(/\{ imediato: Boolean\(descanso\) \}/)
+    })
+
+    it('⚠️ o relógio é lido no HANDLER, nunca dentro do updater', () => {
+        // Com flush imediato o updater roda DUAS vezes (uma para a UI, outra
+        // para o que vai ao servidor). Um `Date.now()` lá dentro daria dois
+        // instantes diferentes: o professor veria um descanso e o aluno, outro.
+        const i = semComentarios.indexOf('const toggleDone = () => {')
+        expect(i, 'o handler de concluir sumiu').toBeGreaterThan(0)
+        const fim = semComentarios.indexOf('const done = ', i)
+        const corpo = semComentarios.slice(i, fim > i ? fim : i + 1800)
+        const updaterInicio = corpo.indexOf('onPatch(prev => {')
+        expect(updaterInicio).toBeGreaterThan(0)
+        expect(
+            corpo.slice(0, updaterInicio),
+            'o `Date.now()` precisa vir ANTES do updater',
+        ).toContain('Date.now()')
+        expect(
+            corpo.slice(updaterInicio),
+            'relógio dentro do updater: com flush imediato ele roda duas vezes e os ' +
+            'dois aparelhos ficam com descansos diferentes.',
+        ).not.toContain('Date.now()')
+    })
+
+    it('o professor vê o descanso e pode PULAR por ele', () => {
+        expect(semComentarios).toMatch(/BarraDeDescansoRemoto/)
+        expect(semComentarios).toMatch(/aria-label="Pular o descanso do aluno"/)
+        expect(semComentarios, 'pular também precisa ser imediato').toMatch(
+            /pularDescanso\(\)[\s\S]{0,120}?imediato: true/,
+        )
+    })
+
+    it('⚠️ o ticker de 1s fica na BARRA, não no modal inteiro', () => {
+        // Um setInterval no componente de cima re-renderizaria a lista inteira de
+        // exercícios a cada segundo — e esta tela acabou de sair de um bug de
+        // "pisca a cada 5 segundos".
+        const i = semComentarios.indexOf('function BarraDeDescansoRemoto')
+        const j = semComentarios.indexOf('setInterval(')
+        expect(i).toBeGreaterThan(0)
+        expect(j, 'o ticker saiu da barra').toBeGreaterThan(i)
     })
 })
