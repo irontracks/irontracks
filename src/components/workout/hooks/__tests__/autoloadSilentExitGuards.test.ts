@@ -13,15 +13,18 @@ import { resolve } from 'node:path'
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8')
 
-const deload = read('src/components/workout/hooks/useWorkoutDeload.ts')
+// O builder do histórico saiu do hook em 12/09/2026 (lib/workout/
+// reportHistoryFromWorkouts, para o servidor poder reusá-lo). O guard lê o
+// arquivo onde o código está hoje.
+const deload = read('src/lib/workout/reportHistoryFromWorkouts.ts')
 const autoload = read('src/components/workout/hooks/useWorkoutAutoload.ts')
 const normalSet = read('src/components/workout/set-renderers/normalSet.tsx')
 
 describe('histórico não é envenenado pelo prefill do motor', () => {
-  it('useWorkoutDeload descarta log que só tem peso automático, sem reps e sem conclusão', () => {
+  it('o builder do histórico descarta log que só tem peso automático, sem reps e sem conclusão', () => {
     // A regra NASCEU aqui e em 06/09/2026 virou fonte única em
     // `lib/workout/isLogDone` — o relatório dizia "29/30 séries" com uma feita
-    // enquanto este hook já sabia descartar. O deload precisa continuar
+    // enquanto este builder já sabia descartar. Ele precisa continuar
     // chamando a regra (importada), e as três condições vivem no módulo; o
     // comportamento delas é provado em `lib/workout/__tests__/isLogDone.test.ts`.
     expect(deload).toMatch(/import \{[^}]*isEnginePrefillOnly[^}]*\} from '@\/lib\/workout\/isLogDone'/)

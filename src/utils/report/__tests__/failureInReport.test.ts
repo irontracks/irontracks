@@ -71,7 +71,7 @@ describe('superfícies que exibem/propagam a falha', () => {
 
   it('histórico propaga setFailures ao motor de carga (trava anti-progressão)', () => {
     // Sem este repasse a trava `anyFailed` do suggestWeight nunca dispara.
-    expect(read('src/components/workout/hooks/useWorkoutDeload.ts')).toContain('setFailures')
+    expect(read('src/lib/workout/reportHistoryFromWorkouts.ts')).toContain('setFailures')
     expect(read('src/components/workout/hooks/useWorkoutAutoload.ts')).toMatch(/failed:\s*f\[i\] === true/)
   })
 })

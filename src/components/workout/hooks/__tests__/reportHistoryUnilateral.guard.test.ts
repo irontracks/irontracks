@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 /**
- * Source-guard do builder de `reportHistory` (useWorkoutDeload) para exercícios
- * UNILATERAIS. Não dá pra exercitar o builder direto — ele vive dentro do hook —
- * então travamos o invariante lendo o arquivo.
+ * Source-guard do builder de `reportHistory` para exercícios UNILATERAIS.
+ *
+ * O builder morava dentro de `useWorkoutDeload` (daí o guard ser de FONTE) e em
+ * 12/09/2026 saiu para `lib/workout/reportHistoryFromWorkouts` — função pura que
+ * o servidor também importa. O guard seguiu o CÓDIGO, não o arquivo antigo.
  *
  * Bug (beta do autoload, 23/07/2026): o builder lia reps/rpe assim —
  *
@@ -16,7 +18,7 @@ import { readFileSync } from 'node:fs'
  * O fix anterior (PR #521/#522) corrigiu só o PESO; reps/rpe seguiram quebrados.
  */
 describe('builder de reportHistory — leitura de reps/rpe do unilateral', () => {
-  const src = readFileSync('src/components/workout/hooks/useWorkoutDeload.ts', 'utf8')
+  const src = readFileSync('src/lib/workout/reportHistoryFromWorkouts.ts', 'utf8')
 
   it('usa os extractors dedicados (que checam > 0 antes de cair no fallback L/R)', () => {
     expect(src).toMatch(/const\s+reps\s*=\s*extractLogReps\(log\)/)

@@ -31,7 +31,10 @@ const CONGELADOS: Record<string, number> = {
   // agora conferem `res.ok`/status antes de comemorar ou desistir.
   'components/NotificationCenter.tsx': 1,
   'components/ExecutionVideoCapture.tsx': 1,
-  'components/teacher/TeacherControlModal.tsx': 1,
+  // components/teacher/TeacherControlModal.tsx saiu da lista em 12/09/2026:
+  // `handleRelease` passou a conferir `res.ok`. Encerrar o controle sem olhar a
+  // resposta deixava o professor sair achando que devolveu o treino enquanto o
+  // app do aluno continuava com as escritas locais suprimidas.
   'components/teacher/TeacherStudentWorkout.tsx': 1,
   'components/VipHub.tsx': 1,
   'app/(app)/dashboard/schedule/ScheduleClient.tsx': 1,
