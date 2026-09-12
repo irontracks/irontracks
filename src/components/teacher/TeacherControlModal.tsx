@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Loader2, Gamepad2, Save, Plus, Minus } from 'lucide-react'
+import { ChevronLeft, Loader2, Gamepad2, Save, Plus, Minus, Check } from 'lucide-react'
 import { useTeacherControl } from '@/hooks/useTeacherControl'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession, Exercise } from '@/types/app'
@@ -93,20 +93,23 @@ function SetRow({
         border: `1px solid ${log.done ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`,
       }}
     >
-      {/* Set number + done toggle */}
-      <button
-        type="button"
-        onClick={toggleDone}
-        className="tap-44 w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-[11px] transition-all active:scale-95"
+      {/* Número da série — INDICADOR, não controle.
+          ⚠️ Ele já foi o único jeito de concluir a série: um toggle escondido
+          atrás de um número, sem rótulo nem affordance. O dono controlou um
+          treino inteiro preenchendo peso/reps/RPE nas quatro séries e nenhuma
+          ficou concluída — ele não tinha como adivinhar que o "1" era botão.
+          A ação agora tem nome e coluna própria ("Feito", à direita). */}
+      <div
+        className="w-7 h-7 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-[11px]"
         style={{
           background: log.done ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.08)',
           color: log.done ? '#22c55e' : 'rgba(255,255,255,0.5)',
           border: `1px solid ${log.done ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`,
         }}
-        aria-label={`Série ${setIdx + 1}`}
+        aria-hidden="true"
       >
         {log.done ? '✓' : String(setIdx + 1)}
-      </button>
+      </div>
 
       {/* Weight — sem type="number": num WebView (locale != pt-BR) ele bloqueia a
           vírgula. O valor é string e é parseado depois (parseTrainingNumber). */}
@@ -144,6 +147,26 @@ function SetRow({
           <option key={r} value={r}>{r}</option>
         ))}
       </select>
+
+      {/* Concluir — a ação que faltava ter NOME.
+          Sem `done` a série não entra no volume, no motor de carga nem no
+          relatório do aluno: o professor anotava tudo e o treino continuava
+          valendo zero. Toggle (e não só marcar) porque errar a série é comum e
+          desfazer não pode exigir o aluno. */}
+      <button
+        type="button"
+        onClick={toggleDone}
+        aria-pressed={Boolean(log.done)}
+        aria-label={log.done ? `Desfazer série ${setIdx + 1}` : `Concluir série ${setIdx + 1}`}
+        className="tap-44 w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center transition-all active:scale-95"
+        style={{
+          background: log.done ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.06)',
+          color: log.done ? '#22c55e' : 'rgba(255,255,255,0.45)',
+          border: `1px solid ${log.done ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.12)'}`,
+        }}
+      >
+        <Check size={16} strokeWidth={3} />
+      </button>
     </div>
   )
 }
@@ -217,11 +240,12 @@ function ExerciseCard({
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-4 gap-2 px-3 pb-1.5">
+      <div className="grid grid-cols-5 gap-2 px-3 pb-1.5">
         <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Série</div>
         <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Kg</div>
         <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Reps</div>
         <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">RPE</div>
+        <div className="text-[9px] font-black uppercase tracking-widest text-white/55 text-center">Feito</div>
       </div>
 
       {/* Set rows */}
