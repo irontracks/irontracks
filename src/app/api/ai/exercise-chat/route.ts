@@ -210,6 +210,20 @@ export async function POST(req: Request) {
     // devolver erro aqui cobraria a cota e entregaria nada. A falha vai para o
     // log (o supabase-js não lança; devolve `{ error }` — já custou caro neste
     // repo tratar isso como sucesso).
+    // ⚠️ INSTANTES DISTINTOS, e é por isso que eles são escritos à mão.
+    //
+    // As duas linhas nascem no MESMO insert, então o `default now()` carimba as
+    // duas com o mesmo microssegundo — medido na primeira conversa real em
+    // produção (13/09/2026: pergunta e resposta ambas em 02:22:47.835979). Com
+    // `created_at` empatado, `ORDER BY created_at` não garante ordem nenhuma, e
+    // a thread podia abrir com a RESPOSTA antes da PERGUNTA.
+    //
+    // A leitura tem um desempate por `role` que funciona por acaso do
+    // vocabulário ('assistant' < 'user' em ordem alfabética) — o dia em que
+    // alguém acrescentar um papel, ou renomear, ele vira ordenação aleatória
+    // sem erro nenhum. Carimbar o milissegundo aqui resolve na origem; o
+    // desempate fica como segunda linha de defesa.
+    const agoraMs = Date.now()
     const { error: insertErr } = await supabase.from('exercise_chat_messages').insert([
       {
         user_id: userId,
@@ -221,6 +235,7 @@ export async function POST(req: Request) {
         media_path: media?.path ?? null,
         media_kind: media?.kind ?? null,
         media_mime: media?.mime ?? null,
+        created_at: new Date(agoraMs).toISOString(),
       },
       {
         user_id: userId,
@@ -229,6 +244,7 @@ export async function POST(req: Request) {
         exercise_name: exerciseName,
         role: 'assistant',
         content: answer,
+        created_at: new Date(agoraMs + 1).toISOString(),
       },
     ])
     if (insertErr) logError('api:ai:exercise-chat:insert', insertErr)
