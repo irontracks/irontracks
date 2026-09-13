@@ -126,3 +126,34 @@ describe('cada turno cobra a cota certa', () => {
         expect(iGate).toBeLessThan(iGemini)
     })
 })
+
+describe('a pergunta aparece ANTES da resposta', () => {
+    const rota = semComentarios(ler(ROTA))
+
+    it('⚠️ as duas mensagens do turno são carimbadas com instantes DISTINTOS', () => {
+        // Medido na primeira conversa real em produção (13/09/2026): as duas
+        // linhas nasceram no mesmo insert e o `default now()` deu o MESMO
+        // microssegundo às duas. Com `created_at` empatado, `ORDER BY created_at`
+        // não garante ordem — a thread podia abrir com a resposta antes da
+        // pergunta, e o usuário leria uma conversa invertida.
+        expect(rota).toMatch(/created_at: new Date\(agoraMs\)\.toISOString\(\)/)
+        expect(rota).toMatch(/created_at: new Date\(agoraMs \+ 1\)\.toISOString\(\)/)
+    })
+
+    it('o relógio é lido UMA vez, fora do array', () => {
+        // Dois `Date.now()` separados poderiam cair no mesmo milissegundo e
+        // devolver o empate que este caso existe para impedir.
+        const i = rota.indexOf('const agoraMs = Date.now()')
+        expect(i, 'o relógio do insert sumiu').toBeGreaterThan(0)
+        const insert = rota.slice(rota.indexOf('.insert([', i))
+        expect(insert.slice(0, 900)).not.toContain('Date.now()')
+    })
+
+    it('a leitura mantém o desempate como segunda defesa', () => {
+        // Cinto e suspensório: o carimbo resolve na origem, mas as linhas já
+        // gravadas em produção antes desta correção continuam empatadas.
+        const modulo = semComentarios(ler(MODULO))
+        expect(modulo).toMatch(/\.order\('created_at'/)
+        expect(modulo).toMatch(/\.order\('role'/)
+    })
+})
