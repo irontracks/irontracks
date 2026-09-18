@@ -154,9 +154,14 @@ export const ReportMetricsPanel = ({
           </div>
           <div className="text-[10px] text-neutral-400 mt-1">
             {(() => {
+              // A média é do MESMO treino (ver `buildTrainingLoadFlags`). Dizer só
+              // "dia vs média" fazia a tela prometer uma comparação que não existe:
+              // até 18/09/2026 ela misturava Upper, Lower e Pump na mesma conta.
+              const amostra = Number(reportLoadFlags?.sampleSize ?? 0)
               const v = formatNumber(reportLoadFlags?.dayDropPct)
-              if (v == null) return '—'
-              return `dia vs média ${v.toFixed(1)}%`
+              if (v == null || !Number.isFinite(amostra) || amostra <= 0) return 'sem base deste treino ainda'
+              const base = amostra === 1 ? 'última vez neste treino' : `média das ${amostra} últimas neste treino`
+              return `${v.toFixed(1)}% vs ${base}`
             })()}
           </div>
         </div>

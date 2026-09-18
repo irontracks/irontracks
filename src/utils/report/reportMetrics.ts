@@ -7,6 +7,7 @@ import { sessionKcalInputs, type KcalProfileLike } from '@/utils/calories/sessio
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 import { currentWeekRangeBrt } from '@/utils/cron/weekRangeBrt'
 import { isLogDone } from '@/lib/workout/isLogDone'
+import { mesmoTreinoDaSessao } from '@/lib/workout/sessionWorkoutIdentity'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -580,7 +581,22 @@ export type TrainingLoadFlags = {
   isBadDay: boolean
   isHeavyWeek: boolean
   reason: string
+  /** Quantas sessões DO MESMO TREINO entraram na média de referência. */
+  sampleSize: number
 }
+
+/**
+ * Mínimo de sessões do MESMO treino para o app declarar "dia ruim".
+ *
+ * "Sem dado suficiente" é diferente de "caiu de verdade", e abaixo disso a
+ * régua é uma sessão só — um dia fraco anterior viraria o padrão do treino.
+ *
+ * Medido na conta do dono (71 sessões com id, 120 dias): com a janela antiga de
+ * 13 dias o mesmo treino aparecia 0,90 vez em média e só 10 sessões tinham 2+
+ * ocorrências; em 45 dias são 3,62 e 53. Por isso o piso de 2 vem acompanhado
+ * da janela maior na rota do finish — sozinho, ele deixaria a flag morta.
+ */
+export const MIN_SESSOES_MESMO_TREINO = 2
 
 export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: UnknownRecord[], weekly: WeeklyVolumeStats): TrainingLoadFlags => {
   const baseDate = extractSessionDateMs(currentSession) || Date.now()
@@ -591,13 +607,19 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
     // carga por ordem do próprio app, então baixaria a régua e faria a sessão
     // normal seguinte parecer um pico.
     .filter((s) => !isDeloadSession(s))
+    // …e sessão de OUTRO treino também não. Upper A, Lower B e Pump têm volumes
+    // estruturalmente diferentes; misturá-los fazia o app acusar −20 % num dia
+    // em que todos os exercícios progrediram (18/09/2026). A identidade é o
+    // `originWorkoutId` — o nome muda de prefixo quando a semana é reorganizada.
+    .filter((s) => mesmoTreinoDaSessao(currentSession, s))
     .map((s) => ({ ms: extractSessionDateMs(s), volume: getSessionVolumeKg(s) }))
     .filter((s) => s.ms > 0 && s.ms < baseDate)
     .sort((a, b) => b.ms - a.ms)
     .slice(0, 6)
   const currentVolume = getSessionVolumeKg(currentSession)
-  const prevAvg = prevSessions.length
-    ? prevSessions.reduce((sum, s) => sum + s.volume, 0) / prevSessions.length
+  const sampleSize = prevSessions.length
+  const prevAvg = sampleSize
+    ? prevSessions.reduce((sum, s) => sum + s.volume, 0) / sampleSize
     : 0
   const dayDropPct = prevAvg > 0 ? Math.round(((currentVolume - prevAvg) / prevAvg) * 1000) / 10 : 0
   const weekDeltaPct = weekly.deltaPct
@@ -606,17 +628,26 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
   // guarda o relatório acusa "queda no dia" e o Coach IA escreve que o aluno
   // regrediu justamente quando ele seguiu a orientação do app.
   const isDeloadDay = isDeloadSession(currentSession)
-  const isBadDay = prevAvg > 0 && !isDeloadDay ? dayDropPct <= -10 : false
+  // O `dayDropPct` segue sendo publicado com uma única sessão de referência (é
+  // comparação honesta: esta vez contra a última vez do MESMO treino), mas o
+  // VEREDITO exige amostra — senão um dia fraco anterior vira o padrão.
+  const amostraSuficiente = sampleSize >= MIN_SESSOES_MESMO_TREINO
+  const isBadDay = amostraSuficiente && prevAvg > 0 && !isDeloadDay ? dayDropPct <= -10 : false
   const reason = isDeloadDay
     ? 'Sessão de descarga (deload) — queda de carga planejada'
-    : isBadDay && isHeavyWeek
-      ? 'Queda no dia com semana pesada'
-      : isBadDay
-        ? 'Queda no dia vs média recente'
-        : isHeavyWeek
-          ? 'Semana pesada sem queda crítica no dia'
-          : 'Dentro do padrão recente'
-  return { dayDropPct, weekDeltaPct, isBadDay, isHeavyWeek, reason }
+    : !amostraSuficiente
+      ? (sampleSize === 0
+        ? 'Sem histórico deste treino para comparar o dia'
+        : 'Só 1 sessão deste treino no histórico — amostra pequena para o veredito')
+        + (isHeavyWeek ? ' · semana pesada' : '')
+      : isBadDay && isHeavyWeek
+        ? 'Queda no dia com semana pesada'
+        : isBadDay
+          ? 'Queda no dia vs média deste treino'
+          : isHeavyWeek
+            ? 'Semana pesada sem queda crítica no dia'
+            : 'Dentro do padrão recente deste treino'
+  return { dayDropPct, weekDeltaPct, isBadDay, isHeavyWeek, reason, sampleSize }
 }
 
 export const buildWeeklyVolumeStats = (currentSession: UnknownRecord, history: UnknownRecord[]): WeeklyVolumeStats => {

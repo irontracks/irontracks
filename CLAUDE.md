@@ -3032,6 +3032,41 @@ RPC respondeu 0 para quem tem treinos — aí o problema é o parse, não a auth
 e só muda quando um treino entra ou sai do histórico, então gravar o 0
 transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
 
+## "Dia ruim" compara o MESMO treino — e a identidade é o ID (18/09/2026)
+
+`buildTrainingLoadFlags` montava a média de referência com as 6 sessões mais
+recentes de QUALQUER treino numa janela fixa de 13 dias. Upper A, Lower B e Pump
+entravam na mesma conta, e o app acusava queda de 20 % em dia de progressão real.
+
+⚠️ **O falso positivo mora logo DEPOIS da descarga.** As sessões de deload são
+(corretamente) excluídas da média — então, na semana pós-deload, sobram poucas
+sessões na janela, e são justamente as de OUTROS treinos, anteriores à descarga:
+o app compara o recomeço saudável contra o volume alto que motivou o deload.
+Medido na conta do dono, com o `dayDropPct` gravado em produção: 14/09 Upper B
+−26,0 %, 17/09 Lower B −15,5 %, 18/09 Upper A −20,6 % — e contra a mesma sessão
+do ciclo anterior todos os exercícios subiram (leg press +100 kg, puxada +27 kg).
+
+⚠️ **A identidade do treino é `originWorkoutId`, NUNCA o nome.** Medido em 120
+dias: o mesmo treino aparece com 3 a 4 nomes ("SEG · Upper B…", "SEX · Upper B…",
+"Treino 4 · Upper B…") porque o prefixo do dia é reescrito ao reorganizar a
+semana. O id agrupou 15/14/13/10/10 sessões; o nome fatiaria cada split em três.
+`lib/workout/sessionWorkoutIdentity.ts` é a fonte única (`mesmoTreinoDaSessao`):
+id manda quando os dois lados o têm, nome decide quando falta (9 de 155 sessões
+antigas). Sessão sem identidade NENHUMA não existe em produção: 0 de 724.
+
+**Filtrar sem ampliar a janela troca o falso positivo por flag morta.** Com 13
+dias o mesmo treino aparece 0,90 vez em média e só 10 de 71 sessões teriam as 2
+ocorrências que o veredito exige; com 45 dias são 3,62 e 53 — daí a janela do
+finish ter subido para 45 (custo medido: ~22 sessões, ~380 kB por finish, no
+servidor; `buildWeeklyVolumeStats` não muda de resultado). Abaixo de
+`MIN_SESSOES_MESMO_TREINO` (2) o `dayDropPct` é publicado — é comparação honesta
+com a última vez —, mas `isBadDay` fica falso e o `reason` diz por quê: **"sem
+dado suficiente" não é "caiu de verdade"**. A tela também parou de dizer "dia vs
+média", que prometia uma comparação que não existia.
+
+Guard: `utils/report/__tests__/diaRuimComparaMesmoTreino.test.ts`, provado por 4
+mutações (filtro removido · piso 1 · janela 13 · identidade só por nome).
+
 ## Auditoria das ÁREAS DE CÁLCULO — 23/08/2026 (PRs #893–#900)
 
 As oito áreas que fazem conta no app: **volume/força** (`report/setVolume.ts`,

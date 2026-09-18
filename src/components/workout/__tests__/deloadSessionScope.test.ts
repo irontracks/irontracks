@@ -200,8 +200,15 @@ describe('descarga planejada não é "dia ruim"', () => {
    * Coach IA escreve que o aluno regrediu no dia em que ele seguiu a orientação
    * do próprio app.
    */
+  // Todas as fixtures carregam o MESMO `originWorkoutId`: desde 18/09/2026 a
+  // média de referência do "dia ruim" só aceita sessões do mesmo treino, e
+  // sessão sem identidade nenhuma não existe em produção (0 de 724, 17 contas)
+  // — era a fixture que estava incompleta.
+  const TREINO = '11111111-2222-3333-4444-555555555555'
+
   const sessaoNormal = (vol: number, dias: number) => ({
     date: new Date(Date.UTC(2026, 6, 20 - dias)).toISOString(),
+    originWorkoutId: TREINO,
     exercises: [{ name: 'Supino', sets: 1 }],
     logs: { '0-0': { weight: String(vol), reps: '1', done: true } },
   })
@@ -211,6 +218,7 @@ describe('descarga planejada não é "dia ruim"', () => {
   it('sessão de descarga não vira isBadDay, e a razão explica', () => {
     const descarga = {
       date: new Date(Date.UTC(2026, 6, 20)).toISOString(),
+      originWorkoutId: TREINO,
       exercises: [{ name: 'Supino', sets: 1 }],
       logs: { '0-0': { weight: '2200', reps: '1', done: true, deload: { originalWeight: 3000, suggestedWeight: 2200, reductionPct: 0.22 } } },
     }
@@ -233,6 +241,7 @@ describe('descarga planejada não é "dia ruim"', () => {
     // parece um pico — o espelho do mesmo erro.
     const descargaAntiga = {
       date: new Date(Date.UTC(2026, 6, 16)).toISOString(),
+      originWorkoutId: TREINO,
       exercises: [{ name: 'Supino', sets: 1 }],
       logs: { '0-0': { weight: '1000', reps: '1', done: true, deload: { originalWeight: 3000, suggestedWeight: 1000, reductionPct: 0.66 } } },
     }
