@@ -544,6 +544,27 @@ absorvida, teto 20/dia), texto cobra `chat_daily`, e o gate de TIER
 (`limits.media_analysis`) vem antes — sem ele o plano free entraria pela cota de
 conversa. O `summary` NÃO cobra: é consequência de turnos já pagos.
 
+⚠️ **`default now()` num insert em LOTE carimba as linhas com o MESMO instante —
+e aí `ORDER BY created_at` não ordena nada.** A pergunta e a resposta do turno
+nascem no mesmo `insert([...])`, e a PRIMEIRA conversa real em produção
+(13/09/2026) gravou as duas em `02:22:47.835979` — o mesmo microssegundo. Com o
+carimbo empatado o Postgres não promete ordem, então a thread podia abrir com a
+RESPOSTA antes da PERGUNTA. Hoje a rota carimba `agoraMs` e `agoraMs + 1`
+explicitamente, com o relógio lido UMA vez fora do array (dois `Date.now()`
+separados caem no mesmo milissegundo e devolvem o empate).
+
+A leitura tem um desempate por `role` que **funciona por acaso do vocabulário**
+('assistant' < 'user' em ordem alfabética): ele fica como segunda defesa, porque
+as linhas gravadas antes da correção seguem empatadas — mas um papel novo, ou um
+rename, o transforma em ordenação aleatória sem erro nenhum. Não confie nele
+como primeira linha.
+
+⚠️ **Nenhum teste pegaria isto, e a razão importa:** as duas metades estavam
+certas isoladamente (o insert grava, a leitura ordena) e o defeito só existe no
+CONTRATO entre elas. É a mesma família do "7 mil testes verdes" documentada mais
+abaixo — quem achou foi olhar a PRIMEIRA linha real no banco. Guard em
+`exerciseChatCustoEPosse.test.ts`, provado por 2 mutações.
+
 ⚠️ **`utils/ai/mediaPart.ts` foi SALVO da remoção.** É o único lugar do repo que
 resolve vídeo grande no Gemini: inline até 15 MB, acima disso Files API **com
 poll até `ACTIVE`**. Sem o poll o modelo responde sobre arquivo ainda não
@@ -841,10 +862,36 @@ BOM** — o botão BIBLIOTECA da aba Nutrição (`useCustomFoods.ts`). Ali o usu
 cadastrou o rótulo à mão ou pelo scanner de código de barras, então os macros
 são por 100 g e confiáveis: na conta do dono são **23 itens, 7 com barcode**,
 todos com densidade plausível (máx. 512 kcal/100 g). É o oposto de
-`nutrition_learned_foods`, cujo nome parecido já rendeu confusão. Vale para
-clonar entre contas (feito em 31/08/2026, do dono para uma aluna) — mas ela
-aceita duplicata: a mesma conta tinha "Biscoito de arroz" e "Leite Italac" duas
-vezes, com macros diferentes.
+`nutrition_learned_foods`, cujo nome parecido já rendeu confusão. Ela aceita
+duplicata: a conta do dono teve "Biscoito de arroz" e "Leite Italac" duas vezes,
+com macros diferentes.
+
+⚠️ **O clone entre contas de 31/08/2026 NÃO sobreviveu — não o cite como
+precedente que funcionou.** Medido em 14/09/2026: os 19 itens clonados do dono
+para a conta da aluna (`frankokott@gmail.com`) não existem mais lá, nem por id
+nem por nome; a biblioteca dela hoje tem 4 itens próprios. **Não investiguei
+quando nem por que sumiram** — é suspeita, não achado: pode ter sido ela
+limpando. Quem for clonar de novo, confira DEPOIS se sobreviveu.
+
+**A dedup de 07/09 deixou uma tabela de backup, e o dono decidiu MANTER**
+(`backup_dedup_custom_foods_2026_09_07`, 23 linhas, ele e a esposa). Ela é
+histórico morto: nenhum dos 23 ids dela existe em `nutrition_custom_foods` — as
+entradas atuais ("Biscoito de arroz Jasmine", "Leite Italac integral"…) são
+registros NOVOS, não as antigas renomeadas. Não proponha dropar de novo.
+
+⚠️ **E ela mostrou uma CLASSE: tabela de backup criada à mão no schema público
+nasce SEM RLS e HERDA o grant de `anon`.** Medido em 14/09/2026: RLS desligada e
+`anon` com SELECT, INSERT, UPDATE, DELETE e **TRUNCATE** — a chave anônima viaja
+no bundle do app, então qualquer pessoa podia ler ou APAGAR aqueles dados.
+Corrigido (RLS ligada sem policy + grants revogados; o service-role continua
+alcançando, as 23 linhas ficaram intactas).
+
+**O que falhou não foi a detecção, foi a leitura:** o `get_advisors` do Supabase
+já acusava essa tabela como ERROR de RLS, e o guard do catálogo LGPD a pegaria
+como "tabela de produção sem decisão" — ninguém tinha olhado nenhum dos dois
+entre 07/09 e 14/09. **Criou tabela por SQL manual? Rode o advisor no mesmo
+dia** — a criação acontece fora do repo, então nenhum teste do CI nasce sabendo
+dela.
 
 **Classificar alimento por macro dominante SOZINHO produz sugestão absurda.** Auditoria de 132 trocas reais (04/08/2026) pegou: bife virando ovo (gordura dominava), leite desnatado virando substituto de mamão e feijão (caía em fruta/verdura), maionese virando bolo, arroz virando "orange chicken". As cinco regras que consertaram, todas em `foodSwap`: (1) proteína ≥ 10 g/100 g e ≥ 25% das kcal manda, mesmo com gordura maior; (2) `produce` exige proteína < 35% das kcal — o corte fica ENTRE leite desnatado (39%) e alface/brócolis (26–29%), e apertar demais joga alface em `carb`; (3) `mixed` NÃO troca (sem saber o papel, é chute); (4) dentro de `fat`, candidato com > 25% das kcal em carbo sai (separa requeijão de brigadeiro); (5) porção que encosta no clamp (10 g/1000 g) é recusada. Além disso, a adequação à refeição vem do HISTÓRICO (`mealContext`: em que refeições ele já comeu aquele alimento), não de lista fixa — e alimento sem histórico não é bloqueado, só não ganha preferência. **Ao mexer aqui, audite contra dados reais e LEIA as sugestões: os filtros mecânicos diziam "0 problemas" enquanto o motor sugeria trocas que ninguém faria.**
 
