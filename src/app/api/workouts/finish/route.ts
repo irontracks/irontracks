@@ -108,7 +108,15 @@ export async function POST(request: Request) {
     try {
       const baseDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))
       const start = new Date(baseDate)
-      start.setDate(baseDate.getDate() - 13)
+      // 45 dias, não 13: desde 18/09/2026 o "dia ruim" compara a sessão com as
+      // anteriores do MESMO treino, e quem treina por split encontra a própria
+      // repetição a cada 7 dias. Medido na conta do dono (71 sessões): em 13
+      // dias o mesmo treino aparecia 0,90 vez em média (só 10 sessões com 2+
+      // ocorrências, o mínimo para o veredito); em 45 dias são 3,62 e 53.
+      // Custo medido: ~22 sessões (~380 kB de notes) por finish, no servidor.
+      // `buildWeeklyVolumeStats` não muda de resultado — ele só soma o que cai
+      // nas duas semanas da janela dele.
+      start.setDate(baseDate.getDate() - 45)
       const { data: rows } = await supabase
         .from('workouts')
         .select('notes, date, created_at')
@@ -117,7 +125,7 @@ export async function POST(request: Request) {
         .gte('date', start.toISOString())
         .lte('date', baseDate.toISOString())
         .order('date', { ascending: false })
-        .limit(180)
+        .limit(60)
       const historySessions = (Array.isArray(rows) ? rows : [])
         .map((row) => {
           if (row?.notes && typeof row.notes === 'object') return row.notes as Record<string, unknown>
