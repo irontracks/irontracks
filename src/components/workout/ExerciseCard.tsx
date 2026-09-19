@@ -786,7 +786,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
               `docs/plans/voz-na-serie.md`), não por série: a série alvo é
               calculada e mostrada antes de ouvir. Some sozinho quando a sessão
               não é do dono, mesma regra do vizinho acima. */}
-          <VoiceExerciseButton exIdx={exIdx} />
+          <VoiceExerciseButton />
           <button
             type="button"
             onClick={async (e) => {

@@ -79,6 +79,20 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
     // ---- Notes & UI ----
     const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
     const [inviteOpen, setInviteOpen] = useState<boolean>(false);
+    /**
+     * Modo de DITADO ligado (peso/reps/RPE por voz).
+     *
+     * Estado da SESSÃO, não do card: o interruptor mora no cabeçalho de cada
+     * exercício, mas o gatilho é uma faixa única no rodapé, que acompanha a
+     * rolagem. Sem um estado só, ligar num card e descer a tela perderia o
+     * microfone — que é exatamente o problema que o dono relatou em
+     * 19/09/2026 ("o botão fica fixo e vai subindo com a tela").
+     *
+     * Nasce DESLIGADO a cada sessão de propósito: microfone é permissão
+     * sensível, e um gatilho grande e permanente no rodapé convida toque
+     * acidental de bolso.
+     */
+    const [vozLigada, setVozLigada] = useState<boolean>(false);
     const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(new Set());
     const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
     const [finishing, setFinishing] = useState<boolean>(false);
@@ -240,6 +254,7 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
         // Notes & UI flags
         openNotesKeys, setOpenNotesKeys,
         inviteOpen, setInviteOpen,
+        vozLigada, setVozLigada,
         linkedWeightExercises, setLinkedWeightExercises,
         currentExerciseIdx, setCurrentExerciseIdx,
         finishing, setFinishing,

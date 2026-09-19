@@ -2464,6 +2464,34 @@ existe fronteira de palavra, e exigi-la mataria justamente `RP7`.
 36px na linha da série (grid de 6 colunas) tira 28% da largura dos campos
 peso/reps/RPE no iPhone comum, deixando o RPE com ~23px — não cabe "8,5".
 
+⚠️ **E por que ele deixou de DITAR (19/09/2026, relato de uso real).** O botão
+mora no cabeçalho do card: *"conforme você vai descendo e concluindo as séries
+o botão fica fixo e vai subindo com a tela"*. Rolar até as séries de baixo
+levava o microfone junto, justamente onde ele é preciso. Hoje são DOIS
+controles, separação proposta pelo dono: `VoiceExerciseButton` (no card)
+**liga/desliga o modo**, e `VoiceDictationPill` **dita** — ela vive DENTRO do
+`WorkoutFooter`, então acompanha a rolagem.
+
+⚠️ **A faixa NÃO é uma barra fixa própria, de propósito.** O `WorkoutFooter` já
+resolve a convivência com a barra do descanso (sobe por `--it-rest-bar-h`);
+uma segunda barra fixa repetiria de fora o bug que já deixou o FINALIZAR
+inalcançável — "duas barras disputam o mesmo espaço físico, e z-index não
+resolve". Ela some com o modo desligado, então o rodapé em repouso continua
+com **uma ação só** (decisão de 18/08/2026, registrada no próprio arquivo).
+
+**O alvo é o exercício da VEZ (`currentExerciseIdx`), não o card onde o modo
+foi ligado.** É a resposta que o app JÁ dá para "onde o usuário está":
+`focoAposSerieConcluida` a move sozinha ao concluir série, a tira de navegação
+a veste de dourado e a Live Activity a anuncia. Um segundo conceito de "onde
+estou" faria as superfícies discordarem — e o usuário rolaria dois exercícios
+para ditar no errado. A faixa **diz o alvo** ("Supino · 2ª série") porque, com
+a tela rolada, o card não está à vista.
+
+**Reps implausíveis AVISAM, não bloqueiam** (`REPS_PARA_CONFERIR = 50`). O dono
+falou "100 repetições" por engano e o app gravou sem piscar; recusar quebraria
+série longa de verdade (abdominal, panturrilha, cardio). O limiar é
+conservador para o aviso não virar ruído.
+
 ⚠️ **A combinação "por exercício" + "voz nunca conclui a série" (decisão do
 dono) produz um requisito que nenhuma das duas dizia sozinha:** se o alvo fosse
 "a primeira série não concluída", ditar duas vezes seguidas escreveria SEMPRE
