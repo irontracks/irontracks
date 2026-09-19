@@ -86,15 +86,17 @@ export default function WorkoutFooter() {
           O CTA passa a ocupar a barra, mesma anatomia do START do descanso
           logo abaixo. Peso continua vindo da COR, não da largura: neutro
           enquanto há série pendente, dourado quando o treino fecha. */}
-      {/* O microfone do ditado entra NA MESMA FILEIRA do Finalizar — só o
-          ícone, sem faixa própria (pedido do dono ao ver na tela: "deixa só o
-          microfone... aí ele pode ficar na linha do finalizar deixando a tela
-          mais limpa"). Ele se apaga sozinho com o modo desligado, então o
-          rodapé em repouso continua com UMA ação só, e a geometria da barra do
-          descanso (`--it-rest-bar-h`) continua resolvida por este contêiner. */}
-      <div className="max-w-6xl mx-auto flex justify-end items-center gap-2">
+      {/* Microfone na quina ESQUERDA, Finalizar na direita — quinas opostas por
+          pedido do dono depois de usar no aparelho. Não é só estética: ditar é
+          reversível e acontece muitas vezes por treino; finalizar ENCERRA e
+          acontece uma vez. Colados, a mira errada custava caro num dos dois
+          lados. `justify-between` com o mic ausente (modo desligado) mantém o
+          Finalizar exatamente onde sempre esteve, à direita — e a geometria da
+          barra do descanso (`--it-rest-bar-h`) segue resolvida por este
+          contêiner, sem barra fixa nova. */}
+      <div className="max-w-6xl mx-auto flex justify-between items-center gap-2">
         <VoiceDictationPill />
-        <div className="relative pointer-events-auto">
+        <div className="relative pointer-events-auto ml-auto">
           {allDone && !finishing && (
             <div className="absolute inset-0 rounded-xl pointer-events-none animate-pulse-glow" />
           )}

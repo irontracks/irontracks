@@ -8,7 +8,7 @@ import { resolverSerieAlvoDaVoz } from '@/lib/workout/serieAlvoDaVoz'
 import { REPS_PARA_CONFERIR } from '@/lib/workout/falaDaSerie'
 
 /* ──────────────────────────────────────────────────────────────────────────
- * O GATILHO do ditado — um ícone na linha do FINALIZAR.
+ * O GATILHO do ditado — um ícone na quina ESQUERDA do rodapé.
  *
  * ## Como ele encolheu (19/09/2026, o dono vendo no aparelho)
  *
@@ -18,6 +18,13 @@ import { REPS_PARA_CONFERIR } from '@/lib/workout/falaDaSerie'
  * finalizar deixando a tela mais limpa"*. É a mesma régua que esvaziou este
  * rodapé em 18/08/2026: **peso de superfície proporcional à frequência de
  * uso**, e o alvo escrito era informação permanente para uma ação pontual.
+ *
+ * Na volta seguinte ele foi para a quina ESQUERDA, oposta ao Finalizar, e
+ * ganhou 44px reais: *"aumenta ele um pouco e coloca do lado esquerdo, o lado
+ * contrário do finalizar, levemente maior para não errar o clique"*. Separar
+ * as quinas também separa as CONSEQUÊNCIAS — ditar é reversível, finalizar
+ * encerra o treino, e colados eles convidavam o erro de mira que o dono
+ * sentiu.
  *
  * ## O que NÃO se perdeu junto com o texto
  *
@@ -90,7 +97,7 @@ export default function VoiceDictationPill() {
       {aviso && (
         <div
           role="status"
-          className={`absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg border bg-neutral-900/95 px-2.5 py-1.5 text-[11px] font-bold shadow-lg shadow-black/50 backdrop-blur ${corDoBalao}`}
+          className={`absolute bottom-full left-0 mb-2 whitespace-nowrap rounded-lg border bg-neutral-900/95 px-2.5 py-1.5 text-[11px] font-bold shadow-lg shadow-black/50 backdrop-blur ${corDoBalao}`}
         >
           {aviso.texto}
         </div>
@@ -102,9 +109,16 @@ export default function VoiceDictationPill() {
         aria-label={aria}
         title={aria}
         className={[
-          // Mesma altura do FINALIZAR ao lado (h-9 + alvo de 44pt pelo ::after),
-          // para os dois lerem como uma fileira, não como dois tamanhos.
-          'tap-44 h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-full border shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
+          // 44px REAIS, não 36 com área estendida: este é o único controle do
+          // treino que se toca de pé, no meio da série, com a mão suada e sem
+          // olhar direito — e errar o toque aqui abre (ou fecha) o microfone
+          // por engano. O dono pediu explicitamente "levemente maior para não
+          // errar o clique" depois de usar no aparelho.
+          //
+          // Ele fica MAIOR que o Finalizar (36px) de propósito: são ações de
+          // naturezas diferentes em quinas opostas, não uma fileira — tamanho
+          // igual só importaria se estivessem lado a lado.
+          'tap-44 h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-full border shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
           gravando
             ? 'bg-yellow-500/25 border-yellow-500/60 text-yellow-300 animate-pulse'
             // Neutro em repouso, como o FINALIZAR enquanto há série pendente:
@@ -112,7 +126,7 @@ export default function VoiceDictationPill() {
             : 'bg-neutral-900/90 border-neutral-700/70 text-neutral-300 hover:border-yellow-500/40 hover:text-yellow-400',
         ].join(' ')}
       >
-        {gravando ? <Square size={13} aria-hidden="true" /> : <Mic size={15} aria-hidden="true" />}
+        {gravando ? <Square size={15} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
       </button>
     </div>
   )
