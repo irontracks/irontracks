@@ -97,7 +97,7 @@ export default function VoiceDictationPill() {
       {aviso && (
         <div
           role="status"
-          className={`absolute bottom-full left-0 mb-2 whitespace-nowrap rounded-lg border bg-neutral-900/95 px-2.5 py-1.5 text-[11px] font-bold shadow-lg shadow-black/50 backdrop-blur ${corDoBalao}`}
+          className={`absolute bottom-full left-2 mb-2 whitespace-nowrap rounded-lg border bg-neutral-900/95 px-2.5 py-1.5 text-[11px] font-bold shadow-lg shadow-black/50 backdrop-blur ${corDoBalao}`}
         >
           {aviso.texto}
         </div>
@@ -109,16 +109,22 @@ export default function VoiceDictationPill() {
         aria-label={aria}
         title={aria}
         className={[
-          // 44px REAIS, não 36 com área estendida: este é o único controle do
-          // treino que se toca de pé, no meio da série, com a mão suada e sem
-          // olhar direito — e errar o toque aqui abre (ou fecha) o microfone
-          // por engano. O dono pediu explicitamente "levemente maior para não
-          // errar o clique" depois de usar no aparelho.
+          // 56px REAIS — o tamanho de um botão de ação flutuante, e não por
+          // gosto: este é o único controle do treino que se toca de pé, no meio
+          // da série, com a mão suada e sem olhar direito. Chegou aqui em dois
+          // passos, os dois com o dono usando no aparelho: 36 → 44 ("levemente
+          // maior para não errar o clique") → 56 ("aumentar mais um pouco").
+          //
+          // O `ml-2` afasta da quina (16px do contêiner + 8 = 24px da borda)
+          // contra os 16px do Finalizar do outro lado. A assimetria é
+          // deliberada e é correção ÓTICA: um círculo encostado na quina lê
+          // como cortado, um retângulo não — foi exatamente o que o dono
+          // apontou ("ficou muito no canto").
           //
           // Ele fica MAIOR que o Finalizar (36px) de propósito: são ações de
           // naturezas diferentes em quinas opostas, não uma fileira — tamanho
           // igual só importaria se estivessem lado a lado.
-          'tap-44 h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-full border shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
+          'tap-44 ml-2 h-14 w-14 shrink-0 inline-flex items-center justify-center rounded-full border shadow-lg shadow-black/50 backdrop-blur transition-all duration-300 active:scale-95',
           gravando
             ? 'bg-yellow-500/25 border-yellow-500/60 text-yellow-300 animate-pulse'
             // Neutro em repouso, como o FINALIZAR enquanto há série pendente:
@@ -126,7 +132,7 @@ export default function VoiceDictationPill() {
             : 'bg-neutral-900/90 border-neutral-700/70 text-neutral-300 hover:border-yellow-500/40 hover:text-yellow-400',
         ].join(' ')}
       >
-        {gravando ? <Square size={15} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
+        {gravando ? <Square size={18} aria-hidden="true" /> : <Mic size={22} aria-hidden="true" />}
       </button>
     </div>
   )
