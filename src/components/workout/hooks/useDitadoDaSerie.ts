@@ -24,6 +24,7 @@ import { useSpeechToText } from '@/hooks/useSpeechToText'
 import { falaDaSerie } from '@/lib/workout/falaDaSerie'
 import { resolverSerieAlvoDaVoz } from '@/lib/workout/serieAlvoDaVoz'
 import { rastrearTreino, EVENTOS_TREINO } from '@/lib/workout/telemetriaTreino'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { isUnilateralByName } from '@/utils/exerciseTracking'
 import { coordenadorDeVozUnica } from '@/lib/workout/vozAtivaSingleton'
 
@@ -99,6 +100,30 @@ export function useDitadoDaSerie({ exercises, logs, exIdx, updateLog }: UseDitad
       temReps: parsed.reps !== undefined,
       temRpe: parsed.rpe !== undefined,
       temSerieFalada: parsed.serie !== undefined,
+    })
+
+    /**
+     * ⚠️ TEMPORÁRIO, E É O TEXTO QUE A PESSOA FALOU. Remover quando o parser
+     * do RPE estiver calibrado.
+     *
+     * O evento de produto (`vozDaSerie`) não grava conteúdo, por decisão do
+     * catálogo (`telemetriaTreino.ts`: "sem PII e sem o conteúdo") — e é por
+     * isso que, com o RPE falhando em 3 de 3 tentativas do dono em produção,
+     * não havia como saber O QUE o reconhecedor devolveu. Duas rodadas de
+     * regex por palpite já falharam; "instrumente, não chute" é a regra deste
+     * repo, e a Fase 0 do plano (que existia para medir isto ANTES) foi
+     * pulada a pedido do dono.
+     *
+     * Reusa `voice_capture_sample` — o mesmo evento da ferramenta de
+     * calibração (`/dashboard/voice-capture`), fora do catálogo de treino
+     * justamente por ser instrumentação descartável. Só o transcript: nenhum
+     * dado de treino, de série ou de identificação vai junto.
+     */
+    trackUserEvent('voice_capture_sample', {
+      type: 'debug',
+      screen: 'active_workout',
+      path: `/_voz-serie/${Date.now()}`,
+      metadata: { transcript: texto, origem: 'botao_do_exercicio', entendeuRpe: parsed.rpe !== undefined },
     })
 
     if (!parsed.entendeu) {

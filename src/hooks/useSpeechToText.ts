@@ -102,6 +102,19 @@ export function mensagemDeErroDeVoz(codigo: string): string {
 export const ehPermissaoNegada = (codigo: string): boolean =>
     codigo === 'not-allowed' || codigo === 'service-not-allowed'
 
+/**
+ * A mensagem do reconhecedor nativo é um CANCELAMENTO — ou seja, o fim normal
+ * de um ditado, não uma falha.
+ *
+ * Pela MENSAGEM e não pelo código porque é só a mensagem que chega ao JS
+ * (`irontracksNative.ts` repassa `result.message || result.error`). O Swift já
+ * filtra o código 216; "Recognition request was canceled" chega com outro
+ * código e passava direto, virando erro na tela mesmo com o ditado bem
+ * sucedido (relato do dono, 19/09/2026).
+ */
+export const ehCancelamentoDeReconhecimento = (mensagem: string): boolean =>
+    /cancel(ed|led|ada|ado)?\b/i.test(String(mensagem ?? ''))
+
 export function useSpeechToText({ onFinal, lang = 'pt-BR' }: UseSpeechToTextOptions): SpeechToText {
     const [gravando, setGravando] = useState(false)
     const [parcial, setParcial] = useState('')
@@ -261,6 +274,25 @@ export function useSpeechToText({ onFinal, lang = 'pt-BR' }: UseSpeechToTextOpti
                     },
                     (mensagem) => {
                         nativoAtivoRef.current = false
+                        limparSilencio()
+                        // ⚠️ CANCELAMENTO NÃO É ERRO — é como o ditado TERMINA.
+                        //
+                        // `stopRecognitionEngine()` (Swift) chama
+                        // `recognitionTask?.cancel()`, e o Speech framework emite
+                        // "Recognition request was canceled". O plugin filtra o
+                        // código 216, mas essa mensagem vem com OUTRO código
+                        // (301), então passava direto e virava erro na tela —
+                        // inclusive quando o ditado tinha funcionado: o dono viu
+                        // "65 kg" preenchido COM o erro por cima (19/09/2026).
+                        //
+                        // Entregar aqui (em vez de só engolir) é o que impede o
+                        // outro extremo: silenciar sem `entregar()` deixaria o
+                        // botão presto em "ouvindo" para sempre, porque é
+                        // `entregar()` quem faz `setGravando(false)`.
+                        if (ehCancelamentoDeReconhecimento(mensagem)) {
+                            entregar()
+                            return
+                        }
                         setGravando(false)
                         setErro(`Erro no reconhecimento de voz: ${mensagem}`)
                     },
