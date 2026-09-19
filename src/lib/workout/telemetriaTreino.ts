@@ -48,6 +48,13 @@ export const EVENTOS_TREINO = {
    * maioria, o desenho está errado para o uso real.
    */
   blocoAutomatico: 'workout_cardio_chain',
+  /**
+   * Ditado terminou (peso/reps/RPE por voz, no card do exercício). Sem
+   * texto/PII — só o que o PARSER conseguiu extrair, porque este parser não
+   * foi calibrado com transcript real (Fase 0 pulada, ver `falaDaSerie.ts`) e
+   * é assim que se mede se ele funciona na academia de verdade.
+   */
+  vozDaSerie: 'workout_set_voice',
 } as const
 
 export type EventoTreino = (typeof EVENTOS_TREINO)[keyof typeof EVENTOS_TREINO]

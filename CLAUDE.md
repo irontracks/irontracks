@@ -2427,6 +2427,59 @@ blocos retroativamente inventaria treino que ninguém fez. **O WKWebView
 congela com a tela bloqueada** (nenhum JS roda), então o efeito também escuta
 `visibilitychange` e rechega a cada 30 s.
 
+## Peso/reps/RPE por voz — botão por EXERCÍCIO, parser sem calibração real (19/09/2026)
+
+Plano completo: `docs/plans/voz-na-serie.md`. Reusa a infra de voz que já
+existia (`useSpeechToText`, ponte nativa iOS, crash já corrigido em 28/08) —
+não foi preciso escrever reconhecimento de voz nenhum, só o parser e a
+fronteira de escrita.
+
+⚠️ **O parser (`lib/workout/falaDaSerie.ts`) NÃO foi calibrado com transcript
+real.** O plano previa uma Fase 0 (`/dashboard/voice-capture`, ainda no ar) —
+o dono ditando ~15 frases antes de escrever o parser — e ela foi pulada a
+pedido dele ("implementação completa nessa rodada"). O que está no ar é
+heurística sobre o formato do pedido original, com conversor de número por
+extenso pt-BR (0–999 + "e meio/meia") escrito à mão. `EVENTOS_TREINO.vozDaSerie`
+(`workout_set_voice`) grava se o parser entendeu — é o substituto tardio da
+Fase 0. **Reabra o parser assim que essa telemetria mostrar amostra real.**
+
+**Por que o botão é por EXERCÍCIO, não por série.** Medido: um microfone de
+36px na linha da série (grid de 6 colunas) tira 28% da largura dos campos
+peso/reps/RPE no iPhone comum, deixando o RPE com ~23px — não cabe "8,5".
+
+⚠️ **A combinação "por exercício" + "voz nunca conclui a série" (decisão do
+dono) produz um requisito que nenhuma das duas dizia sozinha:** se o alvo fosse
+"a primeira série não concluída", ditar duas vezes seguidas escreveria SEMPRE
+na mesma série — sem conclusão automática ela continua pendente. O alvo real é
+a primeira série sem `reps` do usuário (`serieAlvoDaVoz.ts`), e "série N" na
+fala vence o automático — único jeito de corrigir uma série anterior.
+
+**`weightSource: 'user'` em toda escrita de peso** (a mesma regra dos 14
+renderers — sem ela o `useAutoloadWeight` reescreve por cima, o bug de
+22/08/2026). Unilateral escreve nos dois lados (`L_weight`/`R_weight`):
+dizer "cem quilos" não tem como significar só metade do exercício.
+
+**Trava de "só um ditado por vez"** (`vozAtivaSingleton.ts`) — cada card de
+exercício tem sua própria instância de `useSpeechToText`; sem a trava, tocar
+no mic de um exercício e depois no de outro (sem lembrar de parar o primeiro)
+faria dois reconhecedores brigarem pelo microfone nativo.
+
+**O discriminador "sessão é do dono" saiu do `ExerciseChatButton` para
+`lib/workout/sessionOwnership.ts`** (`sessaoEhPropria`) — mesma regra
+(`ehDeOutraPessoa`), sem exigir `startedAt` (o botão de voz não endereça nada
+por data). `enderecoDaConversa` passou a reusá-lo. Sessão nula/não-objeto
+devolve `false` (esconde o botão) — decisão tomada durante o teste de fiação:
+a primeira versão devolvia `true` por padrão e o botão aparecia sem sessão
+nenhuma, mais permissivo que o vizinho.
+
+⚠️ **Observação de layout, não corrigida:** medido no pior caso (vídeo +
+calculadora de anilhas + sugestão de deload todos visíveis ao mesmo tempo —
+9 ícones no cabeçalho do card), o 9º botão faz a barra `flex-wrap` quebrar e a
+lixeira cair sozinha numa segunda linha, em vez de ficar alinhada com o resto.
+Sem o botão de voz, os 8 cabiam numa linha só em 390pt. Não é bug (a barra já
+usa `flex-wrap` por desenho, nada corta), mas fica esteticamente estranho — é
+raro os três condicionais coincidirem. Decisão do dono se vale a pena mexer.
+
 ## Controle do professor sobre o treino do aluno (12/09/2026)
 
 O professor assume o treino em andamento e anota pelo aluno. O canal já

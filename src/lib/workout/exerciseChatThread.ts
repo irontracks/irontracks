@@ -30,7 +30,14 @@
  * e no dia em que alguém acrescentar um (para o cronômetro, digamos) o botão
  * vazaria em silêncio para a tela do parceiro. Declarar na ORIGEM que aquela
  * sessão é de outra pessoa é o que sobrevive a essa mudança.
+ *
+ * ⚠️ O discriminador puro (`ehDeOutraPessoa`) saiu para `sessionOwnership.ts`
+ * em 19/09/2026 — o botão de voz por exercício precisava da MESMA regra sem o
+ * resto do contrato daqui (endereço, `startedAt` obrigatório). `enderecoDaConversa`
+ * segue exigindo `startedAt` por cima dela, porque a thread É endereçada por
+ * data; o botão de voz não precisa desse carimbo.
  */
+import { sessaoEhPropria } from './sessionOwnership'
 
 export type PapelDaMensagem = 'user' | 'assistant'
 export type TipoDeMidia = 'photo' | 'video'
@@ -70,8 +77,8 @@ export interface SessaoPossivelmenteAlheia {
  */
 export function enderecoDaConversa(session: unknown): string | null {
   if (!session || typeof session !== 'object') return null
+  if (!sessaoEhPropria(session)) return null
   const s = session as SessaoPossivelmenteAlheia
-  if (s.ehDeOutraPessoa === true) return null
 
   const ms = typeof s.startedAt === 'number' ? s.startedAt : Number(s.startedAt)
   // `new Date(NaN).toISOString()` LANÇA RangeError, e o mesmo vale para valores
