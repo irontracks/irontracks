@@ -86,17 +86,14 @@ export default function WorkoutFooter() {
           O CTA passa a ocupar a barra, mesma anatomia do START do descanso
           logo abaixo. Peso continua vindo da COR, não da largura: neutro
           enquanto há série pendente, dourado quando o treino fecha. */}
-      {/* A faixa do ditado por voz, quando o modo está ligado. Ela mora AQUI,
-          e não como barra fixa própria, porque este contêiner já resolve a
-          convivência com a barra do descanso (sobe por `--it-rest-bar-h`) —
-          uma segunda barra fixa repetiria de fora o bug que já deixou o
-          FINALIZAR inalcançável. Some sozinha com o modo desligado, então o
-          rodapé em repouso continua com UMA ação só. */}
-      <div className="max-w-6xl mx-auto">
+      {/* O microfone do ditado entra NA MESMA FILEIRA do Finalizar — só o
+          ícone, sem faixa própria (pedido do dono ao ver na tela: "deixa só o
+          microfone... aí ele pode ficar na linha do finalizar deixando a tela
+          mais limpa"). Ele se apaga sozinho com o modo desligado, então o
+          rodapé em repouso continua com UMA ação só, e a geometria da barra do
+          descanso (`--it-rest-bar-h`) continua resolvida por este contêiner. */}
+      <div className="max-w-6xl mx-auto flex justify-end items-center gap-2">
         <VoiceDictationPill />
-      </div>
-
-      <div className="max-w-6xl mx-auto flex justify-end">
         <div className="relative pointer-events-auto">
           {allDone && !finishing && (
             <div className="absolute inset-0 rounded-xl pointer-events-none animate-pulse-glow" />
