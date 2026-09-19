@@ -97,15 +97,24 @@ describe('VoiceDictationPill — o gatilho que acompanha a rolagem', () => {
     expect(screen.queryByLabelText(/ditar peso/i)).toBeNull()
   })
 
-  it('modo ligado: mostra o exercício da VEZ e a série alvo', () => {
+  it('modo ligado: mira no exercício da VEZ (e o diz no rótulo acessível)', () => {
     montar(<VoiceDictationPill />, {
       vozLigada: true,
       exercises: [exercicio(4, 'Supino'), exercicio(4, 'Remada')],
       currentExerciseIdx: 1,
     })
-    // O alvo é o exercício da vez (índice 1), não o primeiro da lista.
-    expect(screen.getByText(/Remada/)).toBeTruthy()
+    // O alvo é o exercício da vez (índice 1), não o primeiro da lista. Desde
+    // 19/09 ele não ocupa a tela em repouso — o dono cortou o texto para o
+    // ícone caber na linha do Finalizar —, mas continua no `aria-label`.
     expect(screen.getByLabelText(/vai preencher a 1ª série de Remada/i)).toBeTruthy()
+  })
+
+  it('em repouso é SÓ o ícone — sem faixa, sem texto ocupando a tela', () => {
+    const { container } = montar(<VoiceDictationPill />, { vozLigada: true })
+    // Nada de balão de status antes de o usuário fazer alguma coisa.
+    expect(screen.queryByRole('status')).toBeNull()
+    // Um controle só (o X de desligar saiu: quem desliga é o mic do card).
+    expect(container.querySelectorAll('button')).toHaveLength(1)
   })
 
   it('a série alvo anda conforme as reps já preenchidas', () => {
@@ -126,10 +135,9 @@ describe('VoiceDictationPill — o gatilho que acompanha a rolagem', () => {
     expect(sttParar).toHaveBeenCalledTimes(1)
   })
 
-  it('o X desliga o modo', () => {
-    const setVozLigada = vi.fn()
-    montar(<VoiceDictationPill />, { vozLigada: true, setVozLigada })
-    fireEvent.click(screen.getByLabelText(/desligar o preenchimento por voz/i))
-    expect(setVozLigada).toHaveBeenCalledWith(false)
+  it('gravando: avisa em qual série está ouvindo', () => {
+    sttState.gravando = true
+    montar(<VoiceDictationPill />, { vozLigada: true })
+    expect(screen.getByRole('status').textContent).toMatch(/ouvindo/i)
   })
 })
