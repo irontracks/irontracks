@@ -32,6 +32,8 @@ export interface FalaDaSerie {
   rpe?: number
   /** "série 2" → 2 (1-based). Ausente = nenhuma série foi mencionada. */
   serie?: number
+  /** Dito "falha" — a série foi levada à falha muscular. */
+  falha?: boolean
   /** Pelo menos um campo foi entendido. */
   entendeu: boolean
   /** O transcript original, para telemetria/depuração. */
@@ -160,7 +162,12 @@ export function falaDaSerie(transcriptBruto: string): FalaDaSerie {
     if (n !== undefined && n >= 1) { out.serie = n; out.entendeu = true }
   }
 
-  const mPeso = t.match(/(\d+(?:,\d+)?)\s*(?:kg|kilos?|quilos?|quilo)\b/i)
+  // Peso: número ANTES da unidade ("120 quilos") é o comum; a unidade antes
+  // ("Quilos 100") apareceu no transcript real do dono em 19/09/2026 — o
+  // reconhecedor às vezes inverte quando a frase começa pela unidade.
+  const UNIDADE_PESO = '(?:kg|kilos?|quilos?)'
+  let mPeso = t.match(new RegExp(`(\\d+(?:,\\d+)?)\\s*${UNIDADE_PESO}\\b`, 'i'))
+  if (!mPeso) mPeso = t.match(new RegExp(`${UNIDADE_PESO}\\s*(\\d+(?:,\\d+)?)\\b`, 'i'))
   if (mPeso) {
     const n = paraNumero(mPeso[1])
     if (n !== undefined && n > 0) { out.pesoKg = n; out.entendeu = true }
@@ -172,20 +179,52 @@ export function falaDaSerie(transcriptBruto: string): FalaDaSerie {
     if (n !== undefined && n > 0) { out.reps = n; out.entendeu = true }
   }
 
-  // "rpe 8" | "r p e 8" | "erre pê ê 8" (o jeito de FALAR a sigla) | "rpe: 8" /
-  // "rpe de 8" (pontuação/conectivo que o reconhecedor às vezes insere) |
-  // "8 de rpe" / "8 rpe" (ordem invertida). Achado real (19/09/2026): o RPE é
-  // o campo que mais falha no uso — este regex é engenharia defensiva sobre
-  // padrões plausíveis, NÃO calibrada com transcript real (a Fase 0 do plano
-  // foi pulada). Reabrir assim que a telemetria/ferramenta de captura trouxer
-  // o texto exato que falha.
-  const SIGLA_RPE = '(?:rpe|r\\.?\\s*p\\.?\\s*e\\.?|erre\\s*p[eê]\\s*[eê]?)'
-  let mRpe = t.match(new RegExp(`${SIGLA_RPE}\\s*(?:de\\s*)?[:\\-]?\\s*(\\d+(?:,\\d+)?)\\b`, 'i'))
+  /**
+   * ⚠️ O reconhecedor pt-BR do iPhone NÃO escreve "RPE" — MEDIDO em 19/09/2026,
+   * nas 4 primeiras falas reais do dono (nenhuma foi reconhecida antes disto):
+   *
+   *   "80 quilos 12 repetições **RP7**"        → perde o E e COLA no número
+   *   "90 quilos 10 repetições **8RP**"        → número antes, colado
+   *   "…12 repetições **ar PA** 10"            → vira fonético, em duas palavras
+   *   "120 quilos cinco repetições **RP 10**…" → com espaço
+   *
+   * Duas rodadas de regex por PALPITE (`rpe`, `r p e`, `erre pê ê`) falharam
+   * porque nenhuma delas aparece na prática. Este bloco é calibrado sobre o
+   * texto real — se surgir forma nova, ela está no evento
+   * `voice_capture_sample`, que grava o transcript cru.
+   *
+   * Sem `\b` à direita da sigla de propósito: entre "p" e "7" (letra e dígito)
+   * não existe fronteira de palavra, e exigi-la mataria justamente "RP7".
+   */
+  const SIGLA_RPE = '(?:rpe?|r\\.?\\s*p\\.?\\s*e?\\.?|erre\\s*p[eê]\\s*[eê]?|ar\\s*pa)'
+  let mRpe = t.match(new RegExp(`\\b${SIGLA_RPE}\\s*(?:de\\s*)?[:\\-]?\\s*(\\d+(?:,\\d+)?)\\b`, 'i'))
+  // Sigla DEPOIS do número ("8RP"): aqui a âncora é o próprio dígito, então
+  // não cabe `\b` à esquerda da sigla — em "8RP" não há fronteira entre eles.
   if (!mRpe) mRpe = t.match(new RegExp(`(\\d+(?:,\\d+)?)\\s*(?:de\\s*)?${SIGLA_RPE}\\b`, 'i'))
   if (mRpe) {
     const n = paraNumero(mRpe[1])
     if (n !== undefined && n >= 0 && n <= 10) { out.rpe = n; out.entendeu = true }
   }
+
+  /**
+   * "…e falha" → marca a série como levada à falha muscular (pedido do dono,
+   * 19/09/2026 — e a palavra já tinha aparecido espontaneamente no transcript
+   * real: "120 quilos cinco repetições RP 10 e falha").
+   *
+   * ⚠️ A NEGAÇÃO é tratada de propósito. `log.failure` alimenta a trava
+   * anti-progressão do motor de carga (`suggestWeight` segura o peso quando a
+   * última sessão foi à falha), então marcar por engano custa progressão real
+   * ao aluno. Quem diz "sem falha" ou "não fui à falha" está dizendo o
+   * CONTRÁRIO — e um regex ingênuo de "contém a palavra falha" marcaria os
+   * dois casos igual.
+   *
+   * Só marca (`true`), nunca desmarca: quem falou "sem falha" pode estar
+   * corrigindo uma fala anterior, mas desmarcar por voz apagaria uma marcação
+   * feita à mão no botão — e a fala não é confiável o bastante para isso.
+   */
+  const temFalha = /\bfalh(a|ou|ei)\b/i.test(t)
+  const negada = /\b(?:sem|nao|nenhuma)\s+(?:\w+\s+){0,2}?falh(a|ou|ei)\b/i.test(t)
+  if (temFalha && !negada) { out.falha = true; out.entendeu = true }
 
   return out
 }

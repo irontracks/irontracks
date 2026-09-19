@@ -162,6 +162,19 @@ export function useDitadoDaSerie({ exercises, logs, exIdx, updateLog }: UseDitad
       if (unilateral) { patch.L_rpe = rpeTexto; patch.R_rpe = rpeTexto }
       else patch.rpe = rpeTexto
     }
+    /**
+     * "falha" na fala marca o mesmo `log.failure` do botão 🔥 do card.
+     *
+     * Isto NÃO viola o guard `failureIsManualOnly` — pelo contrário, é
+     * exatamente o que ele protege: a flag existe "para o usuário dizer 'esta
+     * série AQUI estourou'", e falar "falha" É o usuário dizendo isso. O que o
+     * guard proíbe é o APP deduzir a falha do método (Heavy Duty e Repetições
+     * Forçadas vão à falha por definição e não gravam, senão a carga deles
+     * congelaria para sempre no `topWeight`).
+     *
+     * Nunca grava `false`: ver a nota sobre negação em `falaDaSerie.ts`.
+     */
+    if (parsed.falha) patch.failure = true
 
     updateLog(key, patch)
     definirResultado({ serie: setIdx + 1, entendeu: true })
