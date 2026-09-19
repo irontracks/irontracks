@@ -70,12 +70,12 @@ export default function VoiceCaptureDebug() {
         )}
 
         <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+          <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
             {capturas.length} amostra{capturas.length === 1 ? '' : 's'}
           </p>
           {capturas.map((c, i) => (
             <div key={i} className="rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2">
-              <p className="text-[10px] text-neutral-500">{c.hora}</p>
+              <p className="text-[10px] text-neutral-400">{c.hora}</p>
               <p className="text-sm text-white">{c.texto}</p>
             </div>
           ))}
