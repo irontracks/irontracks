@@ -16,11 +16,18 @@ import { useDitadoDaSerie } from '../useDitadoDaSerie'
 let capturedOnFinal: ((texto: string) => void) | null = null
 const sttIniciar = vi.fn()
 const sttParar = vi.fn()
+/** Mutável de propósito — o teste de regressão do erro precisa fazer o mock
+ *  MUDAR entre renders (gravando true → false, com erro), e um objeto fixo
+ *  não permite isso. */
+const sttMockState = { gravando: false, erro: '' }
 
 vi.mock('@/hooks/useSpeechToText', () => ({
   useSpeechToText: (opts: { onFinal: (t: string) => void }) => {
     capturedOnFinal = opts.onFinal
-    return { gravando: false, parcial: '', erro: '', permissaoNegada: false, iniciar: sttIniciar, parar: sttParar, limparErro: vi.fn() }
+    return {
+      gravando: sttMockState.gravando, parcial: '', erro: sttMockState.erro,
+      permissaoNegada: false, iniciar: sttIniciar, parar: sttParar, limparErro: vi.fn(),
+    }
   },
 }))
 
@@ -38,6 +45,8 @@ beforeEach(() => {
   capturedOnFinal = null
   sttIniciar.mockClear()
   sttParar.mockClear()
+  sttMockState.gravando = false
+  sttMockState.erro = ''
 })
 
 function montar(exercises: unknown, logs: unknown, updateLog: ReturnType<typeof vi.fn>) {
@@ -112,5 +121,49 @@ describe('useDitadoDaSerie — ditar duas vezes preenche séries DIFERENTES', ()
     act(() => { capturedOnFinal?.('série 1 105kg 12 reps') })
 
     expect(updateLog).toHaveBeenCalledWith('0-0', expect.objectContaining({ weight: '105' }))
+  })
+})
+
+describe('useDitadoDaSerie — ERRO do reconhecedor libera a trava de voz única', () => {
+  /**
+   * Achado real (relato do dono em produção, 19/09/2026): "Erro no
+   * reconhecimento de voz: Recognition request was canceled" é um erro nativo
+   * comum do iOS (Speech framework), disparado por `rec.onerror`. Esse
+   * caminho NUNCA chama `onFinal` — só `setErro`/`setGravando(false)` dentro
+   * de `useSpeechToText`. A versão anterior liberava a trava de "só um
+   * ditado por vez" (`vozAtivaSingleton`) apenas dentro de `onFinal`, então
+   * um erro deixava a trava presa: a PRÓXIMA tentativa, em QUALQUER
+   * exercício, tentaria parar um reconhecedor que já não existia mais.
+   */
+  it('gravando → parou COM erro: finalizar() é chamado mesmo sem onFinal rodar', async () => {
+    const { coordenadorDeVozUnica } = await import('@/lib/workout/vozAtivaSingleton')
+    const finalizarSpy = coordenadorDeVozUnica.finalizar as ReturnType<typeof vi.fn>
+    finalizarSpy.mockClear()
+
+    sttMockState.gravando = true
+    const { rerender } = renderHook(() => useDitadoDaSerie({ exercises: [exercicio(2)], logs: {}, exIdx: 0, updateLog: vi.fn() }))
+    expect(finalizarSpy).not.toHaveBeenCalled()
+
+    // O reconhecedor cancelou — gravando cai para false, erro aparece,
+    // onFinal NUNCA é chamado (capturedOnFinal não é invocado aqui).
+    sttMockState.gravando = false
+    sttMockState.erro = 'Erro no reconhecimento de voz: Recognition request was canceled'
+    rerender()
+
+    expect(finalizarSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('gravando → parou SEM erro (fluxo normal): finalizar() também é chamado — não regride o caso feliz', async () => {
+    const { coordenadorDeVozUnica } = await import('@/lib/workout/vozAtivaSingleton')
+    const finalizarSpy = coordenadorDeVozUnica.finalizar as ReturnType<typeof vi.fn>
+    finalizarSpy.mockClear()
+
+    sttMockState.gravando = true
+    const { rerender } = renderHook(() => useDitadoDaSerie({ exercises: [exercicio(2)], logs: {}, exIdx: 0, updateLog: vi.fn() }))
+
+    sttMockState.gravando = false
+    rerender()
+
+    expect(finalizarSpy).toHaveBeenCalledTimes(1)
   })
 })

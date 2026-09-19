@@ -102,6 +102,33 @@ describe('falaDaSerie — variações de unidade e sigla', () => {
   })
 })
 
+describe('falaDaSerie — RPE, variações que o reconhecedor pode inserir', () => {
+  it('"rpe: 8" (dois-pontos)', () => {
+    expect(falaDaSerie('rpe: 8').rpe).toBe(8)
+  })
+
+  it('"rpe de 8" (conectivo)', () => {
+    expect(falaDaSerie('rpe de 8').rpe).toBe(8)
+  })
+
+  it('"rpe - 8" (traço)', () => {
+    expect(falaDaSerie('rpe - 8').rpe).toBe(8)
+  })
+
+  it('ordem invertida: "8 de rpe"', () => {
+    expect(falaDaSerie('8 de rpe').rpe).toBe(8)
+  })
+
+  it('ordem invertida: "8 rpe"', () => {
+    expect(falaDaSerie('8 rpe').rpe).toBe(8)
+  })
+
+  it('frase completa com rpe: 8 no fim', () => {
+    const r = falaDaSerie('100kg 12 reps rpe: 8')
+    expect(r).toMatchObject({ pesoKg: 100, reps: 12, rpe: 8 })
+  })
+})
+
 describe('falaDaSerie — série explícita', () => {
   it('"série 2: 100kg 12 reps" extrai o índice', () => {
     const r = falaDaSerie('série 2 100kg 12 reps')

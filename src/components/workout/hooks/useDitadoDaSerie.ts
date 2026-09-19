@@ -91,11 +91,6 @@ export function useDitadoDaSerie({ exercises, logs, exIdx, updateLog }: UseDitad
   }, [])
 
   const onFinal = useCallback((texto: string) => {
-    // O ditado terminou — por parada manual ou silêncio — então libera a
-    // trava de "só um por vez". Sempre incondicional aqui: onFinal só roda
-    // quando ESTE reconhecedor de fato encerrou.
-    coordenadorDeVozUnica.finalizar()
-
     const parsed = falaDaSerie(texto)
 
     rastrearTreino(EVENTOS_TREINO.vozDaSerie, {
@@ -156,6 +151,30 @@ export function useDitadoDaSerie({ exercises, logs, exIdx, updateLog }: UseDitad
     coordenadorDeVozUnica.iniciar(stt.parar)
     stt.iniciar()
   }, [stt])
+
+  /**
+   * Libera a trava de "só um por vez" quando a gravação PARA — por QUALQUER
+   * motivo, não só ao terminar com sucesso.
+   *
+   * ⚠️ A versão anterior liberava só dentro de `onFinal`. `useSpeechToText`
+   * chama `onFinal` no encerramento normal (resultado ou silêncio), mas um
+   * ERRO do reconhecedor nativo (`rec.onerror` — "Recognition request was
+   * canceled" é um dos mais comuns no iOS) chama só `setErro`/`setGravando(false)`,
+   * NUNCA `onFinal`. A trava ficava presa apontando para um reconhecedor já
+   * morto, e a PRÓXIMA tentativa (nesta série ou em outra) tentava parar uma
+   * instância que já não existia — achado ao investigar um relato real do
+   * dono em produção (19/09/2026).
+   */
+  const gravandoAntesRef = useRef(false)
+  useEffect(() => {
+    if (gravandoAntesRef.current && !stt.gravando) {
+      coordenadorDeVozUnica.finalizar()
+      if (stt.erro) {
+        rastrearTreino(EVENTOS_TREINO.vozDaSerie, { entendeu: false, erroReconhecimento: true })
+      }
+    }
+    gravandoAntesRef.current = stt.gravando
+  }, [stt.gravando, stt.erro])
 
   return {
     gravando: stt.gravando,
