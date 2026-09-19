@@ -36,6 +36,7 @@ const PONTOS: Array<[chave: string, arquivo: string]> = [
   ['descansoIniciar', 'components/workout/RestTimerOverlay.tsx'],
   ['metodoDaSerie', 'components/workout/set-renderers/SetMethodPicker.tsx'],
   ['trocaAbrir', 'components/workout/AIExerciseSwap.tsx'],
+  ['vozDaSerie', 'components/workout/hooks/useDitadoDaSerie.ts'],
 ]
 
 const semComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

@@ -40,6 +40,7 @@ import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
 import ExerciseChatButton from './ExerciseChatButton'
+import VoiceExerciseButton from './VoiceExerciseButton'
 import PlateCalculatorSheet from './PlateCalculatorSheet'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 import { resolveIncrement } from '@/utils/autoload/plateMath';
@@ -781,6 +782,11 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice, temDestinoAoAdiar =
               distintas, `aria-label` distintos). O componente se apaga sozinho
               quando a sessão não é do dono — ver ExerciseChatButton. */}
           <ExerciseChatButton exerciseName={name} exerciseIndex={exIdx} />
+          {/* Peso/reps/RPE por voz — botão por EXERCÍCIO (ver
+              `docs/plans/voz-na-serie.md`), não por série: a série alvo é
+              calculada e mostrada antes de ouvir. Some sozinho quando a sessão
+              não é do dono, mesma regra do vizinho acima. */}
+          <VoiceExerciseButton exIdx={exIdx} />
           <button
             type="button"
             onClick={async (e) => {
