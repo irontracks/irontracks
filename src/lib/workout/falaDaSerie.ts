@@ -172,8 +172,16 @@ export function falaDaSerie(transcriptBruto: string): FalaDaSerie {
     if (n !== undefined && n > 0) { out.reps = n; out.entendeu = true }
   }
 
-  // "rpe 8" | "r p e 8" | "erre pê ê 8" (o jeito de FALAR a sigla).
-  const mRpe = t.match(/(?:rpe|r\s*p\s*e|erre\s*p[eê]\s*[eê]?)\s*(\d+(?:,\d+)?)\b/i)
+  // "rpe 8" | "r p e 8" | "erre pê ê 8" (o jeito de FALAR a sigla) | "rpe: 8" /
+  // "rpe de 8" (pontuação/conectivo que o reconhecedor às vezes insere) |
+  // "8 de rpe" / "8 rpe" (ordem invertida). Achado real (19/09/2026): o RPE é
+  // o campo que mais falha no uso — este regex é engenharia defensiva sobre
+  // padrões plausíveis, NÃO calibrada com transcript real (a Fase 0 do plano
+  // foi pulada). Reabrir assim que a telemetria/ferramenta de captura trouxer
+  // o texto exato que falha.
+  const SIGLA_RPE = '(?:rpe|r\\.?\\s*p\\.?\\s*e\\.?|erre\\s*p[eê]\\s*[eê]?)'
+  let mRpe = t.match(new RegExp(`${SIGLA_RPE}\\s*(?:de\\s*)?[:\\-]?\\s*(\\d+(?:,\\d+)?)\\b`, 'i'))
+  if (!mRpe) mRpe = t.match(new RegExp(`(\\d+(?:,\\d+)?)\\s*(?:de\\s*)?${SIGLA_RPE}\\b`, 'i'))
   if (mRpe) {
     const n = paraNumero(mRpe[1])
     if (n !== undefined && n >= 0 && n <= 10) { out.rpe = n; out.entendeu = true }
