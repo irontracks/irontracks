@@ -3,93 +3,133 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import React from 'react'
 import { WorkoutProvider, WorkoutLogsProvider } from '../WorkoutContext'
 import VoiceExerciseButton from '../VoiceExerciseButton'
+import VoiceDictationPill from '../VoiceDictationPill'
 
 /**
- * Fiação do botão de voz dentro do provider de verdade — mesmo ângulo do
- * `conversaSoDoDonoDaSessao.test.tsx`: "algoritmo certo, ninguém chamando" é
- * o jeito mais comum de um bug passar verde neste repo.
+ * O ditado tem DOIS controles desde 19/09/2026, por relato do dono: *"conforme
+ * você vai descendo e concluindo as séries o botão fica fixo e vai subindo com
+ * a tela"*.
+ *
+ *  • `VoiceExerciseButton` (cabeçalho do card) → LIGA/DESLIGA o modo;
+ *  • `VoiceDictationPill` (dentro do rodapé)   → DITA, e acompanha a rolagem.
+ *
+ * O que estes casos travam é a separação: o botão não pode voltar a ditar, e a
+ * faixa não pode existir com o modo desligado.
  */
 
-const sttState = { gravando: false, erro: '', permissaoNegada: false }
+const sttState = { gravando: false, erro: '' }
 const sttIniciar = vi.fn()
 const sttParar = vi.fn()
 
 vi.mock('@/hooks/useSpeechToText', () => ({
   useSpeechToText: () => ({
-    gravando: sttState.gravando,
-    parcial: '',
-    erro: sttState.erro,
-    permissaoNegada: sttState.permissaoNegada,
-    iniciar: sttIniciar,
-    parar: sttParar,
-    limparErro: vi.fn(),
+    gravando: sttState.gravando, parcial: '', erro: sttState.erro,
+    permissaoNegada: false, iniciar: sttIniciar, parar: sttParar, limparErro: vi.fn(),
   }),
 }))
-
 vi.mock('@/lib/telemetry/userActivity', () => ({ trackUserEvent: vi.fn() }))
 
 afterEach(() => {
   cleanup()
   sttState.gravando = false
   sttState.erro = ''
-  sttState.permissaoNegada = false
   sttIniciar.mockClear()
   sttParar.mockClear()
 })
 
-const exercicio = (sets: number) => ({ sets, setDetails: Array.from({ length: sets }, () => ({})) })
+const exercicio = (sets: number, name = 'Supino') => ({
+  sets, name, setDetails: Array.from({ length: sets }, () => ({})),
+})
 
-const montar = (session: unknown, logs: unknown = {}) =>
+type Ctx = Record<string, unknown>
+const montar = (ui: React.ReactNode, ctx: Ctx = {}, logs: unknown = {}) =>
   render(
-    <WorkoutProvider value={{ session, exercises: [exercicio(4)], updateLog: vi.fn() } as never}>
-      <WorkoutLogsProvider value={logs as never}>
-        <VoiceExerciseButton exIdx={0} />
-      </WorkoutLogsProvider>
+    <WorkoutProvider value={{
+      session: { startedAt: Date.now() },
+      exercises: [exercicio(4)],
+      currentExerciseIdx: 0,
+      updateLog: vi.fn(),
+      vozLigada: false,
+      setVozLigada: vi.fn(),
+      ...ctx,
+    } as never}>
+      <WorkoutLogsProvider value={logs as never}>{ui}</WorkoutLogsProvider>
     </WorkoutProvider>,
   )
 
-describe('VoiceExerciseButton — só existe para o DONO da sessão', () => {
-  it('aparece na sessão do dono', () => {
-    montar({ startedAt: Date.now() })
-    expect(screen.getByRole('button')).toBeTruthy()
+describe('VoiceExerciseButton — é INTERRUPTOR, não gatilho', () => {
+  it('desligado: o rótulo convida a ligar', () => {
+    montar(<VoiceExerciseButton />)
+    expect(screen.getByLabelText(/ligar o preenchimento por voz/i)).toBeTruthy()
+  })
+
+  it('clicar chama setVozLigada(true) — e NUNCA inicia o microfone', () => {
+    const setVozLigada = vi.fn()
+    montar(<VoiceExerciseButton />, { setVozLigada })
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(setVozLigada).toHaveBeenCalledWith(true)
+    // A regressão que este caso trava: o botão voltar a ditar do cabeçalho,
+    // que é justamente o que some da tela ao rolar.
+    expect(sttIniciar).not.toHaveBeenCalled()
+  })
+
+  it('ligado: reflete o estado e o clique desliga', () => {
+    const setVozLigada = vi.fn()
+    montar(<VoiceExerciseButton />, { vozLigada: true, setVozLigada })
+
+    const botao = screen.getByRole('button')
+    expect(botao.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(botao)
+    expect(setVozLigada).toHaveBeenCalledWith(false)
   })
 
   it('NÃO aparece na sessão do parceiro (Modo Spotter)', () => {
-    montar({ ehDeOutraPessoa: true })
-    expect(screen.queryByRole('button')).toBeNull()
-  })
-
-  it('NÃO aparece sem sessão nenhuma', () => {
-    montar(null)
+    montar(<VoiceExerciseButton />, { session: { ehDeOutraPessoa: true } })
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
 
-describe('VoiceExerciseButton — diz qual série vai receber, antes de ouvir', () => {
-  it('nenhuma série preenchida: aria-label aponta a 1ª', () => {
-    montar({ startedAt: Date.now() }, {})
-    expect(screen.getByLabelText(/vai preencher a 1ª série/i)).toBeTruthy()
+describe('VoiceDictationPill — o gatilho que acompanha a rolagem', () => {
+  it('modo desligado: a faixa não existe', () => {
+    montar(<VoiceDictationPill />, { vozLigada: false })
+    expect(screen.queryByLabelText(/ditar peso/i)).toBeNull()
   })
 
-  it('primeira série já tem reps: aria-label aponta a 2ª', () => {
-    montar({ startedAt: Date.now() }, { '0-0': { reps: '12' } })
+  it('modo ligado: mostra o exercício da VEZ e a série alvo', () => {
+    montar(<VoiceDictationPill />, {
+      vozLigada: true,
+      exercises: [exercicio(4, 'Supino'), exercicio(4, 'Remada')],
+      currentExerciseIdx: 1,
+    })
+    // O alvo é o exercício da vez (índice 1), não o primeiro da lista.
+    expect(screen.getByText(/Remada/)).toBeTruthy()
+    expect(screen.getByLabelText(/vai preencher a 1ª série de Remada/i)).toBeTruthy()
+  })
+
+  it('a série alvo anda conforme as reps já preenchidas', () => {
+    montar(<VoiceDictationPill />, { vozLigada: true }, { '0-0': { reps: '12' } })
     expect(screen.getByLabelText(/vai preencher a 2ª série/i)).toBeTruthy()
   })
-})
 
-describe('VoiceExerciseButton — clique liga/desliga o ditado', () => {
-  it('clique parado chama iniciar()', () => {
-    montar({ startedAt: Date.now() })
-    fireEvent.click(screen.getByRole('button'))
+  it('tocar no microfone inicia o ditado', () => {
+    montar(<VoiceDictationPill />, { vozLigada: true })
+    fireEvent.click(screen.getByLabelText(/ditar peso/i))
     expect(sttIniciar).toHaveBeenCalledTimes(1)
-    expect(sttParar).not.toHaveBeenCalled()
   })
 
-  it('clique gravando chama parar()', () => {
+  it('gravando: o mesmo botão para', () => {
     sttState.gravando = true
-    montar({ startedAt: Date.now() })
-    fireEvent.click(screen.getByRole('button'))
+    montar(<VoiceDictationPill />, { vozLigada: true })
+    fireEvent.click(screen.getByLabelText(/parar o ditado/i))
     expect(sttParar).toHaveBeenCalledTimes(1)
-    expect(sttIniciar).not.toHaveBeenCalled()
+  })
+
+  it('o X desliga o modo', () => {
+    const setVozLigada = vi.fn()
+    montar(<VoiceDictationPill />, { vozLigada: true, setVozLigada })
+    fireEvent.click(screen.getByLabelText(/desligar o preenchimento por voz/i))
+    expect(setVozLigada).toHaveBeenCalledWith(false)
   })
 })

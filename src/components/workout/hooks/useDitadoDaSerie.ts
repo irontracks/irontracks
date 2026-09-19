@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
-import { falaDaSerie } from '@/lib/workout/falaDaSerie'
+import { falaDaSerie, REPS_PARA_CONFERIR } from '@/lib/workout/falaDaSerie'
 import { resolverSerieAlvoDaVoz } from '@/lib/workout/serieAlvoDaVoz'
 import { rastrearTreino, EVENTOS_TREINO } from '@/lib/workout/telemetriaTreino'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
@@ -58,6 +58,12 @@ export interface ResultadoDoDitado {
   /** Série (1-based) que recebeu o preenchimento, ou null se nada coube. */
   serie: number | null
   entendeu: boolean
+  /**
+   * Reps gravadas que pedem conferência (acima de `REPS_PARA_CONFERIR`).
+   * Ausente = número plausível. O valor É gravado de qualquer forma — quem
+   * decide é o usuário, o app só avisa (decisão do dono, 19/09/2026).
+   */
+  repsSuspeita?: number
 }
 
 export interface DitadoDaSerie {
@@ -177,7 +183,13 @@ export function useDitadoDaSerie({ exercises, logs, exIdx, updateLog }: UseDitad
     if (parsed.falha) patch.failure = true
 
     updateLog(key, patch)
-    definirResultado({ serie: setIdx + 1, entendeu: true })
+    definirResultado({
+      serie: setIdx + 1,
+      entendeu: true,
+      ...(parsed.reps !== undefined && parsed.reps > REPS_PARA_CONFERIR
+        ? { repsSuspeita: parsed.reps }
+        : {}),
+    })
   }, [exercises, logs, exIdx, updateLog, definirResultado])
 
   const stt = useSpeechToText({ onFinal })

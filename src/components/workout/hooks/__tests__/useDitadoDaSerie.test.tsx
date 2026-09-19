@@ -113,6 +113,34 @@ describe('useDitadoDaSerie — falha muscular por voz', () => {
   })
 })
 
+describe('useDitadoDaSerie — reps implausíveis pedem conferência, sem bloquear', () => {
+  /**
+   * O dono falou "100 repetições" por engano (19/09/2026) e o app gravou sem
+   * piscar. Decisão dele: AVISAR, não recusar — série longa de verdade existe
+   * (abdominal, panturrilha, cardio), e um teto recusaria dado real.
+   */
+  it('grava o valor E sinaliza para conferência', () => {
+    const updateLog = vi.fn()
+    const { result } = montar([exercicio(2)], {}, updateLog)
+
+    act(() => { capturedOnFinal?.('120 quilos 100 repetições') })
+
+    // Gravou — não bloqueou.
+    expect(updateLog).toHaveBeenCalledWith('0-0', expect.objectContaining({ reps: '100' }))
+    // …e pediu conferência.
+    expect(result.current.ultimoResultado?.repsSuspeita).toBe(100)
+  })
+
+  it('número plausível não vira aviso', () => {
+    const { result } = montar([exercicio(2)], {}, vi.fn())
+
+    act(() => { capturedOnFinal?.('120 quilos 12 repetições') })
+
+    expect(result.current.ultimoResultado?.entendeu).toBe(true)
+    expect(result.current.ultimoResultado?.repsSuspeita).toBeUndefined()
+  })
+})
+
 describe('useDitadoDaSerie — "não entendi" não escreve nada', () => {
   it('fala sem nenhum número reconhecível: updateLog nunca é chamado', () => {
     const updateLog = vi.fn()

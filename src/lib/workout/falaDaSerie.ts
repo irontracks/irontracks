@@ -22,6 +22,17 @@
  * `numeroFalado` (`vozDoCardio.ts`) e as recomendações de check-in deste app.
  */
 
+/**
+ * Acima disto, a contagem de reps PEDE conferência — não é recusada.
+ *
+ * O dono falou "100 repetições" por engano em 19/09/2026 e o app gravou sem
+ * piscar. Bloquear seria pior: série longa de verdade existe (abdominal,
+ * panturrilha, cardio), e um teto recusaria dado real. 50 é conservador de
+ * propósito — grita só no claramente absurdo, senão o aviso vira ruído e
+ * ninguém lê (a mesma lição do bloco "PRECISA DE VOCÊ" que sempre tinha item).
+ */
+export const REPS_PARA_CONFERIR = 50
+
 /** O que o parser conseguiu extrair. Campo ausente = não foi dito. */
 export interface FalaDaSerie {
   /** Peso em kg, já convertido (aceita vírgula/ponto). */

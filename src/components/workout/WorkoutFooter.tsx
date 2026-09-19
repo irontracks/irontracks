@@ -5,6 +5,7 @@ import { Save, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
+import VoiceDictationPill from './VoiceDictationPill';
 
 export default function WorkoutFooter() {
   const {
@@ -85,6 +86,16 @@ export default function WorkoutFooter() {
           O CTA passa a ocupar a barra, mesma anatomia do START do descanso
           logo abaixo. Peso continua vindo da COR, não da largura: neutro
           enquanto há série pendente, dourado quando o treino fecha. */}
+      {/* A faixa do ditado por voz, quando o modo está ligado. Ela mora AQUI,
+          e não como barra fixa própria, porque este contêiner já resolve a
+          convivência com a barra do descanso (sobe por `--it-rest-bar-h`) —
+          uma segunda barra fixa repetiria de fora o bug que já deixou o
+          FINALIZAR inalcançável. Some sozinha com o modo desligado, então o
+          rodapé em repouso continua com UMA ação só. */}
+      <div className="max-w-6xl mx-auto">
+        <VoiceDictationPill />
+      </div>
+
       <div className="max-w-6xl mx-auto flex justify-end">
         <div className="relative pointer-events-auto">
           {allDone && !finishing && (
