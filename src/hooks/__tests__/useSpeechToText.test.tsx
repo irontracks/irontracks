@@ -199,4 +199,59 @@ describe('ditado no iOS nativo', () => {
         expect(onFinal).toHaveBeenCalledWith('uma banana')
         expect(result.current.erro).toBe('')
     })
+
+    /**
+     * CANCELAMENTO NÃO É ERRO — relato do dono em produção (19/09/2026):
+     * "Erro no reconhecimento de voz: Recognition request was canceled"
+     * aparecia na tela COM os campos já preenchidos pelo ditado.
+     *
+     * Mecanismo: `stopRecognitionEngine()` (Swift) chama `recognitionTask?.cancel()`,
+     * e o Speech framework emite esse erro. O plugin filtra só o código 216;
+     * esta mensagem chega com outro código e passava direto.
+     */
+    it('cancelamento do reconhecedor NÃO vira erro na tela', async () => {
+        let dispararErro: ((m: string) => void) | null = null
+        startNativeSpeechRecognition.mockImplementation(async (
+            _lang: string,
+            onResult: (t: string, f: boolean) => void,
+            onError: (m: string) => void,
+        ) => {
+            onResult('100 kg 12 reps', false)
+            dispararErro = onError
+            return true
+        })
+        const onFinal = vi.fn()
+        const { result } = renderHook(() => useSpeechToText({ onFinal }))
+        await act(async () => { result.current.iniciar() })
+        await waitFor(() => expect(dispararErro).toBeTruthy())
+
+        await act(async () => { dispararErro!('Recognition request was canceled') })
+
+        expect(result.current.erro).toBe('')
+        // …e o texto que já tinha sido reconhecido não se perde no caminho.
+        expect(onFinal).toHaveBeenCalledWith('100 kg 12 reps')
+        // O botão precisa voltar ao estado ocioso; sem `entregar()` aqui ele
+        // ficaria preso em "ouvindo" para sempre.
+        expect(result.current.gravando).toBe(false)
+    })
+
+    it('erro de VERDADE continua aparecendo', async () => {
+        let dispararErro: ((m: string) => void) | null = null
+        startNativeSpeechRecognition.mockImplementation(async (
+            _lang: string,
+            _onResult: unknown,
+            onError: (m: string) => void,
+        ) => {
+            dispararErro = onError
+            return true
+        })
+        const { result } = renderHook(() => useSpeechToText({ onFinal: vi.fn() }))
+        await act(async () => { result.current.iniciar() })
+        await waitFor(() => expect(dispararErro).toBeTruthy())
+
+        await act(async () => { dispararErro!('Sem entrada de áudio disponível.') })
+
+        expect(result.current.erro).toMatch(/sem entrada de áudio/i)
+        expect(result.current.gravando).toBe(false)
+    })
 })
