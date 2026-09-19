@@ -102,6 +102,80 @@ describe('falaDaSerie — variações de unidade e sigla', () => {
   })
 })
 
+/**
+ * ⚠️ FIXTURES REAIS — os transcripts exatos que o iPhone do dono produziu em
+ * 19/09/2026, copiados de `user_activity_events.voice_capture_sample`.
+ *
+ * Antes destes quatro, o RPE falhou em 100% das tentativas (3 de 3 na
+ * telemetria, depois 4 de 4 aqui) porque duas rodadas de regex foram escritas
+ * por PALPITE sobre como "RPE" seria transcrito. Nenhum palpite acertou: o
+ * reconhecedor pt-BR perde o "E" (vira "RP"), cola no número e às vezes sai
+ * fonético ("ar PA").
+ *
+ * Fixture nova só entra aqui vinda do banco — nunca inventada.
+ */
+describe('falaDaSerie — transcripts REAIS do iPhone (19/09/2026)', () => {
+  it('"80 quilos 12 repetições RP7" — sigla sem o E, colada no número', () => {
+    expect(falaDaSerie('80 quilos 12 repetições RP7')).toMatchObject({
+      pesoKg: 80, reps: 12, rpe: 7,
+    })
+  })
+
+  it('"90 quilos 10 repetições 8RP" — número antes da sigla, colado', () => {
+    expect(falaDaSerie('90 quilos 10 repetições 8RP')).toMatchObject({
+      pesoKg: 90, reps: 10, rpe: 8,
+    })
+  })
+
+  it('"Quilos 100 12 repetições ar PA 10" — unidade ANTES do número e sigla fonética', () => {
+    expect(falaDaSerie('Quilos 100 12 repetições ar PA 10')).toMatchObject({
+      pesoKg: 100, reps: 12, rpe: 10,
+    })
+  })
+
+  it('"120 quilos cinco repetições RP 10 e falha" — tudo junto, incluindo a falha', () => {
+    expect(falaDaSerie('120 quilos cinco repetições RP 10 e falha')).toMatchObject({
+      pesoKg: 120, reps: 5, rpe: 10, falha: true,
+    })
+  })
+})
+
+describe('falaDaSerie — falha muscular', () => {
+  it('"falha" marca', () => {
+    expect(falaDaSerie('100kg 8 reps falha').falha).toBe(true)
+  })
+
+  it('"falhei" e "falhou" também', () => {
+    expect(falaDaSerie('100kg 8 reps falhei').falha).toBe(true)
+    expect(falaDaSerie('100kg 8 reps falhou').falha).toBe(true)
+  })
+
+  it('sem a palavra: não marca (campo ausente, nunca false)', () => {
+    const r = falaDaSerie('100kg 8 reps')
+    expect(r.falha).toBeUndefined()
+  })
+
+  it('⚠️ "sem falha" NÃO marca — a negação custa progressão real ao aluno', () => {
+    // `log.failure` trava a progressão do motor de carga. Um regex ingênuo de
+    // "contém a palavra falha" marcaria este caso igual ao afirmativo.
+    expect(falaDaSerie('100kg 8 reps sem falha').falha).toBeUndefined()
+  })
+
+  it('"não fui à falha" também não marca', () => {
+    expect(falaDaSerie('100kg 8 reps não fui à falha').falha).toBeUndefined()
+  })
+})
+
+describe('falaDaSerie — peso com a unidade antes do número', () => {
+  it('"quilos 100" (o reconhecedor inverteu)', () => {
+    expect(falaDaSerie('quilos 100').pesoKg).toBe(100)
+  })
+
+  it('a forma normal continua vencendo quando as duas aparecem', () => {
+    expect(falaDaSerie('120 quilos').pesoKg).toBe(120)
+  })
+})
+
 describe('falaDaSerie — RPE, variações que o reconhecedor pode inserir', () => {
   it('"rpe: 8" (dois-pontos)', () => {
     expect(falaDaSerie('rpe: 8').rpe).toBe(8)

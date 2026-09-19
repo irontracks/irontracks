@@ -78,6 +78,41 @@ describe('useDitadoDaSerie — peso sempre é do USUÁRIO', () => {
   })
 })
 
+describe('useDitadoDaSerie — falha muscular por voz', () => {
+  /**
+   * `log.failure` é o MESMO campo do botão 🔥 do card, e alimenta a trava
+   * anti-progressão do motor de carga. Marcar por voz é marcação MANUAL do
+   * usuário — exatamente o que o guard `failureIsManualOnly` protege; o que
+   * ele proíbe é o app DEDUZIR a falha do método.
+   */
+  it('dizer "falha" marca failure: true no log', () => {
+    const updateLog = vi.fn()
+    montar([exercicio(2)], {}, updateLog)
+
+    act(() => { capturedOnFinal?.('120 quilos 5 reps RP 10 e falha') })
+
+    expect(updateLog).toHaveBeenCalledWith('0-0', expect.objectContaining({ failure: true }))
+  })
+
+  it('sem dizer "falha", o campo NÃO entra no patch (não desmarca o que o botão marcou)', () => {
+    const updateLog = vi.fn()
+    montar([exercicio(2)], {}, updateLog)
+
+    act(() => { capturedOnFinal?.('120 quilos 5 reps') })
+
+    expect(updateLog.mock.calls[0][1]).not.toHaveProperty('failure')
+  })
+
+  it('"sem falha" não marca — a negação é respeitada até a escrita', () => {
+    const updateLog = vi.fn()
+    montar([exercicio(2)], {}, updateLog)
+
+    act(() => { capturedOnFinal?.('120 quilos 5 reps sem falha') })
+
+    expect(updateLog.mock.calls[0][1]).not.toHaveProperty('failure')
+  })
+})
+
 describe('useDitadoDaSerie — "não entendi" não escreve nada', () => {
   it('fala sem nenhum número reconhecível: updateLog nunca é chamado', () => {
     const updateLog = vi.fn()

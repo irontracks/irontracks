@@ -2434,14 +2434,31 @@ existia (`useSpeechToText`, ponte nativa iOS, crash já corrigido em 28/08) —
 não foi preciso escrever reconhecimento de voz nenhum, só o parser e a
 fronteira de escrita.
 
-⚠️ **O parser (`lib/workout/falaDaSerie.ts`) NÃO foi calibrado com transcript
-real.** O plano previa uma Fase 0 (`/dashboard/voice-capture`, ainda no ar) —
-o dono ditando ~15 frases antes de escrever o parser — e ela foi pulada a
-pedido dele ("implementação completa nessa rodada"). O que está no ar é
-heurística sobre o formato do pedido original, com conversor de número por
-extenso pt-BR (0–999 + "e meio/meia") escrito à mão. `EVENTOS_TREINO.vozDaSerie`
-(`workout_set_voice`) grava se o parser entendeu — é o substituto tardio da
-Fase 0. **Reabra o parser assim que essa telemetria mostrar amostra real.**
+⚠️ **O iPhone NÃO transcreve "RPE" — e isso custou DUAS rodadas de regex por
+palpite.** Medido em 19/09/2026, nas primeiras falas reais do dono (o RPE
+falhou em 100% delas até aqui): o reconhecedor pt-BR **perde o "E"** e escreve
+**"RP"**, **cola no número** nos dois sentidos (`RP7`, `8RP`), e às vezes sai
+**fonético** (`ar PA 10`). Nenhum dos palpites (`rpe`, `r p e`, `erre pê ê`)
+aparece na prática. O peso também inverte às vezes (`Quilos 100`).
+
+**A lição, que é a regra do repo e eu furei duas vezes:** a Fase 0 do plano
+existia para medir isso ANTES (ela foi pulada a pedido do dono), e os dois
+consertos por suposição falharam em produção, com o dono testando na academia.
+O que resolveu foi gravar o transcript cru em `voice_capture_sample` e LER.
+Fixtures reais em `falaDaSerie.test.ts`; **fixture nova só entra vinda do
+banco, nunca inventada**:
+
+```sql
+select created_at, metadata->>'transcript', metadata->>'entendeuRpe'
+from user_activity_events where event_name = 'voice_capture_sample'
+order by created_at desc limit 25;
+```
+
+⚠️ **A gravação do transcript é TEMPORÁRIA** (`useDitadoDaSerie`) — é o texto
+que a pessoa fala no treino. Sai quando o parser estiver estável.
+
+⚠️ **Sem `\b` à direita da sigla do RPE, de propósito:** entre "p" e "7" não
+existe fronteira de palavra, e exigi-la mataria justamente `RP7`.
 
 **Por que o botão é por EXERCÍCIO, não por série.** Medido: um microfone de
 36px na linha da série (grid de 6 colunas) tira 28% da largura dos campos
@@ -2462,7 +2479,27 @@ dizer "cem quilos" não tem como significar só metade do exercício.
 **Trava de "só um ditado por vez"** (`vozAtivaSingleton.ts`) — cada card de
 exercício tem sua própria instância de `useSpeechToText`; sem a trava, tocar
 no mic de um exercício e depois no de outro (sem lembrar de parar o primeiro)
-faria dois reconhecedores brigarem pelo microfone nativo.
+faria dois reconhecedores brigarem pelo microfone nativo. **Ela é liberada na
+TRANSIÇÃO `gravando` true→false**, não dentro do `onFinal`: um erro do
+reconhecedor nunca chama `onFinal`, e a trava ficava presa apontando para um
+reconhecedor morto.
+
+⚠️ **"Recognition request was canceled" NÃO é erro — é como o ditado TERMINA.**
+`stopRecognitionEngine()` (Swift) chama `recognitionTask?.cancel()`, e o Speech
+framework emite isso. O plugin filtra o código **216**
+(`if nsError.code != 216`), mas essa mensagem chega com OUTRO código e passava
+direto: o dono via o erro na tela **com os campos já preenchidos pelo ditado**.
+Hoje `ehCancelamentoDeReconhecimento` (`useSpeechToText.ts`) trata como
+encerramento e chama `entregar()` — engolir sem entregar deixaria o botão
+preso em "ouvindo", porque é `entregar()` quem faz `setGravando(false)`.
+
+**"Falha" na fala marca `log.failure`** — o mesmo campo do botão 🔥. Não viola
+`failureIsManualOnly`: aquele guard proíbe o APP deduzir a falha do método
+(Heavy Duty e Forçadas congelariam a carga no `topWeight`), e falar "falha" é
+o usuário marcando à mão. **A negação é tratada** ("sem falha", "não fui à
+falha" não marcam): `failure` trava a progressão do motor, então marcar por
+engano custa carga real ao aluno. E a voz **nunca grava `false`** — desmarcar
+apagaria uma marcação feita no botão.
 
 **O discriminador "sessão é do dono" saiu do `ExerciseChatButton` para
 `lib/workout/sessionOwnership.ts`** (`sessaoEhPropria`) — mesma regra
