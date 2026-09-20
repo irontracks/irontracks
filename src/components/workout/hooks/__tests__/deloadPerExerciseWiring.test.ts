@@ -60,14 +60,18 @@ describe('persistência e toggle', () => {
     expect(card).toMatch(/autoLoadEnabled \? null : \(/)
   })
 
-  it('o controle único vive no topo da lista, com a chave do treino', () => {
+  it('o controle único vive no menu "…" do header, com a chave do treino', () => {
+    // ⚠️ Morava no `SessionDeloadBanner` (uma linha permanente no topo de todo
+    // treino com autoload ligado) até 19/09/2026, quando saiu para o menu "…"
+    // por pedido do dono — a linha "aparecendo toda hora" incomodava. Mesma
+    // razão que já tinha levado o "Semana de Deload" pra lá em 10/09.
+    const header = readFileSync('src/components/workout/WorkoutHeader.tsx', 'utf8')
+    expect(header).toMatch(/autoLoadEnabled \?/)
+    expect(header).toMatch(/toggleWorkoutDeload/)
+    expect(header).toMatch(/Descarga automática/)
+    // …e sumiu de vez do banner: reintroduzir ali reabriria a linha permanente.
     const banner = readFileSync('src/components/workout/SessionDeloadBanner.tsx', 'utf8')
-    // Ancorado no que FICA (o toggle e sua condição), não na forma exata do
-    // `if` — que era `if (autoLoadEnabled) {` e deixou de existir em 07/09/2026,
-    // quando o toggle passou a CONVIVER com o banner manual em vez de substituí-lo.
-    expect(banner).toMatch(/autoLoadEnabled \?/)
-    expect(banner).toMatch(/toggleWorkoutDeload/)
-    expect(banner).toMatch(/Descarga do treino/)
+    expect(banner).not.toMatch(/toggleWorkoutDeload/)
     const ctrl = readFileSync('src/components/workout/useActiveWorkoutController.ts', 'utf8')
     // chave = NOME DO TREINO normalizado, não nome de exercício
     expect(ctrl).toMatch(/const workoutDeloadKey = useMemo\(/)

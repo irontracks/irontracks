@@ -2545,6 +2545,47 @@ Sem o botão de voz, os 8 cabiam numa linha só em 390pt. Não é bug (a barra j
 usa `flex-wrap` por desenho, nada corta), mas fica esteticamente estranho — é
 raro os três condicionais coincidirem. Decisão do dono se vale a pena mexer.
 
+## Descarga do treino: o toggle e o gatilho manual saíram para o menu "…" (19/09/2026)
+
+Relato do dono, print com o card circulado: *"essa parte do deload aparecendo
+toda hora está me incomodando"*. Dois problemas, um bug e uma decisão.
+
+⚠️ **O bug: dispensar o card de sugestão não persistia.** `dispensado` era
+`useState(false)` dentro do `SessionDeloadBanner`, com o comentário "não
+persiste de propósito — se o treino for reaberto, o aviso volta". Na prática
+ele reaparecia a cada REMONTAGEM do `ActiveWorkout` — sair da tela e voltar,
+editar o treino, qualquer coisa que refizesse a árvore — não só reabrir o app.
+Corrigido em `lib/workout/deloadDismissal.ts`: a dispensa persiste em
+`localStorage`, chaveada por `(treino, dia BRT)` — dispensar hoje não esconde
+a sugestão para sempre; amanhã, se a regressão persistir, é uma sugestão NOVA.
+
+**A decisão: o toggle "Descarga do treino: Ligada/Desligada" virou item do
+menu "…", e ganhou um irmão — "Aplicar descarga agora".** Pedido do dono:
+*"sem a linha, só aparecer quando o app sentir que precisa e se o próprio
+usuário quiser deload, acionar nos 3 pontinhos"*. Mesmo raciocínio que já tinha
+levado o "Semana de Deload" para lá em 10/09: ação rara custando espaço
+permanente no topo de todo treino. `SessionDeloadBanner` agora só mostra o que
+precisa ser VISTO sem ação nenhuma do usuário — a sugestão automática e a
+faixa de ciclo em andamento.
+
+⚠️ **O modal de seleção precisou aprender a abrir SEM alerta.** Antes ele só
+existia dentro do `if (!sessionDeloadAlert || dispensado) return` — ou seja,
+nunca chegava a montar sem um diagnóstico do motor por trás. "Aplicar descarga
+agora" abre o MESMO modal, manualmente, com `status: 'manual'` (terceiro valor
+do union, ao lado de `'stagnation'`/`'overtraining'`) e todos os exercícios
+JÁ MARCADOS (é "aplicar no treino", com opt-out — abrir vazio faria quem
+clica Aplicar sem mexer em nada não aplicar em ninguém). `sinalizado` (a tag
+"Sem progresso" na lista) ficou null-safe: sem alerta, nenhum exercício é
+sinalizado pelo motor, e a tag some sem quebrar.
+
+**Guard largo demais, corrigido no mesmo PR:** o teste que travava "nada no
+header condiciona a descarga à carga automática" mirava o ARQUIVO INTEIRO —
+correto enquanto só existia o item do CICLO (que não pode depender de
+autoload), mas passou a reprovar o item novo "Descarga automática", que
+DEVE depender (só faz sentido perguntar "o motor pode reduzir sozinho" com o
+motor ligado). Reescrito para mirar só o bloco do ciclo. Jeito nº 8 da lista
+de guards falsos deste repo — largo demais acusa uso legítimo.
+
 ## Controle do professor sobre o treino do aluno (12/09/2026)
 
 O professor assume o treino em andamento e anota pelo aluno. O canal já

@@ -109,8 +109,11 @@ describe('o diagnóstico do motor continua valendo', () => {
 
     it('o sugerido nunca some da lista de atalhos', () => {
         // Se o motor sugerir 12% (STABLE), o usuário tem que conseguir voltar
-        // a ele depois de experimentar outro valor.
-        expect(executavel(banner)).toMatch(/new Set\(\[10, 15, 22, 30, pctSugerido\]\)/)
+        // a ele depois de experimentar outro valor. `pctSugerido` pode ser
+        // `null` desde 19/09/2026 (o modal também abre MANUALMENTE, pelo menu
+        // "…", sem diagnóstico do motor por trás) — daí o espalhamento
+        // condicional em vez do valor direto no Set.
+        expect(executavel(banner)).toMatch(/new Set\(\[10, 15, 22, 30, \.\.\.\(pctSugerido \? \[pctSugerido\] : \[\]\)\]\)/)
     })
 })
 
@@ -118,7 +121,16 @@ describe('a escolha não vira preferência permanente', () => {
     it('o estado é local do componente, não persistido', () => {
         const codigo = executavel(banner)
         expect(codigo).toMatch(/useState<number \| null>\(null\)/)
-        expect(codigo, 'gravar a escolha faria o diagnóstico virar decoração')
+        // Escopado ao BLOCO de `pctEscolhida` — não ao arquivo inteiro. Desde
+        // 19/09/2026 o arquivo TEM localStorage de propósito (a DISPENSA do
+        // card persiste, ver deloadDismissal.ts); o que este guard proíbe é
+        // a PORCENTAGEM escolhida virar preferência fixa, não a existência da
+        // palavra em qualquer lugar do componente — mirar no arquivo todo é
+        // o jeito nº 8 da lista de guards falsos deste repo (largo demais).
+        const inicioBloco = codigo.indexOf('const [pctEscolhida')
+        const fimBloco = codigo.indexOf('const [', inicioBloco + 1)
+        const blocoDaEscolha = codigo.slice(inicioBloco, fimBloco === -1 ? undefined : fimBloco)
+        expect(blocoDaEscolha, 'gravar a escolha faria o diagnóstico virar decoração')
             .not.toMatch(/localStorage|user_settings|preferences/)
     })
 })

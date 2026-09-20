@@ -145,13 +145,19 @@ describe('cards de configuração do topo são de uma linha', () => {
   })
 
   it('descarga do treino (modo ligado): frase no title, uma linha', () => {
-    const src = semComentarios(readFileSync(join(process.cwd(), 'src/components/workout/SessionDeloadBanner.tsx'), 'utf8'))
-    // Fatiado pelo que FICA: a declaração do toggle e a linha que a encerra.
-    // Antes ancorava em `if (autoLoadEnabled) {`, que deixou de existir em
-    // 07/09/2026 (o toggle passou a CONVIVER com o banner em vez de substituí-lo)
-    // — e aí `indexOf` devolvia -1 e o bloco vinha vazio. Quem avisou foi o
-    // `length > 200` logo abaixo; sem ele o guard teria ficado cego, verde e inútil.
-    const bloco = src.slice(src.indexOf('const toggleDoMotor ='), src.indexOf('if (!sessionDeloadAlert || dispensado)'))
+    // ⚠️ O toggle SAIU do SessionDeloadBanner (linha permanente no topo de
+    // todo treino) para o menu "…" do WorkoutHeader em 19/09/2026 — pedido do
+    // dono, a linha "aparecendo toda hora" incomodava. A REGRA de design que
+    // este guard trava (explicação no `title`, nunca como texto visível
+    // separado) segue valendo no novo lar: um item de menu com subtítulo
+    // próprio quebraria a mesma forma "uma linha, ação + rótulo".
+    const src = semComentarios(readFileSync(join(process.cwd(), 'src/components/workout/WorkoutHeader.tsx'), 'utf8'))
+    // Fatiado pelo que FICA: a declaração do item e a linha que a encerra.
+    // Ancorar em `if (autoLoadEnabled) {` foi o que já quebrou este guard uma
+    // vez (07/09/2026): a forma exata do `if` mudou e `indexOf` devolveu -1,
+    // com o bloco vindo vazio. Quem avisou foi o `length > 200` logo abaixo;
+    // sem ele o guard fica cego, verde e inútil.
+    const bloco = src.slice(src.indexOf('autoLoadEnabled ? ('), src.indexOf(') : null}'))
     expect(bloco.length).toBeGreaterThan(200)
     expect(bloco).toMatch(/title=\{workoutDeloadEnabled/)
     expect(bloco).not.toMatch(/<div[^>]*>\s*\{workoutDeloadEnabled\s*\?\s*'Em dia ruim/)

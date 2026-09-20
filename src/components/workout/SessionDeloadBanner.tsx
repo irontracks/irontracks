@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import type { UnknownRecord } from './types';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { resolveWorkoutKey } from '@/lib/workout/workoutKey'
+import { deloadFoiDispensadoHoje, dispensarDeloadHoje } from '@/lib/workout/deloadDismissal'
 
 /**
  * Descarga (deload) no escopo do TREINO.
@@ -16,33 +17,43 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
  * decidir oito vezes seguidas é a explicação mais provável de a ferramenta nunca
  * ter sido usada (0 de 547 sessões concluídas até jul/2026): aqui é UMA decisão,
  * com opt-out por exercício para quem não quer aliviar tudo.
+ *
+ * ⚠️ O toggle "Descarga do treino: Ligada/Desligada" (se o MOTOR pode reduzir a
+ * carga sozinho) e o gatilho "Aplicar descarga agora" (sem esperar sugestão)
+ * saíram deste componente em 19/09/2026 — foram para o menu "…" do
+ * `WorkoutHeader`, mesmo raciocínio que já tinha levado o "Semana de Deload"
+ * pra lá em 10/09: eram uma linha PERMANENTE no topo de todo treino
+ * (`autoLoadEnabled` sozinho já bastava para mostrá-la) para uma ação rara.
+ * Relato do dono: *"essa parte do deload aparecendo toda hora está me
+ * incomodando"*. O que fica AQUI é só o que precisa ser VISTO sem ação nenhuma
+ * do usuário — a sugestão automática e o ciclo em andamento.
  */
 export default function SessionDeloadBanner() {
   const {
+    workout,
+    session,
     exercises,
-    autoLoadEnabled,
     sessionDeloadAlert,
     sessionDeloadModal,
     setSessionDeloadModal,
     applyDeloadToSession,
-    workoutDeloadEnabled,
-    toggleWorkoutDeload,
     deloadCycleStatus,
     deloadCycleDaysRemaining,
     endDeloadCycle,
   } = useWorkoutContext() as unknown as {
+    workout: unknown;
+    session: unknown;
     exercises: UnknownRecord[];
-    autoLoadEnabled: boolean;
     sessionDeloadAlert: { exIdxs: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number } | null;
     sessionDeloadModal: { exIdxs: number[]; selected: number[]; status: string; suggestedPct: number } | null;
-    setSessionDeloadModal: (v: { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null) => void;
+    setSessionDeloadModal: (v: { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining' | 'manual'; suggestedPct: number } | null) => void;
     applyDeloadToSession: (exIdxs: number[], overridePct?: number) => Promise<void>;
-    workoutDeloadEnabled: boolean;
-    toggleWorkoutDeload: () => void;
     deloadCycleStatus: 'inactive' | 'active' | 'ends_today';
     deloadCycleDaysRemaining: number;
     endDeloadCycle: () => void;
   };
+
+  const workoutKey = React.useMemo(() => resolveWorkoutKey(workout, session), [workout, session]);
 
   const [aplicando, setAplicando] = React.useState(false);
   /**
@@ -53,9 +64,20 @@ export default function SessionDeloadBanner() {
    * preferência fixa faria o diagnóstico (12/15/22%) virar decoração.
    */
   const [pctEscolhida, setPctEscolhida] = React.useState<number | null>(null);
-  // Dispensar é só para esta montagem do treino — não persiste. Se o treino for
-  // reaberto e o quadro continuar, o aviso volta (o dado não mudou).
-  const [dispensado, setDispensado] = React.useState(false);
+  /**
+   * ⚠️ Dispensar PRECISA sobreviver a remontar o componente — ver
+   * `deloadDismissal.ts`. `useState(false)` era o bug: qualquer coisa que
+   * desmontasse e remontasse o `ActiveWorkout` (sair da tela e voltar, editar
+   * o treino) trazia o card de volta, mesmo já dispensado na mesma sessão.
+   * Inicializador LAZY (função, não valor) — ler `localStorage` a cada render
+   * seria trabalho refeito à toa.
+   */
+  const [dispensado, setDispensadoState] = React.useState(() => deloadFoiDispensadoHoje(workoutKey));
+  const dispensar = React.useCallback(() => {
+    dispensarDeloadHoje(workoutKey);
+    setDispensadoState(true);
+  }, [workoutKey]);
+
   // Antes de qualquer `return null` deste componente: hook atrás de condicional
   // faz o React contar hooks a menos no re-render (o teste do banner pegou).
   const deloadModalRef = useFocusTrap(!!sessionDeloadModal, () => setSessionDeloadModal(null));
@@ -65,24 +87,6 @@ export default function SessionDeloadBanner() {
     [exercises],
   );
 
-  // Com a carga automática LIGADA, o deload já é contínuo: `suggestWeight` alivia
-  // série a série (`deloadEnabled`), e o botão do card virou o liga/desliga por
-  // exercício. Nesse mundo o modal manual está aposentado (PR #568) — oferecer uma
-  // aplicação em bloco por cima do motor seria dois donos para a mesma carga.
-  // O banner é, portanto, para quem NÃO usa o motor: lá o modal manual segue vivo
-  // e a decisão continua sendo do usuário.
-  // Com a carga automática ligada, a descarga é contínua: o motor alivia série a
-  // série quando o dia pede. O que o usuário decide é se ELE PODE — e essa decisão
-  // é do TREINO. Até ago/2026 esse liga/desliga vivia em cada card: oito botões
-  // para uma decisão só, chaveados por nome de exercício (desligar o Supino aqui
-  // desligava em todos os treinos). Agora é um controle, no topo, e o card ficou
-  // limpo. Pedido do dono: "deload é por treino, não por exercício".
-  // Toggle da descarga contínua do motor. Convive com o banner manual abaixo:
-  // até 07/09/2026 ele RETORNAVA aqui, e com a carga automática ligada o banner
-  // de sessão simplesmente não existia. Sobrava ao usuário o botão "Aliviar X%
-  // hoje" de dentro do aviso de cada card — que nunca foi gated —, ou seja, ele
-  // tinha de decidir oito vezes, exercício por exercício. Era exatamente o que
-  // este banner nasceu para evitar.
   /**
    * CICLO de descarga — a SEMANA, não a sessão.
    *
@@ -100,31 +104,7 @@ export default function SessionDeloadBanner() {
   // chega `undefined` (contexto sem a chave), e o app anunciaria uma semana de
   // descarga que não existe.
   const emCiclo = deloadCycleStatus === 'active' || deloadCycleStatus === 'ends_today';
-  /**
-   * Quando MOSTRAR: só COM ciclo ativo.
-   *
-   * Até 10/09/2026 a condição era `emCiclo || autoLoadEnabled`, e isso tinha
-   * dois defeitos que só apareceram com o dono usando:
-   *
-   *  1. Ele treina com a carga automática DESLIGADA. Sem ciclo ativo e sem
-   *     autoload, os dois lados do `||` eram falsos — a linha nunca era
-   *     desenhada e o botão "Iniciar" ficava INALCANÇÁVEL. Para ligar um ciclo
-   *     era preciso já ter um ciclo. Ele procurou o controle no app e não achou.
-   *  2. Com autoload ligado e nenhum ciclo, a linha ociosa aparecia no topo de
-   *     TODO treino só oferecendo "Iniciar" — exatamente o gasto de espaço nobre
-   *     que a auditoria de 06/09/2026 mediu.
-   *
-   * O erro de fundo foi de premissa: tratei descarga-de-SEMANA como assunto da
-   * carga automática. Não é. O toggle "Descarga do treino" abaixo pertence ao
-   * motor (sem motor ligado não há o que configurar), mas o ciclo é uma decisão
-   * do atleta — ele declarou "essa semana é deload" numa segunda, sem nenhum
-   * alerta do app. Por isso o INICIAR mudou de lugar: virou item do menu "…" do
-   * header (`WorkoutHeader`), alcançável em qualquer estado e sem custo de tela.
-   *
-   * Aqui fica só o que precisa ser VISTO: a faixa de ciclo em andamento, que
-   * muda como se lê a carga do dia inteiro.
-   */
-  const linhaDoCiclo = !emCiclo ? null : (
+  const cabecalho = !emCiclo ? null : (
     <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1">
       <div className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-amber-300/90">
         {deloadCycleStatus === 'ends_today'
@@ -142,57 +122,14 @@ export default function SessionDeloadBanner() {
     </div>
   );
 
-  const toggleDoMotor = autoLoadEnabled ? (
-      // UMA linha, como o toggle da carga automática logo acima. A frase que
-      // explicava ("Em dia ruim, o app pode aliviar…") foi para o `title`: os
-      // dois cards de configuração somavam ~134pt no topo de TODO treino e o
-      // primeiro "Concluir" ficava a 66% da tela (auditoria de 06/09/2026).
-      <div
-        className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-3 py-1"
-        title={workoutDeloadEnabled
-          ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
-          : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
-      >
-        <div className="min-w-0 text-[11px] font-bold uppercase tracking-wide text-neutral-400 truncate">
-          Descarga do treino
-        </div>
-        <button
-          type="button"
-          onClick={toggleWorkoutDeload}
-          aria-pressed={workoutDeloadEnabled}
-          aria-label={`Descarga do treino: ${workoutDeloadEnabled ? 'ligada' : 'desligada'}`}
-          className={[
-            'shrink-0 inline-flex tap-44 h-8 items-center gap-1.5 rounded-lg border px-2.5 transition-colors active:scale-95',
-            workoutDeloadEnabled
-              ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
-              : 'border-neutral-800 bg-neutral-900 text-neutral-400',
-          ].join(' ')}
-        >
-          <ArrowDown size={15} className={workoutDeloadEnabled ? '' : 'opacity-50'} />
-          <span className="text-[11px] font-bold uppercase tracking-wide">
-            {workoutDeloadEnabled ? 'Ligada' : 'Desligada'}
-          </span>
-        </button>
-      </div>
-  ) : null;
-
-  const cabecalho = (
-    <>
-      {linhaDoCiclo}
-      {toggleDoMotor}
-    </>
-  );
-
-  if (!sessionDeloadAlert || dispensado) return cabecalho;
-
-  const pctSugerido = Math.round(sessionDeloadAlert.suggestedPct * 100);
-  const pct = pctEscolhida ?? pctSugerido;
-  const qtd = sessionDeloadAlert.exIdxs.length;
+  const pctSugerido = sessionDeloadAlert ? Math.round(sessionDeloadAlert.suggestedPct * 100) : null;
+  const pct = pctEscolhida ?? pctSugerido ?? 15;
+  const qtd = sessionDeloadAlert?.exIdxs.length ?? 0;
 
   // Atalhos toque-único: quem está na academia não mira slider de mão suada.
   // O sugerido entra na lista mesmo fora dos fixos, para nunca sumir a opção
   // que o motor recomenda. 5% e 40% são os limites que o app já valida.
-  const opcoes = Array.from(new Set([10, 15, 22, 30, pctSugerido])).sort((a, b) => a - b);
+  const opcoes = Array.from(new Set([10, 15, 22, 30, ...(pctSugerido ? [pctSugerido] : [])])).sort((a, b) => a - b);
 
   /**
    * O modal lista o TREINO INTEIRO, com os sinalizados já marcados.
@@ -207,6 +144,7 @@ export default function SessionDeloadBanner() {
   const todosIdxs = (Array.isArray(exercises) ? exercises : []).map((_, i) => i);
 
   const abrir = () => {
+    if (!sessionDeloadAlert) return;
     setSessionDeloadModal({
       exIdxs: todosIdxs.length ? todosIdxs : sessionDeloadAlert.exIdxs,
       selected: [...sessionDeloadAlert.exIdxs],
@@ -220,7 +158,7 @@ export default function SessionDeloadBanner() {
     const on = sessionDeloadModal.selected.includes(i);
     setSessionDeloadModal({
       ...sessionDeloadModal,
-      status: sessionDeloadModal.status as 'stagnation' | 'overtraining',
+      status: sessionDeloadModal.status as 'stagnation' | 'overtraining' | 'manual',
       selected: on ? sessionDeloadModal.selected.filter((x) => x !== i) : [...sessionDeloadModal.selected, i].sort((a, b) => a - b),
     });
   };
@@ -233,11 +171,116 @@ export default function SessionDeloadBanner() {
       // lá dentro, então sem este argumento o app aplicaria o diagnóstico e
       // ignoraria a escolha — o botão dizendo 10% e o peso caindo 22%.
       await applyDeloadToSession(sessionDeloadModal.selected, sessionDeloadModal.suggestedPct);
-      setDispensado(true);
+      dispensar();
     } finally {
       setAplicando(false);
     }
   };
+
+  /**
+   * O MODAL de seleção é independente do alerta automático — ele também abre
+   * pelo menu "…" (`WorkoutHeader`, "Aplicar descarga agora"), sem que o
+   * motor tenha sinalizado nada. `sinalizado` fica null-safe: sem alerta,
+   * nenhum exercício é "sinalizado pelo motor", e a tag some — não quebra.
+   */
+  const modal = sessionDeloadModal ? (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center" {...backdropProps(() => setSessionDeloadModal(null), 'Fechar descarga')}>
+      <div ref={deloadModalRef} {...dialogProps('Descarga do treino')} className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl">
+        <div className="text-lg font-bold text-white">Descarga do treino</div>
+        <div className="mt-1 text-[13px] leading-snug text-neutral-400">
+          Reduz até {Math.round(sessionDeloadModal.suggestedPct * 100)}% da carga nos exercícios marcados.
+          Séries já concluídas não são alteradas, e o app avisa se a máquina não
+          tiver um peso tão leve.
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+            {sessionDeloadModal.selected.length} de {sessionDeloadModal.exIdxs.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (!sessionDeloadModal) return;
+              const todos = sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length;
+              setSessionDeloadModal({
+                ...sessionDeloadModal,
+                status: sessionDeloadModal.status as 'stagnation' | 'overtraining' | 'manual',
+                selected: todos ? [] : [...sessionDeloadModal.exIdxs],
+              });
+            }}
+            className="tap-44 rounded-lg border border-neutral-800 px-2.5 py-1 text-[12px] font-semibold text-neutral-300 active:scale-95"
+          >
+            {sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length ? 'Desmarcar todos' : 'Marcar todos'}
+          </button>
+        </div>
+
+        <div className="mt-2 space-y-2">
+          {sessionDeloadModal.exIdxs.map((i) => {
+            const marcado = sessionDeloadModal.selected.includes(i);
+            const sinalizado = sessionDeloadAlert?.exIdxs.includes(i) ?? false;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => alternar(i)}
+                className={[
+                  'flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
+                  marcado ? 'border-amber-500/50 bg-amber-500/10' : 'border-neutral-800 bg-neutral-900/60',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold',
+                    marcado ? 'border-amber-500 bg-amber-500 text-black' : 'border-neutral-700 text-transparent',
+                  ].join(' ')}
+                  aria-hidden
+                >
+                  ✓
+                </span>
+                <span className={['min-w-0 flex-1 truncate text-[14px]', marcado ? 'text-white' : 'text-neutral-400'].join(' ')}>
+                  {nomeDe(i)}
+                </span>
+                {/* Distingue quem o motor acusou de quem entrou por decisão
+                    sua. Sem isso o diagnóstico some dentro da lista completa. */}
+                {sinalizado ? (
+                  <span className="shrink-0 rounded-md border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                    Sem progresso
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSessionDeloadModal(null)}
+            className="flex-1 rounded-xl border border-neutral-800 px-3 py-2.5 text-[14px] font-semibold text-neutral-300 active:scale-[0.99]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmar}
+            disabled={aplicando || sessionDeloadModal.selected.length === 0}
+            className="flex-1 rounded-xl bg-amber-500 px-3 py-2.5 text-[14px] font-bold text-black disabled:opacity-40 active:scale-[0.99]"
+          >
+            {aplicando ? 'Aplicando…' : `Aplicar em ${sessionDeloadModal.selected.length}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (!sessionDeloadAlert || dispensado) {
+    return (
+      <>
+        {cabecalho}
+        {modal}
+      </>
+    );
+  }
 
   return (
     <>
@@ -257,7 +300,7 @@ export default function SessionDeloadBanner() {
           </div>
           <button
             type="button"
-            onClick={() => setDispensado(true)}
+            onClick={dispensar}
             aria-label="Dispensar sugestão de descarga"
             className="shrink-0 rounded-lg px-2 py-1 text-neutral-400 active:scale-95"
           >
@@ -298,95 +341,7 @@ export default function SessionDeloadBanner() {
         </div>
       </div>
 
-      {sessionDeloadModal ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center" {...backdropProps(() => setSessionDeloadModal(null), 'Fechar descarga')}>
-          <div ref={deloadModalRef} {...dialogProps('Descarga do treino')} className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-neutral-800 bg-neutral-950 p-5 sm:rounded-3xl">
-            <div className="text-lg font-bold text-white">Descarga do treino</div>
-            <div className="mt-1 text-[13px] leading-snug text-neutral-400">
-              Reduz até {Math.round(sessionDeloadModal.suggestedPct * 100)}% da carga nos exercícios marcados.
-              Séries já concluídas não são alteradas, e o app avisa se a máquina não
-              tiver um peso tão leve.
-            </div>
-
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
-                {sessionDeloadModal.selected.length} de {sessionDeloadModal.exIdxs.length}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!sessionDeloadModal) return;
-                  const todos = sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length;
-                  setSessionDeloadModal({
-                    ...sessionDeloadModal,
-                    status: sessionDeloadModal.status as 'stagnation' | 'overtraining',
-                    selected: todos ? [] : [...sessionDeloadModal.exIdxs],
-                  });
-                }}
-                className="tap-44 rounded-lg border border-neutral-800 px-2.5 py-1 text-[12px] font-semibold text-neutral-300 active:scale-95"
-              >
-                {sessionDeloadModal.selected.length === sessionDeloadModal.exIdxs.length ? 'Desmarcar todos' : 'Marcar todos'}
-              </button>
-            </div>
-
-            <div className="mt-2 space-y-2">
-              {sessionDeloadModal.exIdxs.map((i) => {
-                const marcado = sessionDeloadModal.selected.includes(i);
-                const sinalizado = sessionDeloadAlert.exIdxs.includes(i);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => alternar(i)}
-                    className={[
-                      'flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
-                      marcado ? 'border-amber-500/50 bg-amber-500/10' : 'border-neutral-800 bg-neutral-900/60',
-                    ].join(' ')}
-                  >
-                    <span
-                      className={[
-                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] font-bold',
-                        marcado ? 'border-amber-500 bg-amber-500 text-black' : 'border-neutral-700 text-transparent',
-                      ].join(' ')}
-                      aria-hidden
-                    >
-                      ✓
-                    </span>
-                    <span className={['min-w-0 flex-1 truncate text-[14px]', marcado ? 'text-white' : 'text-neutral-400'].join(' ')}>
-                      {nomeDe(i)}
-                    </span>
-                    {/* Distingue quem o motor acusou de quem entrou por decisão
-                        sua. Sem isso o diagnóstico some dentro da lista completa. */}
-                    {sinalizado ? (
-                      <span className="shrink-0 rounded-md border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                        Sem progresso
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setSessionDeloadModal(null)}
-                className="flex-1 rounded-xl border border-neutral-800 px-3 py-2.5 text-[14px] font-semibold text-neutral-300 active:scale-[0.99]"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmar}
-                disabled={aplicando || sessionDeloadModal.selected.length === 0}
-                className="flex-1 rounded-xl bg-amber-500 px-3 py-2.5 text-[14px] font-bold text-black disabled:opacity-40 active:scale-[0.99]"
-              >
-                {aplicando ? 'Aplicando…' : `Aplicar em ${sessionDeloadModal.selected.length}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {modal}
     </>
   );
 }
