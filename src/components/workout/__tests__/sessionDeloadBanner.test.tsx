@@ -38,6 +38,11 @@ let rerender: (() => void) | null = null
 const ALERTA = { exIdxs: [0, 2], status: 'stagnation' as const, suggestedPct: 0.15, itemsCount: 5 }
 
 beforeEach(() => {
+  // A dispensa agora persiste em localStorage (chave = treino + dia), por
+  // pedido do dono — o card não pode reaparecer a cada remontagem. Sem
+  // limpar aqui, um teste que dispensa "vaza" a marca para os seguintes,
+  // que então nasceriam já dispensados.
+  try { window.localStorage.clear() } catch { /* jsdom sempre tem localStorage */ }
   applyDeloadToSession.mockClear()
   ctx = montarCtx(ALERTA)
   rerender = null
@@ -50,34 +55,12 @@ const renderBanner = () => {
 }
 
 describe('SessionDeloadBanner', () => {
-  it('com a carga automática ligada, o toggle CONVIVE com a descarga de hoje', () => {
-    // Invariante revisado em 07/09/2026. A regra "com o motor ligado o modal
-    // manual está aposentado" (#568) valia para o BANNER e para o botão da barra
-    // de ações — mas nunca alcançou o "Aliviar X% hoje" de dentro do aviso de
-    // cada card. Na prática o usuário não perdia o deload manual: perdia só a
-    // versão em BLOCO dele, e tinha de decidir exercício por exercício. Foi o que
-    // aconteceu no treino do dono em 07/09/2026, com dois exercícios ficando de
-    // fora. Hoje as duas coisas convivem: o toggle governa a descarga CONTÍNUA do
-    // motor, o banner aplica a descarga de HOJE.
-    ctx = montarCtx(ALERTA)
-    ;(ctx as Record<string, unknown>).autoLoadEnabled = true
-    ;(ctx as Record<string, unknown>).workoutDeloadEnabled = true
-    ;(ctx as Record<string, unknown>).toggleWorkoutDeload = () => { }
-    const { container, getByRole } = renderBanner()
-    expect(getByRole('button', { name: /descarga do treino/i })).toBeTruthy()
-    expect(getByRole('button', { name: /Reduzir 15% no treino de hoje/i })).toBeTruthy()
-    expect(container.textContent || '').toMatch(/Reduzir \d+% no treino/)
-  })
-
-  it('sem alerta, a carga automática ligada mostra só o toggle', () => {
-    ctx = montarCtx(null)
-    ;(ctx as Record<string, unknown>).autoLoadEnabled = true
-    ;(ctx as Record<string, unknown>).workoutDeloadEnabled = true
-    ;(ctx as Record<string, unknown>).toggleWorkoutDeload = () => { }
-    const { container, getByRole } = renderBanner()
-    expect(getByRole('button', { name: /descarga do treino/i })).toBeTruthy()
-    expect(container.textContent || '').not.toMatch(/Reduzir \d+% no treino/)
-  })
+  // ⚠️ O toggle "Descarga do treino: Ligada/Desligada" e o gatilho manual
+  // ("Aplicar descarga agora") SAÍRAM deste componente em 19/09/2026 — foram
+  // para o menu "…" do WorkoutHeader (pedido do dono: a linha permanente no
+  // topo do treino "aparecendo toda hora" incomodava). Guard de fiação em
+  // deloadPerExerciseWiring.test.ts; este arquivo cobre só o que continua
+  // aqui — a sugestão automática e o ciclo de semana.
 
   it('não renderiza nada sem alerta de sessão', () => {
     ctx = montarCtx(null)

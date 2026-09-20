@@ -14,6 +14,8 @@
  */
 export const DOM_TEST_FILES = [
   'src/lib/workout/__tests__/restoreSessionGate.test.ts',
+  // A dispensa da sugestão de descarga persiste em `localStorage`.
+  'src/lib/workout/__tests__/deloadDismissal.test.ts',
   // A marca de "já treinou hoje" é persistida em `localStorage` — é ela que
   // impede o card de treino piscar a cada abertura do app.
   'src/lib/workout/__tests__/trainedToday.test.ts',

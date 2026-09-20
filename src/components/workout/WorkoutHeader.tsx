@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CalendarDays, Clock, GripVertical, Home, MoreHorizontal, Pause, Pencil, Play, Satellite, UserPlus, X } from 'lucide-react';
+import { ArrowDown, CalendarDays, Clock, GripVertical, Home, MoreHorizontal, Pause, Pencil, Play, Satellite, UserPlus, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Carregado sob demanda: só quem toca em "Treinar em casa" paga por ele.
@@ -38,11 +38,19 @@ export default function WorkoutHeader() {
     deloadCycleDaysRemaining,
     startDeloadCycle,
     endDeloadCycle,
+    autoLoadEnabled,
+    workoutDeloadEnabled,
+    toggleWorkoutDeload,
+    setSessionDeloadModal,
   } = useWorkoutContext() as unknown as ReturnType<typeof useWorkoutContext> & {
     deloadCycleStatus?: 'inactive' | 'active' | 'ends_today';
     deloadCycleDaysRemaining?: number;
     startDeloadCycle?: (durationDays: number) => void;
     endDeloadCycle?: () => void;
+    autoLoadEnabled?: boolean;
+    workoutDeloadEnabled?: boolean;
+    toggleWorkoutDeload?: () => void;
+    setSessionDeloadModal?: (v: { exIdxs: number[]; selected: number[]; status: 'manual'; suggestedPct: number } | null) => void;
   };
 
   // "Hoje treino em casa": adapta o treino inteiro pelo grafo de substituição
@@ -66,6 +74,23 @@ export default function WorkoutHeader() {
    */
   const [descargaAberta, setDescargaAberta] = React.useState(false);
   const emCicloDeDescarga = deloadCycleStatus === 'active' || deloadCycleStatus === 'ends_today';
+
+  /**
+   * "Aplicar descarga agora" — o gatilho MANUAL, sem esperar o motor sinalizar
+   * nada. Mora aqui pela mesma razão da "Semana de Deload" logo acima: é ação
+   * rara (o dono pediu explicitamente que ficasse "nos 3 pontinhos"), então
+   * custa ZERO espaço enquanto não é usada. Abre o MESMO modal do
+   * `SessionDeloadBanner` (seleção por exercício, com opt-out) — a diferença
+   * é só a origem: aqui não há diagnóstico do motor por trás, por isso
+   * `status: 'manual'` (nenhum exercício chega pré-marcado como "sinalizado").
+   * 15% é o ponto médio dos atalhos que o banner já oferece (10/15/22/30) —
+   * sem sugestão do motor para ancorar, é o palpite mais neutro.
+   */
+  const aplicarDescargaAgora = React.useCallback(() => {
+    const idxs = (Array.isArray(exercises) ? exercises : []).map((_, i) => i);
+    if (!idxs.length) return;
+    setSessionDeloadModal?.({ exIdxs: idxs, selected: [...idxs], status: 'manual', suggestedPct: 0.15 });
+  }, [exercises, setSessionDeloadModal]);
   const { elapsedSeconds, formatElapsed, isPaused: timerPaused, togglePause } = useWorkoutTimer();
 
   // Pausa em equipe transmite ao parceiro; sozinho congela o cronômetro local.
@@ -250,6 +275,44 @@ export default function WorkoutHeader() {
                         ? `Encerrar Deload (${deloadCycleDaysRemaining}d)`
                         : 'Semana de Deload'}
                     </button>
+                    {/* "Aplicar descarga agora" — o gatilho MANUAL da descarga
+                        DESTE treino, sem esperar o motor sinalizar nada. Saiu
+                        do topo da tela (onde era um card permanente) para cá,
+                        pedido do dono: "se o próprio usuário quiser deload,
+                        acionar nos 3 pontinhos". */}
+                    <button
+                      type="button"
+                      onClick={() => { aplicarDescargaAgora(); setOverflowOpen(false); }}
+                      disabled={exercises.length === 0}
+                      className={[
+                        'w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left transition-colors border-t border-neutral-800',
+                        exercises.length === 0
+                          ? 'text-neutral-700 cursor-not-allowed'
+                          : 'text-yellow-400 hover:bg-neutral-800',
+                      ].join(' ')}
+                    >
+                      <ArrowDown size={15} />
+                      Aplicar descarga agora
+                    </button>
+                    {/* Se o MOTOR pode reduzir a carga sozinho em dia ruim — só
+                        existe pergunta com a carga automática ligada. Também
+                        veio do topo da tela: era uma linha permanente
+                        ("Descarga do treino: Ligada/Desligada") em todo treino
+                        com autoload, pela mesma reclamação do dono. */}
+                    {autoLoadEnabled ? (
+                      <button
+                        type="button"
+                        onClick={() => { toggleWorkoutDeload?.(); setOverflowOpen(false); }}
+                        aria-pressed={workoutDeloadEnabled}
+                        title={workoutDeloadEnabled
+                          ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
+                          : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors border-t border-neutral-800"
+                      >
+                        <ArrowDown size={15} className={workoutDeloadEnabled ? '' : 'opacity-50'} />
+                        Descarga automática: {workoutDeloadEnabled ? 'Ligada' : 'Desligada'}
+                      </button>
+                    ) : null}
                     <div className="h-px bg-neutral-800" />
                     <button
                       type="button"

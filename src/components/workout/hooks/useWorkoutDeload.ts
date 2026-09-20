@@ -109,7 +109,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   // Modal da descarga de SESSÃO: guarda os exercícios propostos e quais estão
   // marcados (opt-out por exercício — quem não travou não precisa aliviar).
   const [sessionDeloadModal, setSessionDeloadModal] = useState<
-    { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null
+    // 'manual' = aberto pelo menu "…" ("Aplicar descarga agora"), sem
+    // diagnóstico do motor por trás — ver WorkoutHeader.tsx.
+    { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining' | 'manual'; suggestedPct: number } | null
   >(null);
   const [deloadModal, setDeloadModal] = useState<UnknownRecord | null>(null);
 
