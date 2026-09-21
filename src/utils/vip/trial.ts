@@ -24,6 +24,16 @@
  *
  * A dívida com quem recebeu o e-mail prometendo os 14 dias antes do corte foi
  * paga à mão (decisão do dono, 16/08/2026) — não por esta função.
+ *
+ * ⚠️ **Segundo acidente, medido em 21/09/2026 — a data de cadastro nunca veio.**
+ * `public.profiles` NÃO TEM coluna `created_at` (quem tem é `auth.users`). O
+ * `select('role, created_at')` original não checava `error`: a busca falhava
+ * em silêncio, `row` virava `null`/`undefined`, `signupMs` virava `NaN`, e a
+ * trava de segurança ("sem carimbo → não concede") negava o trial SEMPRE,
+ * pra TODO MUNDO — não só quem se cadastrou antes do corte. Medido: **5 de 5
+ * pessoas cadastradas desde 16/08/2026 nunca receberam entitlement nenhum**.
+ * O trial nunca funcionou de verdade depois de "corrigido". Hoje a data vem
+ * de `auth.users` via `admin.auth.admin.getUserById`, que é a fonte real.
  * - Expira sozinho: `getVipPlanLimits` já filtra `valid_until` — nenhum cron
  *   novo, nenhuma revogação manual.
  * - Escrita via service-role, como TODA escrita de entitlement (a regra de
@@ -55,19 +65,34 @@ export async function maybeGrantTrial(userId: string): Promise<boolean> {
         const admin = createAdminClient()
 
         // Papel: admin/teacher já são Elite por role — trial só sujaria a tabela.
-        // `created_at` vem na MESMA consulta: a data de corte não pode custar
-        // um round-trip a mais no bootstrap.
-        const { data: profile } = await admin
-            .from('profiles').select('role, created_at').eq('id', uid).maybeSingle()
-        const row = (profile || null) as { role?: string; created_at?: string } | null
-        const role = String(row?.role || '').toLowerCase()
+        // `public.profiles` não tem `created_at` (é `auth.users` quem tem) — as
+        // duas consultas rodam em PARALELO, e o `error` de cada uma é checado:
+        // silenciar isso foi o que apagou o trial de todo mundo de 16/08 a
+        // 21/09/2026 (ver a nota ⚠️ no cabeçalho do arquivo).
+        const [profileRes, authRes] = await Promise.all([
+            admin.from('profiles').select('role').eq('id', uid).maybeSingle(),
+            admin.auth.admin.getUserById(uid),
+        ])
+        if (profileRes.error) {
+            logError('vip:trial', profileRes.error, { stage: 'profile' })
+            return false
+        }
+        if (authRes.error) {
+            logError('vip:trial', authRes.error, { stage: 'auth_user' })
+            return false
+        }
+        // Perfil ausente é situação anormal (todo cadastro cria uma linha em
+        // `profiles`) — na dúvida, mesma trava conservadora do resto da função.
+        if (!profileRes.data) return false
+        const role = String(profileRes.data.role || '').toLowerCase()
         if (role === 'admin' || role === 'teacher') return false
 
         // Cadastro anterior ao corte não ganha trial automático. Sem carimbo de
         // cadastro o veredito é NÃO conceder: o erro barato é a pessoa não
         // ganhar (dá para conceder à mão); o caro é abrir acesso pago em massa
         // sem ninguém ter decidido.
-        const signupMs = row?.created_at ? Date.parse(String(row.created_at)) : NaN
+        const createdAt = authRes.data?.user?.created_at
+        const signupMs = createdAt ? Date.parse(String(createdAt)) : NaN
         if (!Number.isFinite(signupMs) || signupMs < Date.parse(TRIAL_SIGNUP_CUTOFF)) return false
 
         // QUALQUER linha desqualifica — inclusive expirada ou revogada.

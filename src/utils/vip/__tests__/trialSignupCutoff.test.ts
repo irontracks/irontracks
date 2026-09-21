@@ -1,5 +1,6 @@
 /**
- * Guard da DATA DE CORTE do trial (16/08/2026).
+ * Guard da DATA DE CORTE do trial (16/08/2026) + do bug da FONTE da data
+ * (21/09/2026).
  *
  * Diferente do `trialAndFirstFree.test.ts`, que é source-guard, aqui a função
  * roda de verdade contra um Supabase mockado — porque o que precisa ser provado
@@ -11,11 +12,22 @@
  * CHECK, `maybeGrantTrial` passaria a conceder a todo mundo que "nunca teve
  * entitlement" — 48 contas medidas, a maioria veterana. Estes casos travam
  * isso: quem se cadastrou ANTES do corte não ganha trial automático.
+ *
+ * ⚠️ O mock de `profiles` AQUI já foi a causa do segundo acidente: a versão
+ * anterior deste arquivo mockava `profiles` devolvendo `created_at` junto do
+ * `role`, mas `public.profiles` NUNCA TEVE essa coluna — só `auth.users` tem.
+ * A suíte inteira ficou verde testando uma função que, contra o banco real,
+ * sempre falhava a leitura da data (em silêncio) e negava o trial pra todo
+ * mundo, sempre. `profiles` aqui só devolve `role`; a data vem de um mock
+ * separado de `admin.auth.admin.getUserById`, do jeito que o código real lê.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
-    profile: null as { role?: string; created_at?: string } | null,
+    profileRole: null as string | null,
+    profileError: null as { message: string } | null,
+    authCreatedAt: undefined as string | undefined,
+    authError: null as { message: string } | null,
     entitlements: [] as unknown[],
     inserts: [] as Array<Record<string, unknown>>,
     audits: [] as Array<Record<string, unknown>>,
@@ -26,8 +38,14 @@ vi.mock('@/utils/supabase/admin', () => ({
         from: (table: string) => {
             if (table === 'profiles') {
                 return {
+                    // Schema real: SEM `created_at`. Só `role` existe aqui.
                     select: () => ({
-                        eq: () => ({ maybeSingle: async () => ({ data: h.profile, error: null }) }),
+                        eq: () => ({
+                            maybeSingle: async () => ({
+                                data: h.profileError ? null : (h.profileRole === null ? null : { role: h.profileRole }),
+                                error: h.profileError,
+                            }),
+                        }),
                     }),
                 }
             }
@@ -42,6 +60,14 @@ vi.mock('@/utils/supabase/admin', () => ({
             }
             throw new Error(`tabela inesperada: ${table}`)
         },
+        auth: {
+            admin: {
+                getUserById: async () => ({
+                    data: h.authError ? null : { user: { created_at: h.authCreatedAt } },
+                    error: h.authError,
+                }),
+            },
+        },
     }),
 }))
 
@@ -54,7 +80,10 @@ const ANTES = '2026-06-24T23:01:57.000Z'   // veterano real da base
 const DEPOIS = '2026-08-16T10:00:00.000Z'  // cadastro após o corte
 
 beforeEach(() => {
-    h.profile = null
+    h.profileRole = null
+    h.profileError = null
+    h.authCreatedAt = undefined
+    h.authError = null
     h.entitlements = []
     h.inserts = []
     h.audits = []
@@ -62,13 +91,15 @@ beforeEach(() => {
 
 describe('maybeGrantTrial — data de corte', () => {
     it('cadastro ANTERIOR ao corte não ganha trial automático', async () => {
-        h.profile = { role: 'student', created_at: ANTES }
+        h.profileRole = 'student'
+        h.authCreatedAt = ANTES
         await expect(maybeGrantTrial(UID)).resolves.toBe(false)
         expect(h.inserts).toEqual([])
     })
 
     it('cadastro POSTERIOR ao corte ganha, com provider e prazo certos', async () => {
-        h.profile = { role: 'student', created_at: DEPOIS }
+        h.profileRole = 'student'
+        h.authCreatedAt = DEPOIS
         await expect(maybeGrantTrial(UID)).resolves.toBe(true)
         expect(h.inserts).toHaveLength(1)
         expect(h.inserts[0].provider).toBe(TRIAL_PROVIDER)
@@ -80,18 +111,21 @@ describe('maybeGrantTrial — data de corte', () => {
     })
 
     it('exatamente no instante do corte já vale — o corte é inclusivo', async () => {
-        h.profile = { role: 'student', created_at: TRIAL_SIGNUP_CUTOFF }
+        h.profileRole = 'student'
+        h.authCreatedAt = TRIAL_SIGNUP_CUTOFF
         await expect(maybeGrantTrial(UID)).resolves.toBe(true)
     })
 
     it('sem carimbo de cadastro NÃO concede — na dúvida, não abre acesso pago', async () => {
-        h.profile = { role: 'student' }
+        h.profileRole = 'student'
+        h.authCreatedAt = undefined
         await expect(maybeGrantTrial(UID)).resolves.toBe(false)
         expect(h.inserts).toEqual([])
     })
 
     it('perfil inexistente não concede', async () => {
-        h.profile = null
+        h.profileRole = null
+        h.authCreatedAt = DEPOIS
         await expect(maybeGrantTrial(UID)).resolves.toBe(false)
         expect(h.inserts).toEqual([])
     })
@@ -99,21 +133,24 @@ describe('maybeGrantTrial — data de corte', () => {
     it('admin e teacher continuam fora, mesmo cadastrando depois do corte', async () => {
         for (const role of ['admin', 'teacher']) {
             h.inserts = []
-            h.profile = { role, created_at: DEPOIS }
+            h.profileRole = role
+            h.authCreatedAt = DEPOIS
             await expect(maybeGrantTrial(UID)).resolves.toBe(false)
             expect(h.inserts).toEqual([])
         }
     })
 
     it('entitlement pré-existente continua desqualificando', async () => {
-        h.profile = { role: 'student', created_at: DEPOIS }
+        h.profileRole = 'student'
+        h.authCreatedAt = DEPOIS
         h.entitlements = [{ id: 'algum' }]
         await expect(maybeGrantTrial(UID)).resolves.toBe(false)
         expect(h.inserts).toEqual([])
     })
 
     it('concede deixa trilha em audit_events', async () => {
-        h.profile = { role: 'student', created_at: DEPOIS }
+        h.profileRole = 'student'
+        h.authCreatedAt = DEPOIS
         await maybeGrantTrial(UID)
         expect(h.audits).toHaveLength(1)
         expect(h.audits[0].action).toBe('vip_trial_granted')
@@ -123,5 +160,24 @@ describe('maybeGrantTrial — data de corte', () => {
     it('id vazio nem consulta o banco', async () => {
         await expect(maybeGrantTrial('   ')).resolves.toBe(false)
         expect(h.inserts).toEqual([])
+    })
+
+    it('BUG DE 21/09: erro ao ler o perfil (coluna inexistente, etc.) nega e LOGA — não falha em silêncio', async () => {
+        h.profileRole = 'student'
+        h.profileError = { message: 'column profiles.created_at does not exist' }
+        h.authCreatedAt = DEPOIS
+        const { logError } = await import('@/lib/logger')
+        await expect(maybeGrantTrial(UID)).resolves.toBe(false)
+        expect(h.inserts).toEqual([])
+        expect(logError).toHaveBeenCalledWith('vip:trial', h.profileError, { stage: 'profile' })
+    })
+
+    it('BUG DE 21/09: erro ao ler o usuário do auth nega e LOGA — não falha em silêncio', async () => {
+        h.profileRole = 'student'
+        h.authError = { message: 'user not found' } as { message: string }
+        await expect(maybeGrantTrial(UID)).resolves.toBe(false)
+        expect(h.inserts).toEqual([])
+        const { logError } = await import('@/lib/logger')
+        expect(logError).toHaveBeenCalledWith('vip:trial', h.authError, { stage: 'auth_user' })
     })
 })
