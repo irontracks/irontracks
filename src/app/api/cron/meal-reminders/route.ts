@@ -7,6 +7,7 @@ import { logError } from '@/lib/logger'
 import { planDays, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
 import { minutosDoDia, resumoDaRefeicao } from '@/lib/nutrition/mealTimes'
 import { chaveDoInstante, janelaDeLembretes, type InstanteBrt } from '@/lib/nutrition/janelaDeLembrete'
+import { construirSetDeLancadas, removerJaLancados } from '@/lib/nutrition/mealReminderAlreadyLogged'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,9 +87,42 @@ export async function GET(req: Request) {
 
     if (!pendentes.length) return NextResponse.json({ ok: true, planos: linhas.length, enviados: 0 })
 
+    // Quem já lançou a refeição no diário não precisa do lembrete — pedido do
+    // dono (21/09/2026): "quando a refeição já foi lançada, não mandar a
+    // notificação daquela refeição". Busca escopada aos (usuário, dia) desta
+    // janela só, não a tabela inteira — a janela cobre no máximo 2 dias (a
+    // virada de meia-noite) e um punhado de usuários por passada.
+    const userIdsDaJanela = Array.from(new Set(pendentes.map((p) => p.userId)))
+    const dateKeysDaJanela = Array.from(new Set(pendentes.map((p) => p.instante.dateKey)))
+    const { data: entradasExistentes, error: erroEntradas } = await admin
+      .from('nutrition_meal_entries')
+      .select('user_id, date, food_name')
+      .in('user_id', userIdsDaJanela)
+      .in('date', dateKeysDaJanela)
+    // Falha na leitura NÃO pode travar o cron nem, pior, silenciosamente
+    // deixar de enviar lembrete nenhum: se não dá pra saber quem já lançou,
+    // segue como antes desta regra (notifica cego) — perder o lembrete é
+    // pior do que mandar um de quem já comeu.
+    if (erroEntradas) logError('cron:meal-reminders:ja-lancadas', erroEntradas)
+    const jaLancadas = construirSetDeLancadas(erroEntradas ? [] : (entradasExistentes ?? []))
+
+    const pendentesNaoLancados = removerJaLancados(
+      pendentes.map((p) => ({
+        ...p,
+        dateKey: p.instante.dateKey,
+        nomeDaRefeicao: String(p.meal.name || 'Refeição').trim() || 'Refeição',
+      })),
+      jaLancadas,
+    )
+    const jaLancadasCount = pendentes.length - pendentesNaoLancados.length
+
+    if (!pendentesNaoLancados.length) {
+      return NextResponse.json({ ok: true, planos: linhas.length, enviados: 0, jaLancadas: jaLancadasCount })
+    }
+
     const linhasDeNotificacao: Array<Record<string, unknown>> = []
-    for (const { userId, meal, instante } of pendentes) {
-      const nome = String(meal.name || 'Refeição').trim() || 'Refeição'
+    for (const { userId, meal, instante, nomeDaRefeicao } of pendentesNaoLancados) {
+      const nome = nomeDaRefeicao
       const chave = `meal-reminder:${userId}:${instante.dateKey}:${meal.time}:${nome}`
       // 'unavailable' (Upstash fora) ENVIA: perder o lembrete é pior que repetir
       // — e o cron só cobre cada horário uma vez por janela.
@@ -110,14 +144,19 @@ export async function GET(req: Request) {
     }
 
     if (!linhasDeNotificacao.length) {
-      return NextResponse.json({ ok: true, planos: linhas.length, enviados: 0, deduplicados: pendentes.length })
+      return NextResponse.json({
+        ok: true, planos: linhas.length, enviados: 0,
+        deduplicados: pendentesNaoLancados.length, jaLancadas: jaLancadasCount,
+      })
     }
 
     // O gate da preferência (`notifyMealReminders`) e o "não perturbar" já são
     // aplicados aqui dentro — é o mesmo caminho do cron de hidratação.
     await insertNotifications(linhasDeNotificacao)
 
-    return NextResponse.json({ ok: true, planos: linhas.length, enviados: linhasDeNotificacao.length })
+    return NextResponse.json({
+      ok: true, planos: linhas.length, enviados: linhasDeNotificacao.length, jaLancadas: jaLancadasCount,
+    })
   } catch (e) {
     logError('cron:meal-reminders', e)
     return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 })

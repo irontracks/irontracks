@@ -2971,6 +2971,34 @@ de bug.** Eu afirmei ao dono que o lembrete das 05:30 (Pré-treino) sairia; era
 **domingo**, e no domingo o plano dele começa 09:30. `enviados: 0` estava certo,
 e a linha que li era a de segunda-feira.
 
+### Refeição já lançada não recebe lembrete (21/09/2026)
+
+Pedido do dono: quem já registrou a refeição no diário não precisa do push
+"está na hora". O casamento é por (usuário, dia BRT, NOME da refeição) contra
+`nutrition_meal_entries.food_name` — que já é o nome da refeição, não de um
+alimento (ver a nota do histórico de refeições). Fonte pura em
+`lib/nutrition/mealReminderAlreadyLogged.ts` (`construirSetDeLancadas` +
+`removerJaLancados`), consultada na rota ANTES do dedupe do Upstash — a busca é
+escopada aos `(userId, dateKey)` da própria janela, não à tabela inteira.
+**Falha na leitura não trava o cron nem cancela o envio** — fail-open: se não dá
+pra saber quem já lançou, notifica cego, porque perder o lembrete é pior que
+mandar um de quem já comeu.
+
+⚠️ **Isto NÃO é o mecanismo de "só uma vez por dia"** — esse continua sendo o
+dedupe do Upstash (`cacheSetNxStatus`). Também não reage a DESFAZER lançamento
+(a tela não tem essa ação hoje).
+
+⚠️ **Guard falso pego nesta tarefa — jeito nº 3 da lista (early-return mascara
+mutação).** A primeira bateria de testes só tinha UMA refeição pendente por
+cenário: quando ela já estava lançada, `pendentesNaoLancados` ficava vazio e o
+`if (!pendentesNaoLancados.length) return` interceptava ANTES do loop de
+envio — então mutar o loop para voltar a usar `pendentes` cru passava **verde**
+com a checagem efetivamente desativada. Só um caso com DUAS refeições
+pendentes na mesma janela, só uma lançada, força `pendentesNaoLancados` a ficar
+não-vazio e exercita o loop de fato — foi esse caso que pegou a mutação
+(vermelho). **Guard com só um item no cenário sempre esconde o caminho onde o
+early-return "empresta" proteção ao código depois dele.**
+
 ## Badge do ícone (o "32" no app) — duas metades, e nenhuma marca como lido
 O número no ícone é **recalculado pelo servidor a cada push** (`sendPushToUsers`
 conta as notificações não lidas). Por isso zerar só no device não bastava: o 32
