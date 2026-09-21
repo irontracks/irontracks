@@ -1066,6 +1066,35 @@ por conta própria.
 
 **VIP/pagamentos:** o status VIP NÃO é uma flag persistida — é **derivado em tempo de leitura** por `getVipPlanLimits` (`utils/vip/limits.ts`), em 3 camadas: `profiles.role` (admin/teacher → elite) → `user_entitlements` (fonte de verdade, expira sozinho por `valid_until`) → `app_subscriptions` (fallback legado, filtra `current_period_end`). **Toda escrita de status passa por service-role** (webhook RevenueCat, `revenuecat/sync`, checkout usam `createAdminClient`); o client autenticado só tem SELECT — nunca reintroduzir policy/GRANT de INSERT/UPDATE nessas tabelas pro usuário (foi a brecha de self-grant corrigida em 2026-07-11, migration `lock_down_vip_self_grant_and_usage`). Cotas de IA são contabilizadas SÓ pelos RPCs `SECURITY DEFINER` `increment/decrement_vip_usage_daily` — `vip_usage_daily` também é read-only pro client. Webhook autentica em tempo constante (`safeEqual`) e reconfirma o entitlement na API do RevenueCat antes de conceder.
 
+⚠️ **O trial de 14 dias nunca funcionou de verdade desde que foi "corrigido" em
+16/08/2026 — segundo acidente na mesma função, achado em 21/09/2026 a partir de
+uma reclamação real (usuário Jean, tela de importar ficha bloqueada).**
+`maybeGrantTrial` (`utils/vip/trial.ts`) lia `created_at` de `public.profiles`
+— coluna que **não existe** nessa tabela (quem tem é `auth.users`). O
+`select()` não checava `error`: a busca falhava em silêncio, a data virava
+"desconhecida", e a trava de segurança do código ("sem carimbo → não
+concede") negava o trial pra TODO MUNDO, sempre — não só quem se cadastrou
+antes do corte. Medido: **5 de 5 pessoas cadastradas desde 16/08/2026 nunca
+receberam entitlement nenhum**. Corrigido: a data agora vem de `auth.users`
+via `admin.auth.admin.getUserById`, com `error` checado nas duas consultas
+(perfil e auth) — e perfil ausente também nega, de propósito (situação
+anormal, mesma trava conservadora do resto da função).
+
+**Mesma lição do "supabase-js não lança em erro de escrita", agora em
+LEITURA**: `select()` sem checar `error` finge que a query rodou quando ela
+pode ter falhado — aqui por coluna inexistente, mas o mesmo padrão mata
+silenciosamente por RLS, timeout, ou nome de tabela errado. Guard em
+`utils/vip/__tests__/trialSignupCutoff.test.ts`, provado por 5 mutações (o
+mock de `profiles` foi reescrito para refletir o schema REAL — sem
+`created_at` — depois de descobrir que o mock anterior tinha o MESMO erro do
+código: presumia a coluna sem checar contra o banco).
+
+**Pendência com o dono:** decidir se concede o trial retroativo às 5 pessoas
+afetadas (incluindo o Jean, `04ec5e78-b746-4e26-be59-3dd8d5cb0875` — a conta
+com e-mail correto; ele também abriu sem querer uma segunda conta com erro de
+digitação no e-mail, `dc9231d6-024c-42b0-8f74-e5bb80cb3bc3`, `.vom` em vez de
+`.com`, zero uso).
+
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
