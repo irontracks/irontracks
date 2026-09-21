@@ -138,6 +138,12 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     admin_new_signup: tipo(<UserPlus size={15} />, 'Cadastro', 'acao'),
     // Dinheiro: o caso para o qual o vermelho existe.
     billing_issue: tipo(<CreditCard size={15} />, 'Cobrança', 'aviso'),
+    // Ganhou algo — é CONQUISTA, não ação (ninguém precisa responder nada).
+    // Sem entrada em DESTINO_POR_TIPO de propósito, mesmo motivo do
+    // `billing_issue`: a tela VIP não existe no app iOS (política da Apple
+    // sobre cobrança fora da loja) e não há um lugar único pra levar em todo
+    // cliente — abrir tela errada é pior que não abrir.
+    vip_trial_granted: tipo(<Sparkles size={15} />, 'VIP', 'conquista'),
 
     // ── O trabalho do COACH chegando ao aluno ────────────────────────────────
     // LEMBRETE, não ação: ninguém espera RESPOSTA do aluno — o que se pede é
