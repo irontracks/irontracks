@@ -18,6 +18,11 @@ const { estado } = vi.hoisted(() => ({
     statusFiltrado: '',
     dedupe: 'set' as 'set' | 'exists' | 'unavailable',
     chaves: [] as string[],
+    /** Linhas de `nutrition_meal_entries` — o que o usuário já lançou hoje. */
+    entradasLancadas: [] as Array<Record<string, unknown>>,
+    /** Erro simulado na leitura de entradas lançadas (para o caso de falha). */
+    erroEntradas: null as Error | null,
+    colunasEntradas: '',
   },
 }))
 
@@ -29,9 +34,22 @@ vi.mock('@/lib/social/notifyFollowers', () => ({
 vi.mock('@/utils/cache', () => ({
   cacheSetNxStatus: vi.fn(async (chave: string) => { estado.chaves.push(chave); return estado.dedupe }),
 }))
+// ⚠️ O mock precisa DISTINGUIR A TABELA — a mesma armadilha que já derrubou 8
+// testes de nutrição uma vez (CLAUDE.md): `nutrition_meal_entries` tem a
+// mesma cadeia `select→in→in` de outras tabelas, e um mock que ignora o nome
+// devolveria os PLANOS como se fossem entradas lançadas (ou vice-versa).
 vi.mock('@/utils/supabase/admin', () => ({
   createAdminClient: () => ({
-    from: () => {
+    from: (tabela: string) => {
+      if (tabela === 'nutrition_meal_entries') {
+        const builder = {
+          select: (cols: string) => { estado.colunasEntradas = cols; return builder },
+          in: () => builder,
+          then: (resolve: (v: { data: unknown; error: unknown }) => void) =>
+            resolve({ data: estado.entradasLancadas, error: estado.erroEntradas }),
+        }
+        return builder
+      }
       const builder = {
         select: (cols: string) => { estado.colunas = cols; return builder },
         eq: (_c: string, v: string) => { estado.statusFiltrado = v; return builder },
@@ -67,6 +85,9 @@ describe('cron meal-reminders', () => {
     estado.statusFiltrado = ''
     estado.dedupe = 'set'
     estado.chaves = []
+    estado.entradasLancadas = []
+    estado.erroEntradas = null
+    estado.colunasEntradas = ''
     vi.useFakeTimers()
     // Sábado 05/09/2026, 12:02 BRT — a janela cobre 11:57…12:02.
     vi.setSystemTime(new Date('2026-09-05T15:02:00Z'))
@@ -161,6 +182,102 @@ describe('cron meal-reminders', () => {
     estado.rows = [planoSemanal('15:00')]
     await GET(req())
     expect(estado.notifs).toHaveLength(0)
+  })
+})
+
+/**
+ * Pedido do dono (21/09/2026): "quando a refeição já foi lançada, não mandar
+ * a notificação daquela refeição". `food_name` em `nutrition_meal_entries` é
+ * o NOME da refeição ("Almoço"), não de um alimento — é o que casa com
+ * `PlanMeal.name`.
+ */
+describe('cron meal-reminders — refeição já lançada não notifica', () => {
+  beforeEach(() => {
+    estado.rows = []
+    estado.notifs = []
+    estado.dedupe = 'set'
+    estado.chaves = []
+    estado.entradasLancadas = []
+    estado.erroEntradas = null
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-05T15:02:00Z')) // sábado, 12:02 BRT
+  })
+
+  it('já lançou o Almoço hoje: NÃO notifica', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.entradasLancadas = [{ user_id: UID, date: '2026-09-05', food_name: 'Almoço' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(0)
+  })
+
+  it('o casamento ignora acento/caixa ("almoço" bate com "Almoço")', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.entradasLancadas = [{ user_id: UID, date: '2026-09-05', food_name: 'almoco' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(0)
+  })
+
+  it('lançou OUTRA refeição hoje: o Almoço ainda notifica', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.entradasLancadas = [{ user_id: UID, date: '2026-09-05', food_name: 'Café da manhã' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(1)
+  })
+
+  it('lançou o Almoço em OUTRO dia: hoje ainda notifica', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.entradasLancadas = [{ user_id: UID, date: '2026-09-04', food_name: 'Almoço' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(1)
+  })
+
+  it('OUTRO usuário lançou o Almoço: o meu ainda notifica', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.entradasLancadas = [{ user_id: 'outro-usuario', date: '2026-09-05', food_name: 'Almoço' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(1)
+  })
+
+  it('falha ao ler entradas lançadas: NÃO trava o cron — notifica como antes da regra', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    estado.erroEntradas = new Error('conexão caiu')
+    const res = await GET(req())
+    expect(res.status).toBe(200)
+    // Perder o lembrete é pior do que mandar um de quem já lançou.
+    expect(estado.notifs).toHaveLength(1)
+  })
+
+  it('a busca é escopada ao usuário/dia da janela, sem trazer o resto da tabela', async () => {
+    estado.rows = [planoSemanal('12:00')]
+    await GET(req())
+    expect(estado.colunasEntradas).toContain('user_id')
+    expect(estado.colunasEntradas).toContain('date')
+    expect(estado.colunasEntradas).toContain('food_name')
+  })
+
+  /**
+   * ⚠️ CASO MISTO — o que prova o filtro de verdade.
+   *
+   * Um plano com DUAS refeições pendentes no mesmo horário, só uma já
+   * lançada: se o guard testasse só "1 pendente, já lançado → 0 notifs", o
+   * `if (!pendentesNaoLancados.length) return` (early-return) mascararia
+   * uma mutação no LOOP que monta as notificações — o array já estaria
+   * vazio antes de chegar lá, e a mutação nunca seria exercitada. Medido:
+   * essa é a mutação que só o caso misto pega.
+   */
+  it('CASO MISTO: duas refeições pendentes, só uma lançada — notifica só a outra', async () => {
+    estado.rows = [{
+      user_id: UID,
+      days: Array.from({ length: 7 }, (_, weekday) => ({
+        weekday,
+        meals: [refeicao('Almoço', '12:00'), refeicao('Lanche', '12:00')],
+      })),
+    }]
+    estado.entradasLancadas = [{ user_id: UID, date: '2026-09-05', food_name: 'Almoço' }]
+    await GET(req())
+    expect(estado.notifs).toHaveLength(1)
+    expect(String(estado.notifs[0].title)).toContain('Lanche')
+    expect(String(estado.notifs[0].title)).not.toContain('Almoço')
   })
 })
 
