@@ -1089,11 +1089,31 @@ mock de `profiles` foi reescrito para refletir o schema REAL — sem
 `created_at` — depois de descobrir que o mock anterior tinha o MESMO erro do
 código: presumia a coluna sem checar contra o banco).
 
-**Pendência com o dono:** decidir se concede o trial retroativo às 5 pessoas
-afetadas (incluindo o Jean, `04ec5e78-b746-4e26-be59-3dd8d5cb0875` — a conta
-com e-mail correto; ele também abriu sem querer uma segunda conta com erro de
-digitação no e-mail, `dc9231d6-024c-42b0-8f74-e5bb80cb3bc3`, `.vom` em vez de
-`.com`, zero uso).
+⚠️ **TERCEIRO acidente, achado na mesma sessão, ao tentar conceder manualmente:**
+o CHECK `user_entitlements_provider_check` **nunca aceitou `'trial'`** —
+mesmo depois de 16/08/2026, data em que o comentário original do arquivo
+dizia que isso tinha sido corrigido. Confirmado direto no banco:
+`pg_get_constraintdef` só listava `asaas, stripe, apple, google, manual,
+admin, mercadopago`. Ou seja: mesmo com o `created_at` corrigido, TODA
+concessão de trial (automática ou manual) continuaria morrendo em `23514` e
+caindo no "nunca lança, retorna false em silêncio" — o trial nunca funcionou
+de ponta a ponta desde que foi criado, por DOIS motivos empilhados, não um.
+Corrigido por migration (`20260921233146_user_entitlements_provider_check_allow_trial.sql`)
+adicionando `'trial'` à lista. **Confira sempre o CHECK de verdade no banco
+antes de confiar num comentário que diz "isso já foi corrigido"** — é a
+mesma lição do `docs/DATA_MAP_workout_history.md`: a migration do repo pode
+estar atrás do banco, e aqui foi o inverso — o comentário estava na frente
+de uma correção que nunca chegou a acontecer.
+
+**Concedido retroativamente em 21/09/2026** (autorizado pelo dono) às 4
+contas reais afetadas — 14 dias de `vip_pro`, `provider='trial'`, com
+`audit_events` (`vip_trial_granted`, `metadata.retroativo: true`) e
+notificação (`vip_trial_granted`, "🎁 Você ganhou 14 dias de VIP!") pra cada
+uma: `jorge_terrasilva@hotmail.com`, `juniordebrito@gmail.com`,
+`yohanbatista@hotmail.com`, e o Jean na conta CERTA
+(`04ec5e78-b746-4e26-be59-3dd8d5cb0875`) — **não** na conta com erro de
+digitação no e-mail (`dc9231d6-024c-42b0-8f74-e5bb80cb3bc3`, `.vom` em vez de
+`.com`, zero uso, propositalmente deixada de fora).
 
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
