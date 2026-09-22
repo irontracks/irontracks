@@ -17,7 +17,7 @@
 
 import { normalizeFoodKey } from './learned-foods'
 import { fitsMealGroup, isPreferredForMealGroup, type FoodMealMap, type MealGroup } from './mealContext'
-import { isRoleCompatible } from './mealCoherence'
+import { isRoleCompatible, isPlatedProtein } from './mealCoherence'
 
 /** Macros por 100 g — denominador comum das três fontes. */
 export interface FoodMacros {
@@ -201,6 +201,16 @@ export interface SwapOptions {
    */
   mealGroup?: MealGroup
   foodMealMap?: FoodMealMap
+  /**
+   * A refeição já tem um item líquido (leite, iogurte...)? Pedido do dono,
+   * 22/09/2026: com a Ceia trazendo "Leite desnatado" + "Clara de ovo", trocar a
+   * clara sugeria "Atum sólido" e "Peito de frango" — proteína por proteína está
+   * certo pelo macro, mas soa estranho beber leite ao lado de peixe/carne de
+   * prato. Não FILTRA (o usuário pode não ter mais nada de proteína cadastrado) —
+   * só desempata a favor de opções rápidas (whey, clara, queijo cottage). Ver
+   * `isPlatedProtein` em `mealCoherence.ts`.
+   */
+  mealHasLiquid?: boolean
 }
 
 /**
@@ -306,6 +316,14 @@ export function rankSwapOptions(
     // Acima disso não é substituto, é outra refeição.
     .filter((x) => x.drift <= MAX_KCAL_DRIFT)
     .sort((a, b) => {
+      // Refeição com líquido + proteína: opção rápida (whey, clara, cottage) antes
+      // de carne/peixe de prato. Vem ANTES até do histórico — é coerência do prato,
+      // não preferência aprendida.
+      if (options.mealHasLiquid && cls === 'protein') {
+        const platedA = isPlatedProtein(a.c.name) ? 1 : 0
+        const platedB = isPlatedProtein(b.c.name) ? 1 : 0
+        if (platedA !== platedB) return platedA - platedB
+      }
       // Confirmado pelo histórico NAQUELA refeição vem primeiro, antes até da fonte:
       // um alimento que ele comprovadamente come no almoço ganha de um da base curada
       // que só não foi reprovado por falta de histórico.

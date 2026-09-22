@@ -3,6 +3,7 @@ import {
   isLiquidVehicle,
   requiredVehicle,
   isConcentratedSweet,
+  isPlatedProtein,
   missingVehicleOf,
   findCoherenceIssues,
   repairMissingVehicles,
@@ -173,4 +174,18 @@ describe('reparo — acrescenta o líquido, nunca amputa o prato', () => {
     repairMissingVehicles([cafeDaManhaReal])
     expect(cafeDaManhaReal).toEqual(original)
   })
+})
+
+describe('proteína de PRATO — carne/peixe que pede panela e talher', () => {
+  it.each(['Frango grelhado', 'Peito de frango', 'Atum sólido ao natural', 'Filé de tilápia',
+    'Carne moída magra', 'Patinho cozido', 'Salmão grelhado', 'Bife de contrafilé', 'Camarão refogado'])(
+    '"%s" é proteína de prato',
+    (food) => expect(isPlatedProtein(food)).toBe(true),
+  )
+
+  it.each(['Clara de ovo cozida', 'Whey protein concentrado', 'Queijo cottage', 'Iogurte grego',
+    'Requeijão light', 'Ovo mexido', 'Leite desnatado'])(
+    '"%s" NÃO é proteína de prato — rápida o bastante pra acompanhar um líquido',
+    (food) => expect(isPlatedProtein(food)).toBe(false),
+  )
 })

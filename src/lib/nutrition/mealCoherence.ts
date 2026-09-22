@@ -112,6 +112,21 @@ export function isConcentratedSweet(foodName: unknown): boolean {
   return Boolean(n) && CONCENTRATED_SWEET.test(n)
 }
 
+/**
+ * Proteína de PRATO — carne/peixe que pede panela e talher. Pedido do dono
+ * (22/09/2026): a Ceia tinha "Leite desnatado" + "Clara de ovo cozida", e trocar a
+ * clara sugeria "Atum sólido ao natural" e "Peito de frango" — pelo macro a troca é
+ * impecável (proteína por proteína), mas ninguém bebe leite ao lado de atum. Não
+ * bane (o usuário pode não ter nada mais cadastrado) — só desempata DEPOIS de
+ * `swapFood`, ver `mealHasLiquid` em `foodSwap.ts`.
+ */
+const PLATED_PROTEIN = /\bfrango\b|\bfil[ée]\b|\bpeixe\b|\batum\b|\btil[áa]pia\b|\bsalm[ãa]o\b|\bcarne\b|\bpatinho\b|\bcoxa\b|\bsobrecoxa\b|\bpicanha\b|\balcatra\b|\bl[oô]mbo\b|\bpernil\b|\bbife\b|\bpeito de peru\b|\bcami?ar[aã]o\b|\bsardinha\b|\bacem\b|\bpaleta\b|\bcupim\b|\bmaminha\b/
+
+export function isPlatedProtein(foodName: unknown): boolean {
+  const n = normalize(foodName)
+  return Boolean(n) && PLATED_PROTEIN.test(n)
+}
+
 /** Máximo de doces concentrados no dia inteiro. Um é tempero; dois viram a dieta. */
 export const MAX_SWEETS_PER_DAY = 1
 
