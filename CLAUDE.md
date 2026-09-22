@@ -713,6 +713,27 @@ teste que troca `entries` via `rerender` (simulando o antes/depois da
 edição) — a Ceia, que não tinha sido tocada na 1ª leitura, absorve o
 carboidrato que sobrou assim que a Janta editada aparece no `entries`.
 
+**Adicionar/tirar/mudar quantidade de item na refeição do PLANO, antes de
+lançar** (22/09/2026, pedido do dono). Antes só dava pra trocar um item por
+uma "Opção" pré-cadastrada. Confirmado com o dono: o ajuste vale **só para
+este lançamento**, nunca reescreve o plano — mesma regra da "Opção".
+`lib/nutrition/ajusteDoLancamento.ts` compõe troca→reescala→remoção→adição
+numa função só (`refeicaoParaLancamento`), usada tanto para EXIBIR o card
+quanto para o que `applyMeal` de fato manda ao diário — tela e lançamento não
+podem discordar em dois toques, a mesma regra do resto do módulo.
+`resolveFoodForEditor.ts` foi extraído de `NutritionMixer.tsx` (a cadeia
+parser→base→IA) para ser reusado aqui sem duplicar a fiação.
+
+⚠️ **Achado só na CONFERÊNCIA VISUAL, não pela suíte:** mudar a quantidade no
+campo (250g→100g) já atualizava o total da refeição no cabeçalho, mas a
+linha de macros do PRÓPRIO item continuava mostrando os valores da
+quantidade ORIGINAL (325 kcal em vez de 130) — o campo dizia uma coisa e a
+linha embaixo dizia outra, na mesma tela. Causa: a exibição dos macros por
+item lia `it` (o item cru do plano) em vez de passar por
+`reescalarPlanItem`. É mais um caso da regra "o defeito que 7 mil testes
+verdes não pegam é o de CONTRATO" (ver seção própria) — as duas metades
+(campo editável, total do cabeçalho) estavam certas isoladamente.
+
 **Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
 **Os 18,7° entre proteína e gordura — RESOLVIDO em 12/08/2026, e não trocando cor.** Proteína (`#fbbf24`, 43°) e gordura (`#f97316`, 25°) seguem abaixo dos 40° que a paleta exige de si mesma, e vão continuar: não há faixa de matiz livre (vermelho é ERRO, verde é sucesso, azul é carboidrato, violeta virou a cor da máquina). Mas a distância de matiz nunca foi o problema — **dois matizes próximos convivem enquanto não se TOCAM**. Os dois pontos onde encostavam: (1) no card de lançamento os segmentos são condicionais (`pct > 0`), então refeição sem carboidrato cola âmbar em laranja — o azul que "salvava" era acaso; (2) no `MacroBar` o vermelho de estouro era desenhado encostado no macro, e contra a gordura são **25°** — o alerta sussurrava justamente onde precisa gritar. `MACRO_SEGMENT_GAP_PX` (2px do fundo entre blocos) resolve os dois sem gastar matiz. Guards em `__tests__/macroBar.test.tsx`.
 
@@ -957,6 +978,12 @@ dela.
 
 **Classificar alimento por macro dominante SOZINHO produz sugestão absurda.** Auditoria de 132 trocas reais (04/08/2026) pegou: bife virando ovo (gordura dominava), leite desnatado virando substituto de mamão e feijão (caía em fruta/verdura), maionese virando bolo, arroz virando "orange chicken". As cinco regras que consertaram, todas em `foodSwap`: (1) proteína ≥ 10 g/100 g e ≥ 25% das kcal manda, mesmo com gordura maior; (2) `produce` exige proteína < 35% das kcal — o corte fica ENTRE leite desnatado (39%) e alface/brócolis (26–29%), e apertar demais joga alface em `carb`; (3) `mixed` NÃO troca (sem saber o papel, é chute); (4) dentro de `fat`, candidato com > 25% das kcal em carbo sai (separa requeijão de brigadeiro); (5) porção que encosta no clamp (10 g/1000 g) é recusada. Além disso, a adequação à refeição vem do HISTÓRICO (`mealContext`: em que refeições ele já comeu aquele alimento), não de lista fixa — e alimento sem histórico não é bloqueado, só não ganha preferência. **Ao mexer aqui, audite contra dados reais e LEIA as sugestões: os filtros mecânicos diziam "0 problemas" enquanto o motor sugeria trocas que ninguém faria.**
 
+**6ª lição da mesma classe: classe de macro certa não basta se o motor ignora o RESTO da refeição (22/09/2026).** Relato do dono: Ceia = "Leite desnatado" + "Clara de ovo cozida", e trocar a clara sugeria "Atum sólido ao natural", depois "Peito de frango" — proteína por proteína, classe certa, mas ninguém bebe leite ao lado de peixe/carne de prato. **Não era bug de classificação** — antes de corrigir, rodei o código real (`classifyFood`/`macrosPer100g`) com os dados do plano ATIVO do dono: o leite classificava `carb`, a clara/atum/frango classificavam `protein`, cada um na classe certa, e o filtro `classifyFood(c) === cls` já bloqueava troca entre classes. Faltava uma dimensão que nunca existiu: o motor nunca soube o que JÁ estava do lado.
+
+⚠️ **Armadilha de investigação que quase virou correção errada:** o print do dono mostrava "480g / 149 kcal / 14g P / 23g C" e o banco tinha "300g / 93 kcal / 9g P / 14,1g C" — valores DIFERENTES do mesmo item. Antes de desconfiar do banco, bati a conta: 300×1,6=480, 93×1,6=148,8≈149 — bate EXATO com o `FATOR_MAX=1.6` do reajuste automático (`ajusteAutomaticoDoDia.ts`, seção acima). O print era da tela com o reajuste aplicado (client-side, nunca persiste); o banco sempre esteve certo. A reescala é proporcional, então não muda a classe — só me fez perder tempo confirmando que os dois cálculos (300g e 480g) dão a MESMA classificação antes de seguir pra causa real.
+
+Correção: `isPlatedProtein` (`mealCoherence.ts`) identifica carne/peixe que pede panela e talher, por nome (mesmo padrão de `CONCENTRATED_SWEET`/`DRY_FOODS` do mesmo arquivo). `rankSwapOptions` ganhou `mealHasLiquid` em `SwapOptions`: quando a refeição já tem líquido (leite, iogurte...) e a classe é `protein`, o ranking desempata a favor de proteína rápida (whey, clara, queijo cottage) **antes** de carne/peixe — não BANE os pratos (o usuário pode não ter mais nada cadastrado), só reordena. Aplicado nos TRÊS chamadores de `rankSwapOptions`/`swapFood`: a troca manual (↻), a "Opção" oferecida embaixo do item, e `buildWeekFromDay` (a variação da semana) — esquecer um deixaria a classe viva em outro caminho, a mesma armadilha do `perSetMethodField` no treino.
+
 **O gerador de cardápio tinha o MESMO defeito de fonte — e ninguém percebeu porque o consertado foi o outro caminho.** O motor de TROCA migrou para `nutrition_meal_entries.items` em 03/08; o de GERAÇÃO (`food-profile.ts` → prompt do `dietGenerate`) ficou lendo o cru até 04/08/2026. Duas fontes erradas: (1) `nutrition_meal_entries.food_name` é o nome da REFEIÇÃO, então o prompt mandava "os alimentos que este usuário já come: Almoço (36×), Pós treino (21×), Janta (19×), Café da manhã (18×)…" — 13 dos 20 eram rótulo; (2) `nutrition_learned_foods` sem crivo. O modelo improvisava em cima disso e o dono recebeu um "Plano Cardioprotetor" com **whey 30 g e aveia 40 g secos** no café da manhã e pão francês no almoço. Hoje o repertório sai dos ITENS, passa pelo mesmo `foodItemSanity` da troca e vai ao prompt **agrupado por refeição** (`foodProfileToPromptSections`: "- Almoço: arroz, feijão, patinho") — é o agrupamento, não uma lista fixa, que impede pão com doce de leite de cair no almoço. **Ao tocar em qualquer coisa que alimente prompt de nutrição, cheque as DUAS pontas: o que a troca lê e o que a geração lê.**
 
 **Importar dieta: JSON é grátis, foto/PDF é VIP — `docs/IMPORT_DIETA.md`.**
@@ -1166,6 +1193,24 @@ antes de confiar num comentário que diz "isso já foi corrigido"** — é a
 mesma lição do `docs/DATA_MAP_workout_history.md`: a migration do repo pode
 estar atrás do banco, e aqui foi o inverso — o comentário estava na frente
 de uma correção que nunca chegou a acontecer.
+
+⚠️ **QUARTO acidente na mesma investigação, achado em 22/09/2026: mesmo com
+o trial concedido e os dois bugs acima corrigidos, o Jean CONTINUAVA vendo o
+import de ficha bloqueado.** `checkWorkoutImportAccess`
+(`utils/vip/workoutImportAccess.ts`) checava a feature `'analytics'` — que só
+é `true` no plano Elite (`applyTierCaps`, `utils/vip/limits.ts`) — por cópia
+indevida de `labExamsAccess.ts` (que usa `'lab_exams'`, `true` em TODO VIP)
+sem trocar a chave ao adaptar o padrão. Efeito: **todo usuário VIP Start ou
+Pro** (não só o Jean) caía no fallback "primeira ficha grátis" e via a 2ª
+importação bloqueada do mesmo jeito que quem não paga nada, mesmo com o plano
+ativo. Corrigido com uma chave PRÓPRIA (`workout_photo_import` em
+`VipTierLimits`, `true` em start/pro/elite, metering próprio — não reaproveita
+`lab_exams`, para não somar na cota diária de exames laboratoriais). Guard em
+`vipLimits.test.ts`/`workoutImportAccess.test.ts`. **A lição que passa deste
+caso e dos dois acima:** os quatro bugs empilhados no MESMO fluxo (trial não
+concedia → CHECK recusava → feature errada bloqueava mesmo com trial válido)
+só apareceram porque ninguém tinha testado o fluxo de VIP trial ponta a ponta
+antes — cada bug escondia o próximo.
 
 **Concedido retroativamente em 21/09/2026** (autorizado pelo dono) às 4
 contas reais afetadas — 14 dias de `vip_pro`, `provider='trial'`, com
