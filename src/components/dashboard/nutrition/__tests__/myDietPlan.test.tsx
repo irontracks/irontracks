@@ -671,6 +671,10 @@ describe('MyDietPlan — adicionar/tirar/mudar quantidade no lançamento (22/09/
     fireEvent.change(campo, { target: { value: '100' } })
     // Metade do arroz (200→100, 244→122 kcal) + frango intacto (207) = 329.
     await waitFor(() => expect(screen.getByRole('button', { name: /Jantar/ }).textContent).toContain('329 kcal'))
+    // A linha de macros do PRÓPRIO item também reflete a nova quantidade — não
+    // pode dizer "100g" no campo e continuar mostrando os macros de 200g embaixo.
+    expect(await screen.findByText('122 kcal')).toBeTruthy()
+    expect(screen.queryByText('244 kcal')).toBeNull()
   })
 
   it('adicionar um alimento avulso: chama a resolução compartilhada e soma no cabeçalho', async () => {
