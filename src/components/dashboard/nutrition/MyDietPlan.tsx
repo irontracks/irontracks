@@ -7,7 +7,7 @@ import { useDialog } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, type PlanMeal, type MacroTotals } from '@/lib/nutrition/dietPlanShape'
-import { refeicaoParaLancamento, type AjustesDoLancamento } from '@/lib/nutrition/ajusteDoLancamento'
+import { refeicaoParaLancamento, reescalarPlanItem, type AjustesDoLancamento } from '@/lib/nutrition/ajusteDoLancamento'
 import { resolveFoodForEditor } from '@/lib/nutrition/resolveFoodForEditor'
 import { useCustomFoods } from './useCustomFoods'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
@@ -637,6 +637,10 @@ export default function MyDietPlan({
                       const chaveAjuste = `${idx}-${j}`
                       const removido = itensRemovidosDesta.has(j)
                       const quantidadeEditadaBase = quantidadesEditadas[chaveAjuste]
+                      // Macros exibidos precisam refletir a quantidade EDITADA, não a
+                      // do plano — senão o campo diz "100g" e a linha de baixo continua
+                      // mostrando os macros de 250g, uma contradição visível na tela.
+                      const itemExibido = quantidadeEditadaBase !== undefined ? reescalarPlanItem(it, quantidadeEditadaBase) : it
                       return (
                       <div key={`${it.food}-${j}`} className={`px-2.5 py-2 ${removido ? 'opacity-50' : ''}`}>
                         <div className="flex items-baseline justify-between gap-2">
@@ -684,10 +688,10 @@ export default function MyDietPlan({
                           </span>
                         </div>
                         <div className={`mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400 ${trocado || removido ? 'line-through' : ''}`}>
-                          <span>{Math.round(num(it.calories))} kcal</span>
-                          <span className={trocado || removido ? '' : MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
-                          <span className={trocado || removido ? '' : MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
-                          <span className={trocado || removido ? '' : MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
+                          <span>{Math.round(num(itemExibido.calories))} kcal</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.protein.label}>P {Math.round(num(itemExibido.protein))}g</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.carbs.label}>C {Math.round(num(itemExibido.carbs))}g</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.fat.label}>G {Math.round(num(itemExibido.fat))}g</span>
                         </div>
 
                         {/* A segunda fonte de proteína, oferecida em vez de escondida
