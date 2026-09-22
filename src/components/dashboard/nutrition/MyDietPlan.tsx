@@ -363,6 +363,15 @@ export default function MyDietPlan({
 
   const mealsParaExibir = resultadoAjuste ? resultadoAjuste.refeicoes : (day?.meals ?? [])
 
+  /** Nomes (normalizados) das refeições que o reajuste automático tocou —
+   *  pedido do dono, 22/09/2026: sem isso, só o aviso do topo dizia o que
+   *  mudou, e sumia da vista ao rolar a lista. */
+  const refeicoesAjustadas = useMemo(() => {
+    const nomes = new Set<string>()
+    for (const a of resultadoAjuste?.ajustes ?? []) nomes.add(normalizeFoodKey(a.refeicao))
+    return nomes
+  }, [resultadoAjuste])
+
   if (loading || !row || !days.length) return null
   if (!day) return null
 
@@ -479,13 +488,14 @@ export default function MyDietPlan({
       <div className="space-y-2 px-4 pb-4">
         {mealsParaExibir.map((meal, idx) => {
           const applied = appliedIdx.has(idx) || lancamentosPorNome.has(normalizeFoodKey(meal.name))
+          const ajustada = refeicoesAjustadas.has(normalizeFoodKey(meal.name))
           const isOpen = openMeal === idx
           // O cabeçalho mostra o que vai ser lançado. Deixá-lo no total do plano
           // enquanto a carne trocada muda os macros faria a mesma tela dizer dois
           // números para o mesmo prato.
           const exibida = refeicaoComEscolhas(meal, escolhasDaRefeicao(idx))
           return (
-            <div key={`${meal.name}-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+            <div key={`${meal.name}-${idx}`} className={`rounded-xl bg-white/[0.02] overflow-hidden ${ajustada ? `border ${MACHINE_ACCENT.rule}` : 'border border-white/[0.06]'}`}>
               <button
                 type="button"
                 onClick={() => setOpenMeal(isOpen ? null : idx)}
@@ -493,7 +503,14 @@ export default function MyDietPlan({
                 className="flex w-full items-center justify-between gap-2 p-3 text-left transition active:bg-white/[0.03]"
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-white">{meal.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="block truncate text-sm font-semibold text-white">{meal.name}</span>
+                    {/* A régua lateral já marca o card; o ícone é para quem só olha
+                        de relance a lista fechada, sem abrir a refeição. */}
+                    {ajustada && (
+                      <span className={`shrink-0 text-xs ${MACHINE_ACCENT.icon}`} title="Ajustado automaticamente pelo Ajuste automático">🧠</span>
+                    )}
+                  </span>
                   {meal.time ? <span className="text-[10px] text-neutral-400">{meal.time}</span> : null}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">

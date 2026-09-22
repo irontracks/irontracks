@@ -695,6 +695,24 @@ provado por mutação: trocar `mealsParaExibir` de volta para `day.meals`
 (esquecer de usar o resultado ajustado) derruba o teste — o módulo puro
 isolado (`ajusteAutomaticoDoDia.test.ts`) não pegaria isso sozinho.
 
+**Indicador visual 🧠 na refeição tocada** (22/09/2026, pedido do dono): sem
+ele, só o aviso do topo dizia o que mudou, e sumia da vista ao rolar a lista —
+`refeicoesAjustadas` (Set derivado de `resultadoAjuste.ajustes`) marca o card
+fechado. Guard provado por mutação (fixar `ajustada = false` derruba o teste
+do ícone).
+
+⚠️ **Editar uma refeição JÁ lançada reajusta a próxima sozinho — confirmado,
+não presumido.** Pergunta do dono: se ele editar a janta depois de lançada
+(reduzir quantidade, tirar item), a refeição seguinte se ajusta sem ação
+extra? Sim, e não precisou de código novo — é a mesma arquitetura "derivado
+na leitura": `editEntryCore` (`lib/nutrition/mutations.ts`) recalcula os
+macros da entrada a partir da SOMA dos itens editados e grava; o
+`NutritionMixer` dispara `entriesTick` após o sucesso, que rebusca `entries`;
+`ajustarDia` roda de novo a cada render com o `entries` novo. Provado com um
+teste que troca `entries` via `rerender` (simulando o antes/depois da
+edição) — a Ceia, que não tinha sido tocada na 1ª leitura, absorve o
+carboidrato que sobrou assim que a Janta editada aparece no `entries`.
+
 **Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
 **Os 18,7° entre proteína e gordura — RESOLVIDO em 12/08/2026, e não trocando cor.** Proteína (`#fbbf24`, 43°) e gordura (`#f97316`, 25°) seguem abaixo dos 40° que a paleta exige de si mesma, e vão continuar: não há faixa de matiz livre (vermelho é ERRO, verde é sucesso, azul é carboidrato, violeta virou a cor da máquina). Mas a distância de matiz nunca foi o problema — **dois matizes próximos convivem enquanto não se TOCAM**. Os dois pontos onde encostavam: (1) no card de lançamento os segmentos são condicionais (`pct > 0`), então refeição sem carboidrato cola âmbar em laranja — o azul que "salvava" era acaso; (2) no `MacroBar` o vermelho de estouro era desenhado encostado no macro, e contra a gordura são **25°** — o alerta sussurrava justamente onde precisa gritar. `MACRO_SEGMENT_GAP_PX` (2px do fundo entre blocos) resolve os dois sem gastar matiz. Guards em `__tests__/macroBar.test.tsx`.
 
