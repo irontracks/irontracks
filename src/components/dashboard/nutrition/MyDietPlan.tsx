@@ -7,13 +7,16 @@ import { useDialog } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, type PlanMeal, type MacroTotals } from '@/lib/nutrition/dietPlanShape'
-import { refeicaoComEscolhas } from '@/lib/nutrition/escolhaDaProteina'
+import { refeicaoParaLancamento, type AjustesDoLancamento } from '@/lib/nutrition/ajusteDoLancamento'
+import { resolveFoodForEditor } from '@/lib/nutrition/resolveFoodForEditor'
+import { useCustomFoods } from './useCustomFoods'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { normalizeFoodKey } from '@/lib/nutrition/learned-foods'
 import { ajustarDia, type MacroAjustavel } from '@/lib/nutrition/ajusteAutomaticoDoDia'
 import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
 import HorariosDasRefeicoes from './HorariosDasRefeicoes'
+import { NumericInput } from '@/components/ui/NumericInput'
 import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
 /** O mínimo de uma entrada do diário que o reajuste automático precisa. */
@@ -75,6 +78,19 @@ export default function MyDietPlan({
    *  não muda, e a marca morre ao trocar de dia ou de data. */
   const [escolhidos, setEscolhidos] = useState<Set<string>>(new Set())
   const [rejected, setRejected] = useState<Record<string, string[]>>({})
+  /**
+   * Ajustes do LANÇAMENTO (22/09/2026, confirmado com o dono: só hoje, nunca
+   * o plano) — remover item, mudar quantidade, adicionar item avulso. Chave
+   * `mealIdx-itemIdx` para remoção/quantidade (paralela a `escolhidos`);
+   * `adicionadosPorRefeicao` é por `mealIdx` porque o item novo não tem
+   * índice no plano original.
+   */
+  const [itensRemovidos, setItensRemovidos] = useState<Set<string>>(new Set())
+  const [quantidadesEditadas, setQuantidadesEditadas] = useState<Record<string, number>>({})
+  const [adicionadosPorRefeicao, setAdicionadosPorRefeicao] = useState<Record<number, PlanItem[]>>({})
+  const [textoNovoItem, setTextoNovoItem] = useState<Record<number, string>>({})
+  const [adicionando, setAdicionando] = useState<number | null>(null)
+  const [erroAdicionar, setErroAdicionar] = useState<{ idx: number; msg: string } | null>(null)
   const [salvandoNota, setSalvandoNota] = useState<number | null>(null)
   /** Falha da gravação, presa à refeição que falhou — no topo da lista ela
    *  nasceria longe (ou fora) do campo que o usuário acabou de usar. */
@@ -94,6 +110,7 @@ export default function MyDietPlan({
     return () => { alive = false }
   }, [])
   const { settings, save } = useUserSettings(userId)
+  const { foods: customFoods } = useCustomFoods(userId)
   const autoAjusteLigado = Boolean(settings?.nutritionAutoAdjust)
   const [salvandoAjuste, setSalvandoAjuste] = useState(false)
   const alternarAutoAjuste = useCallback(async () => {
@@ -163,6 +180,12 @@ export default function MyDietPlan({
     // A escolha da proteína é do lançamento de UM dia. Sem zerar, marcar carne na
     // terça faria a quarta lançar carne sem a opção nem estar na tela.
     setEscolhidos(new Set())
+    // Mesma regra para os ajustes de lançamento (adicionar/remover/redimensionar
+    // item): são do dia visível, nunca do plano — ver `ajusteDoLancamento.ts`.
+    setItensRemovidos(new Set())
+    setQuantidadesEditadas({})
+    setAdicionadosPorRefeicao({})
+    setTextoNovoItem({})
   }, [dateKey, dayIndex])
 
   /*
@@ -222,11 +245,82 @@ export default function MyDietPlan({
     return mapa
   }, [escolhidos, alternativas])
 
+  /** Remoção/reescala/adição marcadas nesta refeição, para ESTE lançamento. */
+  const ajustesDaRefeicao = useCallback((mealIdx: number): AjustesDoLancamento => {
+    const removidos = new Set<number>()
+    for (const chave of itensRemovidos) {
+      const [m, i] = chave.split('-').map((n) => Number(n))
+      if (m === mealIdx && Number.isFinite(i)) removidos.add(i)
+    }
+    const quantidades = new Map<number, number>()
+    for (const [chave, valor] of Object.entries(quantidadesEditadas)) {
+      const [m, i] = chave.split('-').map((n) => Number(n))
+      if (m === mealIdx && Number.isFinite(i)) quantidades.set(i, valor)
+    }
+    return { removidos, quantidades, adicionados: adicionadosPorRefeicao[mealIdx] ?? [] }
+  }, [itensRemovidos, quantidadesEditadas, adicionadosPorRefeicao])
+
+  const alternarRemocaoDoItem = useCallback((mealIdx: number, itemIdx: number) => {
+    const chave = `${mealIdx}-${itemIdx}`
+    setItensRemovidos((prev) => {
+      const next = new Set(prev)
+      if (next.has(chave)) next.delete(chave)
+      else next.add(chave)
+      return next
+    })
+  }, [])
+
+  const mudarQuantidadeDoItem = useCallback((mealIdx: number, itemIdx: number, novoValor: number | null) => {
+    const chave = `${mealIdx}-${itemIdx}`
+    setQuantidadesEditadas((prev) => {
+      if (novoValor === null || !(novoValor > 0)) {
+        // Campo em branco durante a digitação não pode zerar o item — some do
+        // mapa de ajustes e a refeição volta a mostrar a gramatura original.
+        if (!(chave in prev)) return prev
+        const next = { ...prev }
+        delete next[chave]
+        return next
+      }
+      return { ...prev, [chave]: novoValor }
+    })
+  }, [])
+
+  const removerItemAdicionado = useCallback((mealIdx: number, itemIdx: number) => {
+    setAdicionadosPorRefeicao((prev) => {
+      const lista = prev[mealIdx] ?? []
+      return { ...prev, [mealIdx]: lista.filter((_, i) => i !== itemIdx) }
+    })
+  }, [])
+
+  const adicionarItem = useCallback(async (mealIdx: number) => {
+    const texto = String(textoNovoItem[mealIdx] ?? '').trim()
+    if (!texto) return
+    setAdicionando(mealIdx); setErroAdicionar(null)
+    try {
+      const res = await resolveFoodForEditor(texto, customFoods)
+      if (!res.ok) {
+        setErroAdicionar({ idx: mealIdx, msg: res.error || 'Não reconheci esse alimento.' })
+        return
+      }
+      const novos: PlanItem[] = res.items.map((it) => ({
+        food: it.label, grams: num(it.grams), calories: num(it.calories),
+        protein: num(it.protein), carbs: num(it.carbs), fat: num(it.fat),
+      }))
+      setAdicionadosPorRefeicao((prev) => ({ ...prev, [mealIdx]: [...(prev[mealIdx] ?? []), ...novos] }))
+      setTextoNovoItem((prev) => ({ ...prev, [mealIdx]: '' }))
+    } catch (e: unknown) {
+      setErroAdicionar({ idx: mealIdx, msg: getErrorMessage(e) || 'Falha ao adicionar.' })
+    } finally {
+      setAdicionando(null)
+    }
+  }, [textoNovoItem, customFoods])
+
   const applyMeal = useCallback(async (mealOriginal: PlanMeal, idx: number) => {
-    // Lança o que está NA TELA: se o usuário marcou a carne, o diário recebe a
-    // carne. Os totais saem do `refeicaoComEscolhas`, o mesmo que o cabeçalho da
-    // refeição exibe — card e diário não podem discordar em dois toques.
-    const meal = refeicaoComEscolhas(mealOriginal, escolhasDaRefeicao(idx))
+    // Lança o que está NA TELA: se o usuário marcou a carne, tirou o pimentão
+    // ou ajustou a gramatura, o diário recebe exatamente isso. Os totais saem
+    // de `refeicaoParaLancamento`, o mesmo que o cabeçalho da refeição exibe —
+    // card e diário não podem discordar em dois toques.
+    const meal = refeicaoParaLancamento(mealOriginal, escolhasDaRefeicao(idx), ajustesDaRefeicao(idx))
     if (applyingIdx !== null) return
     setApplyingIdx(idx); setError(null)
     try {
@@ -239,13 +333,20 @@ export default function MyDietPlan({
       )
       if (!res?.ok) { setError(String(res?.error || 'Falha ao lançar.')); return }
       setAppliedIdx((prev) => new Set(prev).add(idx))
+      // Ajustes já foram lançados — limpa só os DESTA refeição, para não
+      // arrastar "removido"/"quantidade editada" para o próximo dia (o plano
+      // volta a mostrar o item original, que é o que a próxima leitura de
+      // `entries` já reflete como lançado).
+      setItensRemovidos((prev) => new Set([...prev].filter((c) => !c.startsWith(`${idx}-`))))
+      setQuantidadesEditadas((prev) => Object.fromEntries(Object.entries(prev).filter(([c]) => !c.startsWith(`${idx}-`))))
+      setAdicionadosPorRefeicao((prev) => { const next = { ...prev }; delete next[idx]; return next })
       onApplied?.()
     } catch (e: unknown) {
       setError(getErrorMessage(e) || 'Falha ao lançar.')
     } finally {
       setApplyingIdx(null)
     }
-  }, [applyingIdx, dateKey, onApplied, escolhasDaRefeicao])
+  }, [applyingIdx, dateKey, onApplied, escolhasDaRefeicao, ajustesDaRefeicao])
 
   const swapItem = useCallback(async (mealIdx: number, itemIdx: number) => {
     if (swappingKey) return
@@ -493,7 +594,9 @@ export default function MyDietPlan({
           // O cabeçalho mostra o que vai ser lançado. Deixá-lo no total do plano
           // enquanto a carne trocada muda os macros faria a mesma tela dizer dois
           // números para o mesmo prato.
-          const exibida = refeicaoComEscolhas(meal, escolhasDaRefeicao(idx))
+          const exibida = refeicaoParaLancamento(meal, escolhasDaRefeicao(idx), ajustesDaRefeicao(idx))
+          const itensRemovidosDesta = ajustesDaRefeicao(idx).removidos
+          const itensAdicionadosDesta = adicionadosPorRefeicao[idx] ?? []
           return (
             <div key={`${meal.name}-${idx}`} className={`rounded-xl bg-white/[0.02] overflow-hidden ${ajustada ? `border ${MACHINE_ACCENT.rule}` : 'border border-white/[0.06]'}`}>
               <button
@@ -531,39 +634,68 @@ export default function MyDietPlan({
                       const chaveOpcao = `${idx}-${j}`
                       const opcao = alternativas[chaveOpcao]
                       const trocado = escolhidos.has(chaveOpcao)
+                      const chaveAjuste = `${idx}-${j}`
+                      const removido = itensRemovidosDesta.has(j)
+                      const quantidadeEditadaBase = quantidadesEditadas[chaveAjuste]
                       return (
-                      <div key={`${it.food}-${j}`} className="px-2.5 py-2">
+                      <div key={`${it.food}-${j}`} className={`px-2.5 py-2 ${removido ? 'opacity-50' : ''}`}>
                         <div className="flex items-baseline justify-between gap-2">
                           {/* Riscado, não apagado: o piso de contraste do app vale para o estado
-                              desativado também — quem escolheu a carne ainda precisa LER o que
-                              deixou de lado. */}
-                          <span className={`truncate text-xs ${trocado ? 'text-neutral-400 line-through' : 'text-white'}`}>{it.food}</span>
-                          <span className="flex shrink-0 items-center gap-1.5">
-                            <span className="text-xs font-semibold tabular-nums text-neutral-200">{Math.round(num(it.grams))}g</span>
+                              desativado também — quem escolheu a carne (ou tirou o item) ainda
+                              precisa LER o que deixou de lado. */}
+                          <span className={`truncate text-xs ${trocado || removido ? 'text-neutral-400 line-through' : 'text-white'}`}>{it.food}</span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            {removido ? (
+                              <span className="text-xs font-semibold tabular-nums text-neutral-400 line-through">{Math.round(num(it.grams))}g</span>
+                            ) : (
+                              <span className="flex items-center gap-0.5">
+                                <NumericInput
+                                  value={quantidadeEditadaBase ?? Math.round(num(it.grams))}
+                                  onValueChange={(v) => mudarQuantidadeDoItem(idx, j, v)}
+                                  decimal={false}
+                                  disabled={trocado}
+                                  aria-label={`Quantidade de ${it.food}, em gramas`}
+                                  className="tap-44 h-6 w-12 rounded-md border border-white/[0.08] bg-transparent px-1 text-right text-xs font-semibold tabular-nums text-neutral-200 disabled:opacity-30"
+                                />
+                                <span className="text-[10px] text-neutral-400">g</span>
+                              </span>
+                            )}
                             <button
                               type="button"
-                              onClick={() => swapItem(idx, j)}
-                              disabled={swappingKey !== null}
-                              title={`Trocar ${it.food} por outro parecido`}
-                              aria-label={`Trocar ${it.food}`}
-                              className="flex size-6 items-center justify-center rounded-md text-[11px] text-neutral-400 transition hover:bg-white/[0.08] hover:text-yellow-300 disabled:opacity-30"
+                              onClick={() => alternarRemocaoDoItem(idx, j)}
+                              title={removido ? `Manter ${it.food} no lançamento` : `Tirar ${it.food} deste lançamento`}
+                              aria-label={removido ? `Manter ${it.food}` : `Tirar ${it.food}`}
+                              className="flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] text-neutral-400 transition hover:bg-white/[0.08] hover:text-red-300"
                             >
-                              {swappingKey === `${dayIndex}-${idx}-${j}` ? '…' : '↻'}
+                              {removido ? '↺' : '🗑'}
                             </button>
+                            {!removido && (
+                              <button
+                                type="button"
+                                onClick={() => swapItem(idx, j)}
+                                disabled={swappingKey !== null}
+                                title={`Trocar ${it.food} por outro parecido`}
+                                aria-label={`Trocar ${it.food}`}
+                                className="flex size-6 items-center justify-center rounded-md text-[11px] text-neutral-400 transition hover:bg-white/[0.08] hover:text-yellow-300 disabled:opacity-30"
+                              >
+                                {swappingKey === `${dayIndex}-${idx}-${j}` ? '…' : '↻'}
+                              </button>
+                            )}
                           </span>
                         </div>
-                        <div className={`mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400 ${trocado ? 'line-through' : ''}`}>
+                        <div className={`mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400 ${trocado || removido ? 'line-through' : ''}`}>
                           <span>{Math.round(num(it.calories))} kcal</span>
-                          <span className={trocado ? '' : MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
-                          <span className={trocado ? '' : MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
-                          <span className={trocado ? '' : MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
+                          <span className={trocado || removido ? '' : MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
                         </div>
 
                         {/* A segunda fonte de proteína, oferecida em vez de escondida
                             atrás de um toque: a decisão "hoje é frango ou carne?" se
                             toma olhando as duas. Escolher aqui vale para o LANÇAMENTO;
-                            o plano só muda pelo ↻. */}
-                        {opcao && (
+                            o plano só muda pelo ↻. Some quando o item foi TIRADO — não
+                            faz sentido oferecer opção de algo que não vai ser lançado. */}
+                        {opcao && !removido && (
                           <button
                             type="button"
                             onClick={() => setEscolhidos((prev) => {
@@ -599,7 +731,61 @@ export default function MyDietPlan({
                       </div>
                       )
                     })}
+
+                    {/* Itens avulsos adicionados só para ESTE lançamento — não
+                        entram no plano, mesma regra da remoção/quantidade. */}
+                    {itensAdicionadosDesta.map((it, j) => (
+                      <div key={`novo-${it.food}-${j}`} className="px-2.5 py-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-xs text-white">{it.food}</span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="text-xs font-semibold tabular-nums text-neutral-200">{Math.round(num(it.grams))}g</span>
+                            <button
+                              type="button"
+                              onClick={() => removerItemAdicionado(idx, j)}
+                              title={`Tirar ${it.food}`}
+                              aria-label={`Tirar ${it.food}`}
+                              className="flex size-6 items-center justify-center rounded-md text-[11px] text-neutral-400 transition hover:bg-white/[0.08] hover:text-red-300"
+                            >
+                              🗑
+                            </button>
+                          </span>
+                        </div>
+                        <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
+                          <span>{Math.round(num(it.calories))} kcal</span>
+                          <span className={MACRO_SURFACES.protein.label}>P {Math.round(num(it.protein))}g</span>
+                          <span className={MACRO_SURFACES.carbs.label}>C {Math.round(num(it.carbs))}g</span>
+                          <span className={MACRO_SURFACES.fat.label}>G {Math.round(num(it.fat))}g</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+
+                  {/* Adicionar um alimento avulso a ESTE lançamento — mesma cadeia
+                      de reconhecimento de texto do diário (parser → base → IA). */}
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      inputMode="text"
+                      aria-label={`Adicionar alimento a ${meal.name}`}
+                      value={textoNovoItem[idx] ?? ''}
+                      onChange={(e) => setTextoNovoItem((prev) => ({ ...prev, [idx]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void adicionarItem(idx) } }}
+                      placeholder="Adicionar alimento (ex.: 100g batata doce)"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 text-xs text-white placeholder:text-neutral-400 focus:border-yellow-500/40 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void adicionarItem(idx)}
+                      disabled={adicionando === idx || !String(textoNovoItem[idx] ?? '').trim()}
+                      className="tap-44 h-8 shrink-0 rounded-lg bg-white/[0.06] px-2.5 text-[11px] font-bold text-white transition hover:bg-white/[0.1] disabled:opacity-40"
+                    >
+                      {adicionando === idx ? '...' : '+ Add'}
+                    </button>
+                  </div>
+                  {erroAdicionar?.idx === idx && (
+                    <p className="mt-1 text-[10px] text-red-300">{erroAdicionar.msg}</p>
+                  )}
 
                   <CampoDeNotaDaRefeicao
                     nota={meal.note ?? ''}
