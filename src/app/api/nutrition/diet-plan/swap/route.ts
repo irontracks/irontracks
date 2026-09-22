@@ -9,6 +9,7 @@ import { buildSwapCandidates } from '@/lib/nutrition/swapCandidates'
 import { buildUserFoodMealMap } from '@/lib/nutrition/mealItemFoods'
 import { mealGroupOf } from '@/lib/nutrition/mealContext'
 import { swapFood } from '@/lib/nutrition/foodSwap'
+import { isLiquidVehicle } from '@/lib/nutrition/mealCoherence'
 import { planDays, type PlanDay, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
 
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,9 @@ export async function POST(req: Request) {
       // Nome da refeição ("Almoço", "Café da Manhã") decide o que cabe ali.
       mealGroup: mealGroupOf(meal.name),
       foodMealMap,
+      // Ceia com "Leite" + "Clara de ovo": trocar a clara não pode priorizar
+      // atum/frango só porque bateu o macro. Ver SwapOptions.mealHasLiquid.
+      mealHasLiquid: meal.items.some((i) => isLiquidVehicle(i.food)),
     })
     if (!swapped) {
       return NextResponse.json({ ok: false, error: 'no_alternative' }, { status: 409 })

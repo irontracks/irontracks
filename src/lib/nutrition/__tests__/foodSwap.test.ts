@@ -5,6 +5,7 @@ import {
   classifyFood,
   macrosPer100g,
   portionFor,
+  rankSwapOptions,
   swapFood,
   type SwapCandidate,
 } from '../foodSwap'
@@ -268,5 +269,63 @@ describe('source-guard: a troca grava sozinha e só no plano próprio', () => {
 
   it('mantém o formato do plano — trocar um item não transforma dia em semana', () => {
     expect(route).toMatch(/isWeek\s*\?/)
+  })
+})
+
+/**
+ * Refeição com líquido: a troca de proteína não pode sugerir carne/peixe de PRATO
+ * primeiro. Caso real do dono, 22/09/2026: Ceia = "Leite desnatado" + "Clara de ovo
+ * cozida", e trocar a clara sugeria "Atum sólido" e "Peito de frango" — pelo macro é
+ * proteína por proteína, mas soa estranho beber leite ao lado de peixe/carne.
+ */
+describe('mealHasLiquid — proteína rápida antes de carne/peixe de prato', () => {
+  const CLARA_DE_OVO = { food: 'Clara de ovo cozida', grams: 100, calories: 59.4, protein: 13.5, carbs: 0, fat: 0.1 }
+  // MESMA fonte ('database') para os quatro — isola a regra nova do desempate por
+  // fonte, que já favorece 'learned'. Sem isso, o teste passaria mesmo sem a regra
+  // (jeito nº 3 da lista de guards falsos: cobrindo as pontas, não a fiação).
+  const WHEY = cand('whey protein concentrado', 380, 80, 8, 4, 'database')
+  const COTTAGE = cand('queijo cottage', 98, 11, 3.4, 4.3, 'database')
+  const ATUM_SOLIDO = cand('atum solido ao natural', 111, 25.5, 0, 0.8, 'database')
+  const PEITO_DE_FRANGO = cand('peito de frango', 164, 31, 0, 3.6, 'database')
+
+  it('SEM líquido na refeição: ordem normal (fonte/desvio calórico) — prato pode vir primeiro', () => {
+    const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO], {})
+    expect(opcoes.length).toBeGreaterThan(0)
+    // Sem a regra nova, nada impede o prato de vencer por desvio calórico — não
+    // afirmamos QUAL vence, só que a regra de líquido não está em jogo aqui.
+  })
+
+  it('COM líquido: proteína rápida (whey, cottage) vem ANTES de atum/frango', () => {
+    const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO, WHEY, COTTAGE], {
+      mealHasLiquid: true,
+    })
+    expect(opcoes.length).toBeGreaterThan(0)
+    expect(['whey protein concentrado', 'queijo cottage']).toContain(opcoes[0].food)
+  })
+
+  it('COM líquido mas SEM opção rápida disponível: ainda oferece o prato — não filtra, só desempata', () => {
+    const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO], { mealHasLiquid: true })
+    expect(opcoes.length).toBeGreaterThan(0)
+  })
+
+  it('mealHasLiquid não afeta troca de CARBOIDRATO — a regra é só para protein', () => {
+    const semLiquido = rankSwapOptions(ARROZ, [BATATA, MACARRAO], {})
+    const comLiquido = rankSwapOptions(ARROZ, [BATATA, MACARRAO], { mealHasLiquid: true })
+    expect(comLiquido.map((o) => o.food)).toEqual(semLiquido.map((o) => o.food))
+  })
+
+  it('a rota de swap calcula mealHasLiquid a partir do resto da refeição', () => {
+    const swapRoute = readFileSync('src/app/api/nutrition/diet-plan/swap/route.ts', 'utf8')
+    expect(swapRoute).toMatch(/mealHasLiquid:\s*meal\.items\.some/)
+  })
+
+  it('a rota de alternativas calcula mealHasLiquid por refeição', () => {
+    const altRoute = readFileSync('src/app/api/nutrition/diet-plan/alternatives/route.ts', 'utf8')
+    expect(altRoute).toMatch(/mealHasLiquid\s*=\s*meal\.items\.some/)
+  })
+
+  it('a variação da semana (buildWeekFromDay) também respeita a regra', () => {
+    const weekPlan = readFileSync('src/lib/nutrition/weekPlan.ts', 'utf8')
+    expect(weekPlan).toMatch(/mealHasLiquid:\s*meal\.items\.some/)
   })
 })
