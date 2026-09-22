@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction, resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import type { UserStats } from '@/lib/nutrition/goals'
 import { computeGoalsForPhase, type NutritionPhase } from '@/lib/nutrition/phase'
 import { saveNutritionPhase } from '@/actions/nutrition-actions'
 import PhaseSelector from './PhaseSelector'
 import { analyzeMeal } from '@/lib/nutrition/parser'
+import { resolveFoodForEditor as resolveFoodForEditorCore } from '@/lib/nutrition/resolveFoodForEditor'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
 import { Sparkles, SlidersHorizontal, X, Camera, Library, Droplet, Plus, Bot, UtensilsCrossed, ScanBarcode, Moon, Flame, Clapperboard, Mic, Square, ClipboardPaste } from 'lucide-react'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
@@ -434,50 +435,14 @@ export default function NutritionMixer({
     [userId, schemaMissing, currentDateKey, waterMl],
   )
 
-  // Resolve um texto de alimento → item(s) pro editor de refeição:
-  // parser local (base + biblioteca) → resolveFood (TACO/OFF) → IA (VIP).
-  // Offline usa só o parser local.
-  const resolveFoodForEditor = useCallback(async (
-    text: string,
-  ): Promise<{ ok: true; items: MealItemView[] } | { ok: false; error?: string; needsAi?: boolean }> => {
-    const t = String(text || '').trim()
-    if (!t) return { ok: false, error: 'Digite um alimento.' }
-
-    // 1. parser local (instantâneo)
-    try {
-      const extra = customFoodsToExtraFoods(Array.isArray(effectiveCustomFoods) ? effectiveCustomFoods : [])
-      const a = analyzeMeal(t, extra)
-      if (a.items.length > 0 && a.unknownLines.length === 0) {
-        return { ok: true, items: a.items.map((it) => ({ label: it.label, grams: it.grams, calories: it.calories, protein: it.protein, carbs: it.carbs, fat: it.fat })) }
-      }
-    } catch { /* cai pro servidor */ }
-
-    if (isOffline()) return { ok: false, error: 'Sem internet pra reconhecer esse alimento.' }
-
-    // 2. servidor: resolveFood (base/TACO/learned/custom/OFF)
-    try {
-      const res = await resolveFoodItemsAction(t)
-      if (res?.ok && Array.isArray(res.items) && res.items.length > 0) {
-        return { ok: true, items: res.items as MealItemView[] }
-      }
-      if (!(res as Record<string, unknown>)?.needsAi) {
-        return { ok: false, error: String((res as Record<string, unknown>)?.error || 'Não reconheci esse alimento.') }
-      }
-    } catch { /* tenta IA */ }
-
-    // 3. IA (VIP)
-    try {
-      const ai = await estimateFoodAction(t)
-      const aiObj = ai as Record<string, unknown>
-      if (ai?.ok && aiObj?.item) {
-        return { ok: true, items: [aiObj.item as MealItemView] }
-      }
-      const upgrade = Boolean(aiObj?.upgradeRequired) || String(aiObj?.error || '') === 'vip_required'
-      return { ok: false, error: upgrade ? 'Estimativa por IA é do plano VIP.' : 'Não reconheci esse alimento.' }
-    } catch {
-      return { ok: false, error: 'Falha ao adicionar.' }
-    }
-  }, [effectiveCustomFoods])
+  // Resolve um texto de alimento → item(s) pro editor de refeição. Fiação
+  // real em `lib/nutrition/resolveFoodForEditor.ts` (compartilhada com o
+  // editor do plano alimentar, `MyDietPlan.tsx`) — este wrapper só injeta a
+  // biblioteca do usuário, que aqui vem de um hook e lá de outro.
+  const resolveFoodForEditor = useCallback(
+    (text: string) => resolveFoodForEditorCore(text, Array.isArray(effectiveCustomFoods) ? effectiveCustomFoods : []),
+    [effectiveCustomFoods],
+  )
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const safeEntries = Array.isArray(entries) ? entries : []

@@ -33,6 +33,16 @@ vi.mock('@/hooks/useUserSettings', () => ({
     save: vi.fn(async () => ({ ok: true })),
   }),
 }))
+vi.mock('../useCustomFoods', () => ({
+  useCustomFoods: () => ({ foods: [] }),
+}))
+
+// Controlável por teste: o que "adicionar alimento" resolve. Default: erro
+// (nenhum teste que não seja de adicionar deveria bater aqui).
+let resolveFoodMock = vi.fn(async () => ({ ok: false, error: 'não usado neste teste' }))
+vi.mock('@/lib/nutrition/resolveFoodForEditor', () => ({
+  resolveFoodForEditor: (...args: unknown[]) => resolveFoodMock(...(args as [])),
+}))
 
 import MyDietPlan from '../MyDietPlan'
 
@@ -522,8 +532,9 @@ describe('MyDietPlan — reajuste automático (fiação real, não só o módulo
     render(<MyDietPlan dateKey="2026-08-03" canApply entries={ENTRIES_COM_DESVIO} />)
     fireEvent.click(await screen.findByRole('button', { name: /Janta/ }))
     expect(await screen.findByText('Carne moída magra')).toBeTruthy()
-    // 200g originais, sem ajuste — o toggle está desligado.
-    expect(screen.getByText('Arroz branco cozido').closest('div')?.parentElement?.textContent).toContain('200g')
+    // 200g originais, sem ajuste — o toggle está desligado. Quantidade agora é
+    // campo editável (NumericInput), não texto puro — o valor mora no input.
+    expect(screen.getByLabelText('Quantidade de Arroz branco cozido, em gramas')).toHaveValue('200')
     expect(screen.queryByText(/Reequilibrei/i)).toBeNull()
   })
 
@@ -534,9 +545,10 @@ describe('MyDietPlan — reajuste automático (fiação real, não só o módulo
 
     expect(await screen.findByText(/Reequilibrei seu dia/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Janta/ }))
-    const linhaDoArroz = await screen.findByText('Arroz branco cozido')
+    await screen.findByText('Arroz branco cozido')
     // Mais que os 200g originais — absorveu o carboidrato que sobrou no almoço.
-    expect(linhaDoArroz.closest('div')?.parentElement?.textContent).not.toContain('200g')
+    // Quantidade é campo editável (NumericInput); o valor mora no input, não no texto.
+    expect(screen.getByLabelText('Quantidade de Arroz branco cozido, em gramas')).not.toHaveValue('200')
   })
 
   it('LIGADO: refeição JÁ lançada nunca aparece alterada, mesmo se o toggle estiver ligado', async () => {
@@ -546,9 +558,9 @@ describe('MyDietPlan — reajuste automático (fiação real, não só o módulo
     await screen.findByText(/Reequilibrei seu dia/i)
 
     fireEvent.click(screen.getByRole('button', { name: /Almoço/ }))
-    const linhaDoArroz = await screen.findByText('Arroz branco cozido')
+    await screen.findByText('Arroz branco cozido')
     // O almoço é a refeição JÁ lançada — continua com os 200g do plano.
-    expect(linhaDoArroz.closest('div')?.parentElement?.textContent).toContain('200g')
+    expect(screen.getByLabelText('Quantidade de Arroz branco cozido, em gramas')).toHaveValue('200')
   })
 
   it('LIGADO: a refeição ajustada mostra o indicador 🧠 na lista fechada; as demais não', async () => {
@@ -604,7 +616,132 @@ describe('MyDietPlan — reajuste automático (fiação real, não só o módulo
     // refeição, ainda não lançada) absorve o carboidrato que sobrou.
     expect(await screen.findByText(/Reequilibrei seu dia/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Ceia/ }))
-    const linhaDaAveia = await screen.findByText('Aveia')
-    expect(linhaDaAveia.closest('div')?.parentElement?.textContent).not.toContain('100g')
+    await screen.findByText('Aveia')
+    expect(screen.getByLabelText('Quantidade de Aveia, em gramas')).not.toHaveValue('100')
+  })
+})
+
+describe('MyDietPlan — adicionar/tirar/mudar quantidade no lançamento (22/09/2026)', () => {
+  beforeEach(() => {
+    applyMealMock.mockClear()
+    nutritionAutoAdjustMock = false
+    resolveFoodMock = vi.fn(async () => ({ ok: false, error: 'não usado neste teste' }))
+  })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  const itemJanta = (food: string, grams: number, protein: number, carbs: number, fat: number) =>
+    ({ food, grams, calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat })
+
+  // Arroz 244 kcal + Frango 207 kcal = 451 kcal.
+  const PLANO_JANTA = {
+    id: 'p5',
+    plan_name: 'Minha dieta',
+    plan_kind: 'day',
+    meals: [
+      { name: 'Jantar', items: [itemJanta('Arroz branco cozido', 200, 5, 56, 0), itemJanta('Frango grelhado', 150, 45, 0, 3)] },
+    ],
+    days: null,
+  }
+
+  it('tirar um item: some da lista, os totais do cabeçalho descontam ele, e o toque seguinte devolve', async () => {
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Frango grelhado')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Frango grelhado' }))
+    // Riscado, não some da tela — mesma regra de "trocado" (o usuário precisa
+    // continuar LENDO o que deixou de lado).
+    expect(screen.getByText('Frango grelhado').className).toContain('line-through')
+    // O cabeçalho da refeição (fechado por trás do botão) já reflete o desconto.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Jantar/ }).textContent).toContain('244 kcal'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manter Frango grelhado' }))
+    expect(screen.getByText('Frango grelhado').className).not.toContain('line-through')
+    await waitFor(() => expect(screen.getByRole('button', { name: /Jantar/ }).textContent).toContain('451 kcal'))
+  })
+
+  it('mudar a quantidade: reescala os macros do item e o cabeçalho', async () => {
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Arroz branco cozido')
+
+    const campo = screen.getByLabelText('Quantidade de Arroz branco cozido, em gramas')
+    fireEvent.change(campo, { target: { value: '100' } })
+    // Metade do arroz (200→100, 244→122 kcal) + frango intacto (207) = 329.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Jantar/ }).textContent).toContain('329 kcal'))
+  })
+
+  it('adicionar um alimento avulso: chama a resolução compartilhada e soma no cabeçalho', async () => {
+    resolveFoodMock = vi.fn(async (texto: string) => {
+      expect(texto).toBe('100g brócolis cozido')
+      return { ok: true, items: [{ label: 'Brócolis cozido', grams: 100, calories: 40, protein: 3, carbs: 7, fat: 0 }] }
+    })
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Arroz branco cozido')
+
+    fireEvent.change(screen.getByLabelText('Adicionar alimento a Jantar'), { target: { value: '100g brócolis cozido' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+
+    expect(await screen.findByText('Brócolis cozido')).toBeTruthy()
+    // 451 (plano) + 40 (brócolis) = 491.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Jantar/ }).textContent).toContain('491 kcal'))
+    expect(resolveFoodMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('erro ao adicionar (alimento não reconhecido) mostra a mensagem, sem quebrar a tela', async () => {
+    resolveFoodMock = vi.fn(async () => ({ ok: false, error: 'Não reconheci esse alimento.' }))
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Arroz branco cozido')
+
+    fireEvent.change(screen.getByLabelText('Adicionar alimento a Jantar'), { target: { value: 'xyzabc123' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+
+    expect(await screen.findByText('Não reconheci esse alimento.')).toBeTruthy()
+  })
+
+  it('o item adicionado só entra no lançamento — some ao tirar antes de lançar', async () => {
+    resolveFoodMock = vi.fn(async () => ({
+      ok: true, items: [{ label: 'Brócolis cozido', grams: 100, calories: 40, protein: 3, carbs: 7, fat: 0 }],
+    }))
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Arroz branco cozido')
+
+    fireEvent.change(screen.getByLabelText('Adicionar alimento a Jantar'), { target: { value: '100g brócolis cozido' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+    await screen.findByText('Brócolis cozido')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Brócolis cozido' }))
+    await waitFor(() => expect(screen.queryByText('Brócolis cozido')).toBeNull())
+  })
+
+  it('lançar a refeição manda os itens exatamente como ajustados na tela (remoção + adição juntas)', async () => {
+    resolveFoodMock = vi.fn(async () => ({
+      ok: true, items: [{ label: 'Brócolis cozido', grams: 100, calories: 40, protein: 3, carbs: 7, fat: 0 }],
+    }))
+    mockFetch(PLANO_JANTA)
+    render(<MyDietPlan dateKey="2026-08-03" canApply />)
+    fireEvent.click(await screen.findByRole('button', { name: /Jantar/ }))
+    await screen.findByText('Frango grelhado')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar Frango grelhado' }))
+    fireEvent.change(screen.getByLabelText('Adicionar alimento a Jantar'), { target: { value: '100g brócolis cozido' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }))
+    await screen.findByText('Brócolis cozido')
+
+    fireEvent.click(screen.getByRole('button', { name: '✚ Lançar refeição' }))
+    await waitFor(() => expect(applyMealMock).toHaveBeenCalled())
+    const [, , itensLancados] = applyMealMock.mock.calls[0] as [unknown, unknown, Array<{ label: string }>]
+    const nomes = itensLancados.map((it) => it.label)
+    expect(nomes).toContain('Arroz branco cozido')
+    expect(nomes).toContain('Brócolis cozido')
+    expect(nomes).not.toContain('Frango grelhado') // tirado — não pode ir pro diário
   })
 })
