@@ -550,4 +550,61 @@ describe('MyDietPlan — reajuste automático (fiação real, não só o módulo
     // O almoço é a refeição JÁ lançada — continua com os 200g do plano.
     expect(linhaDoArroz.closest('div')?.parentElement?.textContent).toContain('200g')
   })
+
+  it('LIGADO: a refeição ajustada mostra o indicador 🧠 na lista fechada; as demais não', async () => {
+    nutritionAutoAdjustMock = true
+    mockFetch(PLANO_COM_CARBO)
+    render(<MyDietPlan dateKey="2026-08-03" canApply entries={ENTRIES_COM_DESVIO} />)
+    await screen.findByText(/Reequilibrei seu dia/i)
+
+    const cardDaJanta = screen.getByRole('button', { name: /Janta/ })
+    const cardDoAlmoco = screen.getByRole('button', { name: /Almoço/ })
+    expect(cardDaJanta.textContent).toContain('🧠')
+    expect(cardDoAlmoco.textContent).not.toContain('🧠')
+  })
+
+  it('LIGADO: editar a refeição JÁ lançada (entries muda) recalcula o ajuste sozinho, sem ação extra', async () => {
+    // Cenário do dono: lançou a janta, depois editou (reduziu quantidade,
+    // tirou um item) — a pergunta é se a PRÓXIMA refeição se reajusta
+    // sozinha. A resposta está na arquitetura: nada aqui é persistido, o
+    // ajuste é recalculado toda vez que `entries` muda — e `entries` É o
+    // diário de verdade, atualizado pelo NutritionMixer após qualquer edição.
+    nutritionAutoAdjustMock = true
+    const planoTresRefeicoes = {
+      id: 'p4',
+      plan_name: 'Minha dieta',
+      plan_kind: 'day',
+      meals: [
+        { name: 'Almoço', items: [itemPuro('Arroz branco cozido', 200, 0, 56, 0)] },
+        { name: 'Janta', items: [itemPuro('Arroz branco cozido', 200, 0, 56, 0)] },
+        { name: 'Ceia', items: [itemPuro('Aveia', 100, 0, 60, 0)] },
+      ],
+      days: null,
+    }
+    mockFetch(planoTresRefeicoes)
+
+    // 1ª leitura: Almoço e Janta lançados EXATAMENTE como o plano — sem desvio.
+    const entriesAntesDaEdicao = [
+      { food_name: 'Almoço', calories: 224, protein: 0, carbs: 56, fat: 0 },
+      { food_name: 'Janta', calories: 224, protein: 0, carbs: 56, fat: 0 },
+    ]
+    const { rerender } = render(<MyDietPlan dateKey="2026-08-03" canApply entries={entriesAntesDaEdicao} />)
+    await screen.findByText('Ceia')
+    expect(screen.queryByText(/Reequilibrei/i)).toBeNull()
+
+    // 2ª leitura: o usuário EDITOU a janta (reduziu o arroz) — simula a nova
+    // versão de `entries` que o NutritionMixer traria após o refetch.
+    const entriesDepoisDaEdicao = [
+      entriesAntesDaEdicao[0],
+      { food_name: 'Janta', calories: 112, protein: 0, carbs: 28, fat: 0 },
+    ]
+    rerender(<MyDietPlan dateKey="2026-08-03" canApply entries={entriesDepoisDaEdicao} />)
+
+    // Sem tocar em nada além de passar o `entries` novo, a Ceia (a PRÓXIMA
+    // refeição, ainda não lançada) absorve o carboidrato que sobrou.
+    expect(await screen.findByText(/Reequilibrei seu dia/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Ceia/ }))
+    const linhaDaAveia = await screen.findByText('Aveia')
+    expect(linhaDaAveia.closest('div')?.parentElement?.textContent).not.toContain('100g')
+  })
 })
