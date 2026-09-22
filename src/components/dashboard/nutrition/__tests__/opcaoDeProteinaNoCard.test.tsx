@@ -21,6 +21,14 @@ vi.mock('@/contexts/DialogContext', () => ({
 vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
   applyGeneratedMealAction: (...args: unknown[]) => applyMealMock(...(args as [])),
 }))
+// O reajuste automático (feature separada) precisa de userId/settings — mock
+// mínimo para não quebrar a suíte deste arquivo, que não testa aquela feature.
+vi.mock('@/utils/supabase/client', () => ({
+  createClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user-teste' } } }) } }),
+}))
+vi.mock('@/hooks/useUserSettings', () => ({
+  useUserSettings: () => ({ settings: { nutritionAutoAdjust: false }, save: vi.fn(async () => ({ ok: true })) }),
+}))
 
 import MyDietPlan from '../MyDietPlan'
 

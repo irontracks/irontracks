@@ -1290,6 +1290,7 @@ export default function NutritionMixer({
         dateKey={currentDateKey}
         canApply={isToday}
         onApplied={() => setEntriesTick(v => v + 1)}
+        entries={entries}
       />
 
       {/* O gerador de dieta saiu daqui — virou uma ação dentro do card

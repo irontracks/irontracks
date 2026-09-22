@@ -651,6 +651,50 @@ de 596 linhas.
 
 **Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`) — hoje pelo **`userSnapshot`** (ver abaixo), não cada uma por conta. Ao mexer em meta/nutrição, ajuste as DUAS. **O overlay renderiza o MESMO `NutritionMixer`** — ou seja, todo card da página existe também no app nativo; a exceção continua sendo a navegação até a página, que só a web tem.
 
+**Reajuste automático das refeições — `lib/nutrition/ajusteAutomaticoDoDia.ts`
+(22/09/2026).** Pedido do dono: hoje o plano é fixo por refeição, e desviar
+(comer menos arroz no almoço) simplesmente perde a diferença — a meta do dia
+fica "errada" sem chance de recuperar. Interruptor em `user_settings.preferences.nutritionAutoAdjust`
+(default desligado). Ligado: ao lançar uma refeição do plano, o app compara
+planejado × lançado por macro e empurra a diferença pra dentro das refeições
+do MESMO DIA que ainda não foram lançadas — sobrou carbo no almoço, a janta
+ganha mais arroz.
+
+Três decisões de produto, todas confirmadas com o dono, e todas viram trava
+no código (não é preciso reabrir nenhuma sem fato novo):
+- **Só dentro do mesmo dia** — a meta do app é DIÁRIA, não semanal (não
+  existe "meta da semana" em lugar nenhum do sistema hoje). Redistribuir
+  pela semana é escopo maior, fora desta v1.
+- **NUNCA mexe numa refeição já lançada** — "não tem como ele vomitar a
+  comida que já mandou pra dentro". `ajustarDia` só toca nos índices SEM
+  lançamento; quem chama usa `entries` do dia (o diário de verdade) pra
+  decidir o que já foi lançado, nunca o `appliedIdx` local (que é só o "✓"
+  desta sessão da tela e reseta ao trocar de dia).
+- **Puro, sem persistência** — `ajustarDia(plano, lançamentos)` é chamada
+  toda vez que a tela renderiza; nada é gravado. Mesmo princípio do
+  `userSnapshot`: derivado na leitura nunca fica velho, e por isso o
+  reajuste funciona mesmo em plano PRESCRITO pelo professor sem tocar no
+  documento que ele escreveu — o ajuste é só na tela do aluno.
+
+**A classificação de papel do item (carbo/proteína/gordura) é a MESMA do
+motor de troca** (`classifyFood`/`macrosPer100g` de `foodSwap.ts`) — sem
+isso, o excedente de carboidrato podia ir parar num item de proteína.
+Teto de variação por item: 0,5×–1,6× o tamanho original (mesma lógica de
+bom senso de outras travas do app — sem teto, um dia sem registrar nada
+faria o item seguinte virar uma montanha de comida).
+
+⚠️ **v1 resolve num item só por macro, na primeira refeição pendente
+compatível — não espalha por múltiplos itens/refeições.** Simplificação
+consciente pra cobrir o caso comum sem a complexidade de um solver
+completo; o que não cabe no teto vira `saldoNaoAbsorvido`, reportado mas
+não perseguido além disso. Evoluir para múltiplos itens é trabalho à
+parte, se a experiência mostrar que falta.
+
+Guard de fiação em `myDietPlan.test.tsx` (describe "reajuste automático"),
+provado por mutação: trocar `mealsParaExibir` de volta para `day.meals`
+(esquecer de usar o resultado ajustado) derruba o teste — o módulo puro
+isolado (`ajusteAutomaticoDoDia.test.ts`) não pegaria isso sozinho.
+
 **Cor de macronutriente tem fonte única: `lib/nutrition/macroColors.ts`** (âmbar/azul/laranja + `MACRO_SURFACES` para blocos). Nasceu porque a mesma decisão estava escrita TRÊS vezes, diferente em cada lugar, e duas conviviam na mesma tela: o carboidrato era azul no card Macronutrientes e amarelo no de Lançamentos, e a gordura usava `#ef4444` — a cor de ERRO do app —, então 23 g de gordura pintavam um bloco inteiro de vermelho. **Vermelho é só estouro de meta** (`MACRO_OVER_COLOR`). Guard em `__tests__/nutritionEntryCard.test.tsx` reprova hex de macro dentro de componente.
 **Os 18,7° entre proteína e gordura — RESOLVIDO em 12/08/2026, e não trocando cor.** Proteína (`#fbbf24`, 43°) e gordura (`#f97316`, 25°) seguem abaixo dos 40° que a paleta exige de si mesma, e vão continuar: não há faixa de matiz livre (vermelho é ERRO, verde é sucesso, azul é carboidrato, violeta virou a cor da máquina). Mas a distância de matiz nunca foi o problema — **dois matizes próximos convivem enquanto não se TOCAM**. Os dois pontos onde encostavam: (1) no card de lançamento os segmentos são condicionais (`pct > 0`), então refeição sem carboidrato cola âmbar em laranja — o azul que "salvava" era acaso; (2) no `MacroBar` o vermelho de estouro era desenhado encostado no macro, e contra a gordura são **25°** — o alerta sussurrava justamente onde precisa gritar. `MACRO_SEGMENT_GAP_PX` (2px do fundo entre blocos) resolve os dois sem gastar matiz. Guards em `__tests__/macroBar.test.tsx`.
 

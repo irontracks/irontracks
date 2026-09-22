@@ -4,12 +4,22 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useDialog } from '@/contexts/DialogContext'
-import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, type PlanMeal } from '@/lib/nutrition/dietPlanShape'
+import { createClient } from '@/utils/supabase/client'
+import { useUserSettings } from '@/hooks/useUserSettings'
+import { planDays, weekdayLabel, type DietPlanRow, type PlanDay, type PlanItem, type PlanMeal, type MacroTotals } from '@/lib/nutrition/dietPlanShape'
 import { refeicaoComEscolhas } from '@/lib/nutrition/escolhaDaProteina'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { normalizeFoodKey } from '@/lib/nutrition/learned-foods'
+import { ajustarDia, type MacroAjustavel } from '@/lib/nutrition/ajusteAutomaticoDoDia'
+import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
 import { CampoDeNotaDaRefeicao } from './CampoDeNotaDaRefeicao'
 import HorariosDasRefeicoes from './HorariosDasRefeicoes'
 import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
+
+/** O mínimo de uma entrada do diário que o reajuste automático precisa. */
+export type EntradaDoDiaParaAjuste = { food_name: string; calories: number; protein: number; carbs: number; fat: number }
+
+const ROTULO_MACRO: Record<MacroAjustavel, string> = { protein: 'proteína', carbs: 'carboidrato', fat: 'gordura' }
 
 /**
  * A dieta que o PRÓPRIO usuário salvou — o lugar onde ela vira algo pra seguir, e
@@ -35,11 +45,18 @@ export default function MyDietPlan({
   dateKey,
   canApply,
   onApplied,
+  entries,
 }: {
   dateKey: string
   /** Só deixa lançar no dia atual (histórico/futuro só leem). */
   canApply?: boolean
   onApplied?: () => void
+  /**
+   * As refeições já lançadas HOJE, para o reajuste automático saber o que
+   * sobrou/faltou. Vem do `NutritionMixer`, que já carrega isso pro resumo
+   * do dia — buscar de novo aqui duplicaria a consulta.
+   */
+  entries?: EntradaDoDiaParaAjuste[]
 }) {
   const [row, setRow] = useState<DietPlanRow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,6 +83,24 @@ export default function MyDietPlan({
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [horariosAbertos, setHorariosAbertos] = useState(false)
+
+  // Só para ler o interruptor do reajuste automático — o resto da tela não
+  // precisa do usuário logado, então isto não bloqueia nada enquanto carrega.
+  const [userId, setUserId] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let alive = true
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => { if (alive) setUserId(data?.user?.id) })
+    return () => { alive = false }
+  }, [])
+  const { settings, save } = useUserSettings(userId)
+  const autoAjusteLigado = Boolean(settings?.nutritionAutoAdjust)
+  const [salvandoAjuste, setSalvandoAjuste] = useState(false)
+  const alternarAutoAjuste = useCallback(async () => {
+    if (salvandoAjuste) return
+    setSalvandoAjuste(true)
+    try { await save({ nutritionAutoAdjust: !autoAjusteLigado }) } finally { setSalvandoAjuste(false) }
+  }, [salvandoAjuste, autoAjusteLigado, save])
 
   const load = useCallback(async () => {
     try {
@@ -296,9 +331,39 @@ export default function MyDietPlan({
     }
   }, [removing, confirm])
 
-  if (loading || !row || !days.length) return null
-
   const day: PlanDay | undefined = days[dayIndex] ?? days[0]
+
+  /**
+   * O que já foi lançado HOJE, por nome de refeição normalizado — a fonte é
+   * `entries` (o diário de verdade), nunca `appliedIdx` (que é só o "✓" desta
+   * sessão da tela e reseta ao trocar de dia).
+   */
+  const lancamentosPorNome = useMemo(() => {
+    const mapa = new Map<string, MacroTotals>()
+    for (const e of entries ?? []) {
+      const chave = normalizeFoodKey(String(e?.food_name ?? ''))
+      if (!chave) continue
+      const atual = mapa.get(chave) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      mapa.set(chave, {
+        calories: atual.calories + num(e.calories),
+        protein: atual.protein + num(e.protein),
+        carbs: atual.carbs + num(e.carbs),
+        fat: atual.fat + num(e.fat),
+      })
+    }
+    return mapa
+  }, [entries])
+
+  // Só ajusta o dia ATUAL (canApply = hoje): dia passado já aconteceu por
+  // inteiro, dia futuro ainda não tem lançamento nenhum para comparar.
+  const resultadoAjuste = useMemo(() => {
+    if (!autoAjusteLigado || !canApply || !day) return null
+    return ajustarDia(day.meals, lancamentosPorNome)
+  }, [autoAjusteLigado, canApply, day, lancamentosPorNome])
+
+  const mealsParaExibir = resultadoAjuste ? resultadoAjuste.refeicoes : (day?.meals ?? [])
+
+  if (loading || !row || !days.length) return null
   if (!day) return null
 
   const rawTitle = String(row.plan_name || '').trim()
@@ -319,6 +384,20 @@ export default function MyDietPlan({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {/* Violeta = a cor da MÁQUINA no app inteiro: quando ligado, é o app
+              quem decide reequilibrar as refeições sozinho. */}
+          <button
+            type="button"
+            onClick={alternarAutoAjuste}
+            disabled={salvandoAjuste}
+            aria-pressed={autoAjusteLigado}
+            title="Ao lançar uma refeição diferente do plano, reequilibra automaticamente as refeições do dia que ainda faltam"
+            className={`tap-44 shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold transition disabled:opacity-40 ${
+              autoAjusteLigado ? MACHINE_ACCENT.surfaceActive : 'text-neutral-400 hover:bg-white/[0.06] hover:text-white'
+            }`}
+          >
+            🧠 Ajuste automático: {autoAjusteLigado ? 'Ligado' : 'Desligado'}
+          </button>
           {/* Horários é ação secundária: o dourado do app pertence a lançar a
               refeição, não a configurar quando ela acontece. */}
           <button
@@ -381,9 +460,25 @@ export default function MyDietPlan({
         <div className="mx-4 mb-3 rounded-xl border border-red-500/20 bg-red-500/5 p-2.5 text-[11px] text-red-300">{error}</div>
       )}
 
+      {/* Transparência: o app nunca reequilibra calado — quem vê a tela precisa
+          saber que o jantar que está olhando não é exatamente o que o plano
+          original tinha. */}
+      {resultadoAjuste && resultadoAjuste.ajustes.length > 0 && (
+        <div className={`mx-4 mb-3 rounded-xl border p-2.5 text-[11px] ${MACHINE_ACCENT.surface}`}>
+          <span className={`font-bold ${MACHINE_ACCENT.text}`}>🧠 Reequilibrei seu dia: </span>
+          {resultadoAjuste.ajustes.map((a, i) => (
+            <span key={`${a.refeicao}-${a.macro}-${i}`}>
+              {i > 0 && '; '}
+              {a.deltaG > 0 ? 'mais' : 'menos'} {Math.abs(Math.round(a.deltaG))}g de {ROTULO_MACRO[a.macro]} {a.deltaG > 0 ? 'em' : 'na'} {a.refeicao}
+            </span>
+          ))}
+          .
+        </div>
+      )}
+
       <div className="space-y-2 px-4 pb-4">
-        {day.meals.map((meal, idx) => {
-          const applied = appliedIdx.has(idx)
+        {mealsParaExibir.map((meal, idx) => {
+          const applied = appliedIdx.has(idx) || lancamentosPorNome.has(normalizeFoodKey(meal.name))
           const isOpen = openMeal === idx
           // O cabeçalho mostra o que vai ser lançado. Deixá-lo no total do plano
           // enquanto a carne trocada muda os macros faria a mesma tela dizer dois

@@ -20,6 +20,20 @@ vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
   applyGeneratedMealAction: (...args: unknown[]) => applyMealMock(...(args as [])),
 }))
 
+// O reajuste automático só entra em cena quando ligado — a suíte existente
+// testa o comportamento SEM ele (default), então o mock fixa desligado.
+// Os testes do reajuste em si (abaixo, neste arquivo) sobrescrevem isto.
+let nutritionAutoAdjustMock = false
+vi.mock('@/utils/supabase/client', () => ({
+  createClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user-teste' } } }) } }),
+}))
+vi.mock('@/hooks/useUserSettings', () => ({
+  useUserSettings: () => ({
+    settings: { nutritionAutoAdjust: nutritionAutoAdjustMock },
+    save: vi.fn(async () => ({ ok: true })),
+  }),
+}))
+
 import MyDietPlan from '../MyDietPlan'
 
 const item = (food: string, grams: number, calories: number, protein: number) =>
@@ -52,7 +66,7 @@ const mockFetch = (plan: unknown, extra?: (url: string, init?: RequestInit) => u
 }
 
 describe('MyDietPlan', () => {
-  beforeEach(() => { applyMealMock.mockClear() })
+  beforeEach(() => { applyMealMock.mockClear(); nutritionAutoAdjustMock = false })
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('sem plano salvo não renderiza nada — não polui a tela com card vazio', async () => {
@@ -480,4 +494,60 @@ describe('MyDietPlan — observação da refeição', () => {
         expect(campo.getAttribute('autocorrect')).not.toBe('off')
         expect(campo.getAttribute('autocapitalize')).not.toBe('none')
     })
+})
+
+describe('MyDietPlan — reajuste automático (fiação real, não só o módulo puro)', () => {
+  beforeEach(() => { applyMealMock.mockClear(); nutritionAutoAdjustMock = false })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  const itemPuro = (food: string, grams: number, protein: number, carbs: number, fat: number) =>
+    ({ food, grams, calories: protein * 4 + carbs * 4 + fat * 9, protein, carbs, fat })
+
+  const PLANO_COM_CARBO = {
+    id: 'p3',
+    plan_name: 'Minha dieta',
+    plan_kind: 'day',
+    meals: [
+      { name: 'Almoço', items: [itemPuro('Arroz branco cozido', 200, 0, 56, 0)] },
+      { name: 'Janta', items: [itemPuro('Arroz branco cozido', 200, 0, 56, 0), itemPuro('Carne moída magra', 200, 52, 0, 10)] },
+    ],
+    days: null,
+  }
+
+  // Lançou só metade do arroz do almoço — sobraram 28g de carboidrato.
+  const ENTRIES_COM_DESVIO = [{ food_name: 'Almoço', calories: 112, protein: 0, carbs: 28, fat: 0 }]
+
+  it('DESLIGADO: refeição pendente mostra o plano original, sem aviso', async () => {
+    mockFetch(PLANO_COM_CARBO)
+    render(<MyDietPlan dateKey="2026-08-03" canApply entries={ENTRIES_COM_DESVIO} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Janta/ }))
+    expect(await screen.findByText('Carne moída magra')).toBeTruthy()
+    // 200g originais, sem ajuste — o toggle está desligado.
+    expect(screen.getByText('Arroz branco cozido').closest('div')?.parentElement?.textContent).toContain('200g')
+    expect(screen.queryByText(/Reequilibrei/i)).toBeNull()
+  })
+
+  it('LIGADO: a refeição pendente absorve o que sobrou, e a tela avisa', async () => {
+    nutritionAutoAdjustMock = true
+    mockFetch(PLANO_COM_CARBO)
+    render(<MyDietPlan dateKey="2026-08-03" canApply entries={ENTRIES_COM_DESVIO} />)
+
+    expect(await screen.findByText(/Reequilibrei seu dia/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Janta/ }))
+    const linhaDoArroz = await screen.findByText('Arroz branco cozido')
+    // Mais que os 200g originais — absorveu o carboidrato que sobrou no almoço.
+    expect(linhaDoArroz.closest('div')?.parentElement?.textContent).not.toContain('200g')
+  })
+
+  it('LIGADO: refeição JÁ lançada nunca aparece alterada, mesmo se o toggle estiver ligado', async () => {
+    nutritionAutoAdjustMock = true
+    mockFetch(PLANO_COM_CARBO)
+    render(<MyDietPlan dateKey="2026-08-03" canApply entries={ENTRIES_COM_DESVIO} />)
+    await screen.findByText(/Reequilibrei seu dia/i)
+
+    fireEvent.click(screen.getByRole('button', { name: /Almoço/ }))
+    const linhaDoArroz = await screen.findByText('Arroz branco cozido')
+    // O almoço é a refeição JÁ lançada — continua com os 200g do plano.
+    expect(linhaDoArroz.closest('div')?.parentElement?.textContent).toContain('200g')
+  })
 })
