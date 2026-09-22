@@ -56,6 +56,17 @@ export const UserSettingsSchema = z
      */
     autoLoadDeloadOffWorkouts: z.array(z.string()).default([]),
     /**
+     * Reajuste automático de refeições — pedido do dono, 22/09/2026.
+     *
+     * Ligado: ao lançar uma refeição do plano com quantidade diferente do
+     * planejado, as refeições do MESMO dia que ainda não foram lançadas
+     * absorvem a diferença (sobrou carbo no almoço → o jantar ganha um pouco
+     * mais). Nunca mexe em refeição já lançada, nunca reescreve o plano em
+     * si — é um cálculo feito na hora, cada vez que a tela abre. Default
+     * desligado: ninguém liga sem saber que existe.
+     */
+    nutritionAutoAdjust: z.boolean().default(false),
+    /**
      * CICLO de descarga em andamento — a semana, não a sessão.
      *
      * Decisão do dono em 08/09/2026: a duração é escolhida na ATIVAÇÃO e vale
