@@ -34,7 +34,12 @@ export async function checkWorkoutImportAccess(
     stage: 'create' | 'process',
 ): Promise<WorkoutImportAccess> {
     // VIP primeiro: caminho comum e o único que gasta metering.
-    const vip = await checkVipFeatureAccess(supabase, userId, 'analytics', { meter: true })
+    // ⚠️ 22/09/2026: era 'analytics' aqui — bug de cópia indevida de
+    // labExamsAccess.ts. 'analytics' só é true no Elite, então VIP Start/Pro
+    // pagante caía direto no fallback "primeira grátis" e via o import
+    // bloqueado do mesmo jeito que o free, mesmo sendo VIP ativo. A chave
+    // certa é 'workout_photo_import' (própria, disponível em todo VIP).
+    const vip = await checkVipFeatureAccess(supabase, userId, 'workout_photo_import', { meter: true })
     if (vip.allowed) return { allowed: true, reason: 'vip', tier: vip.tier }
 
     try {

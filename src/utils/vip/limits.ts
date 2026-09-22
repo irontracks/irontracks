@@ -21,6 +21,15 @@ export type VipTierLimits = {
    * teto diário anti-abuso (BOOLEAN_DAILY_CEILING).
    */
   media_analysis: boolean
+  /**
+   * Import de ficha de treino por foto/PDF, a partir da 2ª (22/09/2026) —
+   * feature básica de todo VIP, mesma tese do `lab_exams`. Corrige bug: o
+   * gate nasceu checando `analytics` (só true no Elite) por cópia indevida
+   * de `labExamsAccess.ts`, deixando VIP Start/Pro pagando e vendo o import
+   * bloqueado do mesmo jeito que o free. Chave PRÓPRIA (não reaproveita
+   * `lab_exams`) para não somar na cota diária de exames laboratoriais.
+   */
+  workout_photo_import: boolean
 }
 
 export type VipEntitlementSource =
@@ -49,6 +58,7 @@ export const FREE_LIMITS: VipTierLimits = {
   offline: false,
   lab_exams: false,
   media_analysis: false,
+  workout_photo_import: false,
 }
 
 // Admin/Teacher gets everything unlimited
@@ -62,6 +72,7 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   offline: true,
   lab_exams: true,
   media_analysis: true,
+  workout_photo_import: true,
 }
 
 export const normalizePlanId = (raw: unknown) => {
@@ -86,18 +97,19 @@ export const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
       // `chef_ai` foi REMOVIDO em 02/08/2026: era concedido ao Elite mas não
       // era checado em rota nenhuma nem anunciado em plano nenhum — vaporware
       // no schema. Se a feature um dia existir, nasce com gate + anúncio.
-      return { ...limits, nutrition_macros: true, analytics: true, offline: true, lab_exams: true }
+      return { ...limits, nutrition_macros: true, analytics: true, offline: true, lab_exams: true, workout_photo_import: true }
     }
     if (normalized === 'vip_pro') {
-      return { ...limits, offline: true, lab_exams: true }
+      return { ...limits, offline: true, lab_exams: true, workout_photo_import: true }
     }
     if (normalized === 'vip_start') {
-      return { ...limits, lab_exams: true }
+      return { ...limits, lab_exams: true, workout_photo_import: true }
     }
-    // Qualquer plano VIP não mapeado ainda recebe lab_exams (feature básica de todo VIP).
-    // Isso garante que novos planos não fiquem sem acesso por omissão.
+    // Qualquer plano VIP não mapeado ainda recebe lab_exams/workout_photo_import
+    // (features básicas de todo VIP). Isso garante que novos planos não fiquem
+    // sem acesso por omissão.
     if (normalized.startsWith('vip_')) {
-      return { ...limits, lab_exams: true }
+      return { ...limits, lab_exams: true, workout_photo_import: true }
     }
     return limits
   } catch {
@@ -136,6 +148,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         offline: false,
               lab_exams: true, // disponível em todo VIP (start/pro/elite)
               media_analysis: true,
+              workout_photo_import: true, // idem — feature básica de todo VIP
       }
     }
     if (normalized === 'vip_pro') {
@@ -154,6 +167,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         offline: true,
               lab_exams: true,
               media_analysis: true,
+              workout_photo_import: true,
       }
     }
     if (normalized === 'vip_elite') {
@@ -168,6 +182,7 @@ export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         offline: true,
               lab_exams: true,
               media_analysis: true,
+              workout_photo_import: true,
       }
     }
     return limits
@@ -337,6 +352,9 @@ const BOOLEAN_DAILY_CEILING: Partial<Record<keyof VipTierLimits, number>> = {
   media_analysis: 20,
   nutrition_macros: 200,
   analytics: 150,
+  // Ninguém importa mais que algumas fichas por dia — teto generoso, só
+  // contra script/abuso da chamada Gemini.
+  workout_photo_import: 20,
 }
 
 export async function checkVipFeatureAccess(
