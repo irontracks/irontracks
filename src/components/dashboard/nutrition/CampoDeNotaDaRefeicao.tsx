@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MAX_NOTA_DA_REFEICAO } from '@/lib/nutrition/dietPlanShape'
 
+/** Teto de crescimento automático — acima disso o campo rola em vez de crescer. */
+const ALTURA_MAXIMA_PX = 120
+
 /**
  * O campo de observação/orientação de UMA refeição — um componente só para as
  * duas superfícies que editam (o plano do usuário e o painel do professor).
@@ -61,6 +64,20 @@ export function CampoDeNotaDaRefeicao({
     const temNota = Boolean(nota.trim())
     const editando = aberto || temNota
 
+    // `rows={2}` era um TETO, não um piso: nota perto do limite de 300
+    // caracteres ficava cortada e sem affordance de rolagem (o navegador só
+    // rola texto dentro do textarea se a pessoa tocar e arrastar por dentro
+    // dele — ninguém descobre isso sozinho). O campo agora CRESCE com o
+    // conteúdo até `ALTURA_MAXIMA_PX`; acima disso, `overflow-y-auto` na
+    // classe assume e a rolagem passa a ter barra visível.
+    useEffect(() => {
+        if (!editando) return
+        const el = campoRef.current
+        if (!el) return
+        el.style.height = 'auto'
+        el.style.height = `${Math.min(el.scrollHeight, ALTURA_MAXIMA_PX)}px`
+    }, [editando, rascunho, nota])
+
     const aoSair = useCallback(async () => {
         // Sem rascunho, o campo mostra o que já está salvo — sair dele não é
         // edição. Tratar `null` como '' apagaria a nota de quem só passou o dedo.
@@ -100,10 +117,11 @@ export function CampoDeNotaDaRefeicao({
                 maxLength={MAX_NOTA_DA_REFEICAO}
                 disabled={salvando}
                 placeholder={placeholder}
+                style={{ maxHeight: ALTURA_MAXIMA_PX }}
                 // Campo de entrada é MAIS CLARO que o card, nunca mais escuro:
                 // em dark mode "mais escuro que o entorno" lê como buraco ou
                 // desabilitado. Este é o mesmo tom dos outros inputs da tela.
-                className="w-full resize-none rounded-lg border border-neutral-700/50 bg-neutral-800/60 px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-neutral-400 outline-none transition focus:border-yellow-500/40 disabled:opacity-60"
+                className="w-full resize-none overflow-y-auto rounded-lg border border-neutral-700/50 bg-neutral-800/60 px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-neutral-400 outline-none transition focus:border-yellow-500/40 disabled:opacity-60"
             />
             {/* Altura reservada: sem isto o indicador entra e sai do fluxo e
                 empurra o botão de baixo a cada gravação. */}
