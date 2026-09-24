@@ -32,6 +32,7 @@ import {
 } from '@/lib/workout/deferredExercises';
 import { exercisesToSkip } from '@/lib/workout/skippedExercises';
 import { focoAposSerieConcluida } from '@/lib/workout/focoAposSerie';
+import { espelhoAposEdicaoDireta, planLinkedWeightSync } from '@/lib/workout/linkedWeights';
 import { scrollToExercise } from './helpers/scrollToExercise';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
@@ -255,59 +256,40 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         });
       }
 
-      // If a WEIGHT changes and this exercise has linked weights enabled, replicate
-      // it to all sets. Cobre flat (`weight`) E unilateral (`L_weight`/`R_weight`).
-      // Antes só olhava `weight`, então unilateral — que grava L_weight/R_weight —
-      // NUNCA sincronizava (o LADO R ficava vazio ao digitar o LADO L).
-      //
-      // Unilateral: o lado digitado replica pra ESSE lado em todas as séries, e o
-      // OUTRO lado é auto-preenchido com o mesmo valor SÓ onde está vazio. Assim o
-      // 1º peso preenche os dois lados (caso comum: mesma carga), mas editar um lado
-      // depois não apaga o outro (permite cargas diferentes em L e R).
-      const typedSide: 'L_weight' | 'R_weight' | null =
-        'L_weight' in patchObj ? 'L_weight' : 'R_weight' in patchObj ? 'R_weight' : null;
-      const typedWeight = 'weight' in patchObj ? patchObj.weight
-        : typedSide ? (patchObj as Record<string, unknown>)[typedSide]
-          : undefined;
-      if (linkedWeightExercises.has(exIdx) && typedWeight !== undefined) {
-        const ex = exercises[exIdx];
-        if (ex) {
-          const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
-          const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
-          const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
-          const otherSide = typedSide === 'L_weight' ? 'R_weight' : 'L_weight';
-
-          for (let setIdx = 0; setIdx < setsCount; setIdx++) {
-            const linkedKey = `${exIdx}-${setIdx}`;
-            const prev = getLog(linkedKey);
-            // Peso a propagar nesta série: o lado digitado sempre; o outro lado só se
-            // estiver vazio (não clobbera uma carga diferente já registrada).
-            const weightPatch: Record<string, unknown> = typedSide
-              ? { [typedSide]: typedWeight }
-              : { weight: typedWeight };
-            if (typedSide) {
-              const otherVal = (prev as Record<string, unknown> | null)?.[otherSide];
-              if (otherVal == null || String(otherVal).trim() === '') weightPatch[otherSide] = typedWeight;
-            }
-            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc) por cima
-            // do peso; as demais recebem só o peso. Antes o early-return propagava o
-            // peso e DESCARTAVA o resto do que foi digitado na série atual.
-            const linkedMerged = setIdx === sIdx ? { ...prev, ...weightPatch, ...patchObj } : { ...prev, ...weightPatch };
-            propsRef.current.onUpdateLog(linkedKey, linkedMerged);
-            logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
-          }
-          // Broadcast linked weight update for first set only
-          try {
-            const w = String(patchObj.weight ?? '')
-            if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
-          } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
-          moverFocoSeConcluiu();
-          return;
+      // Sincronizar pesos (🔗): a decisão inteira mora em `lib/workout/linkedWeights`
+      // — quem replica, para onde, e quando o outro lado do unilateral acompanha.
+      // Só a edição do USUÁRIO sincroniza; motor e conclusão de série seguem o
+      // caminho normal. Guard: lib/workout/__tests__/linkedWeights.test.ts
+      const exVinculado = exercises[exIdx];
+      const plano = linkedWeightExercises.has(exIdx) && exVinculado
+        ? planLinkedWeightSync({
+          patch: patchObj,
+          sIdx,
+          setsCount: Math.max(
+            Math.max(0, Number.parseInt(String(exVinculado?.sets ?? '0'), 10) || 0),
+            Array.isArray(exVinculado?.setDetails) ? (exVinculado.setDetails as unknown[]).length
+              : Array.isArray(exVinculado?.set_details) ? (exVinculado.set_details as unknown[]).length : 0,
+          ),
+          getLog: (setIdx) => getLog(`${exIdx}-${setIdx}`),
+        })
+        : null;
+      if (plano) {
+        for (const { setIdx, next } of plano) {
+          const linkedKey = `${exIdx}-${setIdx}`;
+          propsRef.current.onUpdateLog(linkedKey, next);
+          logsRef.current = { ...logsRef.current, [linkedKey]: next };
         }
+        // Broadcast linked weight update for first set only
+        try {
+          const w = String(patchObj.weight ?? '')
+          if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
+        } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
+        moverFocoSeConcluiu();
+        return;
       }
 
       const prev = getLog(key);
-      const merged = { ...prev, ...patchObj };
+      const merged = { ...prev, ...patchObj, ...espelhoAposEdicaoDireta(prev, patchObj) };
       propsRef.current.onUpdateLog(key, merged);
 
       // ── Eagerly update logsRef so the NEXT updateLog call in the same
