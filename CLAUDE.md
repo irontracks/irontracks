@@ -330,6 +330,26 @@ verde com o bug vivo** — o caso precisa do ciclo (digita → grava →
 re-renderiza → efeito roda), e como os renderers são `React.memo` sobre um
 contexto mockado estável, o harness remonta por `key`.
 
+**Sincronizar pesos (🔗) — a decisão mora em `lib/workout/linkedWeights.ts` (24/09/2026).**
+Relato do dono: unilateral com 🔗 ligado, digitar 23 no L deixava R=2 em todas
+as séries. A regra "o outro lado só se vazio" era avaliada **por tecla**; hoje o
+outro lado acompanha enquanto for espelho (`weightMirroredSide` no log) e fica
+independente quando o usuário digita nele. Três regras que a auditoria fixou, e
+que ninguém deve afrouxar: **só edição do usuário sincroniza** (`weightSource:
+'user'` — o motor e o patch de conclusão NÃO; antes o motor e a réplica se
+reescreviam em ciclo, e concluir série sem peso apagava o das outras); **quem
+recebe a réplica vira 'user'** (senão o motor a devolve à sugestão); **série
+concluída não é reescrita**. O 🔗 persiste por sessão (sobrevive a restaurar,
+morre ao finalizar — decisão do dono) e aquecimento É sincronizado (decisão do
+dono, não é lapso).
+
+⚠️ **O teste antigo testava uma CÓPIA da lógica** (reimplementada dentro do
+`useActiveWorkoutController.logic.test.ts`) — verde com o código real quebrado,
+e escrita de uma vez só, nunca tecla por tecla. Guard de lógica copiada no
+arquivo de teste é o jeito nº 3 da lista (pontas sem fiação) na forma mais pura:
+não há fiação nenhuma. O guard novo simula digitação com o motor rodando entre
+as teclas (`linkedWeights.test.ts`, 7 mutações + reversão do controlador).
+
 **O motor aprende os pesos que a MÁQUINA tem** (`machineGrid.ts`). `plateMath` assume máquina de 5 em 5 kg — falso em boa parte dos aparelhos: a "Mesa flexora" desta base registra 18, 23, 27, 32, 36, 41… (stack em LIBRAS, 10 lb = 4,54 kg), e o motor pedia 20/25/30/35/40, valores que não existem ali. Agora os pesos JÁ REGISTRADOS são a verdade sobre o que é montável (`collectKnownWeights` varre TODAS as sessões, sem filtrar deload/treino — um peso registrado prova que o furo do pino existe). Snap só desce ou iguala; acima do topo extrapola pelo passo aprendido; **desiste (volta ao plateMath) quando o alvo cai num buraco do histórico** — snapar 45 para 30 seria regressão inventada por falta de dado.
 
 **Falha muscular (`log.failure`) alimenta o motor, não é só enfeite.** `suggestWeight` não progride a carga quando a última sessão foi à falha (`anyFailed`). O caminho é longo e já esteve QUEBRADO no meio: log → `useWorkoutDeload` monta `setFailures` no `ReportHistoryItem` → `buildHistorySets` repassa `failed` → motor. Até jul/2026 os dois últimos elos não existiam, então a trava nunca disparava e a carga subia após séries que estouraram. Exibição: `ReportExerciseCard` (marca + contagem) **e** `buildHtml.ts` (PDF) — os dois. **A flag é SEMPRE marcação manual do usuário** — Heavy Duty e Repetições Forçadas vão à falha por definição e deliberadamente NÃO a gravam: se gravassem, a carga congelaria no `topWeight` para sempre e o aluno nunca progrediria nesses métodos (decisão do dono, jul/2026; guard em `set-renderers/__tests__/failureIsManualOnly.test.ts`). Não confundir com `reps_failure`, que é a CONTAGEM de reps até falhar, coletada no modal desses dois.
