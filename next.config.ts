@@ -156,6 +156,25 @@ const nextConfig: NextConfig = {
         source: '/map-tiles/osm/:path*',
         destination: 'https://tile.openstreetmap.org/:path*',
       },
+      // ── Espelho temporário /app → raiz (migração raiz↔/comercial) ──────────
+      // Fase 1 de 3: a raiz AINDA é o app de verdade (login/dashboard/auth).
+      // Este rewrite só faz `/app` responder com o MESMO conteúdo, sem mover
+      // nenhum arquivo — para que a build nativa nova (que vai apontar
+      // `capacitor.config.ts` para `/app`) tenha algo para carregar antes da
+      // migração de rotas de verdade acontecer. Sem isso, quem atualizasse
+      // pro build novo antes da fase 2 veria 404 no lugar do dashboard.
+      // Link/router.push internos continuam sem o prefixo `/app` — a troca de
+      // URL na barra é invisível no WKWebView (sem chrome de navegador), então
+      // isso é aceitável só durante a transição. Remover no dia da fase 3
+      // (quando as pastas forem fisicamente movidas para dentro de `src/app/app/`).
+      {
+        source: '/app',
+        destination: '/',
+      },
+      {
+        source: '/app/:path*',
+        destination: '/:path*',
+      },
     ]
   },
   async headers() {
