@@ -11,7 +11,13 @@ const config: CapacitorConfig = {
     // Production URL — app loads from Vercel (SSR, API routes, auth).
     // Override with CAPACITOR_SERVER_URL for local dev:
     // Example: CAPACITOR_SERVER_URL=http://192.168.1.10:3000 npx cap sync
-    url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br',
+    //
+    // Migração raiz↔/comercial (23/09/2026), etapa 2 de 3: a raiz do domínio
+    // vai virar a landing comercial — o app passa a viver em /app. O `/app`
+    // já responde hoje via rewrite espelho em `next.config.ts` (fase 1, no ar
+    // desde a608e77b3), então apontar pra cá agora é seguro mesmo antes da
+    // migração de rotas de verdade (fase 3) acontecer.
+    url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br/app',
   },
   // O WKWebView nasce BRANCO por padrão do sistema, e enquanto ele busca a URL
   // remota não há HTML nenhum para pintar por cima. Medido em 03/09/2026,

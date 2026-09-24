@@ -5,7 +5,7 @@
  *
  * Por que isto existe
  * ───────────────────
- * `capacitor.config.ts` fixa `server.url` em https://irontracks.com.br, então o
+ * `capacitor.config.ts` fixa `server.url` em https://irontracks.com.br/app, então o
  * app do simulador sempre mostrou PRODUÇÃO. Consequência prática: só dava para
  * conferir uma mudança visual DEPOIS do merge — e foi assim que três correções
  * seguidas de UI precisaram de PR, CI, deploy e só então a primeira olhada no
@@ -22,7 +22,7 @@
  * ───
  *   npm run sim:local            # aponta para http://localhost:3000
  *   npm run sim:local -- 3001    # outra porta
- *   npm run sim:prod             # volta para https://irontracks.com.br
+ *   npm run sim:prod             # volta para https://irontracks.com.br/app
  *   npm run sim:status           # mostra para onde o app está apontando
  *
  * O dev server é responsabilidade de quem chama (`npm run dev`). O script avisa
@@ -34,7 +34,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { createConnection } from 'node:net'
 
 const BUNDLE_ID = 'com.irontracks.app'
-const PROD_URL = 'https://irontracks.com.br'
+const PROD_URL = 'https://irontracks.com.br/app'
 const PREFERRED_DEVICE = 'iPhone 17 Pro Max' // o aparelho do dono
 
 const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim()
