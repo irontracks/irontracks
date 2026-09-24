@@ -79,9 +79,11 @@ interface ExerciseCrudDeps {
 export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   const {
     workout, exercises, logs,
+    getLog,
     updateLog,
     setCollapsed,
     setDeferredExercises,
+    linkedWeightExercises,
     setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
     setEditExerciseOriginal,
@@ -218,6 +220,22 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         setDetails: sdArr,
       };
       onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
+      // Com 🔗 ligado a série nova nasce com o peso das irmãs — a sincronização
+      // promete "todas as séries", e a nova ficava vazia (ou com a sugestão do
+      // motor, diferente do que o usuário acabou de sincronizar). Sem
+      // `weightSource: 'user'` de propósito: com ele o `updateLog` trataria a
+      // semente como edição e re-replicaria sobre as outras séries. Peso sem
+      // fonte já é respeitado pelo motor (`useAutoloadWeight`: valor preexistente
+      // que não é dele).
+      if (linkedWeightExercises.has(idx) && setsCount > 0) {
+        const irma = getLog(`${idx}-${setsCount - 1}`);
+        const semente: Record<string, unknown> = {};
+        for (const campo of ['weight', 'L_weight', 'R_weight', 'weightMirroredSide']) {
+          const v = irma?.[campo];
+          if (v != null && String(v).trim() !== '') semente[campo] = v;
+        }
+        if (Object.keys(semente).length > 0) updateLog(`${idx}-${setsCount}`, semente);
+      }
       setCollapsed((prev) => {
         const next = new Set(prev);
         if (next.has(idx)) next.delete(idx);

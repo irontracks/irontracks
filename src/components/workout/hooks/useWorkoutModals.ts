@@ -93,7 +93,23 @@ export function useWorkoutModals(collapsedKey: string | null, deferredKey: strin
      * acidental de bolso.
      */
     const [vozLigada, setVozLigada] = useState<boolean>(false);
-    const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(new Set());
+
+    // ---- Sincronizar pesos 🔗 (persisted) ----
+    // Vivia só em memória: fechar o app no meio do treino e restaurar desligava a
+    // sincronização em silêncio, e a próxima edição de peso não replicava mais.
+    // Decisão do dono (24/09/2026): continua ligada até FINALIZAR o treino. É o
+    // que a chave por sessão já entrega — treino novo é sessão nova, e nasce
+    // desligada. Mesmo esquema de nome do `skipped`.
+    const linkedKey = deferredKey ? `${deferredKey}.linked` : null;
+    const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(() => readIndexSet(linkedKey));
+
+    useEffect(() => {
+        if (!linkedKey) return;
+        try {
+            if (typeof window === 'undefined') return;
+            window.localStorage.setItem(linkedKey, JSON.stringify([...linkedWeightExercises]));
+        } catch { }
+    }, [linkedWeightExercises, linkedKey]);
     const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
     const [finishing, setFinishing] = useState<boolean>(false);
 
