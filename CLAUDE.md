@@ -2571,6 +2571,41 @@ a régua nova — app de fato congelado. Evento com "(N frames não exibidos)" �
 UI colapsando frames de sistema, **não** falta de símbolo: os dSYMs estão lá,
 basta expandir no painel.
 
+⚠️ **Buscar "sentry" por e-mail (Gmail) NÃO acha o alerta, mesmo com ele na
+caixa** — medido em 26/09/2026: o dono tinha o e-mail "New issue" aberto no
+celular (print), e a busca `sentry`/`sentry.io`/`getsentry.com` pelo MCP do
+Gmail devolveu zero resultados relevantes (só um e-mail do NYTimes que casava
+por acaso). Não investiguei a causa (índice de busca, remetente que não
+contém literalmente "sentry"). **Se o MCP do Sentry estiver fora do ar e
+precisar do conteúdo de um alerta, peça print em vez de confiar na busca por
+e-mail.**
+
+## "Connection closed." no Sentry é ruído do Next.js, não bug do app (26/09/2026)
+
+⚠️ **`Error: Connection closed.` nasce DENTRO do runtime do Next.js**, não do
+nosso código — `grep -rn "Connection closed" src` não acha nada; a string
+mora em `node_modules/next/dist/compiled/react-server-dom-turbopack*/.../
+react-server-dom-turbopack-client.browser.development.js`, na função
+`close()`. Ela dispara quando um stream de React Server Components é
+interrompido antes de terminar: troca de página, app perdendo foco, perda de
+rede no meio do carregamento.
+
+**Hipótese testada e DESCARTADA: não tem relação com a migração de rotas
+`/app`** (commits `a608e77b3`/`ad11f9b4b`, 23/09/2026). Fazia sentido pelo
+timing — a própria migração confessa dívida de redirects hardcoded sem
+prefixo `/app` (`login-gate.tsx`, `page.tsx`, e ~13 lugares mais, `grep -rn
+"router\.push('/dashboard')\|redirect('/dashboard')\|redirect('/')" src`) —,
+mas os dois eventos reais vistos no Sentry **não passaram pela rota `/app`**:
+um era bot de teste (`HeadlessChrome`, deploy de preview) e o outro alguém
+saindo da página em produção pela URL raiz (`irontracks.com.br/`, Chrome real
+no iPhone — não o WKWebView do app nativo). **Não descarta a dívida em si**
+(ela é real e listada na fase 2 da migração), só descarta ELA como causa
+DESTES dois eventos.
+
+Tratado como ruído — mesmo padrão de `AbortError`/`ResizeObserver loop`:
+`isNoiseException` em `src/utils/sentryFilters.ts`. Decisão do dono,
+26/09/2026.
+
 ## Cardio em blocos: encadeamento automático e VOZ (12/09/2026)
 
 Pedido do dono: o app **fala** o tempo enquanto ele caminha, e um bloco de
