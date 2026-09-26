@@ -39,9 +39,9 @@ import { join } from 'node:path'
 
 /** Botões com gradiente inline por arquivo. SÓ DESCE. */
 const TETO_GRADIENTE_INLINE: Record<string, number> = {
-  'src/app/(app)/community/ChallengesPanel.tsx': 3,
-  'src/app/(app)/community/CommunityClient.tsx': 2,
-  'src/app/(app)/community/UserProfileModal.tsx': 1,
+  'src/app/app/(app)/community/ChallengesPanel.tsx': 3,
+  'src/app/app/(app)/community/CommunityClient.tsx': 2,
+  'src/app/app/(app)/community/UserProfileModal.tsx': 1,
   'src/components/CardioSessionModal.tsx': 1,
   'src/components/ChatListScreen.tsx': 1,
   'src/components/VipHub.tsx': 2,
@@ -121,7 +121,7 @@ describe('CTA dourado — duas formas nomeadas, nenhuma improvisada', () => {
   })
 
   it('as duas formas nomeadas continuam existindo', () => {
-    const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
+    const css = readFileSync(join('src', 'app', 'app', 'globals.css'), 'utf8')
     expect(css).toContain('.btn-gold-animated')
   })
 

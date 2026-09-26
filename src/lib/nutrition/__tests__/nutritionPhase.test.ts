@@ -171,7 +171,7 @@ describe('fonte única dos mapeamentos de perfil', () => {
   // destes helpers, que divergiram em silêncio — o CLAUDE.md manda mantê-las em
   // sincronia. Este guard falha se alguém recriar a cópia em vez de importar.
   const CONSUMERS = [
-    'src/app/(app)/dashboard/nutrition/page.tsx',
+    'src/app/app/(app)/dashboard/nutrition/page.tsx',
     'src/components/dashboard/nutrition/NutritionOverlay.tsx',
   ]
 

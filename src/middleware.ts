@@ -145,7 +145,16 @@ export const config = {
     // (ida à rede) por request — por isso este matcher continua SEM /api/:
     // as 258 rotas autenticam por conta própria (252 verificadas; as outras 6
     // são públicas por desenho ou usam outro mecanismo).
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml|auth).*)',
+    //
+    // `(?:auth|app/auth)` — fase 3 da migração raiz↔/comercial (26/09/2026):
+    // a exclusão de `auth` cobre `/auth/callback` e `/auth/logout` (como o
+    // app SEMPRE navega, via rewrite reverso, sem prefixo). Mas a URL física
+    // canônica nova é `/app/auth/*`, que começa com "app" e não batia na
+    // exclusão — rodaria CSP bloqueante ali, e o HTML inline de
+    // `auth/callback`/`auth/logout` tem `<script>` sem nonce, que seria
+    // bloqueado. Risco prático baixo (nenhum redirect interno gera
+    // `/app/auth/*`), mas a correção é barata.
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml|(?:auth|app/auth)).*)',
     // API: SÓ a guarda de origem (SEC-08) — comparação de headers, sem rede.
     // O branch de /api/ no topo do middleware retorna antes do updateSession.
     '/api/:path*',

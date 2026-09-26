@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
  */
 describe('TeacherControlHost — abre o controle em qualquer tela', () => {
   const host = readFileSync('src/components/teacher/TeacherControlHost.tsx', 'utf8')
-  const shell = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+  const shell = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
   const studentsTab = readFileSync('src/components/admin-panel/StudentsTab.tsx', 'utf8')
   const push = readFileSync('src/hooks/usePushNotifications.ts', 'utf8')
 

@@ -124,7 +124,7 @@ describe('reportGeofenceArrival — nunca lança, sempre reporta', () => {
 
 describe('source-guard: a fiação existe (algoritmo certo com ninguém ligando não vale nada)', () => {
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-  const shell = strip(readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8'))
+  const shell = strip(readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8'))
   const route = strip(readFileSync('src/app/api/gps/geofence-checkin/route.ts', 'utf8'))
 
   it('a chegada com o app aberto grava o check-in', () => {

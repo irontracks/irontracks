@@ -18,7 +18,7 @@ const applyMealMock = vi.fn(async () => ({ ok: true }))
 vi.mock('@/contexts/DialogContext', () => ({
   useDialog: () => ({ confirm: async () => true, alert: async () => undefined }),
 }))
-vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
+vi.mock('@/app/app/(app)/dashboard/nutrition/actions', () => ({
   applyGeneratedMealAction: (...args: unknown[]) => applyMealMock(...(args as [])),
 }))
 // O reajuste automático (feature separada) precisa de userId/settings — mock

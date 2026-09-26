@@ -37,7 +37,7 @@ const CONGELADOS: Record<string, number> = {
   // app do aluno continuava com as escritas locais suprimidas.
   'components/teacher/TeacherStudentWorkout.tsx': 1,
   'components/VipHub.tsx': 1,
-  'app/(app)/dashboard/schedule/ScheduleClient.tsx': 1,
+  'app/app/(app)/dashboard/schedule/ScheduleClient.tsx': 1,
 }
 
 const SRC = join(process.cwd(), 'src')

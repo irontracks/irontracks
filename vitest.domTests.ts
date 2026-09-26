@@ -19,7 +19,7 @@ export const DOM_TEST_FILES = [
   // A marca de "já treinou hoje" é persistida em `localStorage` — é ela que
   // impede o card de treino piscar a cada abertura do app.
   'src/lib/workout/__tests__/trainedToday.test.ts',
-  'src/app/(app)/community/__tests__/communityAlertsToast.test.ts',
+  'src/app/app/(app)/community/__tests__/communityAlertsToast.test.ts',
   'src/components/update/__tests__/swAutoUpdate.test.ts',
   'src/components/workout/__tests__/deloadGuards.test.ts',
   'src/components/workout/__tests__/postCheckinZIndex.test.ts',

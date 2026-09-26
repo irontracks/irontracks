@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8')
 const postModal = read('src/components/workout/Modals.tsx')
-const preModal = read('src/app/(app)/dashboard/DashboardModals.tsx')
+const preModal = read('src/app/app/(app)/dashboard/DashboardModals.tsx')
 const scale = read('src/components/workout/CheckinScale.tsx')
 
 describe('check-out (pós-treino) — rótulo correto (guard)', () => {

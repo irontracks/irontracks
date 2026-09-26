@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { applyGeneratedMealAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { planDays, type MacroTotals, type PlanMeal as PlanMealShape } from '@/lib/nutrition/dietPlanShape'

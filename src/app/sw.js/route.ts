@@ -17,7 +17,7 @@ const APP_VERSION=${JSON.stringify(version)};
 const CACHE_PREFIX='irontracks';
 const STATIC_CACHE=\`\${CACHE_PREFIX}-static-\${APP_VERSION}\`;
 const RUNTIME_CACHE=\`\${CACHE_PREFIX}-runtime-\${APP_VERSION}\`;
-const OFFLINE_URL='/offline';
+const OFFLINE_URL='/app/offline';
 
 const precache = async () => {
   const cache = await caches.open(STATIC_CACHE);

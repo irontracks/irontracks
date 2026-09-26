@@ -20,7 +20,7 @@ import { join } from 'node:path'
  * sem entender o porquê.
  */
 const actions = readFileSync(
-  join(process.cwd(), 'src/app/(app)/dashboard/nutrition/actions.ts'),
+  join(process.cwd(), 'src/app/app/(app)/dashboard/nutrition/actions.ts'),
   'utf8',
 )
 

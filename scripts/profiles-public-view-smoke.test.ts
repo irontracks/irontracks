@@ -39,7 +39,7 @@ const mustUseView: Array<[string, number]> = [
   ['src/hooks/useWorkoutFetch.ts', 1],
   ['src/hooks/useStudentControlNotice.ts', 1],
   ['src/contexts/team/useTeamInvites.ts', 2],
-  ['src/app/(app)/community/useCommunityData.ts', 2],
+  ['src/app/app/(app)/community/useCommunityData.ts', 2],
   ['src/app/api/team/invite-candidates/route.ts', 2],
 ]
 for (const [rel, minHits] of mustUseView) {

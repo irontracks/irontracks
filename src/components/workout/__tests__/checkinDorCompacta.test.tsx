@@ -80,7 +80,7 @@ describe('CheckinScale compacta', () => {
 
 describe('as duas telas usam o modo compacto na dor', () => {
   it('check-in (pré) e check-out (pós) passam `zero` só na escala de dor', () => {
-    const pre = readFileSync(join(process.cwd(), 'src/app/(app)/dashboard/DashboardModals.tsx'), 'utf8')
+    const pre = readFileSync(join(process.cwd(), 'src/app/app/(app)/dashboard/DashboardModals.tsx'), 'utf8')
     const pos = readFileSync(join(process.cwd(), 'src/components/workout/Modals.tsx'), 'utf8')
     for (const src of [pre, pos]) {
       const dor = src.slice(src.indexOf('label="Dor muscular'), src.indexOf('label="Dor muscular') + 600)

@@ -34,7 +34,7 @@ const semComentarios = (src: string) =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
 const ATIVO = 'src/components/ActiveWorkout.tsx'
-const SHELL = 'src/app/(app)/dashboard/IronTracksAppClientImpl.tsx'
+const SHELL = 'src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx'
 const CONSENTIMENTO = 'src/components/teacher/StudentControlConsent.tsx'
 
 describe('o consentimento do professor mora no FLUXO do treino', () => {

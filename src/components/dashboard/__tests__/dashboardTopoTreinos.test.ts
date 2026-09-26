@@ -197,7 +197,7 @@ describe('linha de ações não transborda em tela estreita', () => {
  * RecoveryScore, seu vizinho semântico.
  */
 describe('shell: nada de consulta acima da ação primária', () => {
-  const SHELL = join(process.cwd(), 'src', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx')
+  const SHELL = join(process.cwd(), 'src', 'app', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx')
   const shell = codeOnly(readFileSync(SHELL, 'utf8'))
 
   it('o HealthWidget não renderiza acima do StudentDashboard', () => {

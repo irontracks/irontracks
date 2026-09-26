@@ -89,7 +89,7 @@ describe('ensureRevenueCatIdentity — ciclo de identidade (A10)', () => {
 })
 
 describe('MarketplaceClient — fiação dos guards (source-guard)', () => {
-  const src = readFileSync('src/app/marketplace/MarketplaceClient.tsx', 'utf8')
+  const src = readFileSync('src/app/app/marketplace/MarketplaceClient.tsx', 'utf8')
 
   it('não chama Purchases.configure direto — identidade passa pelo singleton', () => {
     expect(src).not.toMatch(/Purchases\.configure\(/)

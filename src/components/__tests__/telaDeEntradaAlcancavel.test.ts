@@ -76,7 +76,7 @@ describe('a tela de entrada cabe em tela pequena', () => {
     })
 
     it('a premissa continua valendo: o documento não rola sozinho', () => {
-        const css = readFileSync(join(__dirname, '..', '..', 'app', 'globals.css'), 'utf8')
+        const css = readFileSync(join(__dirname, '..', '..', 'app', 'app', 'globals.css'), 'utf8')
         const bloco = css.slice(css.indexOf('html,\nbody {'), css.indexOf('}', css.indexOf('html,\nbody {')))
         // Se um dia isto virar `min-height`, o documento passa a rolar e a
         // regra acima deixa de ser a única defesa — mas continua correta.

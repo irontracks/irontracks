@@ -22,7 +22,7 @@ const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8')
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
 describe('1. Comunidade desativada — liga na própria tela', () => {
-  const file = read('src/app/(app)/community/CommunityClient.tsx')
+  const file = read('src/app/app/(app)/community/CommunityClient.tsx')
 
   it('não manda mais procurar em Configurações', () => {
     expect(code(file)).not.toContain('Ative em Configurações')
@@ -74,8 +74,8 @@ describe('3. Professor sem conversas — o texto dizia o que não resolve', () =
 })
 
 describe('4. Desafios sem ninguém — escolher quem desafiar', () => {
-  const panel = read('src/app/(app)/community/ChallengesPanel.tsx')
-  const client = read('src/app/(app)/community/CommunityClient.tsx')
+  const panel = read('src/app/app/(app)/community/ChallengesPanel.tsx')
+  const client = read('src/app/app/(app)/community/CommunityClient.tsx')
 
   it('o botão existe e a aba de amigos é ligada nele', () => {
     expect(code(panel)).toContain('Escolher quem desafiar')

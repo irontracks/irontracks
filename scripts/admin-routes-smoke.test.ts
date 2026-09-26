@@ -48,7 +48,7 @@ for (const rel of [
 // /relatorio/[userId] expunha email + composição corporal + nutrição +
 // marcadores de exame a QUALQUER anônimo por enumeração de UUID. Agora exige
 // login + ownership (dono/professor/admin) ANTES de qualquer fetch de dados.
-const relatorioPage = path.join(repoRoot, 'src', 'app', 'relatorio', '[userId]', 'page.tsx')
+const relatorioPage = path.join(repoRoot, 'src', 'app', 'app', 'relatorio', '[userId]', 'page.tsx')
 assert.ok(fs.existsSync(relatorioPage), 'relatorio page missing')
 const relatorioText = fs.readFileSync(relatorioPage, 'utf8')
 assert.ok(relatorioText.includes('auth.getUser()'), 'relatorio page must authenticate the viewer')

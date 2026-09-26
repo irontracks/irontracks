@@ -21,7 +21,7 @@ import { join } from 'node:path'
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 
 const hookSrc = read('src/hooks/useWorkoutLiveActivity.ts')
-const dashboardSrc = read('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+const dashboardSrc = read('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
 const pbxproj = read('ios/App/App.xcodeproj/project.pbxproj')
 const appPlist = read('ios/App/App/Info.plist')
 

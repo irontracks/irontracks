@@ -47,8 +47,8 @@ describe('entrada no menu do avatar', () => {
 })
 
 describe('fiação do menu até a lista', () => {
-  const app = read('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
-  const header = read('src/app/(app)/dashboard/DashboardHeader.tsx')
+  const app = read('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+  const header = read('src/app/app/(app)/dashboard/DashboardHeader.tsx')
   const overlay = read('src/components/dashboard/nutrition/NutritionOverlay.tsx')
   const mixer = read('src/components/dashboard/nutrition/NutritionMixer.tsx')
 

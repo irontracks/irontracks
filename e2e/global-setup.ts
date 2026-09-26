@@ -85,11 +85,13 @@ export default async function globalSetup(_config: FullConfig) {
     const page = await context.newPage()
 
     try {
-        // Navigate to login page (app login is at root /)
+        // Navigate to login page — app login mora em /app desde a fase 3 da
+        // migração raiz↔/comercial (26/09/2026): a raiz nua virou a landing
+        // comercial, sem formulário nenhum.
         // O app mantém conexões vivas (Supabase Realtime/analytics), portanto
         // `networkidle` nunca é uma condição estável. O formulário abaixo é a
         // evidência explícita de que a página terminou de carregar para o login.
-        await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded', timeout: 15_000 })
+        await page.goto(`${baseURL}/app`, { waitUntil: 'domcontentloaded', timeout: 15_000 })
 
         // Wait for login form to appear
         await page.waitForSelector('input[type="email"]', { timeout: 10_000 })
@@ -103,11 +105,11 @@ export default async function globalSetup(_config: FullConfig) {
 
         // Wait for redirect to dashboard (successful login)
         await page.waitForURL(
-            (url) => url.pathname.includes('/dashboard') || url.pathname === '/',
+            (url) => url.pathname.includes('/dashboard') || url.pathname === '/app',
             { timeout: 15_000 },
         )
 
-        // ⚠️ O predicado acima casa com `/`, que é a URL de ANTES do login —
+        // ⚠️ O predicado acima casa com `/app`, que é a URL de ANTES do login —
         // e `waitForURL` testa a URL corrente primeiro. Ou seja: ele volta na
         // hora e NÃO prova que o redirecionamento terminou. Quem espera de
         // verdade é isto, e é o que separa o storage state estável do que é

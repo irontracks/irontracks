@@ -69,7 +69,7 @@ describe('o tour não ensina o que o iOS esconde', () => {
      */
     it('o shell passa o gate do iOS', () => {
         const shell = readFileSync(
-            join(__dirname, '..', '..', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'), 'utf8')
+            join(__dirname, '..', '..', 'app', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'), 'utf8')
         expect(shell).toMatch(/ocultarCobrancas:\s*hideVipOnIos/)
     })
 })

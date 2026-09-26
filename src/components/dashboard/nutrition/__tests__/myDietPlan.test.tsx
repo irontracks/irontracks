@@ -16,7 +16,7 @@ vi.mock('@/contexts/DialogContext', () => ({
   useDialog: () => ({ confirm: async () => confirmaRemocao, alert: async () => undefined }),
 }))
 
-vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
+vi.mock('@/app/app/(app)/dashboard/nutrition/actions', () => ({
   applyGeneratedMealAction: (...args: unknown[]) => applyMealMock(...(args as [])),
 }))
 

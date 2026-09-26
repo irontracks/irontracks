@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import type { UserStats } from '@/lib/nutrition/goals'
 import { computeGoalsForPhase, type NutritionPhase } from '@/lib/nutrition/phase'

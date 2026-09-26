@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
  *           do dia corrente; ao navegar para um dia passado NÃO podem aparecer.
  */
 describe('backdate — push de meta só no dia corrente', () => {
-  const src = readFileSync('src/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
+  const src = readFileSync('src/app/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
 
   it('maybeNotifyDailyGoal tem early-return quando dateKey != hoje', () => {
     // A guarda precisa comparar o dateKey recebido com resolveDateKey() (= hoje).
@@ -32,7 +32,7 @@ describe('backdate — badges de hoje gateados por isToday no Mixer', () => {
 })
 
 describe('estimateFoodAction — rate-limit + metering (custo/DoS)', () => {
-  const src = readFileSync('src/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
+  const src = readFileSync('src/app/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
   const fn = src.slice(src.indexOf('export async function estimateFoodAction'), src.indexOf('export async function applyGeneratedMealAction'))
 
   it('aplica checkRateLimitAsync antes de chamar o Gemini', () => {

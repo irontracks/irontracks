@@ -11,7 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, Plus, Send, Sparkles, X } from 'lucide-react'
-import { applyChatSimulationAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { applyChatSimulationAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import NutritionSimulationCard, { type Simulation } from './NutritionSimulationCard'
 import type { SnapshotGoals } from '@/lib/nutrition/chatContext'

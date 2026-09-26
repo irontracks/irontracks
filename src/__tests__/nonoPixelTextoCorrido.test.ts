@@ -21,8 +21,8 @@ import { join } from 'node:path'
 
 /** Usos de 9px em texto corrido por arquivo. SÓ DESCE. */
 const TETO_POR_ARQUIVO: Record<string, number> = {
-  'src/app/(app)/community/CommunityClient.tsx': 1,
-  'src/app/para-professores/page.tsx': 6,
+  'src/app/app/(app)/community/CommunityClient.tsx': 1,
+  'src/app/app/para-professores/page.tsx': 6,
   'src/components/HistoryListPeriodReportModal.tsx': 1,
   'src/components/VipHub.tsx': 1,
   'src/components/WorkoutReport.tsx': 1,

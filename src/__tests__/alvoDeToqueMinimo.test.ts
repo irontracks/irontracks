@@ -187,7 +187,7 @@ describe('alvo de toque mínimo de 44pt', () => {
   })
 
   it('a utility existe no CSS e não neutraliza o próprio alvo', () => {
-    const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
+    const css = readFileSync(join('src', 'app', 'app', 'globals.css'), 'utf8')
     const bloco = css.slice(css.indexOf('.tap-44:'))
     expect(bloco).toContain("content: ''")
     expect(bloco.slice(0, 400)).not.toContain('pointer-events: none')
@@ -211,7 +211,7 @@ describe('alvo de toque mínimo de 44pt', () => {
    * de hoje.
    */
   it('a utility não rouba o posicionamento de quem declarou o seu', () => {
-    const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
+    const css = readFileSync(join('src', 'app', 'app', 'globals.css'), 'utf8')
     const regra = css
       .split('\n')
       .find((l) => l.includes('.tap-44') && l.includes('position:') && !l.includes('::after'))
@@ -230,7 +230,7 @@ describe('alvo de toque mínimo de 44pt', () => {
     // o press é o único canal que confirma o toque. Quem tem `active:scale-*`
     // na classe apenas sobrescreve (classe vence seletor de elemento) — a
     // maioria não tem, e é esta regra que os atende.
-    const css = readFileSync(join('src', 'app', 'globals.css'), 'utf8')
+    const css = readFileSync(join('src', 'app', 'app', 'globals.css'), 'utf8')
     const regra = /button:active[\s\S]{0,80}?transform:\s*scale\(0?\.\d+\)/
     expect(regra.test(css), 'a regra global de :active sumiu — sem ela, a maioria dos botões não dá retorno nenhum ao toque').toBe(true)
   })

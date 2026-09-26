@@ -10,7 +10,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
  * alimento neste card.
  */
 
-vi.mock('@/app/(app)/dashboard/nutrition/actions', () => ({
+vi.mock('@/app/app/(app)/dashboard/nutrition/actions', () => ({
     applyGeneratedMealAction: vi.fn(async () => ({ ok: true })),
 }))
 

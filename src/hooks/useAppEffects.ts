@@ -233,7 +233,7 @@ export function useAppEffects({
           if (session && session.user?.id) return
           if (ev === 'SIGNED_OUT') {
             clearClientSessionState()
-            if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+            if (typeof window !== 'undefined') window.location.href = '/app?next=/dashboard'
             return
           }
           if (ev === 'INITIAL_SESSION') {
@@ -241,7 +241,7 @@ export function useAppEffects({
               .then((r) => {
                 if (r && r.status === 204) return
                 clearClientSessionState()
-                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+                if (typeof window !== 'undefined') window.location.href = '/app?next=/dashboard'
               })
               .catch(() => { })
             return

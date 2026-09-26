@@ -4,8 +4,8 @@ const path = require('node:path')
 
 const repoRoot = path.join(__dirname, '..')
 
-const loginRoute = path.join(repoRoot, 'src', 'app', 'auth', 'login', 'route.ts')
-const callbackRoute = path.join(repoRoot, 'src', 'app', 'auth', 'callback', 'route.ts')
+const loginRoute = path.join(repoRoot, 'src', 'app', 'app', 'auth', 'login', 'route.ts')
+const callbackRoute = path.join(repoRoot, 'src', 'app', 'app', 'auth', 'callback', 'route.ts')
 
 assert.ok(fs.existsSync(loginRoute), 'auth/login/route.ts missing')
 assert.ok(fs.existsSync(callbackRoute), 'auth/callback/route.ts missing')

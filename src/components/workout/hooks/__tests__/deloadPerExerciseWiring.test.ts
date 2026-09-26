@@ -45,7 +45,7 @@ describe('persistência e toggle', () => {
   })
 
   it('o parent persiste via settings (mesmo padrão do autoLoad)', () => {
-    const impl = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+    const impl = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
     expect(impl).toMatch(/onToggleExerciseDeload=\{/)
     expect(impl).toMatch(/save\?\.\(\{\s*autoLoadDeloadOff:\s*next\s*\}\)/)
   })

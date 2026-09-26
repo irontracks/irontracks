@@ -160,7 +160,7 @@ describe('a tabela de sessões morta não tem leitor', () => {
         // Guard de FIAÇÃO: as duas passaram verdes isoladamente enquanto uma
         // delas somava sobre uma tabela vazia.
         for (const f of [
-            'src/app/(app)/dashboard/nutrition/page.tsx',
+            'src/app/app/(app)/dashboard/nutrition/page.tsx',
             'src/components/dashboard/nutrition/NutritionOverlay.tsx',
         ]) {
             const src = semComentarios(readFileSync(f, 'utf8'))

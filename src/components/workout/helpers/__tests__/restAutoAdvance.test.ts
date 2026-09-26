@@ -59,7 +59,7 @@ describe('RestTimerOverlay — fiação única (source-guard)', () => {
 
 describe('fiação do overlay + default seguro (source-guard)', () => {
   it('DashboardModals liga o overlay à preferência restTimerAutoStart', () => {
-    const modals = readFileSync('src/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
+    const modals = readFileSync('src/app/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
     expect(modals).toMatch(/autoStartEnabled=\{Boolean\([\s\S]*?restTimerAutoStart[\s\S]*?\)\}/)
     expect(modals).toMatch(/restTimerAutoStart:\s*!s\.restTimerAutoStart/)
   })

@@ -30,8 +30,14 @@ const PALETA = [
   '#0a0a0a', '#0f0f0e', '#151514', '#1a1a18',
 ]
 
-/** Landing e páginas comerciais têm identidade própria — fora do produto. */
-const FORA_DO_PRODUTO = /comercial|para-professores/
+/**
+ * Landing e páginas comerciais têm identidade própria — fora do produto.
+ *
+ * `ComercialContent` (não mais `comercial/`, desde a fase 3 da migração
+ * raiz↔/comercial, 26/09/2026: a landing subiu para a raiz de `src/app/` e a
+ * pasta deixou de existir) continua excluída pelo NOME do arquivo.
+ */
+const FORA_DO_PRODUTO = /ComercialContent|para-professores/
 
 const LIMIAR_INVISIVEL = 12
 

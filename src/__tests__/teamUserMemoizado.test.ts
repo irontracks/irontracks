@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const src = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+const src = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
 
 describe('prop `user` do TeamWorkoutProvider', () => {
     it('não é objeto literal no JSX', () => {

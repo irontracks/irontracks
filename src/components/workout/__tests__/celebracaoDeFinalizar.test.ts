@@ -14,7 +14,7 @@ import { join } from 'node:path'
 const SRC = join(__dirname, '..', '..', '..')
 const celebra = readFileSync(join(SRC, 'components/workout/WorkoutFinishCelebration.tsx'), 'utf8')
 const report = readFileSync(join(SRC, 'components/WorkoutReport.tsx'), 'utf8')
-const client = readFileSync(join(SRC, 'app/(app)/dashboard/IronTracksAppClientImpl.tsx'), 'utf8')
+const client = readFileSync(join(SRC, 'app/app/(app)/dashboard/IronTracksAppClientImpl.tsx'), 'utf8')
 
 describe('só comemora finalização DE VERDADE', () => {
     it('o relatório não decide sozinho — recebe o sinal de fora', () => {
@@ -190,7 +190,7 @@ describe('a frase NASCE no centro e vem crescendo', () => {
     it('respeita movimento reduzido', () => {
         expect(celebra).toMatch(/reduzMovimento/)
         expect(celebra).toMatch(/prefers-reduced-motion: reduce/)
-        const css = readFileSync(join(SRC, 'app/globals.css'), 'utf8')
+        const css = readFileSync(join(SRC, 'app/app/globals.css'), 'utf8')
         expect(css, 'o reset global de movimento reduzido sumiu').toMatch(/prefers-reduced-motion:\s*reduce/)
     })
 })

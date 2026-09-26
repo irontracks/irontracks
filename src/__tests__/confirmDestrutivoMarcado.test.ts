@@ -164,8 +164,8 @@ describe('o diálogo é o do app, nunca o do sistema', () => {
      * de parede e o débito fica congelado com cara de resolvido.
      */
     const ALERT_PENDENTE = [
-        'src/app/(app)/community/CommunityClient.tsx',            // fallback quando o toast falha
-        'src/app/marketplace/MarketplaceClient.tsx',              // confirmações de compra/restauro
+        'src/app/app/(app)/community/CommunityClient.tsx',            // fallback quando o toast falha
+        'src/app/app/marketplace/MarketplaceClient.tsx',              // confirmações de compra/restauro
         'src/components/assessment/AssessmentButton.tsx',         // 6 erros de import de JSON
         'src/components/workout/PartnerExerciseOverlay.tsx',      // adapta `alert` para o hook de CRUD
     ]
@@ -182,7 +182,7 @@ describe('o diálogo é o do app, nunca o do sistema', () => {
      * `navigator.clipboard` e fallback, e isso é escopo próprio.
      */
     const PROMPT_PENDENTE = [
-        'src/app/marketplace/MarketplaceClient.tsx', // prompt usado como caixa de cópia do PIX
+        'src/app/app/marketplace/MarketplaceClient.tsx', // prompt usado como caixa de cópia do PIX
     ]
 
     it('window.prompt só encolhe', () => {

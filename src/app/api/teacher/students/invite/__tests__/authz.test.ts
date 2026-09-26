@@ -61,7 +61,7 @@ describe('rota teacher/students/invite (convite + pré-aprovação)', () => {
 })
 
 describe('nome do aluno convidado (anti "nome feio" no OTP)', () => {
-  const layout = stripComments(readFileSync('src/app/(app)/layout.tsx', 'utf8'))
+  const layout = stripComments(readFileSync('src/app/app/(app)/layout.tsx', 'utf8'))
 
   it('o (app)/layout grava display_name do convite ao auto-aprovar (OTP não traz nome)', () => {
     // Regressão da revisão: aluno por OTP fica com display_name = prefixo do email. O branch

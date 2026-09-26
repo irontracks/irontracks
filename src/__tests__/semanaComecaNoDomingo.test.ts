@@ -44,7 +44,7 @@ const stripComments = (code: string): string =>
  */
 const PODE_CALCULAR_SOZINHO: Record<string, string> = {
   'src/utils/cron/weekRangeBrt.ts': 'é a fonte única',
-  'src/app/(app)/dashboard/schedule/ScheduleClient.tsx':
+  'src/app/app/(app)/dashboard/schedule/ScheduleClient.tsx':
     'grade visual da agenda, no fuso do aparelho — já começa no domingo e não conta treino',
   'src/utils/vip/weekReset.ts':
     'reset de COTA VIP (segunda 03:00 BRT). É regra de cobrança, não a semana de treino — mudar aqui altera quando o crédito volta',

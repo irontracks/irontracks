@@ -99,7 +99,7 @@ describe('UI da reordenação', () => {
     it('a tela avisa o PAI na hora — "Iniciar treino" não pode levar o que foi apagado', () => {
         expect(src).toMatch(/onExercisesChange\?\.\(next\)/)
         expect(src).toMatch(/onExercisesChange\?\.\(exercises\.filter/)
-        const pai = readFileSync('src/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
+        const pai = readFileSync('src/app/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
         expect(pai).toMatch(/onExercisesChange=\{\(next\) => setQuickViewWorkout\(\{ \.\.\.qw, exercises: next \}\)\}/)
     })
 

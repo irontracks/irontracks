@@ -25,11 +25,11 @@ import { ConteudoDoCard, destinoDa, temDestino } from '@/components/Notification
 const DIR = join(__dirname, '..')
 const central = readFileSync(join(DIR, 'NotificationCenter.tsx'), 'utf8')
 const shell = readFileSync(
-    join(DIR, '..', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'),
+    join(DIR, '..', 'app', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'),
     'utf8',
 )
 const modais = readFileSync(
-    join(DIR, '..', 'app', '(app)', 'dashboard', 'DashboardModals.tsx'),
+    join(DIR, '..', 'app', 'app', '(app)', 'dashboard', 'DashboardModals.tsx'),
     'utf8',
 )
 

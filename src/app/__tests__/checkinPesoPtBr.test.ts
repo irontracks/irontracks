@@ -16,7 +16,7 @@ import { join } from 'node:path'
  */
 
 const SRC = readFileSync(
-    join(process.cwd(), 'src/app/(app)/dashboard/DashboardModals.tsx'),
+    join(process.cwd(), 'src/app/app/(app)/dashboard/DashboardModals.tsx'),
     'utf8',
 )
 const semComentarios = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '')

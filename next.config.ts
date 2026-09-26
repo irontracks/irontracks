@@ -156,25 +156,52 @@ const nextConfig: NextConfig = {
         source: '/map-tiles/osm/:path*',
         destination: 'https://tile.openstreetmap.org/:path*',
       },
-      // ── Espelho temporário /app → raiz (migração raiz↔/comercial) ──────────
-      // Fase 1 de 3: a raiz AINDA é o app de verdade (login/dashboard/auth).
-      // Este rewrite só faz `/app` responder com o MESMO conteúdo, sem mover
-      // nenhum arquivo — para que a build nativa nova (que vai apontar
-      // `capacitor.config.ts` para `/app`) tenha algo para carregar antes da
-      // migração de rotas de verdade acontecer. Sem isso, quem atualizasse
-      // pro build novo antes da fase 2 veria 404 no lugar do dashboard.
-      // Link/router.push internos continuam sem o prefixo `/app` — a troca de
-      // URL na barra é invisível no WKWebView (sem chrome de navegador), então
-      // isso é aceitável só durante a transição. Remover no dia da fase 3
-      // (quando as pastas forem fisicamente movidas para dentro de `src/app/app/`).
-      {
-        source: '/app',
-        destination: '/',
-      },
-      {
-        source: '/app/:path*',
-        destination: '/:path*',
-      },
+      // ── Rewrite reverso (migração raiz↔/comercial, fase 3, 26/09/2026) ──────
+      // A raiz agora é a landing comercial de verdade (pastas movidas para
+      // src/app/, comercial subiu). O app de verdade mora fisicamente em
+      // `src/app/app/*`, respondendo nativamente em `/app/*`.
+      //
+      // Existem 80+ pontos de navegação hardcoded no código (redirect/
+      // router.push/Link/window.location) apontando para rotas do app SEM o
+      // prefixo `/app` — além de QR codes de convite já impressos, links de
+      // relatório/PDF já compartilhados, e-mails de aprovação já enviados e
+      // notificações já gravadas no banco com `link: '/dashboard'`. Reescrever
+      // tudo isso quebraria essas superfícies externas já emitidas. Em vez
+      // disso, as URLs ANTIGAS sem prefixo continuam respondendo — servindo
+      // por baixo dos panos o conteúdo físico de `/app/*`, sem mudar a URL
+      // visível. Nenhum desses 80+ call sites precisou ser tocado por causa
+      // disto (só os que apontavam para `/` nua, que passou a significar
+      // outra coisa — ver os redirects corrigidos em auth/logout, vip/*,
+      // r/[code], etc).
+      //
+      // Mais específico antes de mais genérico, mesma regra da fase 1.
+      // NÃO incluir aqui: '/', '/comercial' (vira redirect, ver abaixo),
+      // '/api/*', '/privacy', '/terms', '/manifest.json', assets estáticos.
+      { source: '/dashboard', destination: '/app/dashboard' },
+      { source: '/dashboard/:path*', destination: '/app/dashboard/:path*' },
+      { source: '/auth/:path*', destination: '/app/auth/:path*' },
+      { source: '/wait-approval', destination: '/app/wait-approval' },
+      { source: '/onboarding', destination: '/app/onboarding' },
+      { source: '/assessments/:path*', destination: '/app/assessments/:path*' },
+      { source: '/marketplace', destination: '/app/marketplace' },
+      { source: '/checkin', destination: '/app/checkin' },
+      { source: '/profile', destination: '/app/profile' },
+      { source: '/history', destination: '/app/history' },
+      { source: '/relatorio/:userId', destination: '/app/relatorio/:userId' },
+      { source: '/social', destination: '/app/social' },
+      { source: '/community', destination: '/app/community' },
+      { source: '/excluir-conta', destination: '/app/excluir-conta' },
+      { source: '/para-professores', destination: '/app/para-professores' },
+      { source: '/r/:code', destination: '/app/r/:code' },
+      { source: '/admin/:path*', destination: '/app/admin/:path*' },
+      { source: '/offline', destination: '/app/offline' },
+    ]
+  },
+  async redirects() {
+    return [
+      // A landing de verdade agora é a raiz — link antigo pra /comercial não
+      // fica "morto" na barra.
+      { source: '/comercial', destination: '/', permanent: false },
     ]
   },
   async headers() {

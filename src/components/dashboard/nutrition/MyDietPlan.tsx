@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { applyGeneratedMealAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { applyGeneratedMealAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useDialog } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'

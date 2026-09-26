@@ -100,7 +100,7 @@ describe('ratchet — leitura direta de user_settings', () => {
 
   it.each([
     // As duas superfícies que o CLAUDE.md manda manter em sincronia.
-    'app/(app)/dashboard/nutrition/page.tsx',
+    'app/app/(app)/dashboard/nutrition/page.tsx',
     'components/dashboard/nutrition/NutritionOverlay.tsx',
     // Rotas que resolvem fatos do usuário: o perfil delas vem do snapshot.
     'app/api/ai/vip-coach/route.ts',

@@ -22,7 +22,7 @@ const DIR = join(__dirname, '..')
 const historico = readFileSync(join(DIR, 'AssessmentHistory.tsx'), 'utf8')
 const header = readFileSync(join(DIR, 'AssessmentHeader.tsx'), 'utf8')
 const app = readFileSync(
-    join(DIR, '..', '..', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'),
+    join(DIR, '..', '..', 'app', 'app', '(app)', 'dashboard', 'IronTracksAppClientImpl.tsx'),
     'utf8',
 )
 
