@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { Metadata, Viewport } from 'next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
+import { headers } from 'next/headers'
 
 /**
  * Root layout do domínio — envolve a LANDING (`(landing)/`) E o APP (`app/`).
@@ -45,7 +46,15 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // OBRIGATÓRIO: ler os headers força a renderização DINÂMICA de todas as
+  // rotas. O CSP é bloqueante com nonce por requisição (middleware), e o Next
+  // só carimba o nonce nos scripts que injeta quando renderiza na hora — página
+  // pré-gerada no build sai SEM nonce e o navegador bloqueia todo script
+  // inline: a página não hidrata. Foi o que aconteceu com a landing em
+  // 26/09/2026 (fase 3 tirou esta leitura do raiz): conteúdo invisível ou
+  // desmontado, em produção. Guard: src/__tests__/rootLayoutDinamicoCsp.test.ts
+  await headers()
   return (
     <html lang="pt-BR">
       <head>
