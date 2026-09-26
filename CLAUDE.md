@@ -1055,6 +1055,19 @@ aparecia na prévia e SUMIA no arquivo salvo. Hoje `exportLeTudoPorRef.test.ts`
 COMPARA as duas chamadas em vez de listar campos — o próximo esquecido reprova
 sozinho.
 
+⚠️ **Elemento que vale para TODO layout não mora dentro do layout (26/09/2026).**
+`drawStory` tinha um `return` por layout, e cada um precisava lembrar do
+`restore` do zoom e das camadas que vêm depois dele: o `workout` lembrou do
+horário (25/08) e esqueceu a LEGENDA — no layout Treino a alça aparecia vazia, e
+o arquivo salvo saía sem o texto. No avesso, os layouts Normal/Direita/Esquerda
+desenhavam o horário ANTES do `restore`, e com zoom ele andava junto com o bloco
+e se separava da alça. Hoje o conteúdo do layout é `drawBlock` (pode sair cedo à
+vontade) e o `restore` + horário + legenda ficam fora dele, num `finally`.
+Guard em `camadasFinaisEmTodoLayout.test.ts`: um ctx falso que segue a MATRIZ de
+transform varre `STORY_LAYOUTS` + os nomes extintos + os três outros renderers,
+e cobra de cada um legenda por último, horário e marca fora do zoom, e
+`save`/`restore` equilibrados.
+
 São **QUATRO** composers (`StoryComposer` de treino, `NutritionStoryComposer`,
 `CardioStoryComposer`, `MetricsStoryComposer`) sobre `useStoryComposer` + os mesmos
 sub-componentes (`BrandDragHandle`, `AlignmentGuides`, `CustomTextDragHandle`,
