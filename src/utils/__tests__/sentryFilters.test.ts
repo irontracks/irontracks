@@ -42,4 +42,15 @@ describe('isNoiseException', () => {
   it('does not filter empty strings', () => {
     expect(isNoiseException('', '')).toBe(false);
   });
+  // "Connection closed." — o RSC client do Next.js aborta assim quando um
+  // stream é interrompido no meio (navegação, app perdendo foco). Visto no
+  // Sentry em 26/09/2026, confirmado como ruído do framework (não bug do
+  // app): os dois eventos eram bot de teste em preview e alguém saindo da
+  // página em produção — decisão do dono de tratar como ruído.
+  it('filters "Connection closed." (RSC stream interrompido)', () => {
+    expect(isNoiseException('Error', 'Connection closed.')).toBe(true);
+  });
+  it('does not filter a message that merely mentions "connection" loosely', () => {
+    expect(isNoiseException('Error', 'Connection refused by server')).toBe(false);
+  });
 });
