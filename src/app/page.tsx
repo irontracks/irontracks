@@ -1,49 +1,17 @@
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
-import RecoveryBridgeClient from './recovery-bridge-client'
-import LoginGate from './login-gate'
-import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
+import type { Metadata } from 'next'
+import ComercialContent from './ComercialContent'
 
-type SP = Record<string, string | string[] | undefined>
+export const metadata: Metadata = {
+  title: 'IronTracks — O app de treino que funciona de verdade',
+  description: 'Treinos avançados, Coach IA, Cardio GPS, Diário Nutricional e comunidade. Gratuito para iOS, Android e Web.',
+  openGraph: {
+    title: 'IronTracks — Alta Performance. Resultados Reais.',
+    description: 'Monitore cargas, bata recordes, treine com IA. Grátis na App Store e Google Play.',
+    url: 'https://irontracks.com.br',
+    images: [{ url: '/logo-irontracks.png' }],
+  },
+}
 
-export default async function HomePage({ searchParams }: { searchParams?: Promise<SP> }) {
-  const sp = await searchParams
-  const code = typeof sp?.code === 'string' ? sp.code : ''
-  const next = typeof sp?.next === 'string' ? sp.next : ''
-  const type = typeof sp?.type === 'string' ? sp.type : ''
-  const error = typeof sp?.error === 'string' ? sp.error : ''
-  const errorDescription = typeof sp?.error_description === 'string' ? sp.error_description : ''
-
-  if (code) {
-    const safeNext = sanitizeNextParam(next, '/dashboard')
-    const safeType = String(type || '').trim().toLowerCase()
-    if (safeType === 'recovery') {
-      redirect(
-        `/auth/recovery?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeNext)}&type=recovery`,
-      )
-    }
-    redirect(
-      `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeNext)}`,
-    )
-  }
-
-  if (error || errorDescription) {
-    const msg = errorDescription || error
-    redirect(`/auth/error?error=${encodeURIComponent(msg)}`)
-  }
-
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user?.id) redirect('/dashboard')
-  } catch {}
-
-  return (
-    <>
-      <RecoveryBridgeClient />
-      <LoginGate />
-    </>
-  )
+export default function ComercialPage() {
+  return <ComercialContent />
 }

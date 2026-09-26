@@ -11,7 +11,7 @@
  * (VIP), só se o passo anterior sinalizar `needsAi`. Offline usa só o
  * parser local.
  */
-import { resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { resolveFoodItemsAction, estimateFoodAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { analyzeMeal } from './parser'
 import { customFoodsToExtraFoods, type CustomFood } from '@/components/dashboard/nutrition/useCustomFoods'
 import type { MealItem } from './engine'

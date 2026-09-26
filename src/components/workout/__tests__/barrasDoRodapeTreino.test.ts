@@ -32,7 +32,7 @@ import path from 'node:path'
  * enumera o que o autor conhecia não é guard de classe. Antes era a LISTA de
  * arquivos; desta vez foi o DIRETÓRIO.
  */
-const DIRS = ['src/components/workout', 'src/app/(app)/dashboard']
+const DIRS = ['src/components/workout', 'src/app/app/(app)/dashboard']
 
 /**
  * Cada barra fixa no rodapé do treino ativo e o papel dela na convivência.

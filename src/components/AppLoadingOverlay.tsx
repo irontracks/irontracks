@@ -51,8 +51,14 @@ export default function AppLoadingOverlay() {
      * Invertido, o defeito não volta pela porta que o criou: página pública
      * nova nasce dispensando o overlay, em vez de nascer presa por 12 s até
      * alguém lembrar de acrescentá-la a uma lista.
+     *
+     * `/app`, não `/` — fase 3 da migração raiz↔/comercial (26/09/2026): a
+     * raiz nua virou a landing comercial, que não monta este overlay (ele só
+     * existe dentro do layout do app). A entrada real do app hoje é `/app`
+     * (onde `login-gate` mora agora), e `/dashboard*` continua igual — o
+     * rewrite reverso serve o dashboard sem mudar a URL visível.
      */
-    const anunciaProntidao = (p: string) => p === '/' || p.startsWith('/dashboard')
+    const anunciaProntidao = (p: string) => p === '/app' || p.startsWith('/dashboard')
     if (pathname && !anunciaProntidao(pathname)) {
       dismiss()
       return

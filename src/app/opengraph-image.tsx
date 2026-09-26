@@ -12,6 +12,11 @@ export const contentType = 'image/png'
 // public/logo-irontracks.png e é servido normalmente pelo Next.
 const LOGO_URL = 'https://irontracks.com.br/logo-irontracks.png'
 
+/**
+ * OG image da LANDING (raiz). Cópia com copy comercial, separada da versão do
+ * app (`src/app/app/opengraph-image.tsx`) — fase 3 da migração raiz↔/comercial,
+ * 26/09/2026.
+ */
 export default function OpenGraphImage() {
   return new ImageResponse(
     (
@@ -41,7 +46,7 @@ export default function OpenGraphImage() {
             ALTA PERFORMANCE
           </div>
           <div style={{ marginTop: 22, fontSize: 32, color: '#d4d4d4', fontWeight: 600, maxWidth: 620 }}>
-            Track your workouts and progress with IronTracks.
+            O app de treino que funciona de verdade.
           </div>
           <div style={{ marginTop: 40, fontSize: 24, color: '#fbbf24', fontWeight: 900 }}>
             irontracks.com.br

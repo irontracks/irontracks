@@ -72,7 +72,7 @@ describe('hydrateWorkouts do client: exercícios e séries em paralelo', () => {
 })
 
 describe('/api/gps/gyms só em nativo', () => {
-    const src = read('../../app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+    const src = read('../../app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
 
     it('fetch fica atrás do gate de bridge nativo', () => {
         const idxGate = src.indexOf('if (!gymsBridgeReady) return')

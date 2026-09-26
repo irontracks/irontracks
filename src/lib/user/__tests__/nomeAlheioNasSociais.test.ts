@@ -27,8 +27,8 @@ const SOCIAIS = [
   join('src', 'components', 'ChatListScreen.tsx'),
   join('src', 'components', 'ChatDirectScreen.tsx'),
   join('src', 'components', 'stories', 'StoryViewer.tsx'),
-  join('src', 'app', '(app)', 'community', 'CommunityClient.tsx'),
-  join('src', 'app', '(app)', 'community', 'LeaderboardPanel.tsx'),
+  join('src', 'app', 'app', '(app)', 'community', 'CommunityClient.tsx'),
+  join('src', 'app', 'app', '(app)', 'community', 'LeaderboardPanel.tsx'),
   join('src', 'components', 'dashboard', 'StoriesBar.tsx'),
 ]
 

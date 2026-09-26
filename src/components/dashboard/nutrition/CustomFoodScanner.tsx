@@ -9,7 +9,7 @@ import { useState, useRef, useCallback, memo } from 'react'
 import dynamic from 'next/dynamic'
 import type { CustomFoodDraft } from './useCustomFoods'
 import { NumericInput } from '@/components/ui/NumericInput'
-import { lookupBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { lookupBarcodeAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { plainFieldProps, properNameFieldProps } from '@/utils/ui/textFieldProps'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 

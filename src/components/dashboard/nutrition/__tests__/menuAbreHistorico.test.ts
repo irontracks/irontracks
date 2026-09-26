@@ -28,7 +28,7 @@ const ler = (rel: string) => {
 
 const mixer = ler('src/components/dashboard/nutrition/NutritionMixer.tsx')
 const overlay = ler('src/components/dashboard/nutrition/NutritionOverlay.tsx')
-const shell = ler('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+const shell = ler('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
 
 describe('menu do avatar → histórico de refeições', () => {
   it('a abertura REAGE à prop, não só ao nascimento do componente', () => {

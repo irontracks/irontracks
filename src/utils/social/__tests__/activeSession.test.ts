@@ -46,7 +46,7 @@ describe('"Treinando agora" não pode voltar a usar presença de app aberto (gua
     // o app"), então amigo aparecia treinando às 5h. `trainingNowIds` DEVE vir de
     // /api/social/training-now (sessão real). presence/list agora é permitido, mas
     // SÓ pra o indicador de "online" (onlineIds) — nunca pra trainingNowIds.
-    const hook = read('src/app/(app)/community/useCommunityData.ts')
+    const hook = read('src/app/app/(app)/community/useCommunityData.ts')
     expect(hook).toContain('/api/social/training-now')
     expect(hook).toMatch(/trainingRes\.training/) // trainingNowIds vem da sessão real
     // setTrainingNowIds não pode ser alimentado por online_users/presença

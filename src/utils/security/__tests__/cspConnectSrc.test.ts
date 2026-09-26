@@ -51,7 +51,7 @@ describe('origens confirmadas pelos relatórios', () => {
     const SRC = join(__dirname, '..', '..', '..')
     expect(readFileSync(join(SRC, 'hooks/useAppStoreUpdateCheck.ts'), 'utf8'))
       .toContain('itunes.apple.com')
-    expect(readFileSync(join(SRC, 'app/layout.tsx'), 'utf8'))
+    expect(readFileSync(join(SRC, 'app/app/layout.tsx'), 'utf8'))
       .toContain('api.cloudinary.com')
     // res.cloudinary.com: o chamador é o preload do StoryViewer.
     expect(readFileSync(join(SRC, 'components/stories/StoryViewer.tsx'), 'utf8'))

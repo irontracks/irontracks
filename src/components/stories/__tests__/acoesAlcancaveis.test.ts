@@ -99,7 +99,7 @@ describe('ordem dos blocos: controles antes da legenda', () => {
  * tocado (o teclado do iPhone ainda vai comer metade do espaço).
  */
 describe('escrever a legenda com a barra fixa na tela', () => {
-    const css = ler('src/app/globals.css')
+    const css = ler('src/app/app/globals.css')
 
     it('a barra some enquanto o campo está focado', () => {
         expect(css).toMatch(/body:has\(\.story-caption-field:focus\)\s*\.story-actions-bar/)

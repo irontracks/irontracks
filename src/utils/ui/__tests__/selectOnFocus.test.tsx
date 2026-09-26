@@ -131,7 +131,7 @@ describe('fiação — quem instala e quem usa', () => {
   const read = (p: string) => readFileSync(p, 'utf8')
 
   it('o shell do dashboard instala o listener delegado', () => {
-    const src = read('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+    const src = read('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
     expect(src).toMatch(/useEffect\(\(\)\s*=>\s*installNumericSelectOnFocus\(\),\s*\[\]\)/)
   })
 

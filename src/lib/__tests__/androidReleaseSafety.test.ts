@@ -57,7 +57,7 @@ describe('Android distribution flow guards', () => {
   })
 
   it('publishes a public account deletion path', () => {
-    const page = read('src/app/excluir-conta/page.tsx')
+    const page = read('src/app/app/excluir-conta/page.tsx')
     expect(page).toContain('Excluir minha conta')
     expect(page).toContain('mailto:irontrackscompany@gmail.com')
   })

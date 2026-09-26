@@ -50,7 +50,7 @@ describe('feedMessageSemNome', () => {
 })
 
 describe('fiação — o card usa o tratamento', () => {
-  const card = readFileSync(join('src', 'app', '(app)', 'community', 'FeedCard.tsx'), 'utf8')
+  const card = readFileSync(join('src', 'app', 'app', '(app)', 'community', 'FeedCard.tsx'), 'utf8')
 
   it('a mensagem não vai crua para a tela', () => {
     expect(card).not.toMatch(/\{item\.message\}/)

@@ -112,7 +112,7 @@ describe('o Watch recebe o treino que está sendo feito', () => {
   it('prioriza a sessão ATIVA sobre o primeiro treino da lista', () => {
     // O servidor resolve o exercício contra a sessão ativa: mandar `workouts[0]`
     // fazia todo `set.log` voltar 404 e a série sumir sem aviso.
-    const impl = ler('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
+    const impl = ler('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx')
     const i = impl.indexOf('const watchNextWorkout')
     const bloco = impl.slice(i, impl.indexOf('}, [workouts', i) + 40)
     expect(bloco).not.toBe('')

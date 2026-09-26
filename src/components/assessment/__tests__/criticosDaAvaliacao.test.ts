@@ -9,7 +9,7 @@ const semComentarios = (src: string) =>
 /** Quatro críticos da aba Avaliações — auditoria de design, 26/08/2026. */
 describe('avaliação física: os quatro críticos', () => {
   it('o nome do aluno não é literal — ele vai para o PDF', () => {
-    const pagina = semComentarios(ler('src/app/assessments/new/[studentId]/page.tsx'))
+    const pagina = semComentarios(ler('src/app/app/assessments/new/[studentId]/page.tsx'))
     expect(
       pagina,
       "`const studentName = 'Aluno'` era a ÚNICA fonte de nome do formulário, e chegava " +

@@ -18,7 +18,7 @@ import { join } from 'node:path'
  * qualquer número NÃO resolve — daí o portal ser parte do invariante.
  *
  * Mesmo remédio do editor de treino ativo (z-[2200] no shell): ver
- * src/app/(app)/dashboard/__tests__/activeEditorZIndex.test.ts.
+ * src/app/app/(app)/dashboard/__tests__/activeEditorZIndex.test.ts.
  */
 const modals = readFileSync(join(process.cwd(), 'src/components/workout/Modals.tsx'), 'utf8')
 const activeWorkout = readFileSync(join(process.cwd(), 'src/components/ActiveWorkout.tsx'), 'utf8')

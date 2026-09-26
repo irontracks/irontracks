@@ -250,7 +250,7 @@ describe('userSnapshot — custo e resiliência', () => {
  */
 describe.each([
   ['userContext', join('utils', 'ai', 'userContext.ts')],
-  ['página de nutrição', join('app', '(app)', 'dashboard', 'nutrition', 'page.tsx')],
+  ['página de nutrição', join('app', 'app', '(app)', 'dashboard', 'nutrition', 'page.tsx')],
 ])('%s — não volta a ler o perfil por conta própria', (_nome, caminho) => {
   /** Reduz ao código executável: a documentação do proibido cita as chaves. */
   const stripComments = (src: string) =>

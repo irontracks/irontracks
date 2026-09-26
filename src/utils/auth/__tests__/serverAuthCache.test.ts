@@ -31,8 +31,8 @@ describe('serverAuthCache', () => {
 })
 
 describe('layouts do boot usam o cache (não auth direto)', () => {
-    const appLayout = read('../../../app/(app)/layout.tsx')
-    const dashLayout = read('../../../app/(app)/dashboard/layout.tsx')
+    const appLayout = read('../../../app/app/(app)/layout.tsx')
+    const dashLayout = read('../../../app/app/(app)/dashboard/layout.tsx')
 
     for (const [nome, src] of [['(app)/layout', appLayout], ['dashboard/layout', dashLayout]] as const) {
         it(`${nome} resolve user/role via serverAuthCache`, () => {

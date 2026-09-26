@@ -53,7 +53,7 @@ describe('resolveDisplayGoals', () => {
 
 describe('DEFAULT_GOALS mora num lugar só', () => {
   const superficies = [
-    'src/app/(app)/dashboard/nutrition/page.tsx',
+    'src/app/app/(app)/dashboard/nutrition/page.tsx',
     'src/components/dashboard/nutrition/NutritionOverlay.tsx',
   ]
 

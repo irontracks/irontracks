@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
  */
 
 const SRC = join(__dirname, '..')
-const css = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
+const css = readFileSync(join(SRC, 'app', 'app', 'globals.css'), 'utf8')
 
 describe('entrada de modal vem da estrutura, não de classe por arquivo', () => {
     it('as três regras existem e miram em role+aria-modal', () => {

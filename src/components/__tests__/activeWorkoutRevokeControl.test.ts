@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
  */
 describe('ActiveWorkout — botão de revogar controle', () => {
   const aw = readFileSync('src/components/ActiveWorkout.tsx', 'utf8')
-  const parent = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+  const parent = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
 
   it('ActiveWorkout aceita onRevokeControl e mostra o botão que o chama', () => {
     expect(aw).toMatch(/onRevokeControl\?: \(\) => void \| Promise<void>/)

@@ -94,8 +94,8 @@ describe('ratchet — peso 900 em texto miúdo', () => {
 })
 
 describe('o sistema existe e está ligado', () => {
-    const globals = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
-    const layout = readFileSync(join(SRC, 'app', 'layout.tsx'), 'utf8')
+    const globals = readFileSync(join(SRC, 'app', 'app', 'globals.css'), 'utf8')
+    const layout = readFileSync(join(SRC, 'app', 'app', 'layout.tsx'), 'utf8')
 
     it('a escala semântica está definida', () => {
         for (const util of ['@utility t-title', '@utility t-action', '@utility t-meta']) {

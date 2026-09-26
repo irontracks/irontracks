@@ -75,7 +75,7 @@ describe('fiação — guard de CLASSE: toda tela que lança do plano passa os i
   })
 
   it('a action repassa os itens ao trackMeal', () => {
-    const src = readFileSync('src/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
+    const src = readFileSync('src/app/app/(app)/dashboard/nutrition/actions.ts', 'utf8')
     const i = src.indexOf('export async function applyGeneratedMealAction')
     const corpo = src.slice(i, src.indexOf('export async function', i + 10))
     expect(corpo).not.toBe('')

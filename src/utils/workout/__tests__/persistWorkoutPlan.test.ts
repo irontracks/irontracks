@@ -66,7 +66,7 @@ describe('quem grava dentro do treino ativo represa a invalidação', () => {
     })
 
     it('o app solta o represado ao SAIR do treino', () => {
-        const src = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+        const src = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
         expect(src).toContain('flushPendingWorkoutsRefresh')
         expect(src).toMatch(/wasActiveRef\.current && !isActive/)
     })

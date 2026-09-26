@@ -58,7 +58,7 @@ describe('a intenção não vaza para a próxima abertura', () => {
     })
 
     it('e o shell repassa a flag', () => {
-        const SHELL = semComentarios(ler('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx'))
+        const SHELL = semComentarios(ler('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx'))
         expect(SHELL).toMatch(/abrirImportDeFoto=\{createWizardNoImport\}/)
     })
 })

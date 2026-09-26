@@ -33,7 +33,7 @@ describe('o splash cobre só quem anuncia prontidão', () => {
 
     it('a regra é allowlist do que COBRE', () => {
         expect(executavel).toMatch(/anunciaProntidao/)
-        expect(executavel).toMatch(/p === '\/'/)
+        expect(executavel).toMatch(/p === '\/app'/)
         expect(executavel).toMatch(/startsWith\('\/dashboard'\)/)
         expect(executavel).toMatch(/if \(pathname && !anunciaProntidao\(pathname\)\)/)
     })
@@ -49,13 +49,13 @@ describe('o splash cobre só quem anuncia prontidão', () => {
             { encoding: 'utf8' },
         ).trim().split('\n').filter(Boolean).sort()
         expect(quemDispara).toEqual([
-            'src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', // rota /dashboard*
-            'src/app/login-gate.tsx',                              // rota /
+            'src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', // rota /dashboard*
+            'src/app/app/login-gate.tsx',                              // rota /app
         ])
     })
 
     it('as páginas estáticas que ficavam presas continuam sem anunciar nada', () => {
-        for (const pagina of ['src/app/terms/page.tsx', 'src/app/excluir-conta/page.tsx']) {
+        for (const pagina of ['src/app/terms/page.tsx', 'src/app/app/excluir-conta/page.tsx']) {
             const src = readFileSync(pagina, 'utf8')
             expect(src, `${pagina} não dispara ready — por isso não pode ser coberta`).not.toMatch(/irontracks:app:ready/)
         }
