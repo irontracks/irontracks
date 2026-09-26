@@ -11,7 +11,10 @@ const APPLE = 'https://apps.apple.com/br/app/irontracks/id6758735356'
 const GROUP = 'https://groups.google.com/g/irontracks-beta'
 const PLAY  = 'https://play.google.com/apps/testing/com.irontracks.app'
 const PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.irontracks.app'
-const WEB   = 'https://irontracks.com.br'
+// O app mora em /app desde a fase 3 da migração raiz↔/comercial (26/09/2026).
+// Antes, `WEB` (a raiz) ERA o app — depois da inversão ela é esta própria
+// landing, e "Usar no navegador"/"Entrar" só recarregavam a página.
+const APP   = '/app'
 
 // ── Reveal wrapper ──────────────────────────────────────────────────────────
 function Reveal({
@@ -142,14 +145,14 @@ function Nav() {
       borderBottom: scrolled ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
       transition: 'background 0.3s, backdrop-filter 0.3s, border-color 0.3s',
     }}>
-      <Link href={WEB} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
         <Image src="/logo-irontracks.png" alt="IronTracks" width={30} height={30} style={{ borderRadius: 8 }} />
         <span style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 16, color: '#f5f5f5', letterSpacing: '-0.02em' }}>
           IRON<em style={{ fontStyle: 'italic' }}>TRACKS</em>
         </span>
       </Link>
 
-      <div className="hidden md:flex items-center" style={{ gap: 32 }}>
+      <div className="com-nav-links" style={{ gap: 32 }}>
         {[
           { label: 'Features', href: '#features' },
           { label: 'App', href: '#showcase' },
@@ -275,7 +278,7 @@ function Hero({ onAndroidClick }: { onAndroidClick: () => void }) {
               <strong style={{ fontSize: 15 }}>Google Play</strong>
             </span>
           </button>
-          <Link href={WEB} style={{
+          <Link href={APP} style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
             padding: '14px 22px', borderRadius: 14,
             border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)',
@@ -887,7 +890,7 @@ function ProvaSocial() {
 function VipHint() {
   return (
     <div style={{ textAlign: 'center', padding: '36px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      <Link href={WEB} style={{
+      <Link href={APP} style={{
         display: 'inline-flex', alignItems: 'center', gap: 10,
         padding: '12px 22px', borderRadius: 12,
         border: '1px solid rgba(245,184,0,0.2)',
@@ -961,7 +964,7 @@ function FinalCta({ onAndroidClick }: { onAndroidClick: () => void }) {
                 <strong style={{ fontSize: 16 }}>Google Play</strong>
               </span>
             </button>
-            <Link href={WEB} style={{
+            <Link href={APP} style={{
               display: 'inline-flex', alignItems: 'center', gap: 12, padding: '16px 28px', borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)',
               color: '#f5f5f5', textDecoration: 'none', fontWeight: 600,
@@ -992,7 +995,7 @@ function Footer() {
         </div>
         <div style={{ display: 'flex', gap: 24 }}>
           <Link href="/privacy" style={{ fontSize: 13, color: 'rgba(245,245,245,0.3)', textDecoration: 'none' }}>Privacidade</Link>
-          <Link href={WEB} style={{ fontSize: 13, color: 'rgba(245,245,245,0.3)', textDecoration: 'none' }}>Entrar</Link>
+          <Link href={APP} style={{ fontSize: 13, color: 'rgba(245,245,245,0.3)', textDecoration: 'none' }}>Entrar</Link>
         </div>
         <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: 'rgba(245,245,245,0.2)', letterSpacing: '0.08em' }}>
           © 2026 · IRONTRACKS

@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
  *    porque era um literal digitado à mão. Conferido contra a API da Apple.
  */
 
-const comercial = readFileSync('src/app/ComercialContent.tsx', 'utf8')
+const comercial = readFileSync('src/app/(landing)/ComercialContent.tsx', 'utf8')
 const privacy = readFileSync('src/app/privacy/page.tsx', 'utf8')
 const terms = readFileSync('src/app/terms/page.tsx', 'utf8')
 const login = readFileSync('src/components/LoginScreen.tsx', 'utf8')
