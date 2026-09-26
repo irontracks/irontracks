@@ -66,7 +66,7 @@ const RAIZES = [join('src', 'components'), join('src', 'app')]
 
 const arquivos = RAIZES.flatMap((raiz) =>
   readdirSync(raiz, { recursive: true, encoding: 'utf8' })
-    .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__') && !f.includes('comercial'))
+    .filter((f) => f.endsWith('.tsx') && !f.includes('__tests__') && !f.includes('(landing)'))
     .map((f) => join(raiz, f)),
 )
 

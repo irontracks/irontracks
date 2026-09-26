@@ -20,8 +20,8 @@ import { join } from 'node:path'
  */
 
 const ler = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8')
-const CONTENT = ler('src/app/ComercialContent.tsx')
-const LAYOUT = ler('src/app/layout.tsx')
+const CONTENT = ler('src/app/(landing)/ComercialContent.tsx')
+const LAYOUT = ler('src/app/(landing)/layout.tsx')
 /** CSS sem comentários — eles são longos aqui e empurravam a regra para fora
  *  de qualquer janela de caracteres fixa (a primeira versão deste guard
  *  reprovou por isso, medindo o comentário em vez do código). */

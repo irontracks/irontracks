@@ -149,7 +149,7 @@ function Nav() {
         </span>
       </Link>
 
-      <div className="hidden md:flex items-center" style={{ gap: 32 }}>
+      <div className="com-nav-links" style={{ gap: 32 }}>
         {[
           { label: 'Features', href: '#features' },
           { label: 'App', href: '#showcase' },

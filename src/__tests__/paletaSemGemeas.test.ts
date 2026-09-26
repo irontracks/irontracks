@@ -33,11 +33,11 @@ const PALETA = [
 /**
  * Landing e páginas comerciais têm identidade própria — fora do produto.
  *
- * `ComercialContent` (não mais `comercial/`, desde a fase 3 da migração
- * raiz↔/comercial, 26/09/2026: a landing subiu para a raiz de `src/app/` e a
- * pasta deixou de existir) continua excluída pelo NOME do arquivo.
+ * A landing mora no grupo de rotas `(landing)/` desde 26/09/2026 (antes:
+ * `comercial/`, depois solta na raiz por algumas horas). Excluída pela PASTA,
+ * não pelo nome de um arquivo: componente novo da landing já nasce fora.
  */
-const FORA_DO_PRODUTO = /ComercialContent|para-professores/
+const FORA_DO_PRODUTO = /\(landing\)|para-professores/
 
 const LIMIAR_INVISIVEL = 12
 
