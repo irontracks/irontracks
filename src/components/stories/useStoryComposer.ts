@@ -900,7 +900,7 @@ export function useStoryComposer({
         if (draw) {
             draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto, timeOffset: to })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto, timeOffset: to })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo, brandScale: bs, customText: ct, customTextOffset: cto, timeOffset: to })
         }
     }
 

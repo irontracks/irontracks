@@ -413,7 +413,6 @@ export const drawStory = ({
     backgroundImage,
     metrics,
     layout,
-    livePositions,
     transparentBg = false,
     skipClear = false,
     template = DEFAULT_STORY_TEMPLATE,
@@ -430,7 +429,6 @@ export const drawStory = ({
     backgroundImage: HTMLImageElement | null;
     metrics: Metrics;
     layout: string;
-    livePositions: LivePositions;
     transparentBg?: boolean;
     skipClear?: boolean;
     template?: StoryTemplate;
@@ -492,8 +490,11 @@ export const drawStory = ({
     // Zoom/reposição do conteúdo (pinça + arrasto) — vale para TODOS os layouts.
     // Só o CONTEÚDO transforma: fundo (foto/gradiente) e overlay acima ficam fixos.
     // Pivô no centro do canvas pra o zoom crescer/encolher "no lugar".
-    // ⚠️ Todo caminho de saída desta função precisa do `restore` correspondente
-    // (há um `return` antecipado no bloco live/group e outro no workout).
+    // O conteúdo do layout mora em `drawBlock` e pode sair cedo à vontade: o
+    // `restore` e as camadas finais (horário, legenda) ficam DEPOIS dele, aqui
+    // fora, e nenhum `return` de layout alcança os dois. Até 26/09/2026 cada
+    // layout que retornava antes precisava lembrar deles — o `workout` lembrou do
+    // horário e esqueceu a legenda. Guard: `camadasFinaisEmTodoLayout.test.ts`.
     const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
     const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
     // Offset SÓ da marca (aplicado dentro do transform geral, nos blocos de brand).
@@ -513,443 +514,394 @@ export const drawStory = ({
     const right = canvasW - SAFE_SIDE;
     const safeBottomY = canvasH - SAFE_BOTTOM;
 
-    // Team Badge
-    const teamCount = Number(metrics?.teamCount) || 0;
-    if (teamCount >= 2) {
-        const label = `EQUIPE • ${teamCount}`;
-        ctx.save();
-        ctx.textBaseline = 'top';
-        ctx.font = f('900', 24);
-        const padX = 18;
-        const padY = 12;
-        const textW = ctx.measureText(label).width;
-        const w = Math.ceil(textW + padX * 2);
-        const h = 46;
-        const x = Math.max(left, right - w);
-        const y = SAFE_TOP;
-        drawRoundedRect(ctx, x, y, w, h, 18);
-        ctx.fillStyle = C.badgeFill;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = C.badgeBorder;
-        ctx.stroke();
-        ctx.fillStyle = C.badgeText;
-        ctx.fillText(label, x + padX, y + padY);
-        ctx.restore();
-    }
-
-    const gap = 18;
-    const cardH = 130;
-
-    // ── Premium card renderer ─────────────────────────────────────────────────
-    const drawCard = (
-        box: { x: number; y: number; w: number; h: number },
-        card: { label: string; value: string },
-    ) => {
-        const r = template.card.radius;
-
-        // 1. Dark glass fill
-        drawRoundedRect(ctx, box.x, box.y, box.w, box.h, r);
-        ctx.fillStyle = C.cardFill;
-        ctx.fill();
-
-        // 2. Subtle border
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = C.cardBorder;
-        ctx.stroke();
-
-        // 3. Accent bottom line (opcional por template)
-        const accentH = template.card.accentHeight;
-        if (template.card.showAccentLine) {
-            const accentY = box.y + box.h - accentH;
-            const accentInset = 14;
-            drawRoundedRect(ctx, box.x + accentInset, accentY, box.w - accentInset * 2, accentH, accentH / 2);
-            ctx.fillStyle = C.cardAccent;
+    // Conteúdo do layout, DENTRO do zoom/pan do bloco. Pode retornar cedo: quem
+    // desfaz o transform e desenha as camadas finais é o chamador, lá embaixo.
+    // (O antigo ramo `live`/`group` saiu daqui: nenhum dos dois está mais em
+    // `STORY_LAYOUTS`, então `layoutId` nunca os alcançava — era código morto
+    // com um `return` que pulava a legenda.)
+    const drawBlock = (): void => {
+        // Team Badge
+        const teamCount = Number(metrics?.teamCount) || 0;
+        if (teamCount >= 2) {
+            const label = `EQUIPE • ${teamCount}`;
+            ctx.save();
+            ctx.textBaseline = 'top';
+            ctx.font = f('900', 24);
+            const padX = 18;
+            const padY = 12;
+            const textW = ctx.measureText(label).width;
+            const w = Math.ceil(textW + padX * 2);
+            const h = 46;
+            const x = Math.max(left, right - w);
+            const y = SAFE_TOP;
+            drawRoundedRect(ctx, x, y, w, h, 18);
+            ctx.fillStyle = C.badgeFill;
             ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = C.badgeBorder;
+            ctx.stroke();
+            ctx.fillStyle = C.badgeText;
+            ctx.fillText(label, x + padX, y + padY);
+            ctx.restore();
         }
 
-        // 4. Label (acento)
-        ctx.textBaseline = 'top';
-        ctx.font = f(F.labelWeight, 20);
-        ctx.fillStyle = C.cardLabel;
-        ctx.letterSpacing = F.labelLetterSpacing;
-        const labelW = ctx.measureText(card.label).width;
-        const labelX = box.x + (box.w - labelW) / 2;
-        ctx.fillText(card.label, labelX, box.y + 20);
-        ctx.letterSpacing = '0px';
+        const gap = 18;
+        const cardH = 130;
 
-        // 5. Value — auto-shrink to fit
-        ctx.fillStyle = C.value;
-        let valFont = 52;
-        ctx.font = f(F.valueWeight, valFont);
-        let valW = ctx.measureText(card.value).width;
-        while (valW > box.w - 24 && valFont > 26) {
-            valFont -= 2;
+        // ── Premium card renderer ─────────────────────────────────────────────────
+        const drawCard = (
+            box: { x: number; y: number; w: number; h: number },
+            card: { label: string; value: string },
+        ) => {
+            const r = template.card.radius;
+
+            // 1. Dark glass fill
+            drawRoundedRect(ctx, box.x, box.y, box.w, box.h, r);
+            ctx.fillStyle = C.cardFill;
+            ctx.fill();
+
+            // 2. Subtle border
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = C.cardBorder;
+            ctx.stroke();
+
+            // 3. Accent bottom line (opcional por template)
+            const accentH = template.card.accentHeight;
+            if (template.card.showAccentLine) {
+                const accentY = box.y + box.h - accentH;
+                const accentInset = 14;
+                drawRoundedRect(ctx, box.x + accentInset, accentY, box.w - accentInset * 2, accentH, accentH / 2);
+                ctx.fillStyle = C.cardAccent;
+                ctx.fill();
+            }
+
+            // 4. Label (acento)
+            ctx.textBaseline = 'top';
+            ctx.font = f(F.labelWeight, 20);
+            ctx.fillStyle = C.cardLabel;
+            ctx.letterSpacing = F.labelLetterSpacing;
+            const labelW = ctx.measureText(card.label).width;
+            const labelX = box.x + (box.w - labelW) / 2;
+            ctx.fillText(card.label, labelX, box.y + 20);
+            ctx.letterSpacing = '0px';
+
+            // 5. Value — auto-shrink to fit
+            ctx.fillStyle = C.value;
+            let valFont = 52;
             ctx.font = f(F.valueWeight, valFont);
-            valW = ctx.measureText(card.value).width;
+            let valW = ctx.measureText(card.value).width;
+            while (valW > box.w - 24 && valFont > 26) {
+                valFont -= 2;
+                ctx.font = f(F.valueWeight, valFont);
+                valW = ctx.measureText(card.value).width;
+            }
+            const valX = box.x + (box.w - valW) / 2;
+            // centre value vertically in the card (accounting for label height ~40px)
+            const valY = box.y + 20 + 32 + Math.max(0, (box.h - 20 - 32 - valFont - accentH - 8) / 2);
+            ctx.fillText(card.value, valX, valY);
+        };
+
+        const layoutId = STORY_LAYOUTS.some((l) => l.id === layout) ? layout : 'bottom-row';
+
+        // ── Layout "Treino do Dia" — tabela de exercícios (Exercício/Reps/Peso/RPE) ─
+        if (layoutId === 'workout') {
+            const rows = Array.isArray(metrics?.exercises) ? metrics.exercises : [];
+
+            // Brand
+            ctx.textBaseline = 'top';
+            const bY = SAFE_TOP + 14;
+            const bSize = 48;
+            ctx.save();
+            // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o
+            // offset dela (independência total do resto do story).
+            enterBrandSpace(ctx, wt, bOff, brandScale);
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 12;
+            ctx.font = f(F.brandWeight, bSize, F.brandStyle);
+            ctx.fillStyle = C.brandPrimary;
+            ctx.fillText('IRON', left, bY);
+            const ironWidth = ctx.measureText('IRON').width;
+            ctx.fillStyle = C.brandAccent;
+            ctx.fillText('TRACKS', left + ironWidth, bY);
+            ctx.restore();
+
+            // Título (1 linha, trunca pra largura)
+            const tY = bY + bSize + 14;
+            ctx.font = f(F.titleWeight, 40);
+            ctx.fillStyle = C.title;
+            let tStr = (template.titleUppercase ? safeString(metrics?.title).toUpperCase() : safeString(metrics?.title)) || 'TREINO';
+            while (ctx.measureText(tStr).width > right - left && tStr.length > 4) tStr = tStr.slice(0, -2);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 10;
+            ctx.fillText(tStr, left, tY);
+            ctx.restore();
+
+            // Data / subtítulo
+            const dY = tY + 50;
+            ctx.font = f(F.subtitleWeight, 24);
+            ctx.fillStyle = C.subtitle;
+            ctx.letterSpacing = F.labelLetterSpacing;
+            ctx.fillText(metrics?.date ? `TREINO DO DIA · ${metrics.date}` : 'TREINO DO DIA', left, dY);
+            ctx.letterSpacing = '0px';
+
+            // Footer cards (TEMPO + CALORIAS + VOLUME TOTAL) ancorados no rodapé seguro
+            const footerH = cardH;
+            const footerY = safeBottomY - footerH;
+            const fW = Math.floor((right - left - gap * 2) / 3);
+            const tSecs = Math.max(0, Math.round(Number(metrics?.totalTime) || 0));
+            const tMin = Math.floor(tSecs / 60);
+            const tempoStr = tMin >= 60 ? `${Math.floor(tMin / 60)}h ${String(tMin % 60).padStart(2, '0')}min` : `${tMin}min`;
+            drawCard({ x: left, y: footerY, w: fW, h: footerH }, { label: 'TEMPO', value: tempoStr });
+            drawCard({ x: left + fW + gap, y: footerY, w: fW, h: footerH }, { label: 'CALORIAS', value: `${Math.round(Number(metrics?.kcal) || 0)} kcal` });
+            drawCard({ x: left + (fW + gap) * 2, y: footerY, w: fW, h: footerH }, { label: 'VOLUME TOTAL', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` });
+
+            // Cartão da tabela
+            const tableTop = dY + 44;
+            const tableBottom = footerY - 22;
+            drawRoundedRect(ctx, left, tableTop, right - left, tableBottom - tableTop, template.card.radius);
+            ctx.fillStyle = C.cardFill;
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = C.cardBorder;
+            ctx.stroke();
+
+            // Colunas (nome à esquerda; reps/peso/rpe alinhados à direita)
+            const padX = 24;
+            const nameX = left + padX;
+            const rpeR = right - padX;
+            const pesoR = rpeR - 92;
+            const repsR = pesoR - 104;
+            const nameMaxW = repsR - 72 - nameX;
+
+            // Cabeçalho
+            const headY = tableTop + 22;
+            ctx.font = f(F.labelWeight, 19);
+            ctx.fillStyle = C.cardLabel;
+            ctx.letterSpacing = F.labelLetterSpacing;
+            ctx.textAlign = 'left';
+            ctx.fillText('EXERCÍCIO', nameX, headY);
+            ctx.textAlign = 'right';
+            ctx.fillText('REPS', repsR, headY);
+            ctx.fillText('PESO', pesoR, headY);
+            ctx.fillText('TOTAL', rpeR, headY);
+            ctx.letterSpacing = '0px';
+
+            // Divisória
+            const headBottom = headY + 30;
+            ctx.beginPath();
+            ctx.moveTo(nameX, headBottom);
+            ctx.lineTo(rpeR, headBottom);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = C.cardBorder;
+            ctx.stroke();
+
+            // Linhas
+            const rowsTop = headBottom + 16;
+            const rowH = 46;
+            const maxRows = Math.max(0, Math.floor((tableBottom - rowsTop - 8) / rowH));
+            const overflow = rows.length > maxRows;
+            const visible = overflow ? rows.slice(0, Math.max(0, maxRows - 1)) : rows;
+            visible.forEach((row, i) => {
+                const ry = rowsTop + i * rowH;
+                ctx.textAlign = 'left';
+                ctx.font = f('700', 26);
+                ctx.fillStyle = C.value;
+                const full = String(row?.name || '');
+                let nm = full;
+                if (ctx.measureText(nm).width > nameMaxW) {
+                    while (nm.length > 2 && ctx.measureText(`${nm}…`).width > nameMaxW) nm = nm.slice(0, -1);
+                    nm = `${nm}…`;
+                }
+                ctx.fillText(nm, nameX, ry);
+                ctx.textAlign = 'right';
+                ctx.font = f(F.valueWeight, 26);
+                ctx.fillStyle = C.value;
+                ctx.fillText(String(row?.reps ?? '—'), repsR, ry);
+                ctx.fillText(String(row?.weight ?? '—'), pesoR, ry);
+                ctx.fillStyle = C.cardAccent;
+                ctx.fillText(String(row?.totalReps ?? row?.rpe ?? '—'), rpeR, ry);
+            });
+            if (overflow && rows.length > visible.length) {
+                ctx.textAlign = 'left';
+                ctx.font = f('700', 22);
+                ctx.fillStyle = C.subtitle;
+                ctx.fillText(`+ ${rows.length - visible.length} exercícios`, nameX, rowsTop + visible.length * rowH + 4);
+            }
+            if (rows.length === 0) {
+                ctx.textAlign = 'left';
+                ctx.font = f('700', 24);
+                ctx.fillStyle = C.subtitle;
+                ctx.fillText('Sem séries registradas', nameX, rowsTop + 4);
+            }
+
+            ctx.textAlign = 'left';
+            ctx.letterSpacing = '0px';
+            return;
         }
-        const valX = box.x + (box.w - valW) / 2;
-        // centre value vertically in the card (accounting for label height ~40px)
-        const valY = box.y + 20 + 32 + Math.max(0, (box.h - 20 - 32 - valFont - accentH - 8) / 2);
-        ctx.fillText(card.value, valX, valY);
-    };
 
-    const layoutId = STORY_LAYOUTS.some((l) => l.id === layout) ? layout : 'bottom-row';
-
-    if (layoutId === 'live' || layoutId === 'group') {
-        const safe =
-            livePositions && typeof livePositions === 'object' ? livePositions : DEFAULT_LIVE_POSITIONS;
-        const sizes = computeLiveSizes({ ctx, metrics, template });
-
-        const brandPos = clampPctWithSize({ pos: safe.brand, size: sizes.brand });
-        const titlePos = clampPctWithSize({ pos: safe.title, size: sizes.title });
-        const subtitlePos = clampPctWithSize({ pos: safe.subtitle, size: sizes.subtitle });
-        const cardVolumePos = clampPctWithSize({ pos: safe.cardVolume, size: sizes.card });
-        const cardTempoPos = clampPctWithSize({ pos: safe.cardTempo, size: sizes.card });
-        const cardKcalPos = clampPctWithSize({ pos: safe.cardKcal, size: sizes.card });
-
-        const brandX = brandPos.x * CANVAS_W;
-        const brandY = brandPos.y * CANVAS_H;
-
+        // ── Standard Layouts ──────────────────────────────────────────────────────
         ctx.textBaseline = 'top';
-        ctx.font = f(F.brandWeight, 56, F.brandStyle);
+
+        // Safe usable area
+        const safeH = canvasH - SAFE_TOP - SAFE_BOTTOM; // usable vertical pixels
+        void safeH; // referenced below per layout
+
+        // ── Brand logo (IRON·TRACKS) — strictly below SAFE_TOP ───────────────────
+        const brandY = SAFE_TOP + 18;
+        const brandFontSize = 54;
+        ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
+        ctx.textBaseline = 'top';
+
+        // Shadow for legibility on any background
+        ctx.save();
+        // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
+        // dela (independência total do resto do story).
+        enterBrandSpace(ctx, wt, bOff, brandScale);
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 12;
         ctx.fillStyle = C.brandPrimary;
-        ctx.fillText('IRON', brandX, brandY);
+        // IRONTRACKS: uma palavra. Duas cores, zero separador — ver a nota no topo
+        // de `storyTemplates.ts`. Este caminho já foi o único que inseria ' · ',
+        // enquanto live/group/workout desenhavam junto: a mesma marca, escrita de
+        // dois jeitos conforme o layout.
+        ctx.fillText('IRON', left, brandY);
         const ironW = ctx.measureText('IRON').width;
         ctx.fillStyle = C.brandAccent;
-        ctx.fillText('TRACKS', brandX + ironW, brandY);
+        ctx.fillText('TRACKS', left + ironW, brandY);
+        ctx.restore();
 
-        const titleX = titlePos.x * CANVAS_W;
-        const titleY = titlePos.y * CANVAS_H;
-        ctx.fillStyle = C.title;
-        ctx.font = f(F.titleWeight, 34);
-        ; (sizes.titleLines ?? []).forEach((l, idx) => {
-            ctx.fillText(l, titleX, titleY + idx * 40);
-        });
+        // ── Workout title — wrapping text ─────────────────────────────────────────
+        const titleFontSize = 36;
+        const titleLineH = titleFontSize + 8;
+        const title = template.titleUppercase
+            ? safeString(metrics?.title).toUpperCase()
+            : safeString(metrics?.title);
+        ctx.font = f(F.titleWeight, titleFontSize);
+        const lines: string[] = [];
+        const words = title.split(/\s+/).filter(Boolean);
+        let line = '';
+        for (const w of words) {
+            const candidate = line ? `${line} ${w}` : w;
+            if (ctx.measureText(candidate).width <= right - left) line = candidate;
+            else {
+                if (line) lines.push(line);
+                line = w;
+            }
+            if (lines.length >= 2) break;
+        }
+        if (line && lines.length < 2) lines.push(line);
 
-        const subtitleX = subtitlePos.x * CANVAS_W;
-        const subtitleY = subtitlePos.y * CANVAS_H;
-        ctx.fillStyle = C.subtitle;
-        ctx.font = f(F.titleWeight, 34);
-        const dateText = metrics?.date ? `• ${metrics.date}` : '';
-        ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), subtitleX, subtitleY);
-
+        // ── Card data ─────────────────────────────────────────────────────────────
         const cards = [
-            {
-                label: 'VOLUME',
-                value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg`,
-            },
+            { label: 'VOLUME', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` },
             { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
             { label: 'KCAL', value: String(metrics?.kcal || 0) },
         ];
 
-        const cardW = Math.floor((CANVAS_W - SAFE_SIDE * 2 - gap * 2) / 3);
-        const cardsBoxes = [
-            { x: cardVolumePos.x * CANVAS_W, y: cardVolumePos.y * CANVAS_H, w: cardW, h: cardH },
-            { x: cardTempoPos.x * CANVAS_W, y: cardTempoPos.y * CANVAS_H, w: cardW, h: cardH },
-            { x: cardKcalPos.x * CANVAS_W, y: cardKcalPos.y * CANVAS_H, w: cardW, h: cardH },
-        ];
+        // ── Subtitle pill helper ───────────────────────────────────────────────────
+        const drawSubtitlePill = (x: number, y: number) => {
+            const dateText = metrics?.date ? ` · ${metrics.date}` : '';
+            const subText = `RELATÓRIO${dateText}`;
+            ctx.font = f(F.subtitleWeight, 24);
+            const tw = ctx.measureText(subText).width;
+            const padX = 18; const padY = 10;
+            const pillW = tw + padX * 2;
+            const pillH = 24 + padY * 2;
+            drawRoundedRect(ctx, x, y, pillW, pillH, pillH / 2);
+            ctx.fillStyle = C.pillFill;
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = C.pillBorder;
+            ctx.stroke();
+            ctx.fillStyle = C.pillText;
+            ctx.fillText(subText, x + padX, y + padY);
+        };
 
-        cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
-        if (wtApplied) ctx.restore();
-        return;
-    }
+        // ── Layout coordinates (strict safe-area clamping) ────────────────────────
+        const cardW3 = Math.floor((right - left - gap * 2) / 3);
+        // Max card bottom Y = safeBottomY (= canvasH - SAFE_BOTTOM)
+        // So max card top Y = safeBottomY - cardH
+        const maxCardTopY = safeBottomY - cardH;
 
-    // ── Layout "Treino do Dia" — tabela de exercícios (Exercício/Reps/Peso/RPE) ─
-    if (layoutId === 'workout') {
-        const rows = Array.isArray(metrics?.exercises) ? metrics.exercises : [];
+        let titleY = 0;
+        let subtitleY = 0;
+        let cardsBoxes: { x: number; y: number; w: number; h: number }[] = [];
 
-        // Brand
-        ctx.textBaseline = 'top';
-        const bY = SAFE_TOP + 14;
-        const bSize = 48;
+        if (layoutId === 'top-row') {
+            // Brand → title → subtitle → cards, all top-aligned
+            titleY = Math.max(brandY + brandFontSize + 16, SAFE_TOP + brandFontSize + 28);
+            subtitleY = titleY + lines.length * titleLineH + 14;
+            const cardTopY = subtitleY + 50;
+            // Clamp cards so they don't exceed safeBottomY
+            const clampedCardY = Math.min(cardTopY, maxCardTopY);
+            cardsBoxes = cards.map((_, idx) => ({
+                x: left + idx * (cardW3 + gap),
+                y: clampedCardY,
+                w: cardW3,
+                h: cardH,
+            }));
+        } else if (layoutId === 'right-stack' || layoutId === 'left-stack') {
+            const stackW = Math.round((right - left) * 0.52); // ~52% of usable width
+            const x = layoutId === 'right-stack' ? right - stackW : left;
+            const totalStackH = cardH * 3 + gap * 2;
+            // Anchor bottom of last card to safe bottom edge
+            const lastCardBottom = Math.min(safeBottomY - 16, canvasH - SAFE_BOTTOM - 16);
+            const cardY0 = Math.max(SAFE_TOP, lastCardBottom - totalStackH);
+            cardsBoxes = cards.map((_, idx) => ({
+                x,
+                y: cardY0 + idx * (cardH + gap),
+                w: stackW,
+                h: cardH,
+            }));
+            subtitleY = Math.max(SAFE_TOP, cardsBoxes[0].y - 52);
+            titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
+        } else {
+            // bottom-row (default)
+            // Cards sit just above safe bottom edge
+            const cardTopY = safeBottomY - 16 - cardH;
+            subtitleY = cardTopY - 52;
+            titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
+            cardsBoxes = cards.map((_, idx) => ({
+                x: left + idx * (cardW3 + gap),
+                y: cardTopY,
+                w: cardW3,
+                h: cardH,
+            }));
+        }
+
+        // ── Draw workout title ────────────────────────────────────────────────────
         ctx.save();
-        // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o
-        // offset dela (independência total do resto do story).
-        enterBrandSpace(ctx, wt, bOff, brandScale);
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 12;
-        ctx.font = f(F.brandWeight, bSize, F.brandStyle);
-        ctx.fillStyle = C.brandPrimary;
-        ctx.fillText('IRON', left, bY);
-        const ironWidth = ctx.measureText('IRON').width;
-        ctx.fillStyle = C.brandAccent;
-        ctx.fillText('TRACKS', left + ironWidth, bY);
-        ctx.restore();
-
-        // Título (1 linha, trunca pra largura)
-        const tY = bY + bSize + 14;
-        ctx.font = f(F.titleWeight, 40);
-        ctx.fillStyle = C.title;
-        let tStr = (template.titleUppercase ? safeString(metrics?.title).toUpperCase() : safeString(metrics?.title)) || 'TREINO';
-        while (ctx.measureText(tStr).width > right - left && tStr.length > 4) tStr = tStr.slice(0, -2);
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
         ctx.shadowBlur = 10;
-        ctx.fillText(tStr, left, tY);
+        ctx.fillStyle = C.title;
+        ctx.font = f(F.titleWeight, titleFontSize);
+        ctx.textBaseline = 'top';
+        lines.forEach((l, idx) => {
+            ctx.fillText(l, left, titleY + idx * titleLineH);
+        });
         ctx.restore();
 
-        // Data / subtítulo
-        const dY = tY + 50;
-        ctx.font = f(F.subtitleWeight, 24);
-        ctx.fillStyle = C.subtitle;
-        ctx.letterSpacing = F.labelLetterSpacing;
-        ctx.fillText(metrics?.date ? `TREINO DO DIA · ${metrics.date}` : 'TREINO DO DIA', left, dY);
-        ctx.letterSpacing = '0px';
+        // ── Draw subtitle pill ────────────────────────────────────────────────────
+        ctx.textBaseline = 'top';
+        drawSubtitlePill(left, subtitleY);
 
-        // Footer cards (TEMPO + CALORIAS + VOLUME TOTAL) ancorados no rodapé seguro
-        const footerH = cardH;
-        const footerY = safeBottomY - footerH;
-        const fW = Math.floor((right - left - gap * 2) / 3);
-        const tSecs = Math.max(0, Math.round(Number(metrics?.totalTime) || 0));
-        const tMin = Math.floor(tSecs / 60);
-        const tempoStr = tMin >= 60 ? `${Math.floor(tMin / 60)}h ${String(tMin % 60).padStart(2, '0')}min` : `${tMin}min`;
-        drawCard({ x: left, y: footerY, w: fW, h: footerH }, { label: 'TEMPO', value: tempoStr });
-        drawCard({ x: left + fW + gap, y: footerY, w: fW, h: footerH }, { label: 'CALORIAS', value: `${Math.round(Number(metrics?.kcal) || 0)} kcal` });
-        drawCard({ x: left + (fW + gap) * 2, y: footerY, w: fW, h: footerH }, { label: 'VOLUME TOTAL', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` });
-
-        // Cartão da tabela
-        const tableTop = dY + 44;
-        const tableBottom = footerY - 22;
-        drawRoundedRect(ctx, left, tableTop, right - left, tableBottom - tableTop, template.card.radius);
-        ctx.fillStyle = C.cardFill;
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = C.cardBorder;
-        ctx.stroke();
-
-        // Colunas (nome à esquerda; reps/peso/rpe alinhados à direita)
-        const padX = 24;
-        const nameX = left + padX;
-        const rpeR = right - padX;
-        const pesoR = rpeR - 92;
-        const repsR = pesoR - 104;
-        const nameMaxW = repsR - 72 - nameX;
-
-        // Cabeçalho
-        const headY = tableTop + 22;
-        ctx.font = f(F.labelWeight, 19);
-        ctx.fillStyle = C.cardLabel;
-        ctx.letterSpacing = F.labelLetterSpacing;
-        ctx.textAlign = 'left';
-        ctx.fillText('EXERCÍCIO', nameX, headY);
-        ctx.textAlign = 'right';
-        ctx.fillText('REPS', repsR, headY);
-        ctx.fillText('PESO', pesoR, headY);
-        ctx.fillText('TOTAL', rpeR, headY);
-        ctx.letterSpacing = '0px';
-
-        // Divisória
-        const headBottom = headY + 30;
-        ctx.beginPath();
-        ctx.moveTo(nameX, headBottom);
-        ctx.lineTo(rpeR, headBottom);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = C.cardBorder;
-        ctx.stroke();
-
-        // Linhas
-        const rowsTop = headBottom + 16;
-        const rowH = 46;
-        const maxRows = Math.max(0, Math.floor((tableBottom - rowsTop - 8) / rowH));
-        const overflow = rows.length > maxRows;
-        const visible = overflow ? rows.slice(0, Math.max(0, maxRows - 1)) : rows;
-        visible.forEach((row, i) => {
-            const ry = rowsTop + i * rowH;
-            ctx.textAlign = 'left';
-            ctx.font = f('700', 26);
-            ctx.fillStyle = C.value;
-            const full = String(row?.name || '');
-            let nm = full;
-            if (ctx.measureText(nm).width > nameMaxW) {
-                while (nm.length > 2 && ctx.measureText(`${nm}…`).width > nameMaxW) nm = nm.slice(0, -1);
-                nm = `${nm}…`;
-            }
-            ctx.fillText(nm, nameX, ry);
-            ctx.textAlign = 'right';
-            ctx.font = f(F.valueWeight, 26);
-            ctx.fillStyle = C.value;
-            ctx.fillText(String(row?.reps ?? '—'), repsR, ry);
-            ctx.fillText(String(row?.weight ?? '—'), pesoR, ry);
-            ctx.fillStyle = C.cardAccent;
-            ctx.fillText(String(row?.totalReps ?? row?.rpe ?? '—'), rpeR, ry);
-        });
-        if (overflow && rows.length > visible.length) {
-            ctx.textAlign = 'left';
-            ctx.font = f('700', 22);
-            ctx.fillStyle = C.subtitle;
-            ctx.fillText(`+ ${rows.length - visible.length} exercícios`, nameX, rowsTop + visible.length * rowH + 4);
-        }
-        if (rows.length === 0) {
-            ctx.textAlign = 'left';
-            ctx.font = f('700', 24);
-            ctx.fillStyle = C.subtitle;
-            ctx.fillText('Sem séries registradas', nameX, rowsTop + 4);
-        }
-
-        ctx.textAlign = 'left';
-        ctx.letterSpacing = '0px';
-        if (wtApplied) ctx.restore();
-        // O horário vem DEPOIS do restore: ele é independente do zoom/pan do
-        // bloco, como a marca. Antes deste ponto, este caminho retornava sem
-        // desenhar horário nenhum — o layout "Treino" saía sem ele.
-        drawTimePill(ctx, { C, f, right, safeBottomY, offset: tOff });
-        return;
-    }
-
-    // ── Standard Layouts ──────────────────────────────────────────────────────
-    ctx.textBaseline = 'top';
-
-    // Safe usable area
-    const safeH = canvasH - SAFE_TOP - SAFE_BOTTOM; // usable vertical pixels
-    void safeH; // referenced below per layout
-
-    // ── Brand logo (IRON·TRACKS) — strictly below SAFE_TOP ───────────────────
-    const brandY = SAFE_TOP + 18;
-    const brandFontSize = 54;
-    ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
-    ctx.textBaseline = 'top';
-
-    // Shadow for legibility on any background
-    ctx.save();
-    // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
-    // dela (independência total do resto do story).
-    enterBrandSpace(ctx, wt, bOff, brandScale);
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = C.brandPrimary;
-    // IRONTRACKS: uma palavra. Duas cores, zero separador — ver a nota no topo
-    // de `storyTemplates.ts`. Este caminho já foi o único que inseria ' · ',
-    // enquanto live/group/workout desenhavam junto: a mesma marca, escrita de
-    // dois jeitos conforme o layout.
-    ctx.fillText('IRON', left, brandY);
-    const ironW = ctx.measureText('IRON').width;
-    ctx.fillStyle = C.brandAccent;
-    ctx.fillText('TRACKS', left + ironW, brandY);
-    ctx.restore();
-
-    // ── Workout title — wrapping text ─────────────────────────────────────────
-    const titleFontSize = 36;
-    const titleLineH = titleFontSize + 8;
-    const title = template.titleUppercase
-        ? safeString(metrics?.title).toUpperCase()
-        : safeString(metrics?.title);
-    ctx.font = f(F.titleWeight, titleFontSize);
-    const lines: string[] = [];
-    const words = title.split(/\s+/).filter(Boolean);
-    let line = '';
-    for (const w of words) {
-        const candidate = line ? `${line} ${w}` : w;
-        if (ctx.measureText(candidate).width <= right - left) line = candidate;
-        else {
-            if (line) lines.push(line);
-            line = w;
-        }
-        if (lines.length >= 2) break;
-    }
-    if (line && lines.length < 2) lines.push(line);
-
-    // ── Card data ─────────────────────────────────────────────────────────────
-    const cards = [
-        { label: 'VOLUME', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` },
-        { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
-        { label: 'KCAL', value: String(metrics?.kcal || 0) },
-    ];
-
-    // ── Subtitle pill helper ───────────────────────────────────────────────────
-    const drawSubtitlePill = (x: number, y: number) => {
-        const dateText = metrics?.date ? ` · ${metrics.date}` : '';
-        const subText = `RELATÓRIO${dateText}`;
-        ctx.font = f(F.subtitleWeight, 24);
-        const tw = ctx.measureText(subText).width;
-        const padX = 18; const padY = 10;
-        const pillW = tw + padX * 2;
-        const pillH = 24 + padY * 2;
-        drawRoundedRect(ctx, x, y, pillW, pillH, pillH / 2);
-        ctx.fillStyle = C.pillFill;
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = C.pillBorder;
-        ctx.stroke();
-        ctx.fillStyle = C.pillText;
-        ctx.fillText(subText, x + padX, y + padY);
+        // ── Draw cards ────────────────────────────────────────────────────────────
+        cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
     };
 
-    // ── Layout coordinates (strict safe-area clamping) ────────────────────────
-    const cardW3 = Math.floor((right - left - gap * 2) / 3);
-    // Max card bottom Y = safeBottomY (= canvasH - SAFE_BOTTOM)
-    // So max card top Y = safeBottomY - cardH
-    const maxCardTopY = safeBottomY - cardH;
-
-    let titleY = 0;
-    let subtitleY = 0;
-    let cardsBoxes: { x: number; y: number; w: number; h: number }[] = [];
-
-    if (layoutId === 'top-row') {
-        // Brand → title → subtitle → cards, all top-aligned
-        titleY = Math.max(brandY + brandFontSize + 16, SAFE_TOP + brandFontSize + 28);
-        subtitleY = titleY + lines.length * titleLineH + 14;
-        const cardTopY = subtitleY + 50;
-        // Clamp cards so they don't exceed safeBottomY
-        const clampedCardY = Math.min(cardTopY, maxCardTopY);
-        cardsBoxes = cards.map((_, idx) => ({
-            x: left + idx * (cardW3 + gap),
-            y: clampedCardY,
-            w: cardW3,
-            h: cardH,
-        }));
-    } else if (layoutId === 'right-stack' || layoutId === 'left-stack') {
-        const stackW = Math.round((right - left) * 0.52); // ~52% of usable width
-        const x = layoutId === 'right-stack' ? right - stackW : left;
-        const totalStackH = cardH * 3 + gap * 2;
-        // Anchor bottom of last card to safe bottom edge
-        const lastCardBottom = Math.min(safeBottomY - 16, canvasH - SAFE_BOTTOM - 16);
-        const cardY0 = Math.max(SAFE_TOP, lastCardBottom - totalStackH);
-        cardsBoxes = cards.map((_, idx) => ({
-            x,
-            y: cardY0 + idx * (cardH + gap),
-            w: stackW,
-            h: cardH,
-        }));
-        subtitleY = Math.max(SAFE_TOP, cardsBoxes[0].y - 52);
-        titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
-    } else {
-        // bottom-row (default)
-        // Cards sit just above safe bottom edge
-        const cardTopY = safeBottomY - 16 - cardH;
-        subtitleY = cardTopY - 52;
-        titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
-        cardsBoxes = cards.map((_, idx) => ({
-            x: left + idx * (cardW3 + gap),
-            y: cardTopY,
-            w: cardW3,
-            h: cardH,
-        }));
+    try {
+        drawBlock();
+    } finally {
+        if (wtApplied) ctx.restore();
     }
 
-    // ── Draw workout title ────────────────────────────────────────────────────
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = C.title;
-    ctx.font = f(F.titleWeight, titleFontSize);
-    ctx.textBaseline = 'top';
-    lines.forEach((l, idx) => {
-        ctx.fillText(l, left, titleY + idx * titleLineH);
-    });
-    ctx.restore();
-
-    // ── Draw subtitle pill ────────────────────────────────────────────────────
-    ctx.textBaseline = 'top';
-    drawSubtitlePill(left, subtitleY);
-
-    // ── Draw cards ────────────────────────────────────────────────────────────
-    cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
-
-    // O horário é INDEPENDENTE do layout, como a marca — ver `drawTimePill`.
+    // ── Camadas finais: em TODO layout, fora do zoom/pan do bloco ─────────────
+    // O horário é INDEPENDENTE do layout, como a marca — ver `drawTimePill`. E
+    // fica fora do transform porque a alça dele (HTML) não sabe do zoom: até
+    // 26/09/2026 os layouts Normal/Direita/Esquerda o desenhavam antes do
+    // `restore`, e com zoom a pílula andava para um lado e a alça para outro.
     drawTimePill(ctx, { C, f, right, safeBottomY, offset: tOff });
-
-    if (wtApplied) ctx.restore();
 
     // Legenda do usuário POR ÚLTIMO: é o que ele acabou de escrever e posicionar,
     // então nada do template pode cobri-la. Em espaço próprio (desfaz o zoom/pan do
