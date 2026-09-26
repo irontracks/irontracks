@@ -10,7 +10,7 @@ import { setTopWeightReps } from '@/utils/report/setVolume';
 import { getGeminiModel } from '@/utils/ai/gemini';
 import { logError } from '@/lib/logger';
 import { env } from '@/utils/env';
-import { VipPeriodizationQuestionnaire, buildWorkoutPlan } from '@/utils/vip/periodization';
+import { VipPeriodizationQuestionnaire, VipPeriodizationWeek, buildWorkoutPlan } from '@/utils/vip/periodization';
 import { vipPeriodizationExerciseSeed } from '@/data/vipPeriodizationExercises';
 import { isEnginePrefillOnly, isLogDone } from '@/lib/workout/isLogDone';
 
@@ -94,7 +94,44 @@ export const ensureExerciseLibrarySeeded = async (admin: SupabaseClient): Promis
     await admin.from('exercise_library').upsert(rows, { onConflict: 'normalized_name' });
 };
 
-const generateOverview = async (q: VipPeriodizationQuestionnaire, split: string): Promise<string | null> => {
+const PHASE_LABEL_PT: Record<VipPeriodizationWeek['phase'], string> = {
+    adaptation: 'adaptação',
+    progression: 'progressão',
+    peak: 'pico',
+    deload: 'deload',
+    test: 'teste de carga máxima',
+};
+
+/**
+ * Monta o bloco de fases por semana a partir do MESMO `computeWeeks` que gera o
+ * plano — nunca uma tabela separada aqui. Antes o prompt só dizia a duração total
+ * (`- Duração: 8 semanas`) e pedia à IA uma seção "Deload e testes" sem informar
+ * QUAIS semanas são essas — ela inventava (viu 8 semanas no fluxo real e escreveu
+ * "deload na semana 8" e "teste na semana 7", enquanto o plano de verdade fazia
+ * deload nas semanas 4 e 6 e teste na 8). As fases entram como FATO no prompt,
+ * com instrução explícita de não inventar outra semana.
+ */
+const buildWeeksPromptBlock = (weeks: VipPeriodizationWeek[]): string => {
+    const phaseLines = weeks.map((w) => `  Semana ${w.weekNumber}: ${PHASE_LABEL_PT[w.phase]}`);
+    const deloadWeeks = weeks.filter((w) => w.isDeload).map((w) => w.weekNumber);
+    const testWeeks = weeks.filter((w) => w.isTest).map((w) => w.weekNumber);
+    const deloadLine = deloadWeeks.length
+        ? `- Semana${deloadWeeks.length > 1 ? 's' : ''} de deload: ${deloadWeeks.join(' e ')}.`
+        : '- Este programa não tem semana de deload.';
+    const testLine = `- Semana${testWeeks.length > 1 ? 's' : ''} de teste de carga máxima: ${testWeeks.join(' e ')}.`;
+    return [
+        'Fases por semana (já decididas pelo app — use EXATAMENTE estas, nunca cite outra semana como deload ou teste):',
+        ...phaseLines,
+        deloadLine,
+        testLine,
+    ].join('\n');
+};
+
+export const generateOverview = async (
+    q: VipPeriodizationQuestionnaire,
+    split: string,
+    weeks: VipPeriodizationWeek[],
+): Promise<string | null> => {
     const apiKey = env.gemini.apiKey;
     if (!apiKey) return null;
     const model = getGeminiModel(apiKey, MODEL_ID);
@@ -102,7 +139,9 @@ const generateOverview = async (q: VipPeriodizationQuestionnaire, split: string)
         'Você é um coach de musculação do IronTracks.',
         'Crie um resumo curto e prático (pt-BR) para um programa de periodização.',
         'Não invente dados pessoais. Não use emojis.',
-        '', 'Estrutura: Título; Como funciona (3 bullets); Deload e testes (2 bullets); Como progredir (2 bullets).', '',
+        'Não use markdown: sem **, sem *, sem #, sem listas com marcador. Escreva em texto corrido, com quebras de linha simples entre as partes.',
+        '', 'Estrutura: Título; Como funciona (3 frases); Deload e testes (2 frases); Como progredir (2 frases).', '',
+        buildWeeksPromptBlock(weeks), '',
         'Dados:',
         `- Modelo: ${q.model}`, `- Duração: ${q.weeks} semanas`, `- Objetivo: ${q.goal}`, `- Nível: ${q.level}`,
         `- Dias/semana: ${q.daysPerWeek}`, `- Tempo/sessão: ${q.timeMinutes} min`, `- Split: ${split}`,
@@ -208,7 +247,7 @@ export async function createPeriodizationProgram(
     if (pErr) { logError('periodization:program', pErr); throw new Error('database_error'); }
     if (!programRow?.id) throw new Error('failed_to_create_program');
 
-    const overview = await generateOverview(q, plan.split.split);
+    const overview = await generateOverview(q, plan.split.split, plan.weeks);
     if (overview) {
         await admin.from('vip_periodization_programs').update({ config: { ...baseConfig, overview } }).eq('id', programId);
     }

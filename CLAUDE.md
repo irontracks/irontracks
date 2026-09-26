@@ -2584,6 +2584,41 @@ a régua nova — app de fato congelado. Evento com "(N frames não exibidos)" �
 UI colapsando frames de sistema, **não** falta de símbolo: os dSYMs estão lá,
 basta expandir no painel.
 
+⚠️ **Buscar "sentry" por e-mail (Gmail) NÃO acha o alerta, mesmo com ele na
+caixa** — medido em 26/09/2026: o dono tinha o e-mail "New issue" aberto no
+celular (print), e a busca `sentry`/`sentry.io`/`getsentry.com` pelo MCP do
+Gmail devolveu zero resultados relevantes (só um e-mail do NYTimes que casava
+por acaso). Não investiguei a causa (índice de busca, remetente que não
+contém literalmente "sentry"). **Se o MCP do Sentry estiver fora do ar e
+precisar do conteúdo de um alerta, peça print em vez de confiar na busca por
+e-mail.**
+
+## "Connection closed." no Sentry é ruído do Next.js, não bug do app (26/09/2026)
+
+⚠️ **`Error: Connection closed.` nasce DENTRO do runtime do Next.js**, não do
+nosso código — `grep -rn "Connection closed" src` não acha nada; a string
+mora em `node_modules/next/dist/compiled/react-server-dom-turbopack*/.../
+react-server-dom-turbopack-client.browser.development.js`, na função
+`close()`. Ela dispara quando um stream de React Server Components é
+interrompido antes de terminar: troca de página, app perdendo foco, perda de
+rede no meio do carregamento.
+
+**Hipótese testada e DESCARTADA: não tem relação com a migração de rotas
+`/app`** (commits `a608e77b3`/`ad11f9b4b`, 23/09/2026). Fazia sentido pelo
+timing — a própria migração confessa dívida de redirects hardcoded sem
+prefixo `/app` (`login-gate.tsx`, `page.tsx`, e ~13 lugares mais, `grep -rn
+"router\.push('/dashboard')\|redirect('/dashboard')\|redirect('/')" src`) —,
+mas os dois eventos reais vistos no Sentry **não passaram pela rota `/app`**:
+um era bot de teste (`HeadlessChrome`, deploy de preview) e o outro alguém
+saindo da página em produção pela URL raiz (`irontracks.com.br/`, Chrome real
+no iPhone — não o WKWebView do app nativo). **Não descarta a dívida em si**
+(ela é real e listada na fase 2 da migração), só descarta ELA como causa
+DESTES dois eventos.
+
+Tratado como ruído — mesmo padrão de `AbortError`/`ResizeObserver loop`:
+`isNoiseException` em `src/utils/sentryFilters.ts`. Decisão do dono,
+26/09/2026.
+
 ## Cardio em blocos: encadeamento automático e VOZ (12/09/2026)
 
 Pedido do dono: o app **fala** o tempo enquanto ele caminha, e um bloco de
@@ -3407,6 +3442,42 @@ RPC respondeu 0 para quem tem treinos — aí o problema é o parse, não a auth
 **O valor contraditório não é mais cacheado.** A chave é `user.id`+`totalWorkouts`
 e só muda quando um treino entra ou sai do histórico, então gravar o 0
 transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
+
+## Periodização VIP — o prompt de resumo não pode decidir o que o app já decidiu (26/09/2026)
+
+Dois defeitos confirmados no simulador com a conta de teste `djmkbrasil`, programa
+Linear/Hipertrofia de 8 semanas (PR #1171).
+
+⚠️ **`generateOverview` (`src/lib/vip/periodizationCreate.ts`) pedia a seção
+"Deload e testes" sem dizer QUAIS semanas eram — a IA inventava.** O prompt só
+levava `- Duração: 8 semanas`; o motor determinístico (`computeWeeks`,
+`src/utils/vip/periodization.ts`) faz deload nas semanas 4 e 6 e teste na
+última (`deloadWeeksByPlan = {4:[3], 6:[4,6], 8:[4,6]}`, `testWeek = weeks`).
+No programa real a IA escreveu "o deload é realizado na semana 8" e "testes...
+na semana 7" — nenhuma das duas batia com o plano que o próprio app montou.
+Hoje o prompt recebe as fases de CADA semana, tiradas do mesmo `computeWeeks`
+(fonte única, `buildWeeksPromptBlock`), com instrução de nunca citar outra
+semana como deload ou teste. **A classe vale para qualquer prompt de
+resumo/overview deste app: se o app já decidiu algo por conta própria (fase,
+data, valor calculado), o prompt precisa carregar esse fato — pedir à IA para
+"descrever" algo que ela não recebeu é pedir para inventar.** Guard:
+`periodizationOverviewPrompt.test.ts`, cobre 4/6/8 semanas comparando com
+`computeWeeks` (sem duplicar a tabela de deload no teste).
+
+**O resumo aparecia com a marcação markdown crua** — `VipPeriodizationPanel.tsx`
+fazia `String(config.overview)` puro, e a IA devolve `**negrito**`/`* item`.
+Corrigido com `sanitizeOverviewText` (`src/lib/vip/periodizationOverviewText.ts`)
+na exibição, E o prompt passou a pedir texto sem markdown. **As duas pontas são
+necessárias**: o prompt sozinho não bastaria porque `config.overview` de
+programas já criados não é regerado — ficaria com os asteriscos pra sempre sem
+a limpeza na exibição. Mesmo padrão que `NutritionChat.tsx` já usa pro negrito
+do chat (`RichText`), mas ali só o `**`; aqui o texto tinha também cabeçalho e
+lista, daí uma função separada.
+
+**O painel do professor (`PeriodizationModal.tsx`) não lê nem exibe
+`config.overview` hoje** — conferido no código (147 linhas, sem menção a
+`config`). Não havia divergência a corrigir lá; se um dia ele passar a mostrar
+o resumo, precisa do mesmo `sanitizeOverviewText`.
 
 ## "Dia ruim" compara o MESMO treino — e a identidade é o ID (18/09/2026)
 
