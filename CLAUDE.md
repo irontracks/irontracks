@@ -3395,6 +3395,42 @@ RPC respondeu 0 para quem tem treinos — aí o problema é o parse, não a auth
 e só muda quando um treino entra ou sai do histórico, então gravar o 0
 transformava uma falha momentânea em 30 minutos de "Iniciante do Ferro".
 
+## Periodização VIP — o prompt de resumo não pode decidir o que o app já decidiu (26/09/2026)
+
+Dois defeitos confirmados no simulador com a conta de teste `djmkbrasil`, programa
+Linear/Hipertrofia de 8 semanas (PR #1171).
+
+⚠️ **`generateOverview` (`src/lib/vip/periodizationCreate.ts`) pedia a seção
+"Deload e testes" sem dizer QUAIS semanas eram — a IA inventava.** O prompt só
+levava `- Duração: 8 semanas`; o motor determinístico (`computeWeeks`,
+`src/utils/vip/periodization.ts`) faz deload nas semanas 4 e 6 e teste na
+última (`deloadWeeksByPlan = {4:[3], 6:[4,6], 8:[4,6]}`, `testWeek = weeks`).
+No programa real a IA escreveu "o deload é realizado na semana 8" e "testes...
+na semana 7" — nenhuma das duas batia com o plano que o próprio app montou.
+Hoje o prompt recebe as fases de CADA semana, tiradas do mesmo `computeWeeks`
+(fonte única, `buildWeeksPromptBlock`), com instrução de nunca citar outra
+semana como deload ou teste. **A classe vale para qualquer prompt de
+resumo/overview deste app: se o app já decidiu algo por conta própria (fase,
+data, valor calculado), o prompt precisa carregar esse fato — pedir à IA para
+"descrever" algo que ela não recebeu é pedir para inventar.** Guard:
+`periodizationOverviewPrompt.test.ts`, cobre 4/6/8 semanas comparando com
+`computeWeeks` (sem duplicar a tabela de deload no teste).
+
+**O resumo aparecia com a marcação markdown crua** — `VipPeriodizationPanel.tsx`
+fazia `String(config.overview)` puro, e a IA devolve `**negrito**`/`* item`.
+Corrigido com `sanitizeOverviewText` (`src/lib/vip/periodizationOverviewText.ts`)
+na exibição, E o prompt passou a pedir texto sem markdown. **As duas pontas são
+necessárias**: o prompt sozinho não bastaria porque `config.overview` de
+programas já criados não é regerado — ficaria com os asteriscos pra sempre sem
+a limpeza na exibição. Mesmo padrão que `NutritionChat.tsx` já usa pro negrito
+do chat (`RichText`), mas ali só o `**`; aqui o texto tinha também cabeçalho e
+lista, daí uma função separada.
+
+**O painel do professor (`PeriodizationModal.tsx`) não lê nem exibe
+`config.overview` hoje** — conferido no código (147 linhas, sem menção a
+`config`). Não havia divergência a corrigir lá; se um dia ele passar a mostrar
+o resumo, precisa do mesmo `sanitizeOverviewText`.
+
 ## "Dia ruim" compara o MESMO treino — e a identidade é o ID (18/09/2026)
 
 `buildTrainingLoadFlags` montava a média de referência com as 6 sessões mais
