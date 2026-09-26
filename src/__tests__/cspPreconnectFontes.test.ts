@@ -10,8 +10,9 @@ import { buildCspHeader } from '@/utils/security/headers'
  * Apareceu como violação REAL em produção em 28/08/2026, um dia depois de o CSP
  * entrar em modo bloqueante. A saída foi REMOVER, não liberar: a Inter vem de
  * `next/font/google`, que a self-hospeda no build, então o app não pede nada ao
- * Google em runtime. Quem usa Google Fonts é a landing, com os próprios
- * preconnects.
+ * Google em runtime. A landing fazia `preconnect` para as dela até o redesign
+ * de 26/09/2026; hoje também usa `next/font` — ninguém pede fonte ao Google em
+ * tempo real.
  *
  * ⚠️ O que renderiza numa página do app é a SOMA de layouts: o raiz
  * (`src/app/layout.tsx`, que envolve landing E app) + o do app
@@ -49,19 +50,15 @@ describe('preconnect e CSP não podem se contradizer', () => {
         expect(semComentarios(ler(rel))).not.toMatch(/fonts\.googleapis\.com\/css2/)
     })
 
-    it('a landing continua com os dela — é quem usa Google Fonts de verdade', () => {
+    it('a landing também não pede fonte ao Google em tempo real — usa next/font', () => {
+        // Desde o redesign de 26/09/2026 as fontes da landing (Space Grotesk,
+        // JetBrains Mono, Inter) vêm de `next/font/google`, baixadas no BUILD e
+        // servidas pelo próprio site. O visitante não fala com o Google: sem
+        // `preconnect`, sem folha externa, sem IP entregue.
         const landing = semComentarios(ler(LANDING))
-        expect(landing).toMatch(/rel="preconnect"\s+href="https:\/\/fonts\.googleapis\.com"/)
-        expect(landing).toMatch(/fonts\.googleapis\.com\/css2/)
-    })
-
-    it('e a política continua permitindo a folha e os arquivos daquela página', () => {
-        // Removi o preconnect, não o uso: a landing carrega o CSS por
-        // `style-src` e os arquivos por `font-src`. Mexer nesses dois quebraria
-        // a landing.
-        const csp = buildCspHeader('nonce-teste')
-        expect(csp).toMatch(/style-src[^;]*fonts\.googleapis\.com/)
-        expect(csp).toMatch(/font-src[^;]*fonts\.gstatic\.com/)
+        expect(landing).toMatch(/from 'next\/font\/google'/)
+        expect(landing).not.toMatch(PRECONNECT_GOOGLE)
+        expect(landing).not.toMatch(/fonts\.googleapis\.com\/css2/)
     })
 
     it('todo host de preconnect que chega ao app está no connect-src', () => {

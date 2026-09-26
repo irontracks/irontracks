@@ -4,7 +4,7 @@ test.describe('Fluxo de download Android da página comercial', () => {
   test.use({ viewport: { width: 360, height: 640 } })
 
   test('mantém o modal rolável e os links de instalação acessíveis', async ({ page }) => {
-    await page.goto('/comercial')
+    await page.goto('/')
     await page.getByRole('button', { name: /Google Play/i }).first().click()
 
     const dialog = page.getByRole('dialog', { name: 'Baixar para Android' })

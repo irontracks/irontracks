@@ -1,0 +1,81 @@
+/*
+ * CSS da LANDING (raiz do domínio).
+ *
+ * O Tailwind do projeto vem de `app/globals.css`, que só carrega dentro do app.
+ * Aqui entra um Tailwind SÓ com as classes dos arquivos desta pasta
+ * (`source(none)` + `@source`): o CSS da landing não arrasta as utilities do
+ * app, e o app não recebe nada daqui além do que ele mesmo já gera.
+ *
+ * Regra de convivência: nada neste arquivo mira `html`/`body` — este CSS pode
+ * continuar no documento depois de uma navegação para /app. O que precisa
+ * mexer no documento mora no `<style>` do layout, que desmonta com a landing.
+ */
+@import "tailwindcss" source(none);
+@source "./";
+
+/*
+ * `inline`: as fontes referenciam variáveis do `next/font` (--lf-*), que são
+ * definidas no CONTÊINER da landing, não na raiz do documento. Sem `inline`, o
+ * Tailwind declara `--font-sans: var(--lf-body)` em :root — onde --lf-body não
+ * existe —, a fonte vira inválida e o navegador cai na padrão. Sintoma medido:
+ * "fonte pré-carregada e não usada" no console. Com `inline` a referência vai
+ * direto na classe e resolve no elemento, que herda --lf-* do contêiner.
+ */
+@theme inline {
+  --font-display: var(--lf-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--lf-mono), ui-monospace, monospace;
+  --font-sans: var(--lf-body), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@theme {
+  --color-ink: #050505;
+  --color-ink-2: #0b0b0b;
+  --color-ink-3: #121212;
+  --color-gold: #f5b800;
+  --color-gold-soft: #ffd34d;
+  --color-ember: #ff7a1a;
+
+  --animate-marquee: lp-marquee 45s linear infinite;
+  --animate-marquee-reverse: lp-marquee 45s linear infinite reverse;
+  --animate-spin-slow: spin 8s linear infinite;
+  --animate-pulse-dot: lp-pulse-dot 1.6s ease-in-out infinite;
+
+  @keyframes lp-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes lp-pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* Grade de fundo do topo: linhas finas, esmaecidas nas bordas. */
+@utility lp-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 75%);
+}
+
+/* Texto em degradê dourado (títulos de destaque). */
+@utility lp-gold-text {
+  background: linear-gradient(100deg, #ffe08a 0%, #f5b800 45%, #ff7a1a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Borda de 1px em degradê para cartões de destaque. */
+@utility lp-gold-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-ink-2), var(--color-ink-2)) padding-box,
+    linear-gradient(135deg, rgb(245 184 0 / 0.7), rgb(255 255 255 / 0.06) 45%, rgb(255 122 26 / 0.5)) border-box;
+}
