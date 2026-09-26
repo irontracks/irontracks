@@ -55,7 +55,7 @@ const LoadingScreen = () => {
                         // Recomeço deliberado do usuário: zera o contador para o
                         // próximo boot nascer limpo em vez de já abrir no socorro.
                         resetBounce(getBounceStorage())
-                        window.location.replace('/')
+                        window.location.replace('/app')
                     }}
                 >
                     Voltar ao início

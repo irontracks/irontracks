@@ -38,7 +38,7 @@ function fmtPct(n: number): string {
 export default async function AcquisitionPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.id) redirect('/?next=/admin/acquisition')
+  if (!user?.id) redirect('/app?next=/admin/acquisition')
 
   const { role } = await resolveRoleByUser(user)
   if (role !== 'admin') redirect('/dashboard')

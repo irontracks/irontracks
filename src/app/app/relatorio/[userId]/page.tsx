@@ -145,7 +145,7 @@ export default async function RelatorioPage({ params }: PageProps) {
   // próprio dono, o professor vinculado ou admin.
   const viewerClient = await createClient()
   const { data: { user: viewer } } = await viewerClient.auth.getUser()
-  if (!viewer?.id) redirect(`/?next=${encodeURIComponent(`/relatorio/${userId}`)}`)
+  if (!viewer?.id) redirect(`/app?next=${encodeURIComponent(`/relatorio/${userId}`)}`)
   if (viewer.id !== userId && !(await canCoachStudent({ id: viewer.id, email: viewer.email }, userId))) {
     notFound()
   }

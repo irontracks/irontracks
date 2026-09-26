@@ -102,7 +102,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createClient()
   // Dedup por request: mesma resolução do (app)/layout (React.cache).
   const user = await getRequestUser()
-  if (!user?.id) redirect('/?next=/dashboard')
+  if (!user?.id) redirect('/app?next=/dashboard')
 
   const initialUser = {
     id: user.id,

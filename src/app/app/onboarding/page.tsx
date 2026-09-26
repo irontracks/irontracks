@@ -28,14 +28,14 @@ export default function OnboardingPage() {
         const { data } = await supabase.auth.getUser()
         const user = data?.user
         if (!alive) return
-        if (!user) { window.location.replace('/'); return }
+        if (!user) { window.location.replace('/app'); return }
         const meta = (user.user_metadata || {}) as Record<string, unknown>
         const prefill = String(meta.full_name || meta.display_name || meta.name || '').trim()
         if (prefill) setFullName(prefill)
         setReady(true)
       } catch (e) {
         logError('onboarding:init', e)
-        if (alive) window.location.replace('/')
+        if (alive) window.location.replace('/app')
       }
     })()
     return () => { alive = false }

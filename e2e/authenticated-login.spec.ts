@@ -3,15 +3,17 @@ import { test, expect } from '@playwright/test'
 /**
  * Authenticated E2E: Login / Auth Flow
  *
- * The login form lives at / (root). When already authenticated,
- * the root page server-redirects to /dashboard.
+ * The login form lives at /app (raiz do app desde a fase 3 da migração
+ * raiz↔/comercial, 26/09/2026 — a raiz nua "/" virou a landing comercial e
+ * NÃO redireciona ninguém). When already authenticated, /app server-redirects
+ * to /dashboard.
  *
  * Requires: auth storage state (e2e/.auth/user.json).
  */
 test.describe('Login Flow', () => {
-    // Authenticated users hitting / should be redirected to /dashboard
-    test('authenticated user at / is redirected to dashboard', async ({ page }) => {
-        await page.goto('/')
+    // Authenticated users hitting /app should be redirected to /dashboard
+    test('authenticated user at /app is redirected to dashboard', async ({ page }) => {
+        await page.goto('/app')
         await page.waitForURL(url => url.toString().includes('/dashboard'), { timeout: 15_000 })
         expect(page.url()).toContain('/dashboard')
     })

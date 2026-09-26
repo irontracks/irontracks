@@ -7,12 +7,13 @@ export default async function WaitApprovalPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Se não estiver logado, manda pra home (não pra /auth/login que é OAuth-only).
+  // Se não estiver logado, manda pra home do APP (não pra /auth/login que é
+  // OAuth-only, nem pra "/", que desde a fase 3 é a landing comercial).
   // Isso acontece quando o signup terminou mas a sessão ainda não propagou no
   // server (ex: email confirmation obrigatório no Supabase, ou cookie ainda não
   // foi lido pelo SSR).
   if (!user) {
-    redirect("/");
+    redirect("/app");
   }
 
   const email = String(user.email || "").trim().toLowerCase();

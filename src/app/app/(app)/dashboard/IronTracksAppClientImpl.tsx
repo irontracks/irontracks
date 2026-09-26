@@ -560,7 +560,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         const baseUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
         if (!baseUserObj?.id) {
             try {
-                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+                if (typeof window !== 'undefined') window.location.href = '/app?next=/dashboard'
             } catch { }
             return
         }

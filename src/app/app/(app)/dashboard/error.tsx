@@ -56,7 +56,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
           type="button"
           onClick={() => {
             try {
-              window.location.href = '/?next=/dashboard'
+              window.location.href = '/app?next=/dashboard'
             } catch {}
           }}
           className="flex items-center justify-center gap-2 bg-neutral-900 border border-neutral-800 text-white px-6 py-3 rounded-xl font-black hover:bg-neutral-800 transition-all active:scale-95"
