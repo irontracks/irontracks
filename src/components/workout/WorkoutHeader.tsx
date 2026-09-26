@@ -20,7 +20,7 @@ export default function WorkoutHeader() {
   const {
     workout,
     exercises,
-    swapExerciseName,
+    swapExerciseNames,
     inviteOpen,
     setInviteOpen,
     openFullEditor,
@@ -439,8 +439,11 @@ export default function WorkoutHeader() {
         <AdaptarAmbienteModal
           open={adaptarAberto}
           onClose={() => setAdaptarAberto(false)}
-          exercicios={(exercises ?? []).map((e) => String((e as { name?: unknown })?.name ?? '').trim()).filter(Boolean)}
-          aoTrocar={(indice, nome) => swapExerciseName(indice, nome)}
+          // SEM filtrar vazios: o plano devolve `indice` desta lista, e ele
+          // precisa ser a posição no treino — filtrar um nome em branco
+          // deslocaria as trocas seguintes para o exercício errado.
+          exercicios={(exercises ?? []).map((e) => String((e as { name?: unknown })?.name ?? '').trim())}
+          aoAplicar={(trocas) => swapExerciseNames(trocas)}
         />
       )}
 

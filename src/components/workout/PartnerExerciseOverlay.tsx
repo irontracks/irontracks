@@ -224,6 +224,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         // treino do atleta), mas PRECISAM existir pra não dar TypeError.
         updateSetType: noop,
         swapExerciseName: noop,
+        swapExerciseNames: noopWithArg,
         deleteConfirmIdx: null,
         openDeleteConfirm: noopWithArg,
         closeDeleteConfirm: noop,

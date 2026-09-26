@@ -76,6 +76,9 @@ interface ExerciseCrudDeps {
   confirm: ConfirmFn;
 }
 
+/** Uma troca de exercício por posição: `indice` no treino, `para` = nome novo. */
+export type TrocaDeExercicio = { indice: number; para: string };
+
 export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   const {
     workout, exercises, logs,
@@ -706,22 +709,46 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
    * IA, e "Adaptar ambiente" — que troca o treino inteiro num toque — NÃO,
    * senão um gesto viraria N chamadas pagas ao Gemini.
    */
-  const swapExerciseName = (exIdx: number, newName: string, opts?: { gerarNota?: boolean }) => {
+  const swapExerciseName = (exIdx: number, newName: string, opts?: { gerarNota?: boolean }) =>
+    swapExerciseNames([{ indice: exIdx, para: newName }], opts);
+
+  /**
+   * Aplica VÁRIAS trocas numa única escrita da sessão — e é o único caminho de
+   * troca: `swapExerciseName` é este mesmo lote com um item.
+   *
+   * Existe por um defeito de 26/09/2026: "Treinar em casa" chamava a troca
+   * individual num laço e só a ÚLTIMA sobrevivia. Cada chamada montava a lista
+   * a partir do `exercises` deste render (`onUpdateSession` só aceita objeto,
+   * sem updater funcional), então a 2ª escrita apagava a 1ª. Quem precisa
+   * trocar mais de um exercício passa a lista inteira aqui — nunca um laço de
+   * `swapExerciseName`. Guard: `__tests__/treinarEmCasaAplicaTodas.test.tsx`.
+   */
+  const swapExerciseNames = (trocas: TrocaDeExercicio[], opts?: { gerarNota?: boolean }) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
-    if (exIdx < 0 || exIdx >= exercises.length) return;
-    const trimmed = newName.trim();
-    if (!trimmed) return;
     try {
       const nextExercises = [...exercises];
-      const exRaw = nextExercises[exIdx] && typeof nextExercises[exIdx] === 'object' ? nextExercises[exIdx] : {} as WorkoutExercise;
-      const notaAntiga = String((exRaw as { notes?: unknown })?.notes ?? '');
-      // Vazio é melhor que mentiroso: sai a descrição do aparelho velho, fica
-      // só o que CONFIGURA método (o card parseia SST/drop dali).
-      const metodoPreservado = notaAoTrocar(notaAntiga);
-      nextExercises[exIdx] = { ...exRaw, name: trimmed, notes: metodoPreservado };
-      rastrearTreino(EVENTOS_TREINO.trocaAplicar, { gerarNota: Boolean(opts?.gerarNota) });
+      const aplicadas: Array<{ exIdx: number; nome: string; metodo: string }> = [];
+      for (const troca of Array.isArray(trocas) ? trocas : []) {
+        const exIdx = Number(troca?.indice);
+        if (!Number.isInteger(exIdx) || exIdx < 0 || exIdx >= nextExercises.length) continue;
+        const trimmed = String(troca?.para ?? '').trim();
+        if (!trimmed) continue;
+        const exRaw = nextExercises[exIdx] && typeof nextExercises[exIdx] === 'object' ? nextExercises[exIdx] : {} as WorkoutExercise;
+        const notaAntiga = String((exRaw as { notes?: unknown })?.notes ?? '');
+        // Vazio é melhor que mentiroso: sai a descrição do aparelho velho, fica
+        // só o que CONFIGURA método (o card parseia SST/drop dali).
+        const metodoPreservado = notaAoTrocar(notaAntiga);
+        nextExercises[exIdx] = { ...exRaw, name: trimmed, notes: metodoPreservado };
+        aplicadas.push({ exIdx, nome: trimmed, metodo: metodoPreservado });
+      }
+      if (!aplicadas.length) return;
+      for (let i = 0; i < aplicadas.length; i += 1) {
+        rastrearTreino(EVENTOS_TREINO.trocaAplicar, { gerarNota: Boolean(opts?.gerarNota) });
+      }
       onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
-      if (opts?.gerarNota) void gerarNotaDoExercicio(exIdx, trimmed, metodoPreservado);
+      if (opts?.gerarNota) {
+        for (const a of aplicadas) void gerarNotaDoExercicio(a.exIdx, a.nome, a.metodo);
+      }
     } catch { /* silent */ }
   };
 
@@ -852,6 +879,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     saveEditExercise,
     addExtraExerciseToWorkout,
     swapExerciseName,
+    swapExerciseNames,
     openOrganizeModal,
     requestCloseOrganize,
     saveOrganize,
