@@ -132,7 +132,27 @@ function absorverNoItem(item: PlanItem, macro: MacroAjustavel, saldoDisponivel: 
  * lançado. `lancamentosPorNome` é chaveado por `normalizeFoodKey(nome da
  * refeição)` — quem chama monta esse mapa a partir do diário do dia.
  */
-export function ajustarDia(refeicoesDoDia: PlanMeal[], lancamentosPorNome: Map<string, MacroTotals>): ResultadoAjusteDoDia {
+/** "HH:MM" → minutos do dia; `null` quando a refeição não tem horário válido. */
+function minutosDoHorario(time: string | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(time ?? '').trim())
+  if (!m) return null
+  const h = Number(m[1]), min = Number(m[2])
+  if (h > 23 || min > 59) return null
+  return h * 60 + min
+}
+
+/**
+ * Refeição pendente cujo horário JÁ PASSOU não recebe o saldo: ela não vai
+ * mais acontecer (pedido do dono, 28/09/2026 — o Pré-treino das 05:45 não
+ * feito ficava absorvendo carbo às 13h). Sem horário, ou sem `minutoAtual`,
+ * a refeição continua elegível. Ela segue fora do saldo como antes — não
+ * lançar não vira "comeu zero".
+ */
+export function ajustarDia(
+  refeicoesDoDia: PlanMeal[],
+  lancamentosPorNome: Map<string, MacroTotals>,
+  opts: { minutoAtual?: number } = {},
+): ResultadoAjusteDoDia {
   const saldo: Record<MacroAjustavel, number> = { protein: 0, carbs: 0, fat: 0 }
   const indicesPendentes: number[] = []
   const refeicoes = refeicoesDoDia.map((r) => r)
@@ -144,7 +164,9 @@ export function ajustarDia(refeicoesDoDia: PlanMeal[], lancamentosPorNome: Map<s
       saldo.carbs += num(refeicao.totals.carbs) - num(lancado.carbs)
       saldo.fat += num(refeicao.totals.fat) - num(lancado.fat)
     } else {
-      indicesPendentes.push(idx)
+      const horario = minutosDoHorario(refeicao.time)
+      const jaPassou = opts.minutoAtual != null && horario != null && horario < opts.minutoAtual
+      if (!jaPassou) indicesPendentes.push(idx)
     }
   })
 

@@ -106,6 +106,21 @@ describe('ajustarDia', () => {
     expect(r.ajustes.filter((a) => a.macro === 'carbs').length).toBe(3)
   })
 
+  it('refeição pendente com horário já passado não recebe o saldo (28/09/2026)', () => {
+    const pos = refeicao('Pós-treino', [{ food: 'Banana', grams: 200, protein: 0, carbs: 104, fat: 0 }])
+    const pre = { ...refeicao('Pré-treino', [{ food: 'Pré-treino Minotauro', grams: 15, protein: 0, carbs: 6.1, fat: 0 }]), time: '05:45' }
+    const jantar = { ...refeicao('Jantar', [{ food: 'Arroz branco cozido', grams: 200, protein: 0, carbs: 56, fat: 0 }]), time: '19:30' }
+    const lancamentos = new Map<string, MacroTotals>([[normalizeFoodKey('Pós-treino'), totals(0, 59, 0)]])
+
+    const r = ajustarDia([pos, pre, jantar], lancamentos, { minutoAtual: 13 * 60 + 32 })
+
+    expect(r.refeicoes.find((x) => x.name === 'Pré-treino')!.items).toEqual(pre.items)
+    expect(r.ajustes.some((a) => a.refeicao === 'Pré-treino')).toBe(false)
+    expect(r.ajustes.some((a) => a.refeicao === 'Jantar')).toBe(true)
+    // Sem o minuto atual (ou refeição sem horário), segue elegível.
+    expect(ajustarDia([pos, pre, jantar], lancamentos).ajustes.some((a) => a.refeicao === 'Pré-treino')).toBe(true)
+  })
+
   it('macros independentes: proteína e carboidrato ajustam itens diferentes na mesma refeição', () => {
     const almoco = refeicao('Almoço', [
       { food: 'Arroz branco cozido', grams: 200, protein: 5, carbs: 56, fat: 0 },
@@ -135,5 +150,14 @@ describe('ajustarDia', () => {
 
     const resultado = ajustarDia([almoco, janta], lancamentos)
     expect(resultado.ajustes).toEqual([])
+  })
+})
+
+describe('fiação: a tela passa o minuto atual ao reajuste', () => {
+  it('MyDietPlan chama ajustarDia com minutoAtual', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync('src/components/dashboard/nutrition/MyDietPlan.tsx', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(src).toMatch(/ajustarDia\([^)]*\{\s*minutoAtual\s*\}\s*\)/)
   })
 })
