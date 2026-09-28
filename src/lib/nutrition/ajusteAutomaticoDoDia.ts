@@ -22,13 +22,12 @@
  * O QUE fica de fora nesta primeira versão, de propósito:
  * - Redistribuir um macro em MAIS de um item por refeição (resolve no
  *   primeiro item compatível que achar).
- * - Cruzar múltiplas refeições pendentes por macro além da primeira que
- *   tiver item compatível — se ela não bastar (teto de variação), o resto
- *   fica em `saldoNaoAbsorvido`, não continua procurando na seguinte.
- * Os dois são simplificações conscientes: cobrem o caso comum (sobrou
- * carbo, a próxima refeição com carbo absorve) sem a complexidade de um
- * solver completo. Evoluir para múltiplos itens/refeições é trabalho
- * separado, se a experiência mostrar que faz falta.
+ * Isso é simplificação consciente. Mas o que a refeição não absorver
+ * (teto de variação) SEGUE para a próxima refeição pendente — até
+ * 28/09/2026 parava na primeira: no plano real do dono o Pré-treino (não
+ * lançado) travava no teto com +3,7 g de carbo e os outros 44–72 g nunca
+ * chegavam ao Lanche/Jantar; editar o Almoço só mexia no saldo invisível.
+ * Guard: "o que a primeira não absorve segue para a próxima".
  */
 import { normalizeFoodKey } from './learned-foods'
 import { classifyFood, macrosPer100g, type FoodClass } from './foodSwap'
@@ -171,8 +170,8 @@ export function ajustarDia(refeicoesDoDia: PlanMeal[], lancamentosPorNome: Map<s
 
       saldo[macro] -= absorvido
       ajustes.push({ refeicao: refeicao.name, alimento: item.food, macro, deltaG: round(absorvido) })
-      // Só o PRIMEIRO item compatível por refeição, de propósito (ver cabeçalho).
-      break
+      // Um item por refeição (o `findIndex` acima); o que sobrar segue para a
+      // próxima pendente — o `break` do topo do laço encerra quando zerar.
     }
   }
 

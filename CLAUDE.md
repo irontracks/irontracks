@@ -703,12 +703,13 @@ Teto de variação por item: 0,5×–1,6× o tamanho original (mesma lógica de
 bom senso de outras travas do app — sem teto, um dia sem registrar nada
 faria o item seguinte virar uma montanha de comida).
 
-⚠️ **v1 resolve num item só por macro, na primeira refeição pendente
-compatível — não espalha por múltiplos itens/refeições.** Simplificação
-consciente pra cobrir o caso comum sem a complexidade de um solver
-completo; o que não cabe no teto vira `saldoNaoAbsorvido`, reportado mas
-não perseguido além disso. Evoluir para múltiplos itens é trabalho à
-parte, se a experiência mostrar que falta.
+⚠️ **Um item por refeição, mas o saldo ATRAVESSA as refeições pendentes
+(desde 28/09/2026).** Antes parava na primeira compatível, e no plano real
+do dono o Pré-treino (6 g de carbo, não lançado) travava no teto com
++3,7 g enquanto 44–72 g de carbo sumiam em `saldoNaoAbsorvido` — Lanche e
+Jantar nunca mudavam, e editar o Almoço "não recalculava nada". O motor
+estava sendo chamado certo o tempo todo; o limite de UMA refeição é que
+escondia o efeito. Guard: "o que a primeira não absorve segue para a próxima".
 
 Guard de fiação em `myDietPlan.test.tsx` (describe "reajuste automático"),
 provado por mutação: trocar `mealsParaExibir` de volta para `day.meals`
