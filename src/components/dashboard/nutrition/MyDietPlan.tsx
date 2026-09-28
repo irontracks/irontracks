@@ -19,6 +19,13 @@ import HorariosDasRefeicoes from './HorariosDasRefeicoes'
 import { NumericInput } from '@/components/ui/NumericInput'
 import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
 
+function minutoBrtAgora(): number {
+  const partes = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date())
+  const h = Number(partes.find((p) => p.type === 'hour')?.value ?? 0)
+  const m = Number(partes.find((p) => p.type === 'minute')?.value ?? 0)
+  return h * 60 + m
+}
+
 /** O mínimo de uma entrada do diário que o reajuste automático precisa. */
 export type EntradaDoDiaParaAjuste = { food_name: string; calories: number; protein: number; carbs: number; fat: number }
 
@@ -457,10 +464,18 @@ export default function MyDietPlan({
 
   // Só ajusta o dia ATUAL (canApply = hoje): dia passado já aconteceu por
   // inteiro, dia futuro ainda não tem lançamento nenhum para comparar.
+  // Minuto atual em BRT, atualizado a cada minuto: refeição cujo horário já
+  // passou sem ser lançada não recebe mais o saldo do reajuste.
+  const [minutoAtual, setMinutoAtual] = useState(minutoBrtAgora)
+  useEffect(() => {
+    const iv = setInterval(() => setMinutoAtual(minutoBrtAgora()), 60_000)
+    return () => clearInterval(iv)
+  }, [])
+
   const resultadoAjuste = useMemo(() => {
     if (!autoAjusteLigado || !canApply || !day) return null
-    return ajustarDia(day.meals, lancamentosPorNome)
-  }, [autoAjusteLigado, canApply, day, lancamentosPorNome])
+    return ajustarDia(day.meals, lancamentosPorNome, { minutoAtual })
+  }, [autoAjusteLigado, canApply, day, lancamentosPorNome, minutoAtual])
 
   const mealsParaExibir = resultadoAjuste ? resultadoAjuste.refeicoes : (day?.meals ?? [])
 
