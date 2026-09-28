@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ajustarDia } from '../ajusteAutomaticoDoDia'
+import { normalizeFoodKey } from '../learned-foods'
 import type { PlanMeal } from '../dietPlanShape'
 import type { MacroTotals } from '../dietPlanShape'
 
@@ -85,6 +86,24 @@ describe('ajustarDia', () => {
     // crescer sem limite — o teto trava bem abaixo do que absorveria tudo.
     expect(arroz.carbs).toBeLessThan(56) // menos que 4x o original (56 = 14*4)
     expect(resultado.saldoNaoAbsorvido.carbs).toBeGreaterThan(0)
+  })
+
+  it('o que a primeira não absorve segue para a próxima (caso real do dono, 28/09/2026)', () => {
+    // Pré-treino minúsculo (6 g de carbo) é a PRIMEIRA pendente: trava no teto.
+    // Antes, o resto parava ali e Lanche/Jantar nunca mudavam — editar outra
+    // refeição lançada parecia não recalcular nada.
+    const pos = refeicao('Pós-treino', [{ food: 'Banana', grams: 200, protein: 0, carbs: 104, fat: 0 }])
+    const pre = refeicao('Pré-treino', [{ food: 'Pré-treino Minotauro', grams: 15, protein: 0, carbs: 6.1, fat: 0 }])
+    const lanche = refeicao('Lanche', [{ food: 'Pão francês', grams: 50, protein: 0, carbs: 29.5, fat: 0 }])
+    const jantar = refeicao('Jantar', [{ food: 'Arroz branco cozido', grams: 200, protein: 0, carbs: 56, fat: 0 }])
+    const lancamentos = new Map<string, MacroTotals>([[normalizeFoodKey('Pós-treino'), totals(0, 59, 0)]])
+
+    const r = ajustarDia([pos, pre, lanche, jantar], lancamentos)
+
+    const carbDe = (nome: string) => r.refeicoes.find((x) => x.name === nome)!.totals.carbs
+    expect(carbDe('Lanche')).toBeGreaterThan(29.5)
+    expect(carbDe('Jantar')).toBeGreaterThan(56)
+    expect(r.ajustes.filter((a) => a.macro === 'carbs').length).toBe(3)
   })
 
   it('macros independentes: proteína e carboidrato ajustam itens diferentes na mesma refeição', () => {
