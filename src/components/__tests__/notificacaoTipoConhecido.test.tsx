@@ -106,3 +106,68 @@ describe('tipo desconhecido não passa em silêncio', () => {
         expect(bloco).toMatch(/tiposDesconhecidosReportados\.add\(/)
     })
 })
+
+/**
+ * A lista `TIPOS_EM_PRODUCAO` acima é uma FOTO do banco, e foto não enxerga
+ * tipo raro: em 29/09/2026 o Sentry acusou 113 avisos de tipo desconhecido e
+ * havia SETE tipos que o servidor grava sem entrada na tabela
+ * (`daily_goal_hit`, `birthday`, `story_comment`, `mentioned_in_comment`,
+ * `mentioned_in_chat`, `trial_ending`, `admin_vip_expiring`) — um aniversário
+ * por ano não aparece numa janela de 180 dias que acabou de começar.
+ *
+ * Este caso lê a FONTE: todo arquivo que grava notificação, e dentro dele todo
+ * objeto com `type: '...'` que também tem `title`/`message` — o formato da
+ * linha de `notifications`. Payload só de push (`{ type: 'team_chat' }`) não
+ * tem título e fica de fora sozinho: ele nunca chega à Central.
+ */
+describe('todo tipo que o servidor GRAVA tem entrada na tabela', () => {
+    const { readdirSync, statSync } = require('node:fs') as typeof import('node:fs')
+    const RAIZ = join(__dirname, '..', '..')
+    const GRAVA = /insertNotifications|from\(\s*['"]notifications['"]\s*\)\s*\.insert|notifyFollowers\(|createNotification\(/
+
+    const arquivos: string[] = []
+    const andar = (dir: string) => {
+        for (const nome of readdirSync(dir)) {
+            const p = join(dir, nome)
+            if (nome === '__tests__' || nome === 'node_modules') continue
+            if (statSync(p).isDirectory()) andar(p)
+            else if (/\.(ts|tsx)$/.test(nome)) arquivos.push(p)
+        }
+    }
+    andar(RAIZ)
+
+    const emitidos = new Map<string, string>()
+    for (const arq of arquivos) {
+        const src = readFileSync(arq, 'utf8')
+        if (!GRAVA.test(src)) continue
+        for (const m of src.matchAll(/type:\s*['"]([a-z_]+)['"]/g)) {
+            // O resto do MESMO objeto: até a chave que o fecha, no mesmo nível.
+            let prof = 0
+            let fim = m.index! + m[0].length
+            for (; fim < src.length; fim++) {
+                const c = src[fim]
+                if (c === '{' || c === '(' || c === '[') prof++
+                else if (c === '}' || c === ')' || c === ']') { if (prof === 0) break; prof-- }
+            }
+            let ini = m.index!
+            for (let p2 = 0; ini > 0; ini--) {
+                const c = src[ini]
+                if (c === '}' || c === ')' || c === ']') p2++
+                else if (c === '{' || c === '(' || c === '[') { if (p2 === 0) break; p2-- }
+            }
+            const objeto = src.slice(ini, fim)
+            if (/\b(title|message)\s*:/.test(objeto)) emitidos.set(m[1], arq.slice(RAIZ.length + 1))
+        }
+    }
+
+    it('o varredor achou os emissores de verdade', () => {
+        // Sem isto, um parser que não casasse nada deixaria o caso de baixo verde.
+        expect(emitidos.size).toBeGreaterThan(15)
+        expect(emitidos.has('meal_reminder')).toBe(true)
+    })
+
+    it('nenhum tipo gravado cai no sino cinza "Info"', () => {
+        const semEntrada = [...emitidos].filter(([t]) => !chavesDeclaradas.has(t)).map(([t, a]) => `${t} (${a})`)
+        expect(semEntrada, `gravados sem entrada em TYPE_CONFIG: ${semEntrada.join(', ')}`).toEqual([])
+    })
+})
