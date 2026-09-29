@@ -64,20 +64,62 @@ export function logWarn(context: string, message: string, extra?: unknown) {
   console.warn(`[WARN ${ts}] ${context}: ${message}`, extra !== undefined ? sanitize(extra) : '')
 }
 
+/**
+ * Texto do erro para o log e para o Sentry.
+ *
+ * O supabase-js devolve erro como OBJETO SIMPLES (`{ message, code, details,
+ * hint }`), não como `Error` — e `String(obj)` dá `"[object Object]"`. Foi assim
+ * que o Sentry recebeu `hook:useWorkoutDeload.fetchReportHistory: [object
+ * Object]` (JAVASCRIPT-NEXTJS-22) sem dizer o que falhou. Vale para todo
+ * `logError` que recebe o `{ error }` de uma consulta.
+ */
+export function mensagemDoErro(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const o = error as Record<string, unknown>
+    const partes = [o.message, o.code ? `code=${o.code}` : '', o.details, o.hint]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean)
+    if (partes.length) return partes.join(' · ').slice(0, 500)
+    try { return JSON.stringify(sanitize(error)).slice(0, 500) } catch { /* cai no String abaixo */ }
+  }
+  return String(error)
+}
+
+/** Parece um erro de verdade (não um objeto de dados como `{ userId }`)? */
+function pareceErro(v: unknown): boolean {
+  if (v instanceof Error) return true
+  if (!v || typeof v !== 'object') return false
+  const o = v as Record<string, unknown>
+  return typeof o.message === 'string' || '__isAuthError' in o || (typeof o.code === 'string' && 'details' in o)
+}
+
 export function logError(context: string, error: unknown, extra?: unknown) {
+  // ~120 chamadas usam a ordem (contexto, "texto", erro) — o texto caía no lugar
+  // do erro e o erro real ia parar no `extra`, então o Sentry recebia só
+  // "error: FirstAccess Send Error:" (JAVASCRIPT-NEXTJS-1E) sem dizer o que
+  // falhou. Em vez de reescrever 120 chamadas (várias em login e checkout),
+  // o logger reconhece a forma: texto + algo que parece erro → o erro é o 3º.
+  const trocado = typeof error === 'string' && pareceErro(extra)
+  const erroReal = trocado ? extra : error
+  const descricao = trocado ? (error as string).trim() : ''
+  const extraReal = trocado ? undefined : extra
+
   // Erros sempre logados — essenciais para debugging em prod
   const ts = new Date().toISOString()
-  const msg = (error instanceof Error) ? error.message : String(error)
-  console.error(`[ERROR ${ts}] ${context}: ${msg}`, extra !== undefined ? sanitize(extra) : error)
+  const msg = descricao ? `${descricao} ${mensagemDoErro(erroReal)}`.trim() : mensagemDoErro(erroReal)
+  console.error(`[ERROR ${ts}] ${context}: ${msg}`, extraReal !== undefined ? sanitize(extraReal) : erroReal)
 
   // Reporta ao Sentry (server + client). `context` vira tag pra filtrar; `extra`
   // (sanitizado, sem dados sensíveis) vira contexto. Valores não-Error viram um
   // Error sintético com o contexto pra agrupar bem. O try/catch garante que uma
   // falha do reporting nunca quebre o fluxo da aplicação.
   try {
-    Sentry.captureException(error instanceof Error ? error : new Error(`${context}: ${msg}`), {
+    Sentry.captureException(erroReal instanceof Error ? erroReal : new Error(`${context}: ${msg}`), {
       tags: { logContext: context },
-      ...(extra !== undefined ? { extra: { detail: sanitize(extra) } } : {}),
+      ...(extraReal !== undefined || descricao
+        ? { extra: { ...(extraReal !== undefined ? { detail: sanitize(extraReal) } : {}), ...(descricao ? { descricao } : {}) } }
+        : {}),
     })
     scheduleServerFlush()
   } catch {
