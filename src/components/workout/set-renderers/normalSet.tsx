@@ -37,6 +37,11 @@ import { selectFieldContent } from '@/utils/ui/selectOnFocus'
  *  `externalValue` vazio (a gravação ainda não voltou pelo estado do React). */
 const TYPED_VALUE_GRACE_MS = 2000;
 
+/** O retrato é diagnóstico: se falhar, o aviso sai sem ele — nunca derruba o campo. */
+function safeContexto(fn: () => Record<string, unknown>): Record<string, unknown> {
+  try { return fn() } catch { return { contextoFalhou: true } }
+}
+
 /**
  * `selectOnFocus` é o PADRÃO (true) de propósito: quase todo campo aqui é valor
  * curto (peso/reps/RPE, e as variantes L_/R_), onde tocar e digitar deve
@@ -50,7 +55,11 @@ function useInputField(
   externalValue: string,
   onChange: (v: string) => void,
   label?: string,
-  opts?: { selectOnFocus?: boolean },
+  opts?: {
+    selectOnFocus?: boolean
+    /** Retrato do log no instante em que o valor some — só entra no aviso. */
+    contexto?: () => Record<string, unknown>
+  },
 ) {
   const selectOnFocus = opts?.selectOnFocus !== false;
   const [localValue, setLocalValue] = useState(externalValue);
@@ -97,6 +106,12 @@ function useInputField(
           field: label,
           value: localValue,
           focused: isFocused.current,
+          // O aviso chega SEMPRE em par (L_ e R_ do mesmo campo, no mesmo
+          // instante, >2 s depois da última tecla) — assinatura de uma cópia
+          // velha do log sobrescrevendo a local. Sem saber o que mais havia no
+          // log naquela hora não dá para dizer QUEM escreveu; este retrato
+          // responde isso na próxima ocorrência (Sentry JAVASCRIPT-NEXTJS-1C/1D/19/1A).
+          ...(opts?.contexto ? safeContexto(opts.contexto) : {}),
         });
       }
       try { onChangeRef.current?.(localValue); } catch { /* best effort */ }
@@ -382,10 +397,22 @@ const NormalSetInner = ({
     updateLog(key, { L_weight: noNegWeight(v), weightSource: 'user' }));
   const rWeightField = useInputField(extRWeight, (v) =>
     updateLog(key, { R_weight: noNegWeight(v), weightSource: 'user' }));
-  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps');
-  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps');
-  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe');
-  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe');
+  // Retrato do log para o aviso de valor que sumiu (lido só quando ele dispara).
+  const logRef = useRef(log);
+  useEffect(() => { logRef.current = log; });
+  const retratoDoLog = useCallback(() => {
+    const l = (logRef.current ?? {}) as Record<string, unknown>;
+    return {
+      chavesDoLog: Object.keys(l).sort().join(','),
+      temRepsCompartilhado: l.reps != null && String(l.reps) !== '',
+      temRpeCompartilhado: l.rpe != null && String(l.rpe) !== '',
+      done: l.done === true, L_done: l.L_done === true, R_done: l.R_done === true,
+    };
+  }, []);
+  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps', { contexto: retratoDoLog });
+  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps', { contexto: retratoDoLog });
+  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe', { contexto: retratoDoLog });
+  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe', { contexto: retratoDoLog });
 
   // Shared input style — weight column (3fr, roomy)
   // O VALOR digitado é `font-black` branco; o PLACEHOLDER (meta do plano ou
