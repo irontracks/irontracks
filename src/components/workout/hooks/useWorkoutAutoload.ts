@@ -244,6 +244,10 @@ function feelerSignalsKey(signals: Record<number, FeelerSignal>): string {
     .join('|')
 }
 
+
+/** Exercícios já reportados como "sem sugestão" nesta sessão do app. */
+const semSugestaoReportado = new Set<string>()
+
 export function useWorkoutAutoload({ exercises, reportHistory, settings, userId, logs, workoutName }: Params): {
   autoLoadEnabled: boolean
   autoLoadSuggestions: Record<string, AutoloadSuggestion>
@@ -380,7 +384,14 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
       // Esta saída era 100% silenciosa — nem tela, nem log —, então o modo de falha
       // que cegou o Crucifixo invertido só apareceu quando o dono estranhou na mão.
       // Toda saída silenciosa em caminho crítico é bomba-relógio (ver CLAUDE.md).
-      if (suggestion.weight == null) {
+      //
+      // Só avisa quando HAVIA histórico (29/09/2026): exercício novo sem nenhuma
+      // sessão também sai sem sugestão, e isso é o comportamento certo — o motor
+      // pede um Reconhecimento. Contado junto, esse caso esperado afogava o
+      // aviso (1.682 eventos em 2 meses, JAVASCRIPT-NEXTJS-17). E uma vez por
+      // exercício na sessão: o memo recalcula a cada Reconhecimento concluído.
+      if (suggestion.weight == null && ordered.length > 0 && !semSugestaoReportado.has(normalizeExerciseKey(name))) {
+        semSugestaoReportado.add(normalizeExerciseKey(name))
         logWarnRemote('autoload:sem-sugestao', 'motor ligado não sugeriu carga', {
           exercise: name,
           historyItems: ordered.length,

@@ -217,3 +217,62 @@ describe('buildBestByExerciseFromSession', () => {
     expect(result.has('Agachamento')).toBe(false)
   })
 })
+
+/**
+ * Erro do supabase-js é objeto simples, não `Error`: `String(obj)` virava
+ * "[object Object]" e o Sentry recebia só isso (JAVASCRIPT-NEXTJS-22).
+ */
+describe('logError com erro que não é Error', () => {
+  beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); vi.mocked(Sentry.captureException).mockClear() })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('leva a mensagem e o código do erro do Supabase ao Sentry', async () => {
+    const { logError } = await import('@/lib/logger')
+    logError('hook:teste', { message: 'canceling statement due to statement timeout', code: '57014', details: null, hint: null })
+    const enviado = vi.mocked(Sentry.captureException).mock.calls[0][0] as Error
+    expect(enviado.message).toContain('statement timeout')
+    expect(enviado.message).toContain('57014')
+    expect(enviado.message).not.toContain('[object Object]')
+  })
+
+  it('objeto sem message ainda sai legível', async () => {
+    const { mensagemDoErro } = await import('@/lib/logger')
+    expect(mensagemDoErro({ status: 503 })).toBe('{"status":503}')
+    expect(mensagemDoErro(new Error('x'))).toBe('x')
+    expect(mensagemDoErro('texto')).toBe('texto')
+  })
+})
+
+/**
+ * ~120 chamadas usam (contexto, "texto", erro): o Sentry recebia só o texto e o
+ * erro real ficava perdido no `extra` (JAVASCRIPT-NEXTJS-1E: "error:
+ * FirstAccess Send Error:" sem motivo nenhum).
+ */
+describe('logError na ordem (contexto, texto, erro)', () => {
+  beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); vi.mocked(Sentry.captureException).mockClear() })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('o erro real (AuthError do Supabase) chega ao Sentry com o texto junto', async () => {
+    const { logError } = await import('@/lib/logger')
+    logError('error', 'FirstAccess Send Error:', { __isAuthError: true, name: 'AuthApiError', status: 500, message: 'Error sending magic link email' })
+    const [enviado, opcoes] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { extra?: Record<string, unknown> }]
+    expect(enviado.message).toContain('FirstAccess Send Error:')
+    expect(enviado.message).toContain('Error sending magic link email')
+    expect(opcoes.extra?.descricao).toBe('FirstAccess Send Error:')
+  })
+
+  it('Error de verdade no 3º argumento é enviado como está, sem perder a pilha', async () => {
+    const { logError } = await import('@/lib/logger')
+    const e = new Error('falhou de verdade')
+    logError('ctx', 'Texto:', e)
+    expect(vi.mocked(Sentry.captureException).mock.calls[0][0]).toBe(e)
+  })
+
+  it('objeto de DADOS no 3º argumento continua sendo contexto, não erro', async () => {
+    const { logError } = await import('@/lib/logger')
+    logError('checkout', 'MercadoPago falhou', { userId: 'u1', planId: 'p1' })
+    const [enviado, opcoes] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { extra?: Record<string, unknown> }]
+    expect(enviado.message).toBe('checkout: MercadoPago falhou')
+    expect(opcoes.extra?.detail).toEqual({ userId: 'u1', planId: 'p1' })
+  })
+})
