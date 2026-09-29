@@ -5,7 +5,7 @@ import {
     Bell, Check, X, Users, MessageSquare, Trophy, Dumbbell,
     Trash2, Sparkles, Activity, Heart, Star,
     UserPlus, Calendar, Utensils, Swords, Flame, Target,
-    Camera, Megaphone, Droplet, BarChart3, Award, Clock, CreditCard
+    Camera, Megaphone, Droplet, BarChart3, Award, Clock, CreditCard, Cake, AtSign
 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -158,6 +158,22 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     workout_updated: tipo(<Dumbbell size={15} />, 'Treino', 'lembrete'),
     diet_updated: tipo(<Utensils size={15} />, 'Dieta', 'lembrete'),
 
+    // ── Sete tipos que o servidor GRAVA e esta tabela não conhecia ──────────
+    // Achados em 29/09/2026 pelo aviso `notifications.tipo-desconhecido` no
+    // Sentry (113 eventos) e confirmados varrendo quem grava notificação: a
+    // lista de 27/08 era uma FOTO do banco, e tipo raro (um aniversário por
+    // ano, uma meta batida) não aparece em foto. Guard de CLASSE em
+    // `notificacaoTipoConhecido`: ele lê os emissores, não o banco.
+    daily_goal_hit: tipo(<Target size={15} />, 'Meta do dia', 'conquista'),
+    birthday: tipo(<Cake size={15} />, 'Aniversário', 'conquista'),
+    story_comment: tipo(<MessageSquare size={15} />, 'Comentário', 'social'),
+    mentioned_in_comment: tipo(<AtSign size={15} />, 'Menção', 'social'),
+    mentioned_in_chat: tipo(<AtSign size={15} />, 'Menção', 'social'),
+    // Plano acabando é LEMBRETE, não aviso: ainda não deu errado nada — o
+    // vermelho fica para cobrança que FALHOU (`billing_issue`).
+    trial_ending: tipo(<Sparkles size={15} />, 'VIP', 'lembrete'),
+    admin_vip_expiring: tipo(<CreditCard size={15} />, 'Plano', 'lembrete'),
+
     default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
 
@@ -247,6 +263,8 @@ const DESTINO_POR_TIPO: Record<string, string> = {
     challenge_created: COMUNIDADE,
     challenge_accepted: COMUNIDADE,
     challenge_declined: COMUNIDADE,
+    story_comment: COMUNIDADE,
+    mentioned_in_comment: COMUNIDADE,
 
     message: '/dashboard/chat',
     appointment: '/dashboard/schedule',
