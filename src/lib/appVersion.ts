@@ -21,7 +21,7 @@
  *
  * A versão pública tem UMA fonte, e é a mesma que a App Store publica.
  */
-export const APP_VERSION = '1.21.4'
+export const APP_VERSION = '1.21.5'
 
 /** Como a versão é ESCRITA na interface. */
 export const appVersionLabel = () => `v${APP_VERSION}`
