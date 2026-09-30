@@ -85,6 +85,8 @@ describe('lerPlanosPublicos', () => {
     expect(await lerPlanosPublicos(1_000)).toBeNull()
     expect(logError).toHaveBeenCalledTimes(1)
     expect(logError.mock.calls[0][0]).toBe('landing.planos-publicos')
+    // a causa REAL (permission denied), não o "incompleto" que viria de ignorar o erro
+    expect(logError.mock.calls[0][1]).toMatchObject({ message: 'permission denied', code: '42501' })
   })
 
   it('erro na tabela de professores também derruba (não mostra metade)', async () => {
@@ -130,5 +132,58 @@ describe('lerPlanosPublicos', () => {
     expect(chamadas.length).toBe(consultas)
     await lerPlanosPublicos(t0 + 61_000)
     expect(chamadas.length).toBeGreaterThan(consultas)
+  })
+})
+
+describe('lerTiersProfessorPublicos — a página do professor lê SÓ teacher_tiers', () => {
+  it('devolve os cinco níveis ordenados, sem tocar em app_plans', async () => {
+    respostas.app_plans = { data: null, error: { message: 'app_plans fora do ar' } }
+    const { lerTiersProfessorPublicos } = await carregar()
+    const r = await lerTiersProfessorPublicos(1_000)
+    expect(r?.map((t) => t.chave)).toEqual(['free', 'starter', 'pro', 'elite', 'unlimited'])
+    expect(chamadas.map((c) => c.tabela)).toEqual(['teacher_tiers'])
+    expect(logError).not.toHaveBeenCalled()
+  })
+
+  it('usa a chave anônima e pede só o nível ativo', async () => {
+    const { lerTiersProfessorPublicos } = await carregar()
+    await lerTiersProfessorPublicos(1_000)
+    expect(criados).toEqual([{ url: 'https://x.supabase.co', key: 'chave-anonima' }])
+    expect(chamadas[0].passos.join(' ')).toContain('eq:["is_active",true]')
+  })
+
+  it('erro de leitura vira null + logError (a página some com a seção)', async () => {
+    respostas.teacher_tiers = { data: null, error: { message: 'permission denied' } }
+    const { lerTiersProfessorPublicos } = await carregar()
+    expect(await lerTiersProfessorPublicos(1_000)).toBeNull()
+    expect(logError.mock.calls[0][0]).toBe('para-professores.tiers-publicos')
+    // O que vai ao Sentry é a causa REAL, não o "lista vazia" que viria de ignorar o erro:
+    expect(logError.mock.calls[0][1]).toMatchObject({ message: 'permission denied' })
+  })
+
+  it('tabela sem nenhum nível ativo também vira null — lista vazia não é preço', async () => {
+    respostas.teacher_tiers = { data: [], error: null }
+    const { lerTiersProfessorPublicos } = await carregar()
+    expect(await lerTiersProfessorPublicos(1_000)).toBeNull()
+    expect(logError).toHaveBeenCalledTimes(1)
+  })
+
+  it('cache de 10 min e valor guardado em falha passageira', async () => {
+    const { lerTiersProfessorPublicos, PLANOS_TTL_MS } = await carregar()
+    const boa = await lerTiersProfessorPublicos(1_000)
+    const antes = chamadas.length
+    await lerTiersProfessorPublicos(1_000 + PLANOS_TTL_MS - 1)
+    expect(chamadas.length).toBe(antes)
+    respostas.teacher_tiers = { data: null, error: { message: 'timeout' } }
+    const depois = await lerTiersProfessorPublicos(1_000 + PLANOS_TTL_MS + 5)
+    expect(depois).toEqual(boa)
+  })
+
+  it('o cache dos professores é INDEPENDENTE do cache do VIP', async () => {
+    const { lerPlanosPublicos, lerTiersProfessorPublicos } = await carregar()
+    await lerPlanosPublicos(1_000)
+    chamadas.length = 0
+    await lerTiersProfessorPublicos(1_001) // não pode reaproveitar o guardado do VIP
+    expect(chamadas.map((c) => c.tabela)).toEqual(['teacher_tiers'])
   })
 })

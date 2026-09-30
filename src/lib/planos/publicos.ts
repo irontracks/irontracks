@@ -185,7 +185,17 @@ export function montarPlanos(
     })
   }
 
-  const professores: TierProfessor[] = tiers
+  return { vip, professores: montarTiersProfessor(tiers) }
+}
+
+/**
+ * Níveis de professor, ordenados por `sort_order`. `max_students = 0` no banco
+ * quer dizer "sem teto". Módulo à parte de `montarPlanos` porque a página do
+ * professor lê SÓ esta tabela — a landing do VIP não pode derrubá-la, nem o
+ * contrário.
+ */
+export function montarTiersProfessor(tiers: readonly LinhaTeacherTier[]): TierProfessor[] {
+  return tiers
     .filter((t) => t.is_active !== false && typeof t.price_cents === 'number' && t.price_cents >= 0)
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -196,6 +206,4 @@ export function montarPlanos(
       maxAlunos: t.max_students > 0 ? t.max_students : null,
       precoCentavos: t.price_cents,
     }))
-
-  return { vip, professores }
 }

@@ -1280,10 +1280,19 @@ na pasta da landing reprova.
   `vip_pro1_month` R$ 59,90, `vip_elite1_month` R$ 99,90 — lidas pela API do App Store
   Connect em 30/09/2026, iguais às da web). O anual é só web (Mercado Pago), e a landing
   diz isso. O seletor Anual só liga se TODOS os planos têm anual.
-- ⚠️ **Dívida conhecida: `app/para-professores/page.tsx` ainda tem os preços de
-  professor DIGITADOS** (array `id/price/students`, ~linha 278). É a mesma classe que
-  a landing acabou de sair; se `teacher_tiers` mudar, as duas páginas divergem. Não
-  foi mexida porque é tela do app.
+- **A página `/para-professores` também lê do banco (30/09/2026).** Ela tinha os preços
+  de professor DIGITADOS (`price: 49/97/179/249`) — a mesma classe que a landing
+  acabara de deixar, com duas fontes para o mesmo valor. Agora os dois leem
+  `teacher_tiers` (`lerTiersProfessorPublicos`, leitura e cache **independentes** da do
+  VIP: a tabela do VIP falhar não tira os preços do professor). Só a apresentação
+  (qual nível tem destaque, a etiqueta "Mais Popular"/"Academias") fica no arquivo,
+  por chave do nível. Leitura falhou → a seção de preços some, o resto da página fica.
+  Guard: `app/__tests__/paraProfessoresPrecosDoBanco.test.tsx` renderiza a página com
+  valores que NÃO existem no código antigo — se aparecerem, vieram do banco.
+- ⚠️ **Teste de "o erro é olhado" precisa conferir a CAUSA, não só o desfecho.** Ignorar o
+  `{ error }` da leitura dava o mesmo `null` no fim (lista vazia também vira `null`), então a
+  mutação sobreviveu; o que muda é o erro que vai ao Sentry ("sem nenhum nível" no lugar de
+  "permission denied"). Hoje o teste exige que o `logError` receba a causa real.
 - O texto "14 dias de VIP Pro" da landing é o trial de `utils/vip/trial.ts`
   (`TRIAL_DAYS`), concedido no bootstrap — confira que a regra continua valendo antes
   de mudar a promessa.
