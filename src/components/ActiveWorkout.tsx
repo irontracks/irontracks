@@ -15,6 +15,7 @@ import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
 import WorkoutHeader from './workout/WorkoutHeader';
 import ExerciseList from './workout/ExerciseList';
 import WorkoutExerciseRail from './workout/WorkoutExerciseRail';
+import TreinoPausado from './workout/TreinoPausado';
 import { StudentControlConsent } from './teacher/StudentControlConsent';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
@@ -365,6 +366,10 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             continuar alcançável no meio da lista — que é justamente quando ela
             serve. Ela se esconde sozinha em treino curto. */}
         <WorkoutExerciseRail />
+
+        {/* Pausado: faixa bem visível, no fluxo (empurra, não cobre). Também
+            tira da pausa sozinha quando uma série é concluída. */}
+        <TreinoPausado />
 
         {/* Consentimento do professor: NO FLUXO, entre a tira e o conteúdo.
             Ele já foi `fixed` e cobriu, em rodadas sucessivas, o header, depois
