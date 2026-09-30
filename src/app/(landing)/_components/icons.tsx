@@ -77,3 +77,19 @@ export function WifiOffIcon({ className = 'h-5 w-5' }: { className?: string }) {
     </svg>
   )
 }
+
+export function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M4.5 12.5l5 5L19.5 7" />
+    </svg>
+  )
+}
+
+export function DashIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" className={className} aria-hidden="true">
+      <path d="M6 12h12" />
+    </svg>
+  )
+}
