@@ -3065,6 +3065,18 @@ review assim se alguém submetesse sem olhar o campo. Nada foi submetido e o
 texto foi limpo no mesmo dia. **Para só CONSULTAR o estado, use `--dry-run`**,
 que lista builds e versão sem tocar em nada.
 
+⚠️ **Xcode novo pode quebrar o SDK do RevenueCat, e quem escolhe a versão dele é o plugin (30/09/2026).**
+O Xcode Cloud (fluxo "Latest Release") ficou vermelho em 25+ execuções seguidas desde 18/09 — o último
+sucesso foi 13/09 — e o Mac do dono, já no Xcode 27, falhava igual no `ios:release`. Causa: o
+`purchases-ios` 5.67.1 não compila no Xcode 27 (`PaywallColor`/`CustomerCenterConfigData`: "ambiguous use of
+init(stringRepresentation:)"). **Este repositório não escolhe essa versão:** o plugin do Capacitor fixa
+(`exact:`) o `purchases-hybrid-common`, e este fixa o `purchases-ios`. A saída foi subir o plugin
+(12.1.2 → 13.6.1, SDK iOS 5.90.2), e o Android não sente a quebra da 13 (piso de API 23; o nosso é 24).
+Guard em `src/__tests__/revenuecatCompilaNoXcode27.test.ts` (reverter o plugin reprova). **Para saber o que
+o Xcode Cloud acha, leia o erro pela API (`/v1/ciBuildRuns/<id>/actions` → `issues`), não o status do
+GitHub, que só diz "failed".** Antes de trocar de Xcode local, compile o app com ele
+(`xcodebuild … -configuration Release -destination 'generic/platform=iOS' build`).
+
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
 ## ⚠️ Push token é do APARELHO, não da conta (06/09/2026)
