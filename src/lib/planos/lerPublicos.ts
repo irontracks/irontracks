@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { env } from '@/utils/env'
 import { logError } from '@/lib/logger'
-import { montarPlanos, type PlanosPublicos } from './publicos'
+import { montarPlanos, montarTiersProfessor, type PlanosPublicos, type TierProfessor } from './publicos'
 
 /**
  * Lê os planos que a landing mostra. Roda no SERVIDOR, na renderização da
@@ -38,13 +38,20 @@ const REPETIR_APOS_FALHA_MS = 60 * 1000
 
 let guardado: { em: number; valor: PlanosPublicos } | null = null
 
+const COLUNAS_TIER = 'tier_key,name,description,max_students,price_cents,currency,sort_order,is_active'
+
+/** Chave ANÔNIMA, sem sessão — a mesma para as duas leituras. */
+function clienteAnonimo() {
+  return createClient(env.supabase.url, env.supabase.anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
 export async function lerPlanosPublicos(agora: number = Date.now()): Promise<PlanosPublicos | null> {
   if (guardado && agora - guardado.em < PLANOS_TTL_MS) return guardado.valor
 
   try {
-    const db = createClient(env.supabase.url, env.supabase.anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    const db = clienteAnonimo()
     const [planos, tiers] = await Promise.all([
       db
         .from('app_plans')
@@ -53,7 +60,7 @@ export async function lerPlanosPublicos(agora: number = Date.now()): Promise<Pla
         .eq('status', 'active'),
       db
         .from('teacher_tiers')
-        .select('tier_key,name,description,max_students,price_cents,currency,sort_order,is_active')
+        .select(COLUNAS_TIER)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
     ])
@@ -71,6 +78,41 @@ export async function lerPlanosPublicos(agora: number = Date.now()): Promise<Pla
     if (guardado) {
       guardado = { em: agora - PLANOS_TTL_MS + REPETIR_APOS_FALHA_MS, valor: guardado.valor }
       return guardado.valor
+    }
+    return null
+  }
+}
+
+let tiersGuardados: { em: number; valor: TierProfessor[] } | null = null
+
+/**
+ * Só os níveis de professor — para a página `/para-professores`, que não mostra
+ * VIP e não pode sumir porque a tabela do VIP falhou. Mesma política da leitura
+ * acima: chave anônima, `{ error }` olhado, `null` quando falha (a página some
+ * com a seção de preços em vez de mostrar valor velho ou inventado), valor
+ * guardado servido em falha passageira, cache de 10 min.
+ */
+export async function lerTiersProfessorPublicos(agora: number = Date.now()): Promise<TierProfessor[] | null> {
+  if (tiersGuardados && agora - tiersGuardados.em < PLANOS_TTL_MS) return tiersGuardados.valor
+
+  try {
+    const { data, error } = await clienteAnonimo()
+      .from('teacher_tiers')
+      .select(COLUNAS_TIER)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    if (error) throw error
+
+    const tiers = montarTiersProfessor(data ?? [])
+    if (tiers.length === 0) throw new Error('teacher_tiers sem nenhum nível ativo')
+
+    tiersGuardados = { em: agora, valor: tiers }
+    return tiers
+  } catch (e) {
+    logError('para-professores.tiers-publicos', e)
+    if (tiersGuardados) {
+      tiersGuardados = { em: agora - PLANOS_TTL_MS + REPETIR_APOS_FALHA_MS, valor: tiersGuardados.valor }
+      return tiersGuardados.valor
     }
     return null
   }

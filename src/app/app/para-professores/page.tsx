@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { lerTiersProfessorPublicos } from '@/lib/planos/lerPublicos'
 
 export const metadata: Metadata = {
   title: 'IronTracks para Professores — Gerencie, Cobre e Evolua seus Alunos',
@@ -274,17 +275,41 @@ const AssessmentMockup = () => (
 
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
-const plans = [
-  { id: 'free', name: 'Free', price: 0, students: 2, highlight: false, tag: '' },
-  { id: 'starter', name: 'Starter', price: 49, students: 15, highlight: false, tag: '' },
-  { id: 'pro', name: 'Pro', price: 97, students: 40, highlight: true, tag: 'Mais Popular' },
-  { id: 'elite', name: 'Elite', price: 179, students: 100, highlight: false, tag: '' },
-  { id: 'unlimited', name: 'Unlimited', price: 249, students: 0, highlight: false, tag: 'Academias' },
-]
+/**
+ * Preço, nome e teto de alunos vêm de `teacher_tiers` (lido por
+ * `lerTiersProfessorPublicos`) — NUNCA digitados aqui: este array já guardou
+ * `price: 49/97/179/249` à mão e divergiria da cobrança no dia em que a tabela
+ * mudasse. Só o que é apresentação mora neste arquivo: qual nível leva destaque
+ * e a etiqueta. Guard: `src/app/__tests__/paraProfessoresPrecosDoBanco.test.ts`.
+ */
+const DESTAQUE_PROFESSOR = 'pro'
+const ETIQUETA_PROFESSOR: Record<string, string> = { pro: 'Mais Popular', unlimited: 'Academias' }
+
+/** "49" quando redondo, "49,90" quando não. */
+function valorEmReais(centavos: number): string {
+  return (centavos / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: centavos % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ParaProfessoresPage() {
+export default async function ParaProfessoresPage() {
+  // Falhou a leitura → `null` → a seção de preços some. Preço velho ou inventado
+  // numa página de venda é pior que nenhum.
+  const tiers = await lerTiersProfessorPublicos()
+  const plans = tiers
+    ? tiers.map((t) => ({
+        id: t.chave,
+        name: t.nome,
+        cents: t.precoCentavos,
+        students: t.maxAlunos,
+        highlight: t.chave === DESTAQUE_PROFESSOR,
+        tag: ETIQUETA_PROFESSOR[t.chave] ?? '',
+      }))
+    : null
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       {/* ── Sticky nav ──────────────────────────────────────────────────── */}
@@ -603,6 +628,7 @@ export default function ParaProfessoresPage() {
       </section>
 
       {/* ── Pricing ─────────────────────────────────────────────────────── */}
+      {plans && (
       <section className="border-t border-neutral-800 bg-neutral-900/20">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-20">
           <div className="text-center mb-12">
@@ -637,18 +663,18 @@ export default function ParaProfessoresPage() {
                 <div className="mb-4">
                   <p className="t-meta text-xs">{plan.name}</p>
                   <div className="flex items-end gap-1 mt-2">
-                    {plan.price === 0 ? (
+                    {plan.cents === 0 ? (
                       <span className="text-2xl font-black text-white">Grátis</span>
                     ) : (
                       <>
                         <span className="text-xs text-neutral-400 mb-1">R$</span>
-                        <span className="text-2xl font-black text-white">{plan.price}</span>
+                        <span className="text-2xl font-black text-white">{valorEmReais(plan.cents)}</span>
                         <span className="text-xs text-neutral-400 mb-1">/mês</span>
                       </>
                     )}
                   </div>
                   <p className="text-xs text-neutral-400 mt-1">
-                    {plan.students === 0 ? 'Alunos ilimitados' : `Até ${plan.students} alunos`}
+                    {plan.students == null ? 'Alunos ilimitados' : `Até ${plan.students} alunos`}
                   </p>
                 </div>
                 <Link
@@ -659,7 +685,7 @@ export default function ParaProfessoresPage() {
                       : 'bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700'
                   }`}
                 >
-                  {plan.price === 0 ? 'Começar Grátis' : 'Assinar Agora'}
+                  {plan.cents === 0 ? 'Começar Grátis' : 'Assinar Agora'}
                 </Link>
               </div>
             ))}
@@ -670,6 +696,7 @@ export default function ParaProfessoresPage() {
           </p>
         </div>
       </section>
+      )}
 
       {/* ── Final CTA ───────────────────────────────────────────────────── */}
       <section className="border-t border-neutral-800">

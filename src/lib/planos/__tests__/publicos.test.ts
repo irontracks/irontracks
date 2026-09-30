@@ -5,6 +5,7 @@ import {
   linhasDoPlano,
   mesesGratis,
   montarPlanos,
+  montarTiersProfessor,
   porAluno,
 } from '../publicos'
 import { APP_PLANS, TEACHER_TIERS } from './fixtures'
@@ -152,5 +153,25 @@ describe('porAluno', () => {
   it('não inventa número para o grátis nem para o ilimitado', () => {
     expect(porAluno(de('free'))).toBeNull()
     expect(porAluno(de('unlimited'))).toBeNull()
+  })
+})
+
+describe('montarTiersProfessor (isolado do VIP)', () => {
+  it('monta os níveis sem depender de nenhum plano VIP', () => {
+    expect(montarTiersProfessor(TEACHER_TIERS).map((t) => t.chave)).toEqual(['free', 'starter', 'pro', 'elite', 'unlimited'])
+  })
+
+  it('lista vazia devolve lista vazia (quem chama decide esconder a seção)', () => {
+    expect(montarTiersProfessor([])).toEqual([])
+  })
+
+  it('nível inativo ou com preço negativo fica de fora', () => {
+    const r = montarTiersProfessor([
+      ...TEACHER_TIERS,
+      { tier_key: 'velho', name: 'Velho', max_students: 5, price_cents: 100, sort_order: 9, is_active: false },
+      { tier_key: 'ruim', name: 'Ruim', max_students: 5, price_cents: -1, sort_order: 10, is_active: true },
+    ])
+    expect(r.map((t) => t.chave)).not.toContain('velho')
+    expect(r.map((t) => t.chave)).not.toContain('ruim')
   })
 })
