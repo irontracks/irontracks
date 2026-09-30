@@ -1256,6 +1256,38 @@ uma: `jorge_terrasilva@hotmail.com`, `juniordebrito@gmail.com`,
 digitação no e-mail (`dc9231d6-024c-42b0-8f74-e5bb80cb3bc3`, `.vom` em vez de
 `.com`, zero uso, propositalmente deixada de fora).
 
+## Preços na landing (30/09/2026) — vêm do BANCO, e onde eles moram
+
+A seção de planos da landing (`(landing)/_components/Pricing.tsx`) **não tem número
+nenhum**: nome, preço e linhas saem de `app_plans` (VIP) e `teacher_tiers`
+(professores), lidos no servidor por `lib/planos/lerPublicos.ts` e moldados por
+`lib/planos/publicos.ts` (módulo puro, é o único que o componente importa). Guard
+de classe em `app/__tests__/landingPrecosDoBanco.test.ts`: valor monetário digitado
+na pasta da landing reprova.
+
+- **A leitura é ANÔNIMA, de propósito.** As duas tabelas têm policy de SELECT para
+  `anon` só do que está ativo (`status='active'` / `is_active`). Preço público não
+  precisa de service role, e há guard contra `createAdminClient` ali. Os seis ids VIP
+  vão por NOME — a tabela guarda `vip_*_month`/`vip_*_year` inativos com o mesmo valor.
+- **Tudo ou nada:** faltou um plano VIP mensal, ou veio preço ≤ 0, a função devolve
+  `null` e a seção some (e o link "Planos" do menu junto). Preço pela metade é pior
+  que nenhum. Falha com leitura boa guardada serve o valor guardado (cache de 10 min).
+- **As linhas de cada plano saem de `limits`** (o que `getVipPlanLimits` aplica), não
+  do texto solto em `features`: os três cartões mostram as mesmas seis linhas e o que
+  falta aparece apagado. `chat_daily`/`wizard_weekly` ≥ 1000 é "Ilimitado*" — no
+  banco é 9999 — e pede a nota de uso justo.
+- ⚠️ **Na App Store só existem as assinaturas MENSAIS** (`vip_start1_month` R$ 29,90,
+  `vip_pro1_month` R$ 59,90, `vip_elite1_month` R$ 99,90 — lidas pela API do App Store
+  Connect em 30/09/2026, iguais às da web). O anual é só web (Mercado Pago), e a landing
+  diz isso. O seletor Anual só liga se TODOS os planos têm anual.
+- ⚠️ **Dívida conhecida: `app/para-professores/page.tsx` ainda tem os preços de
+  professor DIGITADOS** (array `id/price/students`, ~linha 278). É a mesma classe que
+  a landing acabou de sair; se `teacher_tiers` mudar, as duas páginas divergem. Não
+  foi mexida porque é tela do app.
+- O texto "14 dias de VIP Pro" da landing é o trial de `utils/vip/trial.ts`
+  (`TRIAL_DAYS`), concedido no bootstrap — confira que a regra continua valendo antes
+  de mudar a promessa.
+
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).

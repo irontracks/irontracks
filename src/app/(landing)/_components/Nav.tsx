@@ -12,8 +12,10 @@ const LINKS = [
   { rotulo: 'Além do treino', href: '#alem' },
   { rotulo: 'VIP', href: '#vip' },
 ]
+const LINK_PLANOS = { rotulo: 'Planos', href: '#planos' }
 
-export default function Nav() {
+export default function Nav({ comPlanos = false }: { comPlanos?: boolean }) {
+  const links = comPlanos ? [...LINKS, LINK_PLANOS] : LINKS
   const { scrollY } = useScroll()
   const [rolou, setRolou] = useState(false)
   useMotionValueEvent(scrollY, 'change', (v) => setRolou(v > 24))
@@ -41,7 +43,7 @@ export default function Nav() {
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <a
               key={l.href}
               href={l.href}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { lerPlanosPublicos } from '@/lib/planos/lerPublicos'
 import Landing from './_components/Landing'
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function Page() {
-  return <Landing />
+export default async function Page() {
+  const planos = await lerPlanosPublicos()
+  return <Landing planos={planos} />
 }
