@@ -1299,6 +1299,14 @@ na pasta da landing reprova.
 
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
+- **`tsc` com centenas de `TS1005` em `.next/dev/types/routes.d.ts` não é o código:** é o
+  arquivo gerado pelo `next dev`, cortado ao meio quando o servidor é parado (30/09/2026,
+  "Unterminated string literal"). O `tsconfig` inclui esses tipos. Apague o `.next` (gerado,
+  ignorado pelo git) e rode de novo.
+- **CI "Verify Build" caindo em `next/font` com `Cannot read properties of null (reading '1')`
+  em `(landing)/layout.tsx` é resposta ruim do Google Fonts no build, não o PR** (30/09/2026):
+  tipos, lint, testes e smoke passaram, o layout tinha 0 linhas de diff e a Vercel montou o
+  mesmo commit. Conferido isso, reexecutar só a etapa (`gh run rerun <id> --failed`) — passou.
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
 - **Chave Gemini: conta PAGA, e é a MESMA de produção.** Corrigido pelo dono em 01/08/2026 — esta nota dizia "free tier, 20 req/dia" e isso está **obsoleto**. Não há mais o teto diário que derrubou a Avaliação por Foto em 31/07/2026, então medição empírica contra a API não trava as features dos usuários. O que continua valendo: a chave é compartilhada com produção e **cada chamada custa dinheiro** — o cuidado agora é com CUSTO, não com cota. (Esta linha dizia que o protocolo de exames usava `gemini-pro`, modelo CARO — **errado, e conferido em 24/08/2026**: `gemini-pro` só aparece num comentário; o protocolo lê `env.gemini.modelId` como todo o resto. E `gemini-pro` está desligado desde 2025 — ver "Qual modelo Gemini o app usa", abaixo.) Diagnóstico de IA em produção: runtime logs da Vercel (MCP `get_runtime_logs`). O gap "Sentry não recebe erro de rota server" foi CORRIGIDO em 02/08/2026 — causa: `captureException` só enfileira e a Vercel congela a instância antes do envio; `lib/logger.ts` agora agenda `Sentry.flush` via `waitUntil` (guard em `loggerServerFlush.test.ts`). Se o Sentry voltar a ficar mudo para rotas server, comece por lá.
 - **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (**10 ocorrências** hoje — confira com `grep -c`, não confie no número) antes de um release novo. Ver "iOS — release" pra saber QUANDO ela precisa subir.
@@ -3064,7 +3072,16 @@ O script `scripts/ios-release.sh`:
 
 Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a session do Xcode em `Xcode → Settings → Accounts` (uma vez configurado, não pede de novo).
 
-**Rode do REPO PRINCIPAL, nunca de um worktree.** O grafo SPM resolve os plugins Capacitor por caminho dentro de `node_modules/`; num worktree sem `npm ci` completo o archive morre em `the package at '…/@capacitor-community/apple-sign-in' cannot be accessed`. (Ver o gotcha de worktree lá em cima — a build iOS é o caso que mais dói.)
+**Worktree serve para release, e às vezes é o ÚNICO jeito certo (corrigido em 30/09/2026).**
+Esta nota dizia "nunca de um worktree" — falso: a build 87 saiu de um worktree e
+chegou VALID. O archive empacota a ÁRVORE DE TRABALHO, então com o checkout
+principal sujo (mudança de outra pessoa, `node_modules` de outra versão do plugin)
+o worktree limpo da `origin/main` é o que garante que só vai o que está na `main`.
+Três condições, as três medidas: **`npm ci` completo NO worktree** (sem ele o SPM
+morre em `the package at '…/apple-sign-in' cannot be accessed`; nunca symlink),
+**copiar `ios/App/App/Sentry.xcconfig`** do checkout principal (é ignorado pelo
+git, não vem no worktree), e **exportar as `SENTRY_*`** no shell antes — o script
+lê o `.env.local` da raiz do PRÓPRIO worktree, que não existe ali.
 
 **Quando a `MARKETING_VERSION` PRECISA subir:** depois que uma versão é aprovada na App Store, a Apple fecha o "trem" dela e recusa build nova com o mesmo `CFBundleShortVersionString` — mesmo com build number maior. O erro vem no `exportArchive`, só na hora do upload (o archive passa):
 
@@ -3080,14 +3097,11 @@ nas duas vezes o archive rodou inteiro antes de o upload ser recusado. Se for
 subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION`
 ANTES — evita um ciclo perdido (~5 min).
 
-⚠️ **Estado datado, e ele APODRECEU em três dias — confira antes de acreditar.**
-Esta linha dizia "versão 1.21.2, build 82 SUBMETIDA à review" (02/09/2026).
-Medido em **05/09/2026** com `node scripts/ios-submit.mjs --dry-run`: a 1.21.2 já
-saiu, a **build 83 está VALID** e a marketing version dela, **1.21.3, é NOVA na
-loja** — ou seja, o script *criaria* a versão, porque ela não existe no App Store
-Connect. Traduzindo: **a build 83 foi subida e nunca submetida**, e com ela ficou
-parada a abertura sem flash branco (#1057) e a correção do crash da voz.
-Submeter é decisão do dono.
+⚠️ **Estado datado — confira com `--dry-run` antes de acreditar.** Em
+30/09/2026: **1.21.4 (build 86) na loja; build 87 (1.21.5, RevenueCat 13.6.1)
+VALID no TestFlight, NÃO submetida** — falta o dono testar compra e restauração no
+sandbox. (Esta linha já mentiu uma vez em três dias: dizia "build 82 submetida"
+quando a 83 tinha subido e nunca ido à review.)
 
 **A lição, que vale mais que o número:** o `--dry-run` responde o estado real de
 graça, em segundos e sem tocar em nada. Qualquer afirmação de versão aqui é
