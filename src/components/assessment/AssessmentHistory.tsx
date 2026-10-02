@@ -30,6 +30,7 @@ import { BodyPhotoCaptureModal } from '@/components/body-photo/BodyPhotoCaptureM
 import { BodyPhotoHistoryModal } from '@/components/body-photo/BodyPhotoHistoryModal';
 import { LabExamsSection } from '@/components/lab-exams/LabExamsSection';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
+import { previousSameMethod } from '@/utils/assessment/assessmentMethod';
 import { ArrowLeft } from 'lucide-react';
 
 import {
@@ -139,6 +140,7 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
     sortedAssessments,
     latestAssessment,
     previousAssessment,
+    hasEarlierAssessment,
     assessments,
 
     // Workout sessions / TDEE
@@ -276,7 +278,7 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
           onPhotoAssessment={() => setPhotoModalOpen(true)}
           onPhotoHistory={() => setPhotoHistoryOpen(true)}
         />
-        {latestAssessment && previousAssessment && (
+        {latestAssessment && hasEarlierAssessment && (
           <AssessmentSummaryCards
             latestAssessment={latestAssessment}
             previousAssessment={previousAssessment}
@@ -401,11 +403,12 @@ function AssessmentHistoryInner({ studentId: propStudentId, selfView = false, on
             {[...sortedAssessments].reverse().map((assessment, revIdx) => {
               // Índice na ordem cronológica, para achar a avaliação ANTERIOR.
               const idx = sortedAssessments.length - 1 - revIdx;
-              // A anterior no TEMPO — base da variação exibida no card. Na lista
-              // invertida ela é a próxima linha, mas o que importa é a data.
+              // Base da variação exibida no card: a anterior do MESMO método
+              // (dobras × bioimpedância nunca se comparam — 02/10/2026, a BIA de
+              // 11/09 fazia as dobras de 02/10 mostrarem "massa magra +10,0 kg").
               // `prevInTime` e não `previousAssessment`: esse nome já existe no
               // escopo do componente (vem do hook) e o shadow confundiria.
-              const prevInTime = idx > 0 ? sortedAssessments[idx - 1] ?? null : null;
+              const prevInTime = previousSameMethod(sortedAssessments, idx);
               // Resolve a contraparte (full ↔ bia) para essa avaliação. O
               // pareamento é bidirecional: ambos os registros têm
               // paired_assessment_id apontando um pro outro. O lookup é em

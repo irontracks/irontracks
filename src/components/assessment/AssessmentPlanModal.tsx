@@ -6,6 +6,7 @@ import type { AssessmentRow } from './assessmentUtils'
 import { formatDateCompact } from './assessmentChartData'
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
 import { useBackHandler } from '@/hooks/useBackHandler'
+import { assessmentDayKey } from '@/utils/assessment/assessmentDay'
 
 // ────────────────────────────────────────────────────────────────
 // Props
@@ -71,7 +72,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold truncate">Plano Tático</div>
             <div className="text-white font-black truncate">
-              {formatDateCompact(assessment?.date || assessment?.assessment_date)}
+              {formatDateCompact(assessmentDayKey(assessment))}
             </div>
           </div>
           <button

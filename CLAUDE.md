@@ -3575,6 +3575,35 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## Avaliações: o DIA é `assessment_date`, e métodos não se comparam (02/10/2026)
+
+Dois defeitos vistos na conta oficial, cada um uma classe.
+
+⚠️ **`assessments.date` (timestamptz) NÃO é o dia da avaliação.** Nas linhas
+importadas ele é meia-noite UTC (`2026-10-02 00:00:00+00` = 21h do dia 01 em
+Brasília); nas criadas pelo app é o `now()` da inserção, às vezes dias depois.
+Medido: **13 de 15** linhas com `date` em outro dia do calendário de Brasília,
+`assessment_date` preenchido em **15 de 15**. A tela usava `date || assessment_date`
+e mostrava "01/10/2026 quinta-feira" para a avaliação de 02/10. Fonte única:
+`utils/assessment/assessmentDay.ts` (`assessmentDayKey`, `formatDayKey`,
+`compareAssessmentsByDay`) — dia só ('YYYY-MM-DD') nunca passa por
+`new Date()` + fuso. O mesmo arquivo de teste trava o "hoje" de avaliação nova
+em `brtDateKey()` (com `toISOString()`, depois das 21h nascia datada amanhã).
+
+⚠️ **Dobras e bioimpedância nunca se comparam nem dividem curva** (regra do
+dono). As dobras de 02/10 (5,83%) contra a BIA de 11/09 (17,4%) davam
+"% gordura −11,6" e "massa magra +10,0 kg em 21 dias" — diferença de MÉTODO.
+`utils/assessment/assessmentMethod.ts`: `dobras` · `bia` · `misto` (completa com
+as duas: `body_fat_percentage` grava a MÉDIA, que não é nenhum dos dois). A
+base de variação (cartões do topo, card da lista, relatório do professor) é
+`previousSameMethod`; sem uma, não há variação e a tela diz por quê. Os
+gráficos de composição desenham uma série por método; o peso fica numa só.
+O card e os cartões também RECUSAM base de outro método (defesa em
+profundidade). Guard: `assessment/__tests__/avaliacaoDiaEMetodo.test.tsx`,
+11 mutações, todas vermelhas. Duas pegaram guard falso na 1ª versão: o nome da
+função na linha do `import` passava por "o hook ordena pelo dia", e sem duas
+avaliações no MESMO dia o desempate nunca era exercitado.
+
 ## Histórico de REFEIÇÕES — o irmão do de treinos
 
 Registro completo: `docs/historico/2026-08-historico-refeicoes.md`.

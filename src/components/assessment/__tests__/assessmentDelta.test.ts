@@ -77,8 +77,11 @@ describe('lista do histórico', () => {
     it('compara com a anterior no TEMPO, não com a linha de baixo', () => {
         // Com a lista invertida, a vizinha visual é a anterior — mas depender
         // disso quebraria em qualquer mudança de ordenação.
+        // Desde 02/10/2026 é a anterior no tempo DO MESMO MÉTODO (dobras × BIA
+        // nunca se comparam): `previousSameMethod` anda para trás a partir do
+        // índice cronológico — guard completo em avaliacaoDiaEMetodo.test.tsx.
         expect(HIST).toMatch(/const idx = sortedAssessments\.length - 1 - revIdx/)
-        expect(HIST).toMatch(/sortedAssessments\[idx - 1\]/)
+        expect(HIST).toMatch(/previousSameMethod\(sortedAssessments, idx\)/)
     })
 
     it('o card destaca peso e gordura e mostra a variação', () => {

@@ -1,5 +1,6 @@
 import { logError } from '@/lib/logger'
 import { escapeHtml } from '@/utils/escapeHtml'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 interface AssessmentFormData {
   assessment_date?: string | null
@@ -94,8 +95,9 @@ function buildAssessmentHtml(
   // nome/observação com <img onerror> executava script na janela nova.
   // Guard: __tests__/generatePdfXss.test.ts
   const name = escapeHtml(String(studentName || 'Aluno').trim() || 'Aluno')
-  const dateRaw = data?.assessment_date ?? new Date().toISOString().split('T')[0]
-  const date = escapeHtml(typeof dateRaw === 'string' && dateRaw ? dateRaw : new Date().toISOString().split('T')[0])
+  // Dia de Brasília: `toISOString()` depois das 21h já é amanhã.
+  const dateRaw = data?.assessment_date ?? brtDateKey()
+  const date = escapeHtml(typeof dateRaw === 'string' && dateRaw ? dateRaw : brtDateKey())
 
   const weight = Number.parseFloat(String(data?.weight ?? '0').replace(',', '.')) || 0
   const height = Number.parseFloat(String(data?.height ?? '0').replace(',', '.')) || 0

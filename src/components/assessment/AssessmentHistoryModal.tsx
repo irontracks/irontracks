@@ -11,6 +11,7 @@ import {
     getMeasurementCm,
     getSkinfoldMm,
 } from './assessmentUtils';
+import { assessmentDayKey } from '@/utils/assessment/assessmentDay';
 
 const AssessmentPDFGenerator = dynamic(
     () => import('@/components/assessment/AssessmentPDFGenerator'),
@@ -103,7 +104,7 @@ export function AssessmentHistoryModal({
                                     {/* Date + summary */}
                                     <div>
                                         <div className="font-black text-white">
-                                            {formatDateCompact(a.date || a.assessment_date)}
+                                            {formatDateCompact(assessmentDayKey(a))}
                                         </div>
                                         <div className="text-xs text-neutral-400">
                                             {(() => {
