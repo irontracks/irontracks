@@ -9,6 +9,7 @@ import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
 import { apiVip } from '@/lib/api'
 import PeriodizationCreateModal, { friendlyCreateError } from '@/components/vip/PeriodizationCreateModal'
 import { useDialog } from '@/contexts/DialogContext'
+import { sanitizeOverviewText } from '@/lib/vip/periodizationOverviewText'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -275,7 +276,7 @@ export default function VipPeriodizationPanel({
 
       {program && typeof program === 'object' && program.config && typeof (program as Record<string, unknown>).config === 'object' && (program as Record<string, unknown>).config && (program as Record<string, unknown> & { config?: Record<string, unknown> }).config?.overview ? (
         <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4 whitespace-pre-wrap text-sm text-neutral-200">
-          {String(((program as unknown as { config?: Record<string, unknown> }).config?.overview))}
+          {sanitizeOverviewText((program as unknown as { config?: Record<string, unknown> }).config?.overview)}
         </div>
       ) : null}
 
