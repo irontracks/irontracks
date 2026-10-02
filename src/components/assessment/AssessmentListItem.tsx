@@ -2,7 +2,9 @@
 
 import React from 'react'
 import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import { computeDelta, daysBetween, type MetricDelta } from './assessmentDelta'
+import { computeDelta, type MetricDelta } from './assessmentDelta'
+import { assessmentDayKey, daysBetweenDayKeys } from '@/utils/assessment/assessmentDay'
+import { assessmentMethod, ASSESSMENT_METHOD_LABEL } from '@/utils/assessment/assessmentMethod'
 import dynamic from 'next/dynamic'
 
 import type { AssessmentRow } from './assessmentUtils'
@@ -295,10 +297,10 @@ export function AssessmentListItem({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-black text-white text-sm sm:text-base truncate">
-                {formatDateCompact(assessment.date || assessment.assessment_date)}
+                {formatDateCompact(assessmentDayKey(assessment))}
               </div>
               <div className="text-xs text-neutral-400 mt-0.5 truncate">
-                {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
+                {formatWeekdayCompact(assessmentDayKey(assessment))}
               </div>
             </div>
             <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
@@ -354,12 +356,18 @@ export function AssessmentListItem({
             const lean = getLeanMassKg(assessment)
             const bmr = getBmrKcal(assessment)
 
-            const dPeso = computeDelta(peso, previousAssessment ? getWeightKg(previousAssessment) : null, null)
-            const dBf = computeDelta(bf, previousAssessment ? getBodyFatPercent(previousAssessment) : null, 'down')
-            const dLean = computeDelta(lean, previousAssessment ? getLeanMassKg(previousAssessment) : null, 'up')
-            const dias = previousAssessment
-              ? daysBetween(assessment?.date ?? assessment?.assessment_date,
-                            previousAssessment?.date ?? previousAssessment?.assessment_date)
+            // Base só do MESMO método (02/10/2026): dobras contra a BIA anterior
+            // mostravam "massa magra +10,0 kg" em 21 dias. O pai já escolhe a
+            // base certa; a recusa aqui é defesa em profundidade.
+            const metodo = assessmentMethod(assessment)
+            const base = previousAssessment && assessmentMethod(previousAssessment) === metodo
+              ? previousAssessment
+              : null
+            const dPeso = computeDelta(peso, base ? getWeightKg(base) : null, null)
+            const dBf = computeDelta(bf, base ? getBodyFatPercent(base) : null, 'down')
+            const dLean = computeDelta(lean, base ? getLeanMassKg(base) : null, 'up')
+            const dias = base
+              ? daysBetweenDayKeys(assessmentDayKey(assessment), assessmentDayKey(base))
               : null
 
 
@@ -392,7 +400,7 @@ export function AssessmentListItem({
                     coisas completamente diferentes. */}
                 {dias && (dPeso || dBf || dLean) ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-400">
-                    <span>Desde a anterior, há {dias} {dias === 1 ? 'dia' : 'dias'}:</span>
+                    <span>Desde a anterior por {ASSESSMENT_METHOD_LABEL[metodo]}, há {dias} {dias === 1 ? 'dia' : 'dias'}:</span>
                     {dLean ? (
                       <span style={{ color: tomCor(dLean) }} className="font-bold">
                         massa magra {dLean.label} kg
@@ -600,7 +608,7 @@ export function AssessmentListItem({
                   Métodos de % Gordura
                   {pairedAssessment && (
                     <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
-                      🔗 cruzado com avaliação de {formatDateCompact(String(pairedAssessment.assessment_date ?? pairedAssessment.date ?? ''))}
+                      🔗 cruzado com avaliação de {formatDateCompact(assessmentDayKey(pairedAssessment))}
                     </span>
                   )}
                 </h4>

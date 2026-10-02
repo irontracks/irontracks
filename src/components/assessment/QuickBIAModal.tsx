@@ -26,6 +26,7 @@ import {
 import type { BiaExtractionData } from '@/utils/storage/biaExtraction'
 import { dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 interface QuickBIAModalProps {
   isOpen: boolean
@@ -48,7 +49,7 @@ interface FormState {
 }
 
 const buildInitial = (): FormState => ({
-  assessment_date: new Date().toISOString().split('T')[0],
+  assessment_date: brtDateKey(),
   bia_body_fat_percentage: '',
   bia_lean_mass: '',
   bia_fat_mass: '',

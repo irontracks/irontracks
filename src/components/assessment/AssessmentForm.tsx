@@ -28,6 +28,7 @@ import ResultsPreview from './ResultsPreview';
 import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 interface AssessmentFormProps {
   studentId: string;
@@ -87,7 +88,7 @@ type AssessmentStepProps = {
 };
 
 const buildDefaultFormData = (): AssessmentFormData => ({
-  assessment_date: new Date().toISOString().split('T')[0],
+  assessment_date: brtDateKey(),
   weight: '',
   height: '',
   age: '',

@@ -3,6 +3,7 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { logError } from '@/lib/logger'
 import type { ActionResult } from '@/types/actions'
 import type { BodyPhotoAssessment } from '@/types/bodyPhotoAssessment'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 /**
  * Server-side data functions (browser client, RLS-enforced) para a Avaliação
@@ -37,7 +38,7 @@ export async function createBodyPhotoAssessment(
             user_id: targetUserId,
             trainer_id: isTrainerFlow ? user.id : null,
             created_by: user.id,
-            assessment_date: opts.assessmentDate || new Date().toISOString().slice(0, 10),
+            assessment_date: opts.assessmentDate || brtDateKey(),
             status: 'pending' as const,
         }
 

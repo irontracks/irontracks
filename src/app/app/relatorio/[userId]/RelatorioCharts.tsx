@@ -36,7 +36,8 @@ const GC = 'rgba(255,255,255,0.06)'
 const TC = 'rgba(255,255,255,0.35)'
 
 interface Props {
-  assessments: { date: string; weight: number; bf: number; lean: number }[]
+  /** `bf`/`lean` são null onde a avaliação é de outro método (dobras × BIA não se misturam na curva). */
+  assessments: { date: string; weight: number; bf: number | null; lean: number | null }[]
   workoutsByMonth: { mes: string; treinos: number }[]
   nutritionDays: { date: string; calories: number }[]
   nutritionGoalKcal: number
@@ -98,6 +99,7 @@ export function RelatorioCharts({
             options={{
               responsive: true,
               maintainAspectRatio: false,
+              spanGaps: true,
               interaction: { mode: 'index', intersect: false },
               plugins: { legend: { display: false }, tooltip: TIP },
               scales: {

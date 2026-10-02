@@ -15,6 +15,7 @@ import {
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
 import { logError } from '@/lib/logger'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 
 const BodyMeasurementMap = dynamic(() => import('./BodyMeasurementMap'), { ssr: false })
 
@@ -159,7 +160,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const date = formData.assessment_date || new Date().toISOString().split('T')[0];
+      const date = formData.assessment_date || brtDateKey();
       a.href = url;
       a.download = `avaliacao_${studentName?.replace(/\s+/g, '_') || 'aluno'}_${date}.json`;
       document.body.appendChild(a);

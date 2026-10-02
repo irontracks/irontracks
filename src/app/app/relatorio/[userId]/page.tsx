@@ -4,6 +4,8 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { RelatorioCharts } from './RelatorioCharts'
+import { assessmentDayKey, compareAssessmentsByDay } from '@/utils/assessment/assessmentDay'
+import { assessmentMethod } from '@/utils/assessment/assessmentMethod'
 
 interface PageProps {
   params: Promise<{ userId: string }>
@@ -28,8 +30,15 @@ function fmtMonth(m: string) {
   return MONTHS[parseInt(mo) - 1] + '/' + y.slice(2)
 }
 
-function fmtDate(d: string) {
-  const [, m, day] = d.split('T')[0].split('-')
+/**
+ * Recebe a LINHA da avaliação: o dia é `assessment_date`, não o timestamp
+ * `date` (meia-noite UTC nas importadas, instante da gravação nas outras —
+ * ver utils/assessment/assessmentDay).
+ */
+function fmtDate(row: Record<string, unknown> | null | undefined) {
+  const key = assessmentDayKey(row)
+  if (!key) return '—'
+  const [, m, day] = key.split('-')
   return day + '/' + m
 }
 
@@ -162,9 +171,11 @@ export default async function RelatorioPage({ params }: PageProps) {
       db.auth.admin.getUserById(userId),
       db.from('profiles').select('display_name').eq('id', userId).single(),
       db.from('assessments')
-        .select('date,weight,body_fat_percentage,lean_mass,bmr,bmi,arm_circ,chest_circ,waist_circ,hip_circ,thigh_circ,calf_circ')
+        .select('assessment_date,date,created_at,assessment_type,bia_body_fat_percentage,body_fat_percentage_skinfold,weight,body_fat_percentage,lean_mass,bmr,bmi,arm_circ,chest_circ,waist_circ,hip_circ,thigh_circ,calf_circ')
         .eq('user_id', userId)
-        .order('date', { ascending: true })
+        // As 10 MAIS RECENTES (desc + limit), reordenadas depois. Com `asc` o
+        // relatório mostrava as 10 mais ANTIGAS e o card "ATUAL" não era a atual.
+        .order('assessment_date', { ascending: false })
         .limit(10),
       db.from('workouts')
         .select('id', { count: 'exact', head: true })
@@ -201,7 +212,7 @@ export default async function RelatorioPage({ params }: PageProps) {
   const name = profileRes.data?.display_name ?? user.email?.split('@')[0] ?? 'Usuário'
   const initials = name.slice(0, 2).toUpperCase()
 
-  const assessments = assessmentsRes.data ?? []
+  const assessments = [...(assessmentsRes.data ?? [])].sort(compareAssessmentsByDay)
   const totalWorkouts = workoutsAllRes.count ?? 0
   const workouts6m = workouts6mRes.data ?? []
   const nutritionLogs = nutritionRes.data ?? []
@@ -246,16 +257,26 @@ export default async function RelatorioPage({ params }: PageProps) {
   // Latest & first assessments
   const latest = assessments[assessments.length - 1]
   const first = assessments[0]
-  const leanDelta = latest && first ? (latest.lean_mass ?? 0) - (first.lean_mass ?? 0) : 0
-  const bfDelta = latest && first ? (first.body_fat_percentage ?? 0) - (latest.body_fat_percentage ?? 0) : 0
+  // Composição só se compara dentro do MESMO método (dobras × bioimpedância
+  // nunca — utils/assessment/assessmentMethod). O "desde o início" da massa
+  // magra e da gordura parte da primeira avaliação do método da ATUAL.
+  const metodoAtual = latest ? assessmentMethod(latest) : null
+  const mesmoMetodo = metodoAtual ? assessments.filter((a) => assessmentMethod(a) === metodoAtual) : []
+  const firstSame = mesmoMetodo[0]
+  const leanDelta = latest && firstSame && firstSame !== latest ? (latest.lean_mass ?? 0) - (firstSame.lean_mass ?? 0) : 0
+  const bfDelta = latest && firstSame && firstSame !== latest ? (firstSame.body_fat_percentage ?? 0) - (latest.body_fat_percentage ?? 0) : 0
 
-  // Assessments data for chart
-  const chartAssessments = assessments.map((a) => ({
-    date: fmtDate(a.date as string),
-    weight: Number(a.weight ?? 0),
-    bf: Number(a.body_fat_percentage ?? 0),
-    lean: Number(a.lean_mass ?? 0),
-  }))
+  // Assessments data for chart — composição de outro método vira buraco (null)
+  // na curva, em vez de um pico que é diferença de método.
+  const chartAssessments = assessments.map((a) => {
+    const comparavel = assessmentMethod(a) === metodoAtual
+    return {
+      date: fmtDate(a),
+      weight: Number(a.weight ?? 0),
+      bf: comparavel && a.body_fat_percentage != null ? Number(a.body_fat_percentage) : null,
+      lean: comparavel && a.lean_mass != null ? Number(a.lean_mass) : null,
+    }
+  })
 
   // Nutrition chart data
   const chartNutrition = nutritionLogs.map((d) => ({
@@ -300,7 +321,7 @@ export default async function RelatorioPage({ params }: PageProps) {
                 <div className="sv">{num(latest?.lean_mass, 1)} kg</div>
                 <div style={{ fontSize: 9, color: '#facc15', marginTop: 2, fontWeight: 500 }}>massa magra</div>
                 <div className="sl">Composição</div>
-                <div className="ss">{leanDelta > 0 ? `+${num(leanDelta)} kg` : '—'} em {assessments.length > 1 ? `${assessments.length - 1} aval.` : 'avaliações'}</div>
+                <div className="ss">{leanDelta > 0 ? `+${num(leanDelta)} kg` : '—'} em {mesmoMetodo.length > 1 ? `${mesmoMetodo.length - 1} aval.` : 'avaliações'}</div>
               </a>
               <a className="sc" href="https://irontracks.com.br/assessments" target="_blank" rel="noopener">
                 <div className="sv">{num(latest?.body_fat_percentage)}%</div>
@@ -328,7 +349,7 @@ export default async function RelatorioPage({ params }: PageProps) {
                 <div className="sn">1</div>
                 <div className="st">Evolução corporal</div>
                 <span className="sb">
-                  {first ? fmtDate(first.date as string) : '—'} → {latest ? fmtDate(latest.date as string) : '—'}
+                  {first ? fmtDate(first) : '—'} → {latest ? fmtDate(latest) : '—'}
                 </span>
               </div>
 
@@ -336,7 +357,7 @@ export default async function RelatorioPage({ params }: PageProps) {
                 {assessments.map((a, i) => (
                   <div key={i} className={`tl${i === assessments.length - 1 ? ' cur' : ''}`}>
                     {i === assessments.length - 1 && <div className="tlt">ATUAL</div>}
-                    <div className="tld">{fmtDate(a.date as string)}</div>
+                    <div className="tld">{fmtDate(a)}</div>
                     <div className="tlw" style={i === assessments.length - 1 ? { color: '#facc15' } : {}}>{num(a.weight)} kg</div>
                     <div className="tlb">{num(a.body_fat_percentage)}% GC</div>
                     <div className="tlm">{num(a.lean_mass)} kg magra</div>
@@ -372,7 +393,7 @@ export default async function RelatorioPage({ params }: PageProps) {
                 <div className="sn">2</div>
                 <div className="st">Medidas corporais</div>
                 <span className="sb">
-                  {first ? fmtDate(first.date as string) : '—'} → {latest ? fmtDate(latest.date as string) : '—'}
+                  {first ? fmtDate(first) : '—'} → {latest ? fmtDate(latest) : '—'}
                 </span>
               </div>
               <div className="g3" style={{ marginBottom: 9 }}>

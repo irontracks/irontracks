@@ -15,14 +15,23 @@ import {
     getLeanMassKg,
     getMeasurementCm,
 } from './assessmentUtils';
+import { assessmentDayKey, formatDayKey, isDayKey } from '@/utils/assessment/assessmentDay';
+import { assessmentMethod, methodsPresent, ASSESSMENT_METHOD_SHORT, type AssessmentMethod } from '@/utils/assessment/assessmentMethod';
 
 // ── Date formatting helpers ─────────────────────────────────────────────────
 
+/**
+ * Dia só ('YYYY-MM-DD', o `assessment_date`) sai como o PRÓPRIO dia —
+ * `new Date('2026-10-02')` é meia-noite UTC e, formatado no Brasil, virava
+ * 01/10 (02/10/2026). Instante (timestamp) sai no dia de Brasília. Quem tem a
+ * LINHA deve passar `assessmentDayKey(row)`, não `row.date`.
+ */
 export function formatAssessmentDate(rawDate: unknown, options?: Intl.DateTimeFormatOptions): string {
     if (!rawDate) return '-';
+    if (typeof rawDate === 'string' && isDayKey(rawDate.trim())) return formatDayKey(rawDate.trim(), options ?? {});
     const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate));
     if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('pt-BR', options);
+    return date.toLocaleDateString('pt-BR', { ...options, timeZone: 'America/Sao_Paulo' });
 }
 
 export function formatDateCompact(rawDate: unknown): string {
@@ -208,9 +217,9 @@ function buildBarOptions(title: string, datasets: { data: (number | null)[] }[])
 
 export interface AssessmentChartData {
     /** Weight + Lean Mass (kg scale) */
-    weightLeanMass: { labels: string[]; datasets: { label: string; data: (number | null)[]; borderColor: string; backgroundColor: string; fill: boolean; tension: number }[] };
-    /** Body Fat % (% scale) */
-    bodyFatPercent: { labels: string[]; datasets: { label: string; data: (number | null)[]; borderColor: string; backgroundColor: string; fill: boolean; tension: number }[] };
+    weightLeanMass: { labels: string[]; datasets: { label: string; data: (number | null)[]; borderColor: string; backgroundColor: string; fill: boolean; tension: number; borderDash?: number[] }[] };
+    /** Body Fat % (% scale) — uma série por MÉTODO, nunca dobras e BIA na mesma */
+    bodyFatPercent: { labels: string[]; datasets: { label: string; data: (number | null)[]; borderColor: string; backgroundColor: string; fill: boolean; tension: number; borderDash?: number[] }[] };
     /** Trunk circumferences: Chest, Waist, Hip */
     trunkMeasurements: { labels: string[]; datasets: { label: string; data: (number | null)[]; backgroundColor: string; borderColor: string; borderWidth: number; borderRadius: number }[] };
     /** Limb circumferences: Arm, Thigh, Calf */
@@ -222,17 +231,36 @@ export interface AssessmentChartData {
 const CHART_BAR_LIMIT = 6;
 
 export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): AssessmentChartData {
-    const makeLabel = (assessment: AssessmentRow) => {
-        const rawDate = assessment?.date ?? assessment?.assessment_date;
-        const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate ?? ''));
-        return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-    };
+    const makeLabel = (assessment: AssessmentRow) =>
+        formatDayKey(assessmentDayKey(assessment), { day: '2-digit', month: 'short' });
 
     const labels = sortedAssessments.map(makeLabel);
 
     // Barras: apenas as N mais recentes para não sobrecarregar o eixo X
     const barAssessments = sortedAssessments.slice(-CHART_BAR_LIMIT);
     const barLabels = barAssessments.map(makeLabel);
+
+    /*
+     * Composição corporal: UMA curva por método (02/10/2026). Dobras e
+     * bioimpedância medem coisas diferentes — a BIA do dono lê ~10 pontos acima
+     * das dobras —, e uma curva que passa pelas duas desenha um pico de gordura
+     * que nunca existiu. Cada série tem `null` onde a avaliação é de outro
+     * método; `spanGaps` liga os pontos do mesmo método por cima do buraco.
+     * Com um método só (a maioria), o rótulo não muda.
+     */
+    const metodos = methodsPresent(sortedAssessments);
+    const variosMetodos = metodos.length > 1;
+    const BIA_TRACO = [6, 4];
+    const porMetodo = <S extends Record<string, unknown>>(
+        rotulo: string,
+        valor: (a: AssessmentRow) => number | null,
+        estilo: S,
+    ) => metodos.map((m: AssessmentMethod) => ({
+        ...estilo,
+        ...(m === 'dobras' ? {} : { borderDash: BIA_TRACO, fill: false }),
+        label: variosMetodos ? `${rotulo} · ${ASSESSMENT_METHOD_SHORT[m]}` : rotulo,
+        data: sortedAssessments.map((a) => (assessmentMethod(a) === m ? valor(a) : null)),
+    }));
 
     return {
         weightLeanMass: {
@@ -246,35 +274,29 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
                     fill: true,
                     tension: 0.4,
                 },
-                {
-                    label: 'Massa Magra (kg)',
-                    data: sortedAssessments.map(getLeanMassKg),
+                ...porMetodo('Massa Magra (kg)', getLeanMassKg, {
                     borderColor: '#4ade80',
                     backgroundColor: 'rgba(74,222,128,0.1)',
                     fill: true,
                     tension: 0.4,
-                },
+                }),
             ],
         },
         bodyFatPercent: {
             labels,
             datasets: [
-                {
-                    label: '% Gordura',
-                    data: sortedAssessments.map(getBodyFatPercent),
+                ...porMetodo('% Gordura', getBodyFatPercent, {
                     borderColor: '#f43f5e',
                     backgroundColor: 'rgba(244,63,94,0.1)',
                     fill: true,
                     tension: 0.4,
-                },
-                {
-                    label: 'Massa Gorda (kg)',
-                    data: sortedAssessments.map(getFatMassKg),
+                }),
+                ...porMetodo('Massa Gorda (kg)', getFatMassKg, {
                     borderColor: '#fb923c',
                     backgroundColor: 'rgba(251,146,60,0.08)',
                     fill: false,
                     tension: 0.4,
-                },
+                }),
             ],
         },
         trunkMeasurements: {

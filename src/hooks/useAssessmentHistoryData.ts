@@ -27,6 +27,8 @@ import {
   checkChartHasData,
   buildChartOptions,
 } from '@/components/assessment/assessmentChartData'
+import { assessmentDayKey, compareAssessmentsByDay } from '@/utils/assessment/assessmentDay'
+import { previousSameMethod } from '@/utils/assessment/assessmentMethod'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -198,29 +200,21 @@ export function useAssessmentHistoryData(studentId?: string) {
 
   // ── Computed data ────────────────────────────────────────────
 
-  const sortedAssessments = useMemo(() => {
-    const safeTime = (raw: unknown): number => {
-      const date = new Date(
-        typeof raw === 'string' || typeof raw === 'number' || raw instanceof Date ? raw : String(raw ?? ''),
-      )
-      const time = date.getTime()
-      return Number.isFinite(time) ? time : 0
-    }
-
-    return [...(assessments || [])].sort((a, b) => {
-      const aTime = safeTime(a?.date ?? a?.assessment_date)
-      const bTime = safeTime(b?.date ?? b?.assessment_date)
-      return aTime - bTime
-    })
-  }, [assessments])
+  // Ordem pelo DIA da avaliação (`assessment_date`), não pelo timestamp `date`
+  // — que é meia-noite UTC nas linhas importadas e o instante da gravação nas
+  // outras. Ver utils/assessment/assessmentDay.
+  const sortedAssessments = useMemo(
+    () => [...(assessments || [])].sort(compareAssessmentsByDay),
+    [assessments],
+  )
 
   const workoutWindow = useMemo(() => {
     if (!Array.isArray(sortedAssessments) || sortedAssessments.length === 0) return null
     const minTimes = sortedAssessments
-      .map((a) => safeDateMsStartOfDay(a?.date ?? a?.assessment_date))
+      .map((a) => safeDateMsStartOfDay(assessmentDayKey(a)))
       .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0)
     const maxTimes = sortedAssessments
-      .map((a) => safeDateMsEndOfDay(a?.date ?? a?.assessment_date))
+      .map((a) => safeDateMsEndOfDay(assessmentDayKey(a)))
       .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0)
     if (minTimes.length === 0 || maxTimes.length === 0) return null
     const minTime = Math.min(...minTimes)
@@ -504,7 +498,7 @@ export function useAssessmentHistoryData(studentId?: string) {
     for (const assessment of sortedAssessments) {
       const id = assessment?.id ? String(assessment.id) : ''
       if (!id) continue
-      const dateMs = safeDateMsEndOfDay(assessment?.date ?? assessment?.assessment_date)
+      const dateMs = safeDateMsEndOfDay(assessmentDayKey(assessment))
       if (!dateMs) continue
 
       const bmr = getBmrKcal(assessment)
@@ -540,7 +534,11 @@ export function useAssessmentHistoryData(studentId?: string) {
   const chartOptions = useMemo(() => buildChartOptions(chartData), [chartData])
 
   const latestAssessment = sortedAssessments[sortedAssessments.length - 1]
-  const previousAssessment = sortedAssessments[sortedAssessments.length - 2]
+  // Base dos cartões do topo: a anterior do MESMO método (dobras × BIA nunca se
+  // comparam — utils/assessment/assessmentMethod). `null` quando a última é a
+  // primeira do seu método; `hasEarlierAssessment` diz se há outras.
+  const previousAssessment = previousSameMethod(sortedAssessments, sortedAssessments.length - 1)
+  const hasEarlierAssessment = sortedAssessments.length > 1
 
   // ── Return ───────────────────────────────────────────────────
 
@@ -553,6 +551,7 @@ export function useAssessmentHistoryData(studentId?: string) {
     sortedAssessments,
     latestAssessment,
     previousAssessment,
+    hasEarlierAssessment,
 
     // Workout sessions / TDEE
     workoutSessionsLoading,
