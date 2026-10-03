@@ -3575,6 +3575,27 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## ⚠️ `cacheSetNxStatus` NUNCA funcionou até 03/10/2026 — e ninguém viu
+
+Ela montava `POST /set/<chave>/<valor>?NX=true&EX=<ttl>` sem corpo. Na API REST
+do Upstash cada par da query vira argumento (`?EX=100` = `EX 100`), então o
+comando chegava como `SET chave valor NX true EX <ttl>`: HTTP 400, e a função
+devolveu `'unavailable'` em TODA chamada. Achado porque o lembrete de remédio
+das 06:00 saiu duas vezes. Medido no banco, a mesma causa:
+- lembrete de refeição: **75 de 160** duplicados desde 22/09 (horário redondo
+  cai em duas passadas do cron; a trava nunca barrava a segunda);
+- like em story: **30 curtidas, zero notificações** (`cacheSetNx` é fail-closed);
+- webhook da RevenueCat: `'unavailable'` = **503 a todo evento** desde 14/08 (no
+  dia da correção, só 1 assinatura Apple paga ativa, anual até 05/2027).
+
+Hoje ela usa o SDK `@upstash/redis` (o mesmo do rate limit; ele manda o
+comando por `/pipeline` em JSON) e avisa o Sentry na falha. **Nenhum teste
+pegava porque todos os chamadores mockam o módulo `@/utils/cache` inteiro** — o
+guard (`utils/__tests__/cacheSetNx.test.ts`) emula o PROTOCOLO do Upstash, não
+a função. E o silêncio veio de `logWarn`, que é no-op em produção: caminho que
+"degrada" para um fallback precisa de `logWarnRemote`, senão o fallback vira o
+comportamento permanente sem ninguém saber.
+
 ## Medicamentos — lembrete push + "Tomei" (03/10/2026)
 
 Plano e decisões em **`docs/plans/medicamentos.md`** (contrato de API incluso).
