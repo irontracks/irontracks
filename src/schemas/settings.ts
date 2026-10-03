@@ -171,6 +171,9 @@ export const UserSettingsSchema = z
     notifyMissedMeal: z.boolean().default(false),
     notifyChallenges: z.boolean().default(true),
     notifyMealReminders: z.boolean().default(true),
+    // Lembrete de remédio (cron `medication-reminders`) e aviso de que o professor
+    // editou a lista (`medication_updated`) — um toggle só.
+    notifyMedications: z.boolean().default(true),
     soundVolume: z.number().min(0).max(100).default(100),
     inAppToasts: z.boolean().default(true),
     notificationPermissionPrompt: z.boolean().default(true),

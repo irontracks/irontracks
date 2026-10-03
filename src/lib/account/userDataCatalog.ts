@@ -145,6 +145,12 @@ export const USER_DATA_CATALOG: Record<string, TableEntry> = {
   exercise_chat_summaries: { mechanism: 'cascade', export: own(['user_id']) },
   // Foto/vídeo da observação da série (02/09/2026). Arquivos no bucket set-media (prefixo userId).
   workout_set_media: { mechanism: 'cascade', export: own(['user_id']) },
+  // Medicamentos (03/10/2026) — DADO DE SAÚDE sensível (LGPD art. 11). A FK de user_id
+  // para auth.users é CASCADE (as tomadas caem junto, pela FK composta). created_by /
+  // updated_by / recorded_by são SET NULL: o professor vinculado que apaga a conta NÃO
+  // leva embora os dados de saúde do aluno. O export lê por user_id (o dono do dado).
+  medications: { mechanism: 'cascade', export: own(['user_id']) },
+  medication_intakes: { mechanism: 'cascade', export: own(['user_id'], 20000) },
   exercise_videos: {
     mechanism: 'anonymize',
     reason: 'biblioteca compartilhada; created_by vira NULL (SET NULL) e o vídeo segue servindo os demais',

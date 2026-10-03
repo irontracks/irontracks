@@ -24,6 +24,8 @@ const SUPERFICIES: Array<{ arquivo: string; o_que: string }> = [
     // Dieta: escrita no SERVIDOR, chama o módulo direto.
     { arquivo: 'src/app/api/teacher/diet/prescribe/route.ts', o_que: 'prescreve o plano alimentar' },
     { arquivo: 'src/app/api/teacher/diet/note/route.ts', o_que: 'escreve a orientação de uma refeição' },
+    // Medicamentos: o professor edita a lista do aluno pela rota própria (POST/PATCH/DELETE).
+    { arquivo: 'src/app/api/teacher/medications/route.ts', o_que: 'cria, edita e apaga os remédios do aluno' },
     // Treino: sync de templates roda no servidor…
     { arquivo: 'src/app/api/admin/workouts/sync-templates/route.ts', o_que: 'empurra os templates para o aluno' },
     // …e a edição do painel é gravada pelo CLIENTE, por isso passa pela rota.
@@ -52,6 +54,42 @@ describe('quem altera o plano do aluno avisa o aluno', () => {
                 expect(c, `${arquivo}: envolva em waitUntil/catch`).toMatch(/catch/)
             }
         }
+    })
+})
+
+describe('medicamentos: o aviso do professor sai de TODA escrita da rota', () => {
+    it('as três escritas (POST, PATCH, DELETE) avisam com o tipo e a origem certos', () => {
+        const código = semComentarios(ler('src/app/api/teacher/medications/route.ts'))
+        // O guard genérico de cima só pede que exista ALGUMA chamada no arquivo:
+        // remover o aviso de UM método o deixaria verde. Aqui cada escrita é conferida.
+        const chamadas = código.match(/notifyCoachChange\s*\(/g) ?? []
+        const escritas = código.match(/export async function (POST|PATCH|DELETE)\b/g) ?? []
+        expect(escritas).toHaveLength(3)
+        // O aviso mora num helper (`avisarAluno`) acionado por cada método, e só
+        // depois de o núcleo devolver sucesso.
+        expect(chamadas.length).toBeGreaterThanOrEqual(1)
+        for (const metodo of ['POST', 'PATCH', 'DELETE']) {
+            const corpo = código.split(new RegExp(`export async function ${metodo}\\b`))[1]?.split(/export async function /)[0] ?? ''
+            expect(corpo, `${metodo} precisa avisar o aluno`).toMatch(/avisarAluno\s*\(/)
+            expect(corpo, `${metodo}: aviso só DEPOIS da escrita confirmada`).toMatch(
+                /Core\([\s\S]*?if \(!r\.ok\)[\s\S]*?avisarAluno\s*\(/,
+            )
+        }
+        expect(código).toMatch(/kind:\s*'medication_updated'/)
+        expect(código).toMatch(/origem:\s*'medication_edit'/)
+    })
+
+    it('medication_updated tem toggle (schema + tela) e a Central o conhece e o roteia pelo TIPO', () => {
+        const pref = NOTIFICATION_TYPE_TO_PREFERENCE['medication_updated']
+        expect(pref, 'sem mapa, o tipo é enviado sem como desligar').toBeTruthy()
+        expect(ler('src/schemas/settings.ts')).toContain(`${pref}:`)
+        expect(ler('src/components/settings/SettingsSections.tsx')).toContain(pref)
+        const centro = ler('src/components/NotificationCenter.tsx')
+        expect(centro, 'cairia no default "Info"').toMatch(/medication_updated:\s*tipo\(/)
+        // A tela de medicamentos é um modal do shell, não uma URL: o toque é roteado
+        // pelo tipo (ROTEADOS_PELO_TIPO), e não por DESTINO_POR_TIPO.
+        const roteados = centro.split('ROTEADOS_PELO_TIPO = new Set([')[1]?.split(']')[0] ?? ''
+        expect(roteados).toContain('medication_updated')
     })
 })
 

@@ -5,7 +5,7 @@ import {
     Bell, Check, X, Users, MessageSquare, Trophy, Dumbbell,
     Trash2, Sparkles, Activity, Heart, Star,
     UserPlus, Calendar, Utensils, Swords, Flame, Target,
-    Camera, Megaphone, Droplet, BarChart3, Award, Clock, CreditCard, Cake, AtSign
+    Camera, Megaphone, Droplet, BarChart3, Award, Clock, CreditCard, Cake, AtSign, Pill
 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -106,6 +106,10 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     challenge_accepted: tipo(<Swords size={15} />, 'Aceito', 'conquista'),
     challenge_declined: tipo(<Swords size={15} />, 'Recusado', 'social'),
     meal_reminder: tipo(<Utensils size={15} />, 'Refeição', 'lembrete'),
+    // Remédio: lembrete na hora e aviso de edição do professor — os dois são
+    // cutucão, não alarme (o vermelho é só do AVISO).
+    medication_reminder: tipo(<Pill size={15} />, 'Remédio', 'lembrete'),
+    medication_updated: tipo(<Pill size={15} />, 'Remédio', 'lembrete'),
     workout_reminder: tipo(<Activity size={15} />, 'Lembrete', 'lembrete'),
 
     // ── Os 14 tipos que o servidor emite e esta tabela não conhecia ──────────
@@ -284,7 +288,14 @@ const DESTINO_POR_TIPO: Record<string, string> = {
 }
 
 /** Tipos que o roteador resolve pelo TYPE, sem precisar de link. */
-const ROTEADOS_PELO_TIPO = new Set(['admin_access_request', 'admin_new_signup'])
+const ROTEADOS_PELO_TIPO = new Set([
+    'admin_access_request',
+    'admin_new_signup',
+    // A tela de medicamentos é um modal aberto pelo shell a partir do TIPO — não
+    // há URL para pôr em DESTINO_POR_TIPO.
+    'medication_reminder',
+    'medication_updated',
+])
 
 /**
  * O link do destino, ou string vazia quando não há para onde ir.

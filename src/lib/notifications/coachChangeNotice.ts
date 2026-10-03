@@ -31,8 +31,8 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { logError } from '@/lib/logger'
 
-/** Os dois tipos que este módulo emite. Ambos mapeados em NOTIFICATION_TYPE_TO_PREFERENCE. */
-export type CoachChangeKind = 'workout_updated' | 'diet_updated'
+/** Os tipos que este módulo emite. Todos mapeados em NOTIFICATION_TYPE_TO_PREFERENCE. */
+export type CoachChangeKind = 'workout_updated' | 'diet_updated' | 'medication_updated'
 
 /**
  * Minutos em que um segundo aviso do MESMO tipo é engolido.
@@ -43,7 +43,7 @@ export type CoachChangeKind = 'workout_updated' | 'diet_updated'
  */
 export const JANELA_DE_AGRUPAMENTO_MIN = 30
 
-type Origem = 'workout_edit' | 'diet_prescribe' | 'diet_note'
+type Origem = 'workout_edit' | 'diet_prescribe' | 'diet_note' | 'medication_edit'
 
 export interface CoachChangeInput {
     /** AUTH UID do aluno (o dono da conta que recebe o aviso). */
@@ -73,6 +73,14 @@ export function textoDoAviso(kind: CoachChangeKind, nome?: string | null): { tit
                 : 'Seu treino mudou. Dá uma olhada antes de treinar.',
         }
     }
+    if (kind === 'medication_updated') {
+        // Sem `nome`: a edição do professor pode tocar vários remédios na mesma
+        // rodada (a janela de 30 min agrupa), então o aviso fala da lista.
+        return {
+            title: 'Seu professor atualizou seus medicamentos 💊',
+            message: 'Confira os horários na tela de Medicamentos.',
+        }
+    }
     return {
         title: 'Seu professor atualizou sua dieta 🥗',
         message: alvo
@@ -81,8 +89,13 @@ export function textoDoAviso(kind: CoachChangeKind, nome?: string | null): { tit
     }
 }
 
-/** Para onde o toque leva. Treino abre a lista; dieta, a aba de nutrição. */
+/**
+ * Para onde o toque leva. Treino abre a lista; dieta, a aba de nutrição.
+ * Medicamentos devolve VAZIO de propósito: a tela é um modal aberto pelo shell a
+ * partir do TIPO da notificação, não uma URL.
+ */
 export function destinoDoAviso(kind: CoachChangeKind): string {
+    if (kind === 'medication_updated') return ''
     return kind === 'workout_updated' ? '/dashboard' : '/dashboard/nutrition'
 }
 
@@ -134,13 +147,16 @@ export async function notifyCoachChange(input: CoachChangeInput): Promise<CoachC
         }
 
         const { title, message } = textoDoAviso(input.kind, input.nome)
+        const destino = destinoDoAviso(input.kind)
         const r = await insertNotifications([
             {
                 user_id: studentUserId,
                 title,
                 message,
                 type: input.kind,
-                metadata: { link: destinoDoAviso(input.kind), origem: input.origem ?? null },
+                // `link` só quando há URL: medicamentos é roteado pelo tipo e um link
+                // vazio no metadata confundiria o roteador do push.
+                metadata: { ...(destino ? { link: destino } : {}), origem: input.origem ?? null },
             },
         ])
         return { ok: r.ok, notified: r.ok && r.inserted > 0, motivo: r.ok ? undefined : 'erro' }

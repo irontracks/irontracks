@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Sparkles,
   Crown,
+  Pill,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 import { rotuloDePapel } from '@/lib/user/rotuloDePapel'
@@ -39,6 +40,8 @@ interface HeaderActionsMenuProps {
   onOpenHistory?: () => void
   /** Histórico de REFEIÇÕES — irmão do de treinos, e onde o dono foi procurar. */
   onOpenNutritionHistory?: () => void
+  /** Tela de Medicamentos (modal por estado). */
+  onOpenMedications?: () => void
   onOpenNotifications?: () => void
   onLogout?: () => void
   onOpenSchedule?: () => void
@@ -171,6 +174,7 @@ export default function HeaderActionsMenu({
   onOpenChatList,
   onOpenHistory,
   onOpenNutritionHistory,
+  onOpenMedications,
   onOpenNotifications,
   onLogout,
   onOpenSchedule,
@@ -498,6 +502,14 @@ export default function HeaderActionsMenu({
                   icon={<Apple size={14} className="text-neutral-400" />}
                   label="Histórico de refeições"
                   onClick={() => { onOpenNutritionHistory?.(); close() }}
+                />
+              )}
+
+              {onOpenMedications && (
+                <MenuItem
+                  icon={<Pill size={14} className="text-neutral-400" />}
+                  label="Medicamentos"
+                  onClick={() => { onOpenMedications?.(); close() }}
                 />
               )}
 

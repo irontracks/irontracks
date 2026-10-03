@@ -43,6 +43,10 @@ interface ModalStoreState {
   settingsOpen: boolean
   setSettingsOpen: (v: boolean) => void
 
+  /** Tela de Medicamentos — modal por estado (rota fora de /app abriria o Safari no iPhone). */
+  medicationsOpen: boolean
+  setMedicationsOpen: (v: boolean) => void
+
   coachPending: boolean
   setCoachPending: (v: boolean) => void
 
@@ -81,6 +85,9 @@ export const useModalStore = create<ModalStoreState>((set) => ({
 
   settingsOpen: false,
   setSettingsOpen: (v) => set({ settingsOpen: v }),
+
+  medicationsOpen: false,
+  setMedicationsOpen: (v) => set({ medicationsOpen: v }),
 
   coachPending: false,
   setCoachPending: (v) => set({ coachPending: v }),
