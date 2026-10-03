@@ -1,4 +1,5 @@
-import { logWarn } from '@/lib/logger'
+import { Redis } from '@upstash/redis'
+import { logWarn, logWarnRemote } from '@/lib/logger'
 import { env } from '@/utils/env'
 
 type CacheEntry = {
@@ -188,30 +189,48 @@ export const cacheDeletePattern = async (pattern: string): Promise<void> => {
  */
 export type CacheSetNxResult = 'set' | 'exists' | 'unavailable'
 
-export const cacheSetNxStatus = async (key: string, value: string, ttlSeconds: number): Promise<CacheSetNxResult> => {
+/**
+ * ⚠️ Pelo SDK oficial, NUNCA por URL montada à mão (corrigido em 03/10/2026).
+ * A versão anterior fazia `POST /set/<chave>/<valor>?NX=true&EX=<ttl>` sem corpo;
+ * na API REST do Upstash cada par da query vira argumento, então o comando
+ * chegava como `SET chave valor NX true EX <ttl>` — sintaxe inválida, HTTP 400,
+ * e esta função devolveu `'unavailable'` em TODA chamada desde que existe. Em
+ * produção: lembretes de refeição duplicados (75 de 160), like de story sem
+ * push nenhum, webhook da RevenueCat respondendo 503 a todo evento. O SDK
+ * (`@upstash/redis`, o mesmo do rate limit) monta o comando corretamente.
+ *
+ * E a falha agora vai ao Sentry: `logWarn` é no-op em produção, e foi esse
+ * silêncio que escondeu o defeito por meses.
+ */
+type CacheRedisGlobals = { __irontracksCacheRedis?: Redis }
+
+const getCacheRedis = (): Redis | null => {
   const cfg = getUpstashConfig()
-  if (!cfg) {
-    logWarn('cache', `cacheSetNxStatus: Upstash not configured — returning 'unavailable' for key=${key}`)
+  if (!cfg) return null
+  const g = globalThis as unknown as CacheRedisGlobals
+  if (!g.__irontracksCacheRedis) {
+    g.__irontracksCacheRedis = new Redis({ url: cfg.url, token: cfg.token, automaticDeserialization: false })
+  }
+  return g.__irontracksCacheRedis
+}
+
+/** Só o prefixo da chave vai ao Sentry — o resto costuma carregar ids de usuário. */
+const prefixoDaChave = (key: string): string => key.split(':').slice(0, 2).join(':')
+
+export const cacheSetNxStatus = async (key: string, value: string, ttlSeconds: number): Promise<CacheSetNxResult> => {
+  const redis = getCacheRedis()
+  if (!redis) {
+    logWarnRemote('cache.setnx', 'Upstash não configurado — devolvendo unavailable', { prefixo: prefixoDaChave(key) })
     return 'unavailable'
   }
-
   try {
-    const res = await fetch(
-      `${cfg.url}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?NX=true&EX=${Math.max(1, Math.floor(ttlSeconds))}`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${cfg.token}` },
-      }
-    )
-    if (!res.ok) {
-      logWarn('cache', `cacheSetNxStatus: Upstash returned HTTP ${res.status} for key=${key} — returning 'unavailable'`)
-      return 'unavailable'
-    }
-    const json = await res.json().catch(() => null)
-    const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
-    return result === 'OK' ? 'set' : 'exists'
+    const r = await redis.set(key, value, { nx: true, ex: Math.max(1, Math.floor(ttlSeconds)) })
+    return r === 'OK' ? 'set' : 'exists'
   } catch (e) {
-    logWarn('cache', `cacheSetNxStatus: network error for key=${key} — returning 'unavailable'`, e)
+    logWarnRemote('cache.setnx', 'Upstash falhou — devolvendo unavailable', {
+      prefixo: prefixoDaChave(key),
+      erro: e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200),
+    })
     return 'unavailable'
   }
 }
