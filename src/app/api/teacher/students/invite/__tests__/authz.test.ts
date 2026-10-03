@@ -102,7 +102,8 @@ describe('login primeiro acesso OTP (useLoginScreen)', () => {
   })
 
   it('após verificar, vai pro /onboarding', () => {
-    expect(src).toMatch(/replace\(\s*['"]\/onboarding['"]\s*\)/)
+    // Por `navegarNoApp(..., { replace: true })` desde 02/10/2026 (sob /app).
+    expect(src).toMatch(/navegarNoApp\(\s*['"]\/onboarding['"]\s*,\s*\{\s*replace:\s*true\s*\}\s*\)/)
   })
 
   it('email não cadastrado dá mensagem clara (não vaza erro cru)', () => {

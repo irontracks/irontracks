@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw, Flame, Trophy, Activity, Moon } from 'lucide-react'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { translateAiError } from '@/utils/ai/clientErrors'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 type WeeklySummary = {
   ok: boolean
@@ -103,7 +104,7 @@ export default function VipWeeklySummaryCard() {
               <div className="min-w-0">Disponível para assinantes VIP.</div>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/marketplace')}
+                onClick={() => navegarNoApp('/marketplace')}
                 className="shrink-0 rounded-xl bg-yellow-500 px-3 py-2 text-xs font-black text-black hover:bg-yellow-400"
               >
                 Ver planos

@@ -128,7 +128,7 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
 
       {/* Fallback: go to login */}
       <a
-        href="/auth/login"
+        href="/app/auth/login"
         className="text-neutral-400 text-sm underline underline-offset-4 mt-4"
       >
         Entrar com outra conta

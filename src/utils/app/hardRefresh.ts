@@ -14,6 +14,8 @@
  * ativo pode repovoar o que acabou de ser limpo.
  */
 
+import { caminhoDoApp } from '@/utils/navigation/appPath'
+
 export interface HardRefreshResult {
     localStorageKeys: number
     cachesDeleted: number
@@ -78,7 +80,9 @@ export async function hardRefreshApp(): Promise<HardRefreshResult> {
     try {
         const url = new URL(window.location.href)
         url.searchParams.set('_r', String(Date.now()))
-        window.location.replace(url.toString())
+        // Sob /app: no iPhone, recarregar em /dashboard (fora do server.url do
+        // Capacitor) abriria o Safari — ver utils/navigation/appPath.
+        window.location.replace(caminhoDoApp(url.toString()))
     } catch {
         try { window.location.reload() } catch { /* nada mais a fazer */ }
     }

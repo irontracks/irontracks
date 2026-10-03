@@ -3575,6 +3575,29 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## ⚠️ No iPhone, navegação de página inteira fora de `/app` abre o SAFARI (02/10/2026)
+
+Relato: tocar em "Sair" abria o Safari e a conta continuava logada no app, sem
+como trocar de conta. Desde a build 86 o `server.url` é
+`https://irontracks.com.br/app`, e o Capacitor iOS (`WebViewDelegationHandler`)
+só mantém no app a navegação cujo endereço **começa com esse texto** —
+`/auth/logout`, mesmo domínio, vai para o sistema. Na web o rewrite de
+`next.config.ts` esconde isso; no app a navegação nem acontece.
+
+Vale para `window.location.*`, `<a href>` cru e `<Link>` para route handler
+(`/auth/*`). **Não** vale para `router.push`/`<Link>` de página, nem para
+redirect do servidor — o boot (`/app` → `/dashboard` por `redirect()`) segue no
+app, visto no simulador. Regra: destino de página inteira passa por
+`navegarNoApp()`/`caminhoDoApp()` (`utils/navigation/appPath.ts`); a raiz `/` é
+a landing, e para o app vira `/app`. Guard de classe em
+`utils/navigation/__tests__/appPath.test.ts` (regra do Swift lida do
+`capacitor.config.ts`, varredura de `src/`, lista de prefixos comparada com os
+rewrites; 11 mutações). Ponto cego conhecido: destino montado em variável ou
+ternário não casa com a varredura — passe pelo ajudante na fonte.
+
+Achado junto: "Sair de todos os aparelhos" e "Excluir conta" iam para
+`/auth/signin`, que **não existe** (404) — hoje vão para `/app`.
+
 ## Avaliações: o DIA é `assessment_date`, e métodos não se comparam (02/10/2026)
 
 Dois defeitos vistos na conta oficial, cada um uma classe.

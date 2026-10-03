@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveSession, Exercise, UserRecord } from '@/types/app'
 import type { ConfirmFn } from '@/contexts/DialogContext'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -52,7 +53,7 @@ export function useAppHandlers({
     const ok = await confirm('Deseja realmente sair da sua conta?', 'Sair')
     if (!ok) return
     try { clearClientSessionState() } catch { }
-    try { window.location.href = '/auth/logout' } catch { }
+    try { navegarNoApp('/auth/logout') } catch { }
   }, [confirm, clearClientSessionState])
 
   const handleSaveProfile = useCallback(async () => {

@@ -17,6 +17,7 @@
 import React, { useEffect } from 'react'
 import { Sparkles, FlaskConical, Crown } from 'lucide-react'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 export type UpsellFeature = 'wizard' | 'lab_exams'
 
@@ -64,7 +65,7 @@ export function VipUpsellCard({ feature, onDismiss }: {
 
     const irParaPlanos = () => {
         try { trackUserEvent('paywall_cta', { type: 'paywall', screen: feature }) } catch { }
-        try { window.location.href = '/marketplace' } catch { }
+        try { navegarNoApp('/marketplace') } catch { }
     }
 
     return (

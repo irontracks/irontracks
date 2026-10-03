@@ -56,6 +56,7 @@ const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStory
 import { useCustomFoods, customFoodsToExtraFoods, type CustomFood } from './useCustomFoods'
 import { properNameFieldProps } from '@/utils/ui/textFieldProps'
 import { useDialog } from '@/contexts/DialogContext'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -1173,7 +1174,7 @@ export default function NutritionMixer({
           <div className="text-sm font-semibold text-white">Macros no plano Pro</div>
           <div className="mt-1 text-xs text-neutral-400">Ative para acompanhar proteína, carbo e gordura.</div>
           {!hideVipCtas && (
-            <button type="button" onClick={() => (window.location.href = '/marketplace')} className="mt-3 tap-44 h-9 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 active:scale-95 transition">
+            <button type="button" onClick={() => navegarNoApp('/marketplace')} className="mt-3 tap-44 h-9 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 active:scale-95 transition">
               Ver planos
             </button>
           )}
@@ -1557,7 +1558,7 @@ export default function NutritionMixer({
               <div className="flex items-start justify-between gap-2">
                 <span>{error}</span>
                 {aiUpgrade && !hideVipCtas && (
-                  <button type="button" onClick={() => (window.location.href = '/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
+                  <button type="button" onClick={() => navegarNoApp('/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
                 )}
               </div>
               {String(error).startsWith('Não reconheci') && !aiUpgrade && (
