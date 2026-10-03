@@ -616,6 +616,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
     const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
+    const notifyMedications = Boolean(draft?.notifyMedications ?? true)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
 
     return (
@@ -951,6 +952,13 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyMealReminders}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
+                    />
+                    <NotifRow
+                        title="Medicamentos"
+                        description="No horário de cada remédio, e quando seu professor mudar a sua lista."
+                        checked={notifyMedications}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMedications', !notifyMedications)}
                     />
                     <NotifRow
                         title="Meta diária atingida"

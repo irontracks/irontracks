@@ -41,6 +41,8 @@ interface DashboardHeaderProps {
     onOpenHistory: () => void
     /** Histórico de refeições — irmão do de treinos no menu do avatar. */
     onOpenNutritionHistory?: () => void
+    /** Medicamentos — modal por estado, aberto pelo menu do avatar. */
+    onOpenMedications?: () => void
     onOpenNotifications: () => void
     onOpenSchedule: () => void
     onOpenWallet: () => void
@@ -73,7 +75,7 @@ export function DashboardHeader({
     hideVipOnIos, vipAccess, syncState,
     isHeaderVisible, coachPending,
     onGoHome, onOpenVip, onOpenAdmin, onOpenTeacherArea, onOpenChatList,
-    onOpenHistory, onOpenNutritionHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
+    onOpenHistory, onOpenNutritionHistory, onOpenMedications, onOpenNotifications, onOpenSchedule, onOpenWallet,
     onOpenSettings, onOpenTour, onOpenProfile, onLogout, onAcceptCoach,
     onAddStory,
 }: DashboardHeaderProps) {
@@ -182,6 +184,7 @@ export function DashboardHeader({
                         onOpenChatList={onOpenChatList}
                         onOpenHistory={onOpenHistory}
                         onOpenNutritionHistory={onOpenNutritionHistory}
+                        onOpenMedications={onOpenMedications}
                         onOpenNotifications={onOpenNotifications}
                         onOpenSchedule={onOpenSchedule}
                         onOpenWallet={onOpenWallet}

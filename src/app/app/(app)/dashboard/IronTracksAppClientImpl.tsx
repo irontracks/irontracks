@@ -297,6 +297,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const settingsOpen = useModalStore((s) => s.settingsOpen)
     const setSettingsOpen = useModalStore((s) => s.setSettingsOpen)
+    const medicationsOpen = useModalStore((s) => s.medicationsOpen)
+    const setMedicationsOpen = useModalStore((s) => s.setMedicationsOpen)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
     // VIP access & status — extracted to useVipAccess hook
@@ -873,6 +875,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             // entrega notificação LOCAL também, com o `userInfo` do Swift em `data`.
             // Sem link: o destino é o dashboard, e a chegada precisa virar check-in.
             if (detail?.type === 'gym_geofence') { handleGymArrival(); return; }
+            // Lembrete de remédio / aviso de que o professor mexeu na lista: a tela é
+            // um modal por ESTADO (não uma rota — fora de /app o iPhone abre o Safari),
+            // então o toque no push e o toque no card do sino chegam aqui pelo MESMO evento.
+            if (detail?.type === 'medication_reminder' || detail?.type === 'medication_updated') {
+                setMedicationsOpen(true);
+                return;
+            }
             // Avisos de admin abrem o painel na aba certa. Tem de ser pelo TYPE,
             // não por link: o painel é uma `view` deste componente, não uma rota
             // — `/admin` sequer existe em `app/`. O link antigo (`/admin?tab=
@@ -920,7 +929,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView, router, openAdminPanel, handleGymArrival]);
+    }, [setView, router, openAdminPanel, handleGymArrival, setMedicationsOpen]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
@@ -1217,6 +1226,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenChatList={handleOpenChatList}
                             onOpenHistory={handleOpenHistory}
                             onOpenNutritionHistory={openNutritionHistory}
+                            onOpenMedications={() => setMedicationsOpen(true)}
                             onOpenNotifications={handleOpenNotifications}
                             onOpenSchedule={() => router.push('/dashboard/schedule')}
                             onOpenWallet={() => { openAdminPanel('billing'); setView('admin'); }}
@@ -1727,6 +1737,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             preCheckinResolveRef={preCheckinResolveRef}
                             settingsOpen={settingsOpen}
                             setSettingsOpen={setSettingsOpen}
+                            medicationsOpen={medicationsOpen}
+                            setMedicationsOpen={setMedicationsOpen}
                             userSettingsApi={userSettingsApi as Record<string, unknown> | null}
                             openStudent={openStudent}
                             setOpenStudent={setOpenStudent as (v: unknown) => void}

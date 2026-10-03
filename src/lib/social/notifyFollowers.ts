@@ -63,6 +63,10 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   challenge_accepted: 'notifyChallenges',
   challenge_declined: 'notifyChallenges',
   meal_reminder: 'notifyMealReminders',
+  // Remédio: o lembrete do cron e o aviso de que o professor mexeu na lista
+  // dividem o MESMO toggle (decisão do dono, 03/10/2026).
+  medication_reminder: 'notifyMedications',
+  medication_updated: 'notifyMedications',
 }
 
 /** Given a notification type, return the preference key that gates it, or null. */

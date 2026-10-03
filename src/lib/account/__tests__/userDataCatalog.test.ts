@@ -27,7 +27,7 @@ import {
   USER_PREFIX_BUCKETS,
 } from '@/lib/account/userDataCatalog'
 
-/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — re-medido em 12/09/2026 (112 tabelas) */
+/** `select table_name from information_schema.tables where table_schema='public' and table_type='BASE TABLE'` — re-medido em 12/09/2026 (112 tabelas); `medications` e `medication_intakes` entraram em 03/10/2026 (114) */
 const PROD_TABLES_SNAPSHOT = [
   'access_requests', 'active_workout_sessions', 'admin_emails', 'app_payments', 'app_plans',
   'app_subscriptions', 'appointments', 'asaas_customers', 'asaas_webhook_events', 'assessments', 'audit_events',
@@ -41,7 +41,7 @@ const PROD_TABLES_SNAPSHOT = [
   'exercise_execution_submissions', 'exercise_library', 'exercise_muscle_maps', 'exercise_substitutions',
   'exercise_videos', 'exercises', 'foods_off_cache', 'foods_taco', 'gym_checkins', 'invites', 'lab_exam_files',
   'lab_exams', 'lab_result_markers', 'lab_results', 'live_activity_push_tokens', 'marketplace_payments',
-  'marketplace_subscriptions', 'mercadopago_webhook_events', 'muscle_weekly_summaries', 'notifications',
+  'marketplace_subscriptions', 'medication_intakes', 'medications', 'mercadopago_webhook_events', 'muscle_weekly_summaries', 'notifications',
   'nutrition_custom_foods', 'nutrition_day_flags', 'nutrition_favorite_meals', 'nutrition_goals', 'nutrition_learned_foods',
   'nutrition_library_partners',
   'nutrition_meal_entries', 'onboarding_events', 'password_recovery_codes', 'phone_verifications', 'photos',

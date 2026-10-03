@@ -19,6 +19,7 @@ const formatKgPtBr = (kg: number): string =>
 
 const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false })
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false })
+const MedicationsScreen = dynamic(() => import('@/components/medications/MedicationsScreen'), { ssr: false })
 const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ssr: false })
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false })
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
@@ -111,6 +112,9 @@ export interface DashboardModalsProps {
     // Settings
     settingsOpen: boolean
     setSettingsOpen: (v: boolean) => void
+    // Medicamentos
+    medicationsOpen: boolean
+    setMedicationsOpen: (v: boolean) => void
     userSettingsApi: Record<string, unknown> | null
 
     // Open student
@@ -147,7 +151,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
         showAdminPanel, closeAdminPanel, whatsNewOpen, setWhatsNewOpen, pendingUpdate,
         setPendingUpdate, closeWhatsNew, mothersDayOpen, closeMothersDay,
         preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
-        preCheckinDraft, setPreCheckinDraft, preCheckinResolveRef, settingsOpen, setSettingsOpen,
+        preCheckinDraft, setPreCheckinDraft, preCheckinResolveRef, settingsOpen, setSettingsOpen, medicationsOpen, setMedicationsOpen,
         userSettingsApi,
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
         handleExportPdf, handleExportJson, vipAccess, openVipView, alert,
@@ -721,6 +725,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Medicamentos */}
+            {medicationsOpen && (
+                <MedicationsScreen onClose={() => setMedicationsOpen(false)} />
             )}
 
             {/* Settings */}

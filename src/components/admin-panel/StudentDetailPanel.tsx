@@ -27,6 +27,7 @@ import { StudentCheckinsTab } from './StudentCheckinsTab';
 import { StudentEvolutionTab } from './StudentEvolutionTab';
 import { StudentWorkoutsTab } from './StudentWorkoutsTab';
 import { StudentNutritionTab } from './StudentNutritionTab';
+import { StudentMedicationsTab } from './StudentMedicationsTab';
 import { StudentVideosTab } from './StudentVideosTab';
 import { StudentProfileTab } from './StudentProfileTab';
 
@@ -350,6 +351,16 @@ export const StudentDetailPanel: React.FC = () => {
                         </button>
                         <button
                             type="button"
+                            onClick={() => setSubTab('medications')}
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full t-meta-inherit text-[11px] transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'medications'
+                                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                : 'text-neutral-200'
+                                }`}
+                        >
+                            Remédios
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setSubTab('evolution')}
                             className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'evolution'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
@@ -414,6 +425,13 @@ export const StudentDetailPanel: React.FC = () => {
                 {
                     !loading && subTab === 'nutrition' && (
                         <StudentNutritionTab />
+                    )}
+
+                {
+                    !loading && subTab === 'medications' && (
+                        // `user_id` é o id de AUTH do aluno (o das tabelas de medicamentos);
+                        // `selectedStudent.id` é o da linha de `students` e a rota o recusaria.
+                        <StudentMedicationsTab key={String(selectedStudent?.user_id || '')} studentId={String(selectedStudent?.user_id || '')} />
                     )}
 
                 {

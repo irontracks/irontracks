@@ -113,3 +113,33 @@ describe('o que chega ao aluno', () => {
         expect(textoDoAviso('workout_updated').title).not.toBe(textoDoAviso('diet_updated').title)
     })
 })
+
+describe('medication_updated — o professor editou a lista de remédios (03/10/2026)', () => {
+    it('o texto fala da lista e não promete um destino que não existe', () => {
+        const t = textoDoAviso('medication_updated', 'Losartana')
+        expect(t.title).toBe('Seu professor atualizou seus medicamentos 💊')
+        expect(t.message).toBe('Confira os horários na tela de Medicamentos.')
+        expect(t.title).not.toBe(textoDoAviso('workout_updated').title)
+        expect(t.title).not.toBe(textoDoAviso('diet_updated').title)
+    })
+
+    it('destino VAZIO: a tela é um modal aberto pelo tipo, não uma URL', () => {
+        expect(destinoDoAviso('medication_updated')).toBe('')
+    })
+
+    it('grava o tipo gateado por notifyMedications e NÃO põe `link` no metadata', async () => {
+        await notifyCoachChange({ studentUserId: ALUNO, kind: 'medication_updated', origem: 'medication_edit' })
+        const linha = (insertNotifications.mock.calls[0][0] as Array<Record<string, unknown>>)[0]
+        expect(linha.type).toBe('medication_updated')
+        const meta = linha.metadata as Record<string, unknown>
+        expect(meta).not.toHaveProperty('link')
+        expect(meta.origem).toBe('medication_edit')
+    })
+
+    it('a janela de 30 min também engole o segundo aviso de remédio', async () => {
+        notificacoesRecentes.push({ id: 'n1' })
+        const r = await notifyCoachChange({ studentUserId: ALUNO, kind: 'medication_updated' })
+        expect(r.motivo).toBe('agrupado')
+        expect(insertNotifications).not.toHaveBeenCalled()
+    })
+})

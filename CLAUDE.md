@@ -3575,6 +3575,30 @@ Fonte única em `lib/workout/workoutKey.ts` (`resolveWorkoutKey`).
 - Cadência **rápida** gasta MAIS e super-lenta gasta MENOS (TUT alto = menos
   reps por minuto). Contraintuitivo; escrevi o teste invertido antes de ler.
 
+## Medicamentos — lembrete push + "Tomei" (03/10/2026)
+
+Plano e decisões em **`docs/plans/medicamentos.md`** (contrato de API incluso).
+Menu do avatar → modal (`modalStore.medicationsOpen`, sem rota: a regra do
+Safari não se aplica); push/card do sino abrem pelo TIPO (`ROTEADOS_PELO_TIPO`,
+não `DESTINO_POR_TIPO`). Professor vinculado vê e EDITA (decisão do dono) pela
+aba "Remédios" do aluno; só o aluno marca "Tomei". Lógica única em
+`lib/medications/agenda.ts` (cron, tela e rota decidem pelas mesmas funções);
+escrita única em `lib/medications/mutations.ts` (aluno e professor).
+
+⚠️ **Tabela nova neste banco nasce aberta para `anon`** — o `pg_default_acl`
+do schema `public` concede tudo (inclusive TRUNCATE). A M1 faz `REVOKE ALL ...
+FROM anon`; toda tabela nova precisa repetir isso (guard em
+`medicationsMigration.test.ts`).
+
+⚠️ **"Tomei" grava com `ignoreDuplicates`, nunca `ON CONFLICT DO UPDATE`:**
+`medication_intakes` não tem policy de UPDATE de propósito (tomada se registra
+ou se desfaz), e o upsert que atualiza falharia por RLS.
+
+⚠️ **O job `meal-reminders` de produção lê `public.cron_secrets` com fallback
+ao Vault; a migration dele no repo está ATRÁS** (só Vault) e a criação de
+`cron_secrets` não está versionada. O job `medication-reminders` copia o de
+PRODUÇÃO. Diagnóstico de cron mudo: as duas consultas da seção dos crons.
+
 ## ⚠️ No iPhone, navegação de página inteira fora de `/app` abre o SAFARI (02/10/2026)
 
 Relato: tocar em "Sair" abria o Safari e a conta continuava logada no app, sem
