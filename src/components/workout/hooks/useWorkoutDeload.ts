@@ -47,7 +47,6 @@ import {
   analyzeDeloadHistory,
   buildSessionDeloadAlert,
   parseAiRecommendation,
-  getDeloadReason,
   buildDeloadPatches,
   clampDeloadWeight,
   roundSuggestion,
@@ -735,11 +734,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             } catch { }
             return;
           }
-          const reason = getDeloadReason(suggestion.analysis, suggestion.appliedReduction, suggestion.historyCount);
           setDeloadModal({
             ...suggestion,
             reductionPct: suggestion.appliedReduction,
-            reason,
           });
         })(),
         totalTimeoutMs,
@@ -817,7 +814,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         knownWeights: knownWeightsForExercise(ex),
         meta: {
           reductionPct: deloadModal.reductionPct,
-          reason: deloadModal.reason,
+          analysis: (deloadModal.analysis ?? null) as DeloadAnalysis | null,
           historyCount: deloadModal.historyCount,
         },
       });
@@ -921,7 +918,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           knownWeights: knownWeightsForExercise(ex as WorkoutExercise),
           meta: {
             reductionPct: sug.appliedReduction,
-            reason: getDeloadReason(sug.analysis as DeloadAnalysis, Number(sug.appliedReduction || 0), Number(sug.historyCount || 0)),
+            analysis: sug.analysis as DeloadAnalysis,
             historyCount: sug.historyCount,
           },
         });

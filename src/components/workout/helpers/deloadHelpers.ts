@@ -199,7 +199,13 @@ export function buildDeloadPatches(input: {
     ratio: number;
     baseWeight: number;
     appliedAt: string;
-    meta: { reductionPct: unknown; reason: unknown; historyCount: unknown };
+    /**
+     * `analysis` e `historyCount` no lugar de um `reason` pronto: o texto é montado
+     * AQUI, com a redução MEDIDA de cada série. Texto pronto vindo de fora ficava
+     * congelado no valor de quando o modal abriu (11,9 %) enquanto a série caía
+     * 39,4 % depois do slider — caso real de 01/10/2026.
+     */
+    meta: { reductionPct: unknown; analysis: DeloadAnalysis | null | undefined; historyCount: unknown };
     /**
      * Pesos já registrados neste exercício, de todas as sessões. Alimentam o grid
      * da máquina (`utils/autoload/machineGrid`), a mesma fonte que o motor de carga
@@ -302,7 +308,7 @@ export function buildDeloadPatches(input: {
                     reductionPct: Math.round(reducaoEfetiva * 1000) / 1000,
                     /** O que o usuário pediu — guardado para diagnóstico, nunca exibido como fato. */
                     requestedPct: Number(meta?.reductionPct) || null,
-                    reason: meta?.reason,
+                    reason: getDeloadReason(meta?.analysis as DeloadAnalysis, reducaoEfetiva, Number(meta?.historyCount) || 0),
                     historyCount: meta?.historyCount,
                 },
                 advanced_config: item?.cfg ?? log.advanced_config ?? null,

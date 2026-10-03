@@ -20,6 +20,8 @@ import { isNonStandardEditorMethod } from './helpers/editorMethod';
 import { useWorkoutContext } from './WorkoutContext';
 import { isObject } from './utils';
 import { UnknownRecord } from './types';
+import { getDeloadReason } from './helpers/deloadHelpers';
+import type { DeloadAnalysis } from './types';
 import { ModalsSimpleMethods } from './ModalsSimpleMethods';
 import { ModalsComplexMethods } from './ModalsComplexMethods';
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
@@ -341,7 +343,7 @@ export default function Modals() {
                       />
                     </div>
                     <div className="text-lg font-black text-white truncate">{String(deloadModal?.name || 'Exercício')}</div>
-                    <div className="text-xs text-neutral-400 truncate">{String(deloadModal?.reason || '')}</div>
+                    <div className="text-xs text-neutral-400 truncate">{deloadModal?.analysis ? getDeloadReason(deloadModal.analysis as DeloadAnalysis, Number(deloadModal.reductionPct) || 0, Number(deloadModal.historyCount) || 0) : ''}</div>
                     <div className="mt-1 text-[11px] text-neutral-400 leading-snug">
                       Treinar mais leve por uma sessão para recuperar e voltar mais forte.
                     </div>
