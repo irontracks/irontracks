@@ -326,13 +326,13 @@ export default async function ParaProfessoresPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href="/auth/login"
+              href="/app/auth/login"
               className="hidden sm:inline-flex px-4 py-2 rounded-xl border border-neutral-700 text-sm text-neutral-300 hover:border-neutral-600 hover:text-white transition-colors font-bold"
             >
               Entrar
             </Link>
             <Link
-              href="/auth/login"
+              href="/app/auth/login"
               className="px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-black transition-colors shadow-lg shadow-yellow-500/20"
             >
               Começar Grátis
@@ -373,7 +373,7 @@ export default async function ParaProfessoresPage() {
 
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/auth/login"
+                href="/app/auth/login"
                 className="px-6 py-3.5 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm transition-all shadow-2xl shadow-yellow-500/30 active:scale-95"
               >
                 Começar Grátis →
@@ -678,7 +678,7 @@ export default async function ParaProfessoresPage() {
                   </p>
                 </div>
                 <Link
-                  href="/auth/login"
+                  href="/app/auth/login"
                   className={`mt-auto w-full py-2.5 rounded-xl font-black text-xs text-center transition-all ${
                     plan.highlight
                       ? 'bg-yellow-500 hover:bg-yellow-400 text-black shadow-lg shadow-yellow-500/20'
@@ -713,7 +713,7 @@ export default async function ParaProfessoresPage() {
             95% dos seus alunos. Junte-se agora — é grátis para começar.
           </p>
           <Link
-            href="/auth/login"
+            href="/app/auth/login"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-base transition-all shadow-2xl shadow-yellow-500/30 active:scale-95"
           >
             Criar minha conta grátis →
@@ -737,7 +737,7 @@ export default async function ParaProfessoresPage() {
             © {new Date().getFullYear()} IronTracks. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4">
-            <Link href="/auth/login" className="text-xs text-neutral-400 hover:text-white transition-colors">
+            <Link href="/app/auth/login" className="text-xs text-neutral-400 hover:text-white transition-colors">
               Entrar
             </Link>
             <Link href="/para-professores" className="text-xs text-neutral-400 hover:text-white transition-colors">

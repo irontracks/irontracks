@@ -29,7 +29,9 @@ describe('VipUpsellCard', () => {
     })
 
     it('CTA leva ao marketplace', () => {
-        expect(CARD).toMatch(/window\.location\.href = '\/marketplace'/)
+        // Por `navegarNoApp` (02/10/2026): caminho cru fora de /app abre o Safari
+        // no iPhone — ver utils/navigation/appPath.
+        expect(CARD).toMatch(/navegarNoApp\('\/marketplace'\)/)
     })
 })
 

@@ -1,6 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Clock, LogOut } from "lucide-react";
 
 export default async function WaitApprovalPage() {
@@ -59,13 +58,16 @@ export default async function WaitApprovalPage() {
         </p>
 
         <div className="space-y-3">
-          <Link
-            href="/auth/logout"
+          {/* `<a>`, não `<Link>`: logout é route handler — o Link do Next pode
+              pré-carregar o destino ao entrar na tela, e pré-carregar /auth/logout
+              é sair. E sob /app: fora dele o iPhone abre o Safari. */}
+          <a
+            href="/app/auth/logout"
             className="w-full py-4 px-6 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 group"
           >
             <LogOut size={18} className="group-hover:text-red-400 transition-colors" />
             Sair da conta
-          </Link>
+          </a>
           
           <p className="text-[10px] text-neutral-400 mt-6 font-mono uppercase tracking-widest">
             ID: {user.id.slice(0, 8)}...

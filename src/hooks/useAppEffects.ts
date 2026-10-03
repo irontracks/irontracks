@@ -8,6 +8,7 @@ import { registerBounce, resetBounce, getBounceStorage, clearBoundLoginMark } fr
 import type { ActiveWorkoutSession, DirectChatState } from '@/types/app'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isRecord } from '@/utils/guards'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 // ────────────────────────────────────────────────────────────────
 // Exported helpers (used by sibling hooks) — fonte única em utils/guards
@@ -159,7 +160,7 @@ export function useAppEffects({
         logWarnRemote('auth.boot.bounce', 'freio de ricochete: dashboard parou de expulsar para a raiz', { count })
         return
       }
-      try { window.location.replace('/?next=/dashboard') } catch { }
+      try { navegarNoApp('/app?next=/dashboard', { replace: true }) } catch { }
     }, 3000)
     return () => { clearTimeout(t) }
   }, [authLoading, userId, router])
@@ -233,7 +234,7 @@ export function useAppEffects({
           if (session && session.user?.id) return
           if (ev === 'SIGNED_OUT') {
             clearClientSessionState()
-            if (typeof window !== 'undefined') window.location.href = '/app?next=/dashboard'
+            if (typeof window !== 'undefined') navegarNoApp('/app?next=/dashboard')
             return
           }
           if (ev === 'INITIAL_SESSION') {
@@ -241,7 +242,7 @@ export function useAppEffects({
               .then((r) => {
                 if (r && r.status === 204) return
                 clearClientSessionState()
-                if (typeof window !== 'undefined') window.location.href = '/app?next=/dashboard'
+                if (typeof window !== 'undefined') navegarNoApp('/app?next=/dashboard')
               })
               .catch(() => { })
             return

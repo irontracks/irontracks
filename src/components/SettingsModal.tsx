@@ -48,6 +48,7 @@ import {
 } from '@/components/settings/SettingsSections'
 import ChangePasswordModal from '@/components/settings/ChangePasswordModal'
 import AvatarUploadModal from '@/components/settings/AvatarUploadModal'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 interface SettingsModalProps {
   isOpen?: boolean
@@ -413,7 +414,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   access the subscription purchase flow"). */}
               <button
                 type="button"
-                onClick={() => { try { window.location.href = '/marketplace' } catch { } }}
+                onClick={() => { try { navegarNoApp('/marketplace') } catch { } }}
                 className="w-full flex items-center gap-3 p-3 rounded-xl border transition-all group mb-2"
                 style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.25)' }}
               >
@@ -561,12 +562,12 @@ export default function SettingsModal(props: SettingsModalProps) {
               <button type="button" disabled={exportingData} onClick={async () => { setExportingData(true); try { const res = await fetch('/api/account/export', { method: 'GET' }); const data = await res.json().catch((): null => null); if (!data || !data.ok) { await alert('Falha ao exportar dados: ' + (data?.error || '')); return } const payload = JSON.stringify(data, null, 2); const blob = new Blob([payload], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `irontracks-account-export-${new Date().toISOString()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url) } catch (e: unknown) { await alert('Falha ao exportar dados: ' + (getErrorMessage(e) ?? String(e))) } finally { setExportingData(false) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <Download size={16} className="text-yellow-500" /> Exportar meus dados
               </button>
-              <button type="button" onClick={async () => { try { let supa; try { supa = createClient() } catch { await alert('Falha ao sair: configuração ausente'); return } await supa.auth.signOut({ scope: 'global' }); try { window.location.href = '/auth/signin' } catch { } } catch (e: unknown) { await alert('Falha ao sair: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+              <button type="button" onClick={async () => { try { let supa; try { supa = createClient() } catch { await alert('Falha ao sair: configuração ausente'); return } await supa.auth.signOut({ scope: 'global' }); try { navegarNoApp('/app') } catch { } } catch (e: unknown) { await alert('Falha ao sair: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <LogOut size={16} className="text-yellow-500" /> Sair de todos
               </button>
             </div>
             <div className="mt-3">
-              <button type="button" disabled={deletingAccount} onClick={async () => { const typed = await prompt('Isso apaga sua conta e todos os seus dados. Não tem volta.\n\nDigite EXCLUIR para confirmar.', 'Excluir conta'); if (String(typed || '').trim().toUpperCase() !== 'EXCLUIR') return; setDeletingAccount(true); try { const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'EXCLUIR' }) }); const data = await res.json().catch((): null => null); if (!data || !data.ok) { await alert('Falha ao excluir conta: ' + (data?.error || '')); return } try { let supa; try { supa = createClient() } catch { supa = null } if (supa) await supa.auth.signOut({ scope: 'global' }) } catch { } try { window.location.href = '/auth/signin' } catch { } } catch (e: unknown) { await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e))) } finally { setDeletingAccount(false) } }} className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="button" disabled={deletingAccount} onClick={async () => { const typed = await prompt('Isso apaga sua conta e todos os seus dados. Não tem volta.\n\nDigite EXCLUIR para confirmar.', 'Excluir conta'); if (String(typed || '').trim().toUpperCase() !== 'EXCLUIR') return; setDeletingAccount(true); try { const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: 'EXCLUIR' }) }); const data = await res.json().catch((): null => null); if (!data || !data.ok) { await alert('Falha ao excluir conta: ' + (data?.error || '')); return } try { let supa; try { supa = createClient() } catch { supa = null } if (supa) await supa.auth.signOut({ scope: 'global' }) } catch { } try { navegarNoApp('/app') } catch { } } catch (e: unknown) { await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e))) } finally { setDeletingAccount(false) } }} className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2 disabled:opacity-60">
                 <ShieldAlert size={16} className="text-red-300" /> Excluir minha conta
               </button>
               <div className="mt-2 text-[11px] text-neutral-400">Remove seus dados do app e encerra acesso. Ação irreversível.</div>

@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { properNameFieldProps } from '@/utils/ui/textFieldProps'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 /* Primeiro acesso do aluno convidado — depois de entrar por OTP (só email), ele define uma
  * senha (pra logar normal depois) e confirma o nome. A conta já está criada e aprovada; esta
@@ -28,14 +29,14 @@ export default function OnboardingPage() {
         const { data } = await supabase.auth.getUser()
         const user = data?.user
         if (!alive) return
-        if (!user) { window.location.replace('/app'); return }
+        if (!user) { navegarNoApp('/app', { replace: true }); return }
         const meta = (user.user_metadata || {}) as Record<string, unknown>
         const prefill = String(meta.full_name || meta.display_name || meta.name || '').trim()
         if (prefill) setFullName(prefill)
         setReady(true)
       } catch (e) {
         logError('onboarding:init', e)
-        if (alive) window.location.replace('/app')
+        if (alive) navegarNoApp('/app', { replace: true })
       }
     })()
     return () => { alive = false }
@@ -64,7 +65,7 @@ export default function OnboardingPage() {
       const json = await res.json().catch((): null => null)
       if (!res.ok || !json?.ok) throw new Error(String(json?.error || 'Falha ao salvar seus dados.'))
       try { localStorage.setItem('it.logged_in', '1') } catch { }
-      window.location.replace('/dashboard')
+      navegarNoApp('/dashboard', { replace: true })
     } catch (e: unknown) {
       logError('onboarding:submit', e)
       setError(getErrorMessage(e) || 'Não foi possível concluir. Tente novamente.')

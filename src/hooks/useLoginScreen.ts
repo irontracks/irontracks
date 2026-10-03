@@ -9,6 +9,8 @@ import { isExpectedAuthError } from '@/utils/auth/expectedAuthError'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
 import { sha256Hex } from '@/utils/auth/appleNonce'
+import { navegarNoApp } from '@/utils/navigation/appPath'
+import { caminhoDoApp } from '@/utils/navigation/appPath'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 type AppleAuthorizeOptions = { clientId: string; scopes: string; state?: string; nonce?: string }
@@ -255,7 +257,7 @@ export function useLoginScreen() {
                 .then((ping) => {
                     const decision = decideBootRedirect({ tripped, ping })
                     if (decision === 'show-login') { stayOnLogin('sessao recusada pelo servidor no boot'); return }
-                    window.location.replace('/dashboard')
+                    navegarNoApp('/dashboard', { replace: true })
                 })
             return
         }
@@ -267,7 +269,7 @@ export function useLoginScreen() {
                 supabase.auth.setSession({ access_token: backup.access_token, refresh_token: backup.refresh_token }).then(({ error, data }) => {
                     if (!error && data?.session) {
                         apiAuth.persistSession(data.session.access_token, data.session.refresh_token)
-                            .then(() => { try { localStorage.setItem('it.logged_in', '1') } catch { }; window.location.replace('/dashboard') })
+                            .then(() => { try { localStorage.setItem('it.logged_in', '1') } catch { }; navegarNoApp('/dashboard', { replace: true }) })
                             .catch(() => setIsLoading(false))
                     } else {
                         // setSession failed → backup is bad/expired. Clear it so we don't loop.
@@ -289,7 +291,7 @@ export function useLoginScreen() {
 
     const handleGoogleLogin = useCallback(async () => {
         setIsLoading(true); setErrorMsg('')
-        try { window.location.assign(getOAuthHref('google')) }
+        try { window.location.assign(caminhoDoApp(getOAuthHref('google'))) }
         catch (error: unknown) { logError('error', 'Login Error:', error); setIsLoading(false); setErrorMsg(error instanceof Error ? error.message : 'Falha ao fazer login.') }
     }, [])
 
@@ -357,11 +359,11 @@ export function useLoginScreen() {
                 // carry the HTTP-only cookie just set by persistSession, especially
                 // on WKWebView (Capacitor/iPad). This causes the SSR to redirect
                 // back to login → infinite loop → black screen.
-                window.location.replace(hasProfile ? '/dashboard' : '/wait-approval')
+                navegarNoApp(hasProfile ? '/dashboard' : '/wait-approval', { replace: true })
                 return
             }
             setIsLoading(true)
-            window.location.assign(getOAuthHref('apple'))
+            window.location.assign(caminhoDoApp(getOAuthHref('apple')))
         } catch (error: unknown) {
             logError('error', 'Login Error:', error)
             // Always clean up the logged_in flag to prevent a redirect loop between
@@ -400,7 +402,7 @@ export function useLoginScreen() {
                     writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
-                window.location.replace('/dashboard')
+                navegarNoApp('/dashboard', { replace: true })
             } else if (authMode === 'signup') {
                 if (password !== emailData.confirmPassword) throw new Error('As senhas não coincidem.')
                 const isTeacher = emailData.isTeacher === true
@@ -446,7 +448,7 @@ export function useLoginScreen() {
                 } else {
                     // Email confirmation disabled in Supabase — user is logged in right away.
                     holdLoading = true
-                    window.location.replace('/wait-approval')
+                    navegarNoApp('/wait-approval', { replace: true })
                 }
             } else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth/recovery' })
@@ -485,7 +487,7 @@ export function useLoginScreen() {
                     writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
-                window.location.replace('/dashboard')
+                navegarNoApp('/dashboard', { replace: true })
             }
         } catch (err: unknown) {
             logError('error', 'Auth Error:', err)
@@ -545,7 +547,7 @@ export function useLoginScreen() {
             // /onboarding ao concluir. A sessão pro SSR do /onboarding já vem do persistSession.
             // Primeiro acesso → onboarding (define senha + completa dados). Full reload igual
             // aos outros caminhos (o cookie HTTP-only recém-setado precisa ir no SSR).
-            window.location.replace('/onboarding')
+            navegarNoApp('/onboarding', { replace: true })
         } catch (err: unknown) {
             // Código OTP expirado/inválido, rate limit etc. são esperados (usuário demorou
             // ou reusou um link velho) — não são falha de app. Vão como warn (só console),

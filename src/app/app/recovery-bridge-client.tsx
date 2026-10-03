@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
+import { caminhoDoApp } from '@/utils/navigation/appPath'
 
 function parseHashParams(hash: string) {
   try {
@@ -28,7 +29,7 @@ export default function RecoveryBridgeClient(): null {
 
       const next = sanitizeNextParam(url.searchParams.get('next'), '/dashboard')
 
-      const target = new URL('/auth/recovery', window.location.origin)
+      const target = new URL(caminhoDoApp('/auth/recovery'), window.location.origin)
       target.searchParams.set('next', next)
 
       const queryCode = String(url.searchParams.get('code') || '').trim()
@@ -37,7 +38,7 @@ export default function RecoveryBridgeClient(): null {
       if (hasRecoveryQuery) target.searchParams.set('type', 'recovery')
 
       const nextHref = target.pathname + target.search + (hasRecoveryHash ? window.location.hash : '')
-      if (window.location.pathname === '/auth/recovery') return
+      if (window.location.pathname === '/auth/recovery' || window.location.pathname === '/app/auth/recovery') return
       window.location.replace(nextHref)
     } catch {}
   }, [])

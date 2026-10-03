@@ -9,6 +9,7 @@ import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
 import { apiVip } from '@/lib/api'
 import PeriodizationCreateModal, { friendlyCreateError } from '@/components/vip/PeriodizationCreateModal'
 import { useDialog } from '@/contexts/DialogContext'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -224,7 +225,7 @@ export default function VipPeriodizationPanel({
         <div className="mt-2 text-sm text-neutral-400">Disponível apenas no VIP pago.</div>
         <button
           type="button"
-          onClick={() => (window.location.href = '/marketplace')}
+          onClick={() => navegarNoApp('/marketplace')}
           className="mt-4 inline-flex items-center justify-center rounded-xl bg-yellow-500 px-4 py-3 font-black text-black hover:bg-yellow-400"
         >
           Ver planos

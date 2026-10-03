@@ -20,6 +20,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { parseSseChunk } from '@/utils/ai/sse'
 import { z } from 'zod'
 import { apiVip } from '@/lib/api'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 interface VipHubProps {
   user: {
@@ -456,7 +457,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
             {!hideVipCtas ? (
               <button
-                onClick={() => window.location.href = '/marketplace'}
+                onClick={() => navegarNoApp('/marketplace')}
                 className="w-full px-8 py-4 rounded-xl font-black text-black text-sm transition-all active:scale-[0.97]"
                 style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)', boxShadow: '0 4px 24px rgba(234,179,8,0.4)' }}
               >
@@ -733,7 +734,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                   )
                 })()}
                 {m.isLimit && !hideVipCtas && (
-                  <button onClick={() => window.location.href = '/marketplace'} className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline">
+                  <button onClick={() => navegarNoApp('/marketplace')} className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline">
                     Fazer Upgrade
                   </button>
                 )}

@@ -7,6 +7,7 @@ import GlobalDialog from '@/components/GlobalDialog'
 import { DialogProvider } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 type VipAccess = {
   ok: boolean
@@ -83,7 +84,7 @@ export default function VipOfflineClient() {
                 Este recurso é exclusivo do <span className="font-semibold">VIP Pro</span> e <span className="font-semibold">VIP Elite</span>.
                 <button
                   type="button"
-                  onClick={() => (window.location.href = '/marketplace')}
+                  onClick={() => navegarNoApp('/marketplace')}
                   className="mt-3 inline-flex items-center justify-center rounded-xl bg-yellow-500 text-black font-semibold px-4 py-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition duration-300"
                 >
                   Ver planos

@@ -5,6 +5,7 @@ import { applyGeneratedMealAction } from '@/app/app/(app)/dashboard/nutrition/ac
 import { getErrorMessage } from '@/utils/errorMessage'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
 import { planMealToLogItems } from '@/lib/nutrition/planMealItems'
+import { navegarNoApp } from '@/utils/navigation/appPath'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -236,7 +237,7 @@ export default function DietGenerator({
               <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-300 flex items-start justify-between gap-2">
                 <span>{error}</span>
                 {upgrade && !hideVipCtas && (
-                  <button type="button" onClick={() => (window.location.href = '/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
+                  <button type="button" onClick={() => navegarNoApp('/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
                 )}
               </div>
             )}
