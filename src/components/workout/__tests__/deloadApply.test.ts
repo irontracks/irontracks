@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { buildDeloadPatches, clampDeloadWeight, reducaoEhUtil, type DeloadSetInput } from '../helpers/deloadHelpers'
 import { readFileSync } from 'node:fs'
 
-const META = { reductionPct: 0.22, reason: 'regressão', historyCount: 6 }
+const META = { reductionPct: 0.22, analysis: { status: 'overtraining', volumeDelta: -0.1, weightDelta: null, itemsCount: 6, hasEnoughHistory: true } as never, historyCount: 6 }
 
 /** 4 séries de 100 kg, nenhuma concluída, peso vindo do motor. */
 const setsFromEngine = (): DeloadSetInput[] =>
