@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MealItem } from './engine'
 import { logWarn } from '@/lib/logger'
+import { gramasDoItem } from './mealItemQuantity'
 
 /**
  * Núcleo compartilhado das mutações de nutrição (delete / edit / água) e do
@@ -35,7 +36,8 @@ export interface MealDraft {
 function sanitizeItems(items: MealItem[]): MealItem[] {
   return (Array.isArray(items) ? items : []).map((it) => ({
     label: String(it?.label ?? '').slice(0, 120),
-    grams: Math.max(0, Math.round(Number(it?.grams) || 0)),
+    // Quantidade digitada no rótulo nunca vira `grams: 0` (ver `gramasDoItem`).
+    grams: gramasDoItem(it?.grams, String(it?.label ?? '')),
     calories: Math.max(0, Math.round(Number(it?.calories) || 0)),
     protein: Math.max(0, Math.round(Number(it?.protein) || 0)),
     carbs: Math.max(0, Math.round(Number(it?.carbs) || 0)),
