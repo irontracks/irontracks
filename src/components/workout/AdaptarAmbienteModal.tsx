@@ -30,11 +30,14 @@ interface Props {
     onClose: () => void
     /** Nomes dos exercícios do treino, na ordem. */
     exercicios: string[]
-    /** Aplica uma troca — o mesmo `swapExerciseName` da troca individual. */
-    aoTrocar: (indice: number, novoNome: string) => void
+    /**
+     * Aplica o plano INTEIRO numa chamada — `swapExerciseNames`, o mesmo
+     * caminho da troca individual (que é este lote com um item).
+     */
+    aoAplicar: (trocas: Array<{ indice: number; para: string }>) => void
 }
 
-export default function AdaptarAmbienteModal({ open, onClose, exercicios, aoTrocar }: Props) {
+export default function AdaptarAmbienteModal({ open, onClose, exercicios, aoAplicar }: Props) {
     const [carregando, setCarregando] = useState(false)
     const [plano, setPlano] = useState<PlanoDeAdaptacao | null>(null)
     const [erro, setErro] = useState<string | null>(null)
@@ -61,13 +64,14 @@ export default function AdaptarAmbienteModal({ open, onClose, exercicios, aoTroc
 
     const aplicar = useCallback(() => {
         if (!plano?.trocas.length) return
-        // Aplica de trás para a frente não é necessário aqui (a troca é por
-        // nome, não move posições), mas a ordem por índice mantém o resultado
-        // previsível se `swapExerciseName` mudar de implementação.
-        for (const t of plano.trocas) aoTrocar(t.indice, t.para)
+        // UMA chamada com a lista inteira, nunca um laço de trocas avulsas: até
+        // 26/09/2026 era `for (...) aoTrocar(...)`, cada troca partia da lista
+        // do mesmo render e só a ÚLTIMA sobrevivia ("Trocar 4 exercícios"
+        // mudava um). Guard: __tests__/treinarEmCasaAplicaTodas.test.tsx.
+        aoAplicar(plano.trocas.map((t) => ({ indice: t.indice, para: t.para })))
         setAplicado(true)
         setTimeout(onClose, 900)
-    }, [plano, aoTrocar, onClose])
+    }, [plano, aoAplicar, onClose])
 
     if (!open) return null
 

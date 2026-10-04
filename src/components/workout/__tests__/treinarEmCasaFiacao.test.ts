@@ -36,16 +36,28 @@ describe('o atalho mora no menu da sessão', () => {
 })
 
 describe('aplica pelo MESMO caminho da troca individual', () => {
-    it('usa swapExerciseName', () => {
+    it('usa swapExerciseNames — o lote de que a troca individual é um caso', () => {
         // Um segundo caminho de troca divergiria do primeiro — é o padrão que
-        // este repo já pagou caro em 14 renderers de série.
-        expect(HEADER).toMatch(/aoTrocar=\{\(indice, nome\) => swapExerciseName\(indice, nome\)\}/)
+        // este repo já pagou caro em 14 renderers de série. O COMPORTAMENTO
+        // (todas as trocas chegam) é de treinarEmCasaAplicaTodas.test.tsx.
+        expect(HEADER).toMatch(/aoAplicar=\{\(trocas\) => swapExerciseNames\(trocas\)\}/)
+        const CRUD = semComentarios(ler('src/components/workout/hooks/useWorkoutExerciseCrud.ts'))
+        expect(CRUD).toMatch(/const swapExerciseName = [^;]*swapExerciseNames\(\[/)
     })
 
-    it('e passa os nomes na ORDEM do treino', () => {
+    it('e passa os nomes na ORDEM do treino, sem filtrar', () => {
         // O plano devolve `indice`, e é por ele que a troca acontece: embaralhar
-        // aqui trocaria o exercício errado.
-        expect(HEADER).toMatch(/exercicios=\{\(exercises \?\? \[\]\)\.map/)
+        // — ou filtrar um nome vazio — trocaria o exercício errado.
+        const at = HEADER.indexOf('exercicios={(exercises ?? []).map')
+        expect(at).toBeGreaterThan(-1)
+        expect(HEADER.slice(at, HEADER.indexOf('\n', at))).not.toMatch(/\.filter\(/)
+    })
+
+    it('o modal não aplica trocas num laço', () => {
+        // A forma exata do defeito de 26/09/2026: cada chamada partia da lista
+        // do mesmo render e só a última sobrevivia.
+        expect(MODAL).not.toMatch(/for\s*\([^)]*\)\s*ao[A-Z]\w*\(/)
+        expect(MODAL).not.toMatch(/\.forEach\([^)]*=>\s*ao[A-Z]\w*\(/)
     })
 })
 

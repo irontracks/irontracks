@@ -44,6 +44,19 @@ describe('serveNoAmbiente', () => {
 })
 
 describe('planejarAdaptacao', () => {
+    it('`indice` é a POSIÇÃO no treino, mesmo com um exercício sem nome no meio', async () => {
+        // O header filtrava nomes vazios antes de chamar: o índice passava a
+        // ser da lista filtrada e a troca caía no exercício de baixo.
+        const p = await planejarAdaptacao(
+            supabaseFalso([{ from_id: 'sup', to_id: 'flex', similarity: 0.9 }]),
+            ['Agachamento livre', '  ', 'Supino reto com barra'],
+            'home',
+        )
+        expect(p.trocas).toHaveLength(1)
+        expect(p.trocas[0]).toMatchObject({ indice: 2, de: 'Supino reto com barra' })
+        expect(p.semAlternativa, 'nome vazio não vira item em branco na tela').toEqual([])
+    })
+
     it('troca o que não serve e MANTÉM o que já serve', async () => {
         const p = await planejarAdaptacao(
             supabaseFalso([{ from_id: 'sup', to_id: 'flex', similarity: 0.9 }]),

@@ -65,8 +65,11 @@ export async function planejarAdaptacao(
     alvo: Ambiente = 'home',
 ): Promise<PlanoDeAdaptacao> {
     const vazio: PlanoDeAdaptacao = { trocas: [], mantidos: [], semAlternativa: [] }
-    const nomes = (nomesDosExercicios ?? []).map((n) => String(n ?? '').trim()).filter(Boolean)
-    if (!nomes.length) return vazio
+    // Sem `.filter(Boolean)`: `indice` precisa ser a posição no TREINO, e
+    // filtrar um nome vazio deslocaria as trocas seguintes para o exercício de
+    // baixo. Os vazios são pulados no laço.
+    const nomes = (nomesDosExercicios ?? []).map((n) => String(n ?? '').trim())
+    if (!nomes.some(Boolean)) return vazio
 
     // Uma consulta para toda a biblioteca: são 251 linhas, e filtrar por nome
     // exigiria um `or` gigante que o PostgREST recusa. Trazer tudo é mais
@@ -81,6 +84,8 @@ export async function planejarAdaptacao(
     const resultado: PlanoDeAdaptacao = { trocas: [], mantidos: [], semAlternativa: [] }
 
     nomes.forEach((nome, indice) => {
+        // Exercício sem nome não tem o que adaptar nem o que declarar.
+        if (!nome) return
         const achado = escolherDaBiblioteca(nome, lib)
         if (!achado) {
             // Exercício que a biblioteca não conhece: não dá para afirmar que
