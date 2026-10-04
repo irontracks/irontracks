@@ -34,7 +34,32 @@ export type FoodItem = {
    * (preparo, qualificador) ignorado.
    */
   generic?: boolean
+  /**
+   * Macros por 100 g do alimento CRU, quando a chave descreve o alimento PRONTO.
+   *
+   * O usuário pesa a carne pronta (confirmado pelo dono em 04/10/2026), e a base
+   * tratava frango, arroz e feijão como prontos mas patinho e filé mignon como
+   * CRUS: "200g carne moida de patinho" saía com 266 kcal / 54 g P contra ≈438 /
+   * 72 do patinho grelhado — ~170 kcal a menos por jantar, toda semana. Hoje a
+   * chave é o pronto, e o parser só usa este valor quando a linha diz "cru"
+   * ("200g patinho cru"). Ver `parser.ts`, bloco do MODO DE PREPARO.
+   */
+  cru?: { kcal: number; p: number; c: number; f: number }
 }
+
+// ── Carne vermelha: PRONTA por padrão ───────────────────────────────────────
+// Fontes, conferidas em 04/10/2026:
+//  - patinho: TACO (`foods_taco`) "Carne, bovina, patinho, sem gordura,
+//    grelhado" 219,26 kcal · P35,90 · G7,31 | cru 133,47 · P21,72 · G4,51
+//  - alcatra: TACO "Carne, bovina, miolo de alcatra, sem gordura, grelhado"
+//    241,36 · P31,93 · G11,64 | cru 162,87 · P21,61 · G7,83
+//  - filé mignon: a TACO não tem. USDA FoodData Central (SR Legacy), mesmo
+//    corte nos dois estados — FDC 170641 "Beef, loin, tenderloin steak,
+//    boneless, separable lean only, trimmed to 0\" fat, all grades, cooked,
+//    grilled" 198 · P30,7 · G8,32 | FDC 171767 (idem, raw) 139 · P21,9 · G5,74
+const PATINHO_PRONTO = { kcal: 219.26, p: 35.9, c: 0, f: 7.31, cru: { kcal: 133.47, p: 21.72, c: 0, f: 4.51 } }
+const ALCATRA_PRONTA = { kcal: 241.36, p: 31.93, c: 0, f: 11.64, cru: { kcal: 162.87, p: 21.61, c: 0, f: 7.83 } }
+const FILE_MIGNON_PRONTO = { kcal: 198, p: 30.7, c: 0, f: 8.32, cru: { kcal: 139, p: 21.9, c: 0, f: 5.74 } }
 
 /**
  * Food database — values per 100g (TACO / USDA references).
@@ -52,17 +77,25 @@ export const foodDatabase: Record<string, FoodItem> = {
   // 76 g de gordura em 300 g — mais que o DOBRO dos 33 g corretos — e 938 kcal em vez de 636.
   'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 }, label: 'Carne picada' },
   'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 }, label: 'Carne bovina' },
-  'patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { bife: 120, posta: 120 } },
+  'patinho': { ...PATINHO_PRONTO, approx: { bife: 120, posta: 120 } },
   // Patinho MOÍDO e "carne moída magra" são o mesmo corte da linha acima — e é o que
   // o dono come. Sem estas chaves, "200g de carne moída magra" casava a 'carne moida'
   // comum (212 kcal, 11 g de gordura) e cobrava 79 kcal a mais por 100 g. Elas também
   // sustentam a segunda opção de proteína do card: a moída GORDA estoura o teto de
   // desvio calórico do motor contra um peito de frango, a magra passa.
-  'patinho moido': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Patinho moído' },
-  'carne moida magra': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Carne moída magra' },
-  'carne moida de patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { colher: 25, concha: 80 }, label: 'Carne moída de patinho' },
-  'alcatra': { kcal: 177, p: 26, c: 0, f: 8, approx: { bife: 120, posta: 120 } },
-  'file mignon': { kcal: 143, p: 28, c: 0, f: 3.5, approx: { bife: 120, medalhao: 100 }, label: 'Filé mignon' },
+  'patinho moido': { ...PATINHO_PRONTO, approx: { colher: 25, concha: 80 }, label: 'Patinho moído' },
+  'carne moida magra': { ...PATINHO_PRONTO, approx: { colher: 25, concha: 80 }, label: 'Carne moída magra' },
+  'carne moida de patinho': { ...PATINHO_PRONTO, approx: { colher: 25, concha: 80 }, label: 'Carne moída de patinho' },
+  'alcatra': { ...ALCATRA_PRONTA, approx: { bife: 120, posta: 120 } },
+  // "180g picadinho miolo da alcatra" (04/10/2026) não casava nada e ia para a IA.
+  'miolo de alcatra': { ...ALCATRA_PRONTA, approx: { bife: 120, posta: 120 }, label: 'Miolo de alcatra' },
+  'picadinho de miolo de alcatra': { ...ALCATRA_PRONTA, approx: { colher: 25, concha: 80 }, label: 'Picadinho de miolo de alcatra' },
+  'picadinho de alcatra': { ...ALCATRA_PRONTA, approx: { colher: 25, concha: 80 }, label: 'Picadinho de alcatra' },
+  // "da" e "de" não são intercambiáveis no casamento (só a AUSÊNCIA do conectivo é
+  // tolerada — `buildKeyPattern`), e "miolo DA alcatra" é como se fala.
+  'miolo da alcatra': { ...ALCATRA_PRONTA, approx: { bife: 120, posta: 120 }, label: 'Miolo de alcatra' },
+  'picadinho de miolo da alcatra': { ...ALCATRA_PRONTA, approx: { colher: 25, concha: 80 }, label: 'Picadinho de miolo de alcatra' },
+  'file mignon': { ...FILE_MIGNON_PRONTO, approx: { bife: 120, medalhao: 100 }, label: 'Filé mignon' },
   'contrafile': { kcal: 195, p: 25, c: 0, f: 10, approx: { bife: 120, posta: 120 }, label: 'Contrafilé' },
   'coxao mole': { kcal: 169, p: 26, c: 0, f: 7, approx: { bife: 120 }, label: 'Coxão mole' },
   'picanha': { kcal: 242, p: 22, c: 0, f: 17, approx: { fatia: 80, espetinho: 100 } },

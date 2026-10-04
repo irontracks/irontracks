@@ -89,6 +89,11 @@ export function buildEstimatePrompt(text: string): string | null {
     '  UM item, não massa + frango + requeijão.',
     '- Em "label" ponha só o nome do alimento, sem a quantidade; a quantidade',
     '  estimada em gramas vai em "grams".',
+    // O usuário pesa o alimento PRONTO (dono, 04/10/2026): sem esta regra o modelo
+    // usava o valor CRU da carne ("180g picadinho miolo da alcatra" → 170 kcal/100 g,
+    // quando o grelhado tem 241) e a refeição saía subestimada.
+    '- O peso de carne, frango, peixe, arroz, feijão e massa é do alimento PRONTO',
+    '  (cozido/grelhado/assado), salvo se o usuário disser "cru".',
     '- Quando o usuário não disser a quantidade, ESTIME a porção usual e',
     '  informe em "grams" — 0 apenas se for impossível arriscar.',
     '- Os campos de topo são o TOTAL da refeição: a soma dos itens.',
