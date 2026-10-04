@@ -638,7 +638,13 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // reconhecido só pra não virar ajuste indevido — delta zero.
     const prep = detectPreparation(foodName)
     const prepApplies = !!prep && !prep.neutral && !keyEncodesPreparation(dbKeyMatched, prep)
-    const effective = prep && prepApplies ? applyPreparation(matchedItem, prep) : matchedItem
+    // CRU: a chave de carne vermelha descreve o alimento PRONTO (é como o usuário
+    // pesa); quem diz "cru" na linha recebe o valor cru que a chave declara.
+    // Chave sem `cru` (arroz, frango…) segue como sempre — "cru" ali é neutro.
+    const base: FoodItem = prep?.id === 'cru' && matchedItem.cru
+      ? { ...matchedItem, ...matchedItem.cru }
+      : matchedItem
+    const effective = prep && prepApplies ? applyPreparation(base, prep) : base
 
     const multiplier = grams / 100
     const p = Math.round(Number(effective.p) * multiplier)
