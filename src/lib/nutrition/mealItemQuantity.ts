@@ -103,6 +103,52 @@ export function lerQuantidadeDoRotulo(label: string): { valor: number; unidade: 
   return null
 }
 
+/** Fator para gramas (ml conta como g, igual ao parser). */
+const FATOR_PARA_GRAMAS: Record<string, number> = { g: 1, gr: 1, ml: 1, kg: 1000, l: 1000 }
+
+/**
+ * Sobrou OUTRO alimento depois da quantidade? Então o número da frente não é
+ * o peso do item inteiro. O memo da IA grava rótulos como "150g arroz branco,
+ * 250g peito de frango, 40g ketchup" num item só — dar 150 g a ele faria o
+ * editor reescalar a refeição inteira a partir do peso do arroz.
+ */
+const OUTRO_ALIMENTO_NO_RESTO = /\d|[,;+]|\s(?:e|mais)\s/i
+
+/**
+ * Gramas que o PRÓPRIO rótulo declara: `"60g nutella"` → 60, `"1,5kg
+ * arroz"` → 1500. Só gramatura (g/gr/ml/kg/l) — "2 ovos" não diz peso, e
+ * inventar gramas aqui seria afirmar uma medição que ninguém fez. 0 quando o
+ * rótulo não começa com gramatura ou quando lista mais de um alimento.
+ */
+export function gramasDoRotulo(label: string): number {
+  const m = String(label ?? '').trim().match(REGEX_GRAMATURA)
+  if (!m) return 0
+  const resto = String(label ?? '').trim().slice(m[0].length)
+  if (OUTRO_ALIMENTO_NO_RESTO.test(resto)) return 0
+  const valor = Number(String(m[1]).replace(',', '.')) * (FATOR_PARA_GRAMAS[m[3].toLowerCase()] ?? 0)
+  if (!(valor > 0)) return 0
+  return Math.min(QUANTIDADE_MAXIMA, Math.round(valor))
+}
+
+/**
+ * As gramas a GRAVAR num item: as que vieram, ou — se vieram 0 — as que o
+ * rótulo declara.
+ *
+ * Existe porque "60g nutella" e "180g picadinho miolo da alcatra" foram
+ * gravados com `grams: 0` (04/10/2026): o caminho de IA do editor
+ * (`estimateFoodAction`) fixava 0 e jogava fora a quantidade que o próprio
+ * usuário digitou. Sem gramas o item perde o campo de quantidade e some do
+ * repertório de troca (`mealItemFoods` deriva densidade de `grams`). Aplicada
+ * na FRONTEIRA de escrita (`trackMeal`, `editEntryCore`), cobre todo caminho
+ * que grava, não só o que deu o defeito. `grams: 0` legítimo continua 0: o
+ * memo de refeição inteira e a água do plano não têm gramatura no rótulo.
+ */
+export function gramasDoItem(grams: unknown, label: string): number {
+  const g = Math.round(num(grams))
+  if (g > 0) return Math.min(QUANTIDADE_MAXIMA, g)
+  return gramasDoRotulo(label)
+}
+
 /**
  * Reescreve SÓ o número na frente do rótulo, preservando unidade e o resto —
  * inclusive sufixo de preparo ("200g frango · à milanesa" → "100g frango · à

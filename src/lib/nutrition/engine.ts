@@ -1,5 +1,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
+import { gramasDoItem } from './mealItemQuantity'
 
 // Funções PURAS de cálculo (BMR/TDEE/macros) vivem em ./goals — sem dependência de
 // servidor, pra poderem ser importadas no client sem puxar supabase/server (que
@@ -73,7 +74,8 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string,
     const safeItems = Array.isArray(items) && items.length > 0
       ? items.map((it) => ({
           label: String(it?.label ?? '').slice(0, 120),
-          grams: Math.max(0, Math.round(Number(it?.grams) || 0)),
+          // Quantidade digitada no rótulo nunca vira `grams: 0` (ver `gramasDoItem`).
+          grams: gramasDoItem(it?.grams, String(it?.label ?? '')),
           calories: Math.max(0, Math.round(Number(it?.calories) || 0)),
           protein: Math.max(0, Math.round(Number(it?.protein) || 0)),
           carbs: Math.max(0, Math.round(Number(it?.carbs) || 0)),

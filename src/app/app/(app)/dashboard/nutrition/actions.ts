@@ -13,6 +13,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { saveMealMemo } from '@/lib/nutrition/learned-foods'
 import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
+import { gramasDoItem, gramasDoRotulo } from '@/lib/nutrition/mealItemQuantity'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -200,8 +201,8 @@ export async function resolveFoodItemsAction(text: string) {
 
 /**
  * Estima macros de UM alimento com IA (VIP), SEM persistir — usado quando o
- * parser/base não reconhece o alimento no editor. Retorna 1 item (grams=0,
- * label = o texto digitado) e aprende o alimento pra próxima.
+ * parser/base não reconhece o alimento no editor. Retorna 1 item (label = o
+ * texto digitado, gramas = as digitadas ou as da IA) e aprende o alimento pra próxima.
  */
 export async function estimateFoodAction(text: string) {
   try {
@@ -233,9 +234,15 @@ export async function estimateFoodAction(text: string) {
       await saveMealMemo(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
     } catch { /* não-fatal */ }
 
+    // Gramas: as que o usuário DIGITOU vencem ("60g nutella" → 60); senão, as
+    // que a IA estimou, mas só quando ela devolveu UM alimento — com vários, a
+    // soma dos pesos não descreve o rótulo e o item fica sem densidade (0).
+    // Até 04/10/2026 isto era `grams: 0` fixo e a quantidade digitada se perdia.
+    const label = normalized.slice(0, 120)
+    const gramsDaIa = out.items.length === 1 ? out.items[0]!.grams : 0
     const item = {
-      label: normalized.slice(0, 120),
-      grams: 0,
+      label,
+      grams: gramasDoRotulo(label) || gramasDoItem(gramsDaIa, ''),
       calories: Math.round(out.calories),
       protein: Math.round(out.protein),
       carbs: Math.round(out.carbs),
