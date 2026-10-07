@@ -898,7 +898,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             // navegava se quem enviou tivesse posto um `link`, e quase ninguém
             // punha: o toque "só abria o app" (relato do dono, 06/10/2026).
             executarDestino(destinoDaNotificacao(detail ?? {}), {
-                abrirRota: (rota) => router.push(rota),
+                // A Nutrição é janela POR CIMA do dashboard: um destino que é o
+                // próprio `/dashboard` (lista de treinos) não troca a view, e sem
+                // fechá-la o toque não mudava nada na tela.
+                abrirRota: (rota) => { setNutritionOpen(false); router.push(rota); },
                 // Nutrição e Medicamentos são janelas por ESTADO, não rotas — fora
                 // de /app o iPhone abriria o Safari.
                 abrirNutricao: openNutrition,
@@ -911,7 +914,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView, router, openAdminPanel, handleGymArrival, setMedicationsOpen, openNutrition]);
+    }, [setView, router, openAdminPanel, handleGymArrival, setMedicationsOpen, openNutrition, setNutritionOpen]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
