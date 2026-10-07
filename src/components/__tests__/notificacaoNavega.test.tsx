@@ -3,7 +3,13 @@ import { join } from 'node:path'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
-import { ConteudoDoCard, destinoDa, temDestino } from '@/components/NotificationCenter'
+import { ConteudoDoCard, temDestino } from '@/components/NotificationCenter'
+import { destinoDaNotificacao } from '@/lib/notifications/destinoDaNotificacao'
+
+const rotaDe = (n: Parameters<typeof destinoDaNotificacao>[0]) => {
+    const d = destinoDaNotificacao(n)
+    return d?.tipo === 'rota' ? d.rota : ''
+}
 
 /**
  * A Central de Notificações era um beco sem saída.
@@ -121,17 +127,15 @@ describe('o que não leva a lugar nenhum não promete', () => {
 })
 
 describe('mensagem sem remetente ainda chega em algum lugar', () => {
-    it('o roteador não descarta o link quando falta o senderId', () => {
-        const bloco = shell.slice(shell.indexOf("if (detail?.type === 'message')"))
-        const ateOFim = bloco.slice(0, bloco.indexOf('setView(\'directChat\')'))
-        // Era `if (!senderId) return;` — o return seco jogava fora o link junto,
-        // e as notificações de mensagem gravadas no banco têm sender_id nulo
+    it('sem senderId, a mensagem leva à lista de conversas', () => {
+        // Era `if (!senderId) return;` — o return seco descartava tudo, e as
+        // notificações de mensagem gravadas no banco têm sender_id nulo
         // (medido: 11 de 11), que é justamente o caso da Central.
-        expect(ateOFim).toMatch(/if \(!senderId\) \{/)
-        expect(ateOFim).toMatch(/router\.push\(destino\)/)
-        // O caminho interno continua obrigatório: o payload vem de fora.
-        expect(ateOFim).toMatch(/startsWith\('\/'\)/)
-        expect(ateOFim).toMatch(/!destino\.startsWith\('\/\/'\)/)
+        expect(rotaDe({ type: 'message' })).toBe('/dashboard/chat')
+        // O ramo da CONVERSA só entra com remetente; sem ele, a tabela decide.
+        const handler = shell.slice(shell.indexOf('const onPushNavigate'), shell.indexOf("addEventListener('irontracks:push:navigate'"))
+        expect(handler).toMatch(/if \(detail\?\.type === 'message' && senderId\)/)
+        expect(handler).toMatch(/executarDestino\(destinoDaNotificacao\(/)
     })
 })
 
@@ -141,7 +145,7 @@ describe('mensagem sem remetente ainda chega em algum lugar', () => {
  *
  * O `.map()` que monta a lista reconstrói cada notificação campo a campo e não
  * copiava `metadata` nem `sender_id`: eles ficavam só dentro de `data`. Aí
- * `destinoDa` não achava o `week_start`, devolvia vazio, e `temDestino` dizia
+ * o destino não achava o `week_start`, devolvia vazio, e `temDestino` dizia
  * que não havia para onde ir. A lista continua IDÊNTICA na tela — some só o
  * clique —, então nada acusa.
  *
@@ -158,7 +162,7 @@ describe('o item da lista carrega o que o destino precisa ler', () => {
 
     it('weekly_recap só tem destino quando sabe QUAL semana', () => {
         expect(temDestino({ type: 'weekly_recap', metadata: { week_start: '2026-08-17' } })).toBe(true)
-        expect(destinoDa({ type: 'weekly_recap', metadata: { week_start: '2026-08-17' } }))
+        expect(rotaDe({ type: 'weekly_recap', metadata: { week_start: '2026-08-17' } }))
             .toBe('/dashboard/report/weekly?week=2026-08-17')
         // Sem a semana, abrir a tela mostraria o período errado — pior que não
         // abrir. É exatamente o caso que o `.map()` incompleto produzia para
@@ -169,11 +173,13 @@ describe('o item da lista carrega o que o destino precisa ler', () => {
 
     it('tipo com destino fixo não depende de metadata', () => {
         expect(temDestino({ type: 'streak_at_risk' })).toBe(true)
-        expect(destinoDa({ type: 'friend_pr' })).toBe('/dashboard/community')
+        expect(rotaDe({ type: 'friend_pr' })).toBe('/dashboard/community')
     })
 
     it('tipo sem destino continua sem destino', () => {
-        for (const t of ['water_reminder', 'billing_issue', 'broadcast', 'invite']) {
+        // Água SAIU desta lista em 06/10/2026: a Nutrição virou destino (o
+        // shell abre a janela pelo tipo) — pedido do dono.
+        for (const t of ['billing_issue', 'broadcast', 'invite']) {
             expect(temDestino({ type: t }), t).toBe(false)
         }
     })

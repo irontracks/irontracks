@@ -19,6 +19,7 @@ import { join } from 'node:path'
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { destinoDaNotificacao, executarDestino } from '@/lib/notifications/destinoDaNotificacao'
 
 vi.mock('@/contexts/DialogContext', () => ({
   useDialog: () => ({ alert: vi.fn(), confirm: vi.fn() }),
@@ -97,20 +98,24 @@ describe('shell — fiação das pontas', () => {
   })
 
   it.each(['medication_reminder', 'medication_updated'])(
-    'o handler de navegação trata %s abrindo a tela e retornando',
+    'o toque em %s abre a tela — e só ela',
     (tipo) => {
-      const i = shell.indexOf("addEventListener('irontracks:push:navigate'")
-      const handler = shell.slice(shell.lastIndexOf('const onPushNavigate', i), i)
-      expect(handler, `${tipo} cairia no fallback (sem link, o toque não faz nada)`).toContain(`'${tipo}'`)
-      const ramo = handler.slice(handler.indexOf(`'${tipo}'`), handler.indexOf(`'${tipo}'`) + 160)
-      expect(ramo).toMatch(/setMedicationsOpen\(true\)/)
-      expect(ramo).toMatch(/return/)
+      // Comportamento: a decisão mora em lib/notifications/destinoDaNotificacao.
+      const acoes = {
+        abrirRota: vi.fn(), abrirNutricao: vi.fn(), abrirMedicamentos: vi.fn(),
+        abrirTreinoAtivo: vi.fn(), abrirPainelAdmin: vi.fn(),
+      }
+      executarDestino(destinoDaNotificacao({ type: tipo }), acoes)
+      expect(acoes.abrirMedicamentos, `${tipo} sem destino: o toque não faria nada`).toHaveBeenCalledTimes(1)
+      expect(acoes.abrirRota).not.toHaveBeenCalled()
     },
   )
 
-  it('o ramo vem ANTES do fallback de link genérico', () => {
-    expect(shell.indexOf("'medication_reminder'")).toBeGreaterThan(-1)
-    expect(shell.indexOf("'medication_reminder'")).toBeLessThan(shell.indexOf("const link = String(detail?.link"))
+  it('o shell liga "abrir medicamentos" ao store da tela', () => {
+    const i = shell.indexOf("addEventListener('irontracks:push:navigate'")
+    const handler = shell.slice(shell.lastIndexOf('const onPushNavigate', i), i)
+    expect(handler).toMatch(/executarDestino\(destinoDaNotificacao\(/)
+    expect(handler).toMatch(/abrirMedicamentos:\s*\(\)\s*=>\s*setMedicationsOpen\(true\)/)
   })
 
   it('o shell entrega medicationsOpen/setMedicationsOpen ao DashboardModals', () => {

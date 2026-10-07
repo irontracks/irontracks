@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { NOTIFICATION_TYPE_TO_PREFERENCE } from '@/lib/social/notifyFollowers'
+import { destinoDaNotificacao } from '@/lib/notifications/destinoDaNotificacao'
 
 const ler = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 const semComentarios = (s: string) =>
@@ -87,9 +88,8 @@ describe('medicamentos: o aviso do professor sai de TODA escrita da rota', () =>
         const centro = ler('src/components/NotificationCenter.tsx')
         expect(centro, 'cairia no default "Info"').toMatch(/medication_updated:\s*tipo\(/)
         // A tela de medicamentos é um modal do shell, não uma URL: o toque é roteado
-        // pelo tipo (ROTEADOS_PELO_TIPO), e não por DESTINO_POR_TIPO.
-        const roteados = centro.split('ROTEADOS_PELO_TIPO = new Set([')[1]?.split(']')[0] ?? ''
-        expect(roteados).toContain('medication_updated')
+        // pelo tipo (lib/notifications/destinoDaNotificacao).
+        expect(destinoDaNotificacao({ type: 'medication_updated' })).toEqual({ tipo: 'medicamentos' })
     })
 })
 
@@ -110,8 +110,8 @@ describe('os dois tipos novos têm toggle de verdade', () => {
         const centro = ler('src/components/NotificationCenter.tsx')
         for (const tipo of ['workout_assigned', 'workout_updated', 'diet_updated']) {
             expect(centro, `${tipo} cairia no default`).toMatch(new RegExp(`${tipo}:\\s*tipo\\(`))
-            expect(centro, `${tipo} sem destino: o toque não leva a lugar nenhum`)
-                .toMatch(new RegExp(`${tipo}:\\s*'/dashboard`))
+            expect(destinoDaNotificacao({ type: tipo }), `${tipo} sem destino: o toque não leva a lugar nenhum`)
+                .not.toBeNull()
         }
     })
 })

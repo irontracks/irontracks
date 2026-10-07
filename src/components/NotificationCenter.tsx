@@ -16,6 +16,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import type { AppNotification } from '@/types/social'
 import { backdropProps, dialogProps } from '@/utils/a11y/backdrop'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { destinoDaNotificacao, tipoCanonico } from '@/lib/notifications/destinoDaNotificacao'
 
 type NotificationItem = AppNotification & { data?: Record<string, unknown> };
 
@@ -143,7 +144,7 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     // Dinheiro: o caso para o qual o vermelho existe.
     billing_issue: tipo(<CreditCard size={15} />, 'Cobrança', 'aviso'),
     // Ganhou algo — é CONQUISTA, não ação (ninguém precisa responder nada).
-    // Sem entrada em DESTINO_POR_TIPO de propósito, mesmo motivo do
+    // Sem destino de propósito (ver SEM_DESTINO_DE_PROPOSITO), mesmo motivo do
     // `billing_issue`: a tela VIP não existe no app iOS (política da Apple
     // sobre cobrança fora da loja) e não há um lugar único pra levar em todo
     // cliente — abrir tela errada é pior que não abrir.
@@ -181,13 +182,6 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     default: tipo(<Bell size={15} />, 'Info', 'social'),
 };
 
-// Legacy aliases — map old server type names to the current config entry.
-const TYPE_ALIASES: Record<string, string> = {
-    workout_finished: 'workout_finish',
-    workout_started: 'workout_start',
-    pr: 'friend_pr',
-};
-
 /**
  * Tipo desconhecido já foi reportado nesta sessão?
  *
@@ -207,7 +201,7 @@ const tiposDesconhecidosReportados = new Set<string>();
  * crítico é bomba-relógio" — a regra do repo, aplicada.
  */
 function getTypeConfig(type: string) {
-    const canonical = TYPE_ALIASES[type] ?? type;
+    const canonical = tipoCanonico(type);
     const cfg = TYPE_CONFIG[canonical];
     if (cfg) return cfg;
     if (canonical && !tiposDesconhecidosReportados.has(canonical)) {
@@ -218,108 +212,16 @@ function getTypeConfig(type: string) {
 }
 
 /**
- * Para onde cada notificação leva.
- *
- * A Central era um beco sem saída: 24 tipos, e o card não tinha `onClick`
- * nenhum. Pior que não levar a lugar nenhum, ele PROMETIA — `hover:scale` e
- * `hover:shadow` são o vocabulário de card interativo. O usuário toca no aviso
- * de que um amigo bateu PR e a tela não muda.
- *
- * O destino NÃO é decidido aqui: o app já tem o roteador de notificações
- * (`irontracks:push:navigate`, no shell do dashboard), que é quem sabe abrir
- * uma conversa, um painel de admin ou uma rota interna. Tocar no card emite o
- * MESMO evento que o toque no push emite. Escrever "tipo → destino" num segundo
- * lugar é a duplicação que este repo já pagou caro várias vezes.
- *
- * Só entra tipo cujo destino é INEQUÍVOCO. Ficam de fora, e sem prometer
- * clique:
- *
- * - `meal_reminder` / `water_reminder` — a Nutrição é um overlay, não uma rota;
- *   `/dashboard/nutrition` não é alcançável dentro do app nativo e cairia no
- *   dashboard, que não é o destino que o card sugere.
- * - `muscle_weekly_insights`, `billing_issue`, `broadcast` — sem tela própria
- *   ou, no caso de cobrança, com o gate de iOS por cima.
- * - `invite` — tem os próprios botões de aceitar/recusar no card.
- *
- * Levar para o lugar errado é pior que não levar: o usuário perde o contexto e
- * ainda tem que achar o caminho de volta.
- */
-const COMUNIDADE = '/dashboard/community'
-const DESTINO_POR_TIPO: Record<string, string> = {
-    // Movimento de quem ele segue — tudo isso vive no feed.
-    friend_pr: COMUNIDADE,
-    friend_streak: COMUNIDADE,
-    friend_goal: COMUNIDADE,
-    friend_weekly_goal: COMUNIDADE,
-    friend_achievement: COMUNIDADE,
-    friend_comeback: COMUNIDADE,
-    friends_trained_today: COMUNIDADE,
-    friend_online: COMUNIDADE,
-    workout_start: COMUNIDADE,
-    workout_finish: COMUNIDADE,
-    milestone: COMUNIDADE,
-    story_posted: COMUNIDADE,
-    story_like: COMUNIDADE,
-    story_reaction: COMUNIDADE,
-    like: COMUNIDADE,
-    follow_request: COMUNIDADE,
-    follow_accepted: COMUNIDADE,
-    challenge_created: COMUNIDADE,
-    challenge_accepted: COMUNIDADE,
-    challenge_declined: COMUNIDADE,
-    story_comment: COMUNIDADE,
-    mentioned_in_comment: COMUNIDADE,
-
-    message: '/dashboard/chat',
-    appointment: '/dashboard/schedule',
-    appointment_created: '/dashboard/schedule',
-
-    // Cutucões sobre o próprio treino: o destino é a lista de treinos, de onde
-    // se começa um.
-    workout_reminder: '/dashboard',
-    // O coach mexeu: treino leva à lista (de onde se inicia), dieta à nutrição.
-    workout_assigned: '/dashboard',
-    workout_updated: '/dashboard',
-    diet_updated: '/dashboard/nutrition',
-    streak_at_risk: '/dashboard',
-    inactivity: '/dashboard',
-    pr_close: '/dashboard',
-    morning_briefing: '/dashboard',
-}
-
-/** Tipos que o roteador resolve pelo TYPE, sem precisar de link. */
-const ROTEADOS_PELO_TIPO = new Set([
-    'admin_access_request',
-    'admin_new_signup',
-    // A tela de medicamentos é um modal aberto pelo shell a partir do TIPO — não
-    // há URL para pôr em DESTINO_POR_TIPO.
-    'medication_reminder',
-    'medication_updated',
-])
-
-/**
- * O link do destino, ou string vazia quando não há para onde ir.
- *
- * `weekly_recap` é o único que monta parâmetro: a tela do resumo semanal quer
- * saber QUAL semana, e o metadata guarda `week_start`. Sem ele o link não é
- * emitido — abrir a semana errada é pior que não abrir.
+ * Para onde cada notificação leva — a decisão mora em
+ * `lib/notifications/destinoDaNotificacao`, a MESMA tabela que o toque no push
+ * usa. Esta tela só pergunta "tem destino?" (para prometer clique) e emite o
+ * evento que o shell do dashboard trata.
  */
 type ItemComDestino = { type: string; metadata?: Record<string, unknown> | null; sender_id?: string | null }
 
-export function destinoDa(item: ItemComDestino): string {
-    const canonical = TYPE_ALIASES[item.type] ?? item.type
-    if (canonical === 'weekly_recap') {
-        const meta = (item.metadata ?? {}) as Record<string, unknown>
-        const semana = String(meta.week_start ?? '').trim()
-        return semana ? `/dashboard/report/weekly?week=${encodeURIComponent(semana)}` : ''
-    }
-    return DESTINO_POR_TIPO[canonical] ?? ''
-}
-
 /** O card leva a algum lugar? */
 export function temDestino(item: ItemComDestino): boolean {
-    const canonical = TYPE_ALIASES[item.type] ?? item.type
-    return ROTEADOS_PELO_TIPO.has(canonical) || Boolean(destinoDa(item))
+    return destinoDaNotificacao(item) !== null
 }
 
 // ─── Micro components ─────────────────────────────────────────────────────────
@@ -464,14 +366,14 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
      */
     const abrirDestino = (item: ItemComDestino) => {
         if (!temDestino(item)) return;
-        const canonical = TYPE_ALIASES[item.type] ?? item.type;
+        const canonical = tipoCanonico(item.type);
         onNavigate?.();
         setIsOpen(false);
         window.dispatchEvent(
             new CustomEvent('irontracks:push:navigate', {
                 detail: {
                     type: canonical,
-                    link: destinoDa(item),
+                    metadata: item.metadata ?? null,
                     senderId: String(item.sender_id ?? '').trim() || undefined,
                 },
             }),
@@ -560,7 +462,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
 
     const safeIncomingInvites = Array.isArray(incomingInvites) ? incomingInvites.filter(Boolean) : [];
     // Preserve server-emitted types verbatim — the TYPE_CONFIG map (plus
-    // TYPE_ALIASES for legacy renames) picks the right icon and color.
+    // tipoCanonico for legacy renames) picks the right icon and color.
     const safeSystem = Array.isArray(systemNotifications) ? systemNotifications.map(n => ({
         ...n, type: String(n?.type ?? 'default'),
     })) : [];
@@ -579,7 +481,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             message: String(n.message || (n as unknown as Record<string, unknown>).body || ''),
             // `metadata` e `sender_id` precisam vir para a LISTA, não só dentro
             // de `data`: é deles que sai o destino do toque. Sem `metadata` o
-            // `weekly_recap` não acha o `week_start`, `destinoDa` devolve vazio
+            // `weekly_recap` não acha o `week_start`, o destino sai vazio
             // e o card deixa de ser clicável — em silêncio, porque a lista
             // continua idêntica na tela. Pego na conferência visual, com os
             // testes todos verdes.

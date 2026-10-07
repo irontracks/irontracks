@@ -59,7 +59,15 @@ export async function GET(req: Request) {
         title: 'Resumo da semana 📊',
         message: `Você fez ${count} treino${count > 1 ? 's' : ''} na semana passada. Bora pra mais uma!`,
         is_read: false,
-        metadata: { workouts: count, week_start: startDay, week_end: endDay },
+        // `link` no metadata é o que vai no PUSH (`insertNotifications` lê
+        // `metadata.link`): sem ele o push não levava a semana e o toque só
+        // abria o app. O sino monta o mesmo destino a partir de `week_start`.
+        metadata: {
+          workouts: count,
+          week_start: startDay,
+          week_end: endDay,
+          link: `/dashboard/report/weekly?week=${encodeURIComponent(startDay)}`,
+        },
       })
     })
 

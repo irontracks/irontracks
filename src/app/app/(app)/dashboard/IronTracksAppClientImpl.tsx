@@ -102,6 +102,7 @@ import type { AdminUser } from '@/types/admin'
 import { logError } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import { installNumericSelectOnFocus } from '@/utils/ui/selectOnFocus'
+import { destinoDaNotificacao, executarDestino } from '@/lib/notifications/destinoDaNotificacao'
 const HealthWidget = dynamic(() => import('@/components/dashboard/HealthWidget'), { ssr: false })
 const GymDetectToastWrapper = dynamic(() => import('@/components/dashboard/GymDetectToastWrapper'), { ssr: false })
 
@@ -860,53 +861,27 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }, [setCurrentWorkout, setView, setExpressWorkoutOpen])
 
+    // Lido pelo roteador de notificações sem entrar nas dependências do efeito:
+    // `activeSession` muda a cada série gravada, e religar o listener por isso
+    // não muda nada no destino.
+    const activeSessionRef = useRef(activeSession);
+    activeSessionRef.current = activeSession;
+
     // Deep-link de push de mensagem: ao tocar na notificação, abre a conversa.
     // A push carrega sender_id/sender_name; o ChatDirectScreen resolve o canal
     // a partir do userId, então não precisamos do channelId aqui.
     useEffect(() => {
         const onPushNavigate = (e: Event) => {
-            const detail = (e as CustomEvent<{ type?: string; link?: string; senderId?: string; senderName?: string }>).detail;
-            // Aluno tocou no push "treino novo do professor" → leva pra lista de treinos
-            // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
-            // dashboard por default; com ele, funciona mesmo já aberto em outra view.
-            if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
+            const detail = (e as CustomEvent<{ type?: string; link?: string; senderId?: string; senderName?: string; metadata?: Record<string, unknown> | null }>).detail;
             // Toque na notificação de chegada na academia (o app estava fechado, então o
             // evento `gymGeofenceEntered` não rodou). O plugin de push do Capacitor
             // entrega notificação LOCAL também, com o `userInfo` do Swift em `data`.
-            // Sem link: o destino é o dashboard, e a chegada precisa virar check-in.
+            // A chegada precisa virar check-in, não só navegar.
             if (detail?.type === 'gym_geofence') { handleGymArrival(); return; }
-            // Lembrete de remédio / aviso de que o professor mexeu na lista: a tela é
-            // um modal por ESTADO (não uma rota — fora de /app o iPhone abre o Safari),
-            // então o toque no push e o toque no card do sino chegam aqui pelo MESMO evento.
-            if (detail?.type === 'medication_reminder' || detail?.type === 'medication_updated') {
-                setMedicationsOpen(true);
-                return;
-            }
-            // Avisos de admin abrem o painel na aba certa. Tem de ser pelo TYPE,
-            // não por link: o painel é uma `view` deste componente, não uma rota
-            // — `/admin` sequer existe em `app/`. O link antigo (`/admin?tab=
-            // requests`) levaria a 404; sem link nenhum, o tap só abria a tela
-            // inicial, que foi o que o dono reportou em 01/08.
-            const ADMIN_PUSH_TAB: Record<string, string> = {
-                admin_new_signup: 'requests',
-                admin_access_request: 'requests',
-                admin_vip_expiring: 'vip',
-            };
-            const adminTab = detail?.type ? ADMIN_PUSH_TAB[detail.type] : undefined;
-            if (adminTab) { openAdminPanel(adminTab); setView('admin'); return; }
-            if (detail?.type === 'message') {
-                const senderId = String(detail?.senderId || '').trim();
-                // Sem remetente não dá para abrir a conversa — mas o `return`
-                // seco também descartava o `link`, e aí o toque não fazia NADA.
-                // As notificações de mensagem gravadas no banco têm `sender_id`
-                // nulo (medido: 11 de 11), então é exatamente esse o caso de
-                // quem toca no card na Central. Deixa cair no fallback, que leva
-                // à lista de conversas.
-                if (!senderId) {
-                    const destino = String(detail?.link || '').trim();
-                    if (destino.startsWith('/') && !destino.startsWith('//')) router.push(destino);
-                    return;
-                }
+            // Mensagem com remetente abre a CONVERSA. Sem remetente (as gravadas
+            // no banco têm `sender_id` nulo) cai na tabela, que leva à lista.
+            const senderId = String(detail?.senderId || '').trim();
+            if (detail?.type === 'message' && senderId) {
                 const senderName = String(detail?.senderName || '').trim();
                 setDirectChat({
                     channelId: '',
@@ -918,18 +893,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 setView('directChat');
                 return;
             }
-            // Fallback genérico: QUALQUER push que carregue um `link` interno navega pro
-            // destino — ex.: "Resumo da semana 💪" (link /dashboard/report/weekly?week=...,
-            // que o pathnameToView vira a view 'weeklySummary'). Antes, todo type diferente
-            // de 'message' caía num `return` e o link era ignorado: a push só abria o app.
-            // Só aceita caminho INTERNO ('/x', nunca '//host') — o payload vem de fora e não
-            // pode virar open-redirect.
-            const link = String(detail?.link || '').trim();
-            if (link.startsWith('/') && !link.startsWith('//')) router.push(link);
+            // Todo o resto decide pela tabela única — a MESMA do card do sino
+            // (lib/notifications/destinoDaNotificacao). Antes daqui o push só
+            // navegava se quem enviou tivesse posto um `link`, e quase ninguém
+            // punha: o toque "só abria o app" (relato do dono, 06/10/2026).
+            executarDestino(destinoDaNotificacao(detail ?? {}), {
+                abrirRota: (rota) => router.push(rota),
+                // Nutrição e Medicamentos são janelas por ESTADO, não rotas — fora
+                // de /app o iPhone abriria o Safari.
+                abrirNutricao: openNutrition,
+                abrirMedicamentos: () => setMedicationsOpen(true),
+                // Sem treino em andamento não há para onde ir; a tela atual fica.
+                abrirTreinoAtivo: () => { if (activeSessionRef.current) setView('active'); },
+                // O painel é uma `view` deste componente — `/admin` não existe.
+                abrirPainelAdmin: (aba) => { openAdminPanel(aba); setView('admin'); },
+            });
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView, router, openAdminPanel, handleGymArrival, setMedicationsOpen]);
+    }, [setView, router, openAdminPanel, handleGymArrival, setMedicationsOpen, openNutrition]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
