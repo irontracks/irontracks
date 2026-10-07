@@ -1299,6 +1299,8 @@ na pasta da landing reprova.
 
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
+- **Vitest em worktree de `.claude/worktrees/` não acha NENHUM teste** ("No test files found"): o `EXCLUDE` do `vitest.config.ts` tem `.claude`, e o caminho do worktree contém `.claude`. Rode com uma cópia temporária sem essa entrada (`sed "s/'.claude', //" vitest.config.ts > vitest.wt.config.ts` + `--config vitest.wt.config.ts`) e apague antes do commit. Em zsh, lista de arquivos com `(app)` no caminho precisa de `${=VAR}`. O teste `revenuecatCompilaNoXcode27` falha no worktree (lê o `node_modules` desatualizado da cópia principal) — não é regressão.
+- **Prévia da Vercel falhando em `next/font` (`Cannot read properties of null (reading '1')` em `(landing)/layout.tsx`) é falha passageira do Google Fonts no build** (07/10/2026: só aquele deploy falhou, os 7 anteriores com a mesma landing passaram). Refaça o build com um commit vazio; o quality-check espera a prévia do commit e não anda sem ela.
 - **`tsc` com centenas de `TS1005` em `.next/dev/types/routes.d.ts` não é o código:** é o
   arquivo gerado pelo `next dev`, cortado ao meio quando o servidor é parado (30/09/2026,
   "Unterminated string literal"). O `tsconfig` inclui esses tipos. Apague o `.next` (gerado,
@@ -2084,7 +2086,34 @@ e sobreviveu duas semanas à própria correção.
 ⚠️ **Tipo que o servidor emite e a tabela não conhece cai no `default`** — sino
 cinza, rótulo "Info", e sem destino ao toque. Aconteceu com 14 tipos (27/08) e
 de novo com `workout_assigned` (01/09), que era emitido desde ago/2026. Tipo novo
-entra em `TYPE_CONFIG` **e** em `DESTINO_POR_TIPO`.
+entra em `TYPE_CONFIG` (ícone/cor) **e** em `lib/notifications/destinoDaNotificacao.ts`
+(destino do toque) — ou em `SEM_DESTINO_DE_PROPOSITO`, com o motivo.
+
+### O toque no PUSH e no sino decide pela MESMA tabela (06/10/2026, #1194/#1195)
+
+Relato do dono: "muito card que ao clicar só entra no app". O push carrega só
+`type` e, às vezes, `link` (`insertNotifications` só põe `link` se houver
+`metadata.link`) — e o shell só navegava pelo `link`. Medido: de ~55 tipos
+enviados, ~8 navegavam. O sino tinha a tabela certa e o push não a usava.
+
+Hoje `destinoDaNotificacao` decide pelo TIPO (o `link` só desempata tipo
+desconhecido, e só se começar com `/dashboard`) e `executarDestino` executa no
+shell. Nutrição e Medicamentos são JANELAS por estado, não rotas — por isso o
+destino é uma união. Três armadilhas que já morderam:
+- **`/` agora é a página comercial**: o convite em dupla mandava `link: '/'` e o
+  toque tirava a pessoa do app. `/admin` também não existe.
+- **Destino `/dashboard` com a Nutrição aberta não muda nada** — ela é janela
+  por cima da mesma view; `abrirRota` fecha a janela antes.
+- **Resumo semanal sem a semana não abre** — o cron grava `metadata.link` com
+  `?week=`; sem ele o push saía sem destino.
+
+Guard de CLASSE em `lib/notifications/__tests__/destinoDaNotificacao.test.ts`:
+lê os EMISSORES (`sendPush*`/`insertNotifications`) — tipo novo sem decisão
+reprova. **Conferir no simulador sem esperar push real:**
+`xcrun simctl push <udid> com.irontracks.app arquivo.apns` (JSON com
+`"Simulator Target Bundle"`, `aps.alert` e `type`/`link` na raiz), app em segundo
+plano, tocar no banner. ⚠️ Antes, confira que o simulador está na conta de TESTE
+(chip ARQUIVADOS (6)) — em 07/10 ele estava logado na conta de uma pessoa real.
 
 ### O coach mexeu no treino/dieta: o aluno é avisado (01/09/2026)
 
@@ -3600,8 +3629,8 @@ comportamento permanente sem ninguém saber.
 
 Plano e decisões em **`docs/plans/medicamentos.md`** (contrato de API incluso).
 Menu do avatar → modal (`modalStore.medicationsOpen`, sem rota: a regra do
-Safari não se aplica); push/card do sino abrem pelo TIPO (`ROTEADOS_PELO_TIPO`,
-não `DESTINO_POR_TIPO`). Professor vinculado vê e EDITA (decisão do dono) pela
+Safari não se aplica); push/card do sino abrem pelo TIPO (`destinoDaNotificacao` →
+`{ tipo: 'medicamentos' }`, nunca por URL). Professor vinculado vê e EDITA (decisão do dono) pela
 aba "Remédios" do aluno; só o aluno marca "Tomei". Lógica única em
 `lib/medications/agenda.ts` (cron, tela e rota decidem pelas mesmas funções);
 escrita única em `lib/medications/mutations.ts` (aluno e professor).
