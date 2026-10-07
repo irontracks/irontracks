@@ -142,7 +142,9 @@ export function usePushNotifications(userId?: string | null) {
                 savePendingRestDayAnswer(willTrain)
                 void flushPendingRestDayIntent(String(userId || ''))
                 if (!willTrain) {
-                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard/nutrition', type: 'rest_day' } }))
+                  // Sem link: a Nutrição é janela do shell, não rota — `rest_day` vai
+                  // pela tabela (lib/notifications/destinoDaNotificacao).
+                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { type: 'rest_day' } }))
                 }
                 return
               }
@@ -199,13 +201,6 @@ export function usePushNotifications(userId?: string | null) {
                   }).catch(() => { })
                 }
                 window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard', type } }))
-                return
-              }
-
-              // Push matinal (morning_briefing): no Android não há botões "Vou treinar/
-              // Vou descansar"; o tap ao menos leva pra nutrição, onde a pergunta é feita.
-              if (type === 'morning_briefing') {
-                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard/nutrition', type } }))
                 return
               }
 

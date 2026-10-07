@@ -82,7 +82,9 @@ export async function POST(req: Request) {
 
     const extra: Record<string, string> = {
       type: 'team_invite',
-      link: '/',
+      // Era `/`, que depois da migração de rotas virou a página comercial: o
+      // toque tirava a pessoa do app. O convite aparece como janela no dashboard.
+      link: '/dashboard',
     }
     if (sessionId) extra.sessionId = sessionId
 

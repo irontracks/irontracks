@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { pathnameToView, viewToPath } from '../viewPath'
+import { destinoDaNotificacao, rotaInternaDoApp } from '@/lib/notifications/destinoDaNotificacao'
 
 /**
  * Regressão: a push "Resumo da semana 💪" carregava o deep-link certo
@@ -27,16 +28,19 @@ describe('deep-link da push → view do resumo semanal', () => {
   // string (o guard anti-open-redirect) — o stripComments trataria isso como comentário.
   const shell = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
 
-  it('o listener LÊ o link do push (não só type message/workout_assigned)', () => {
+  it('o link do push chega ao destino (não só type message/workout_assigned)', () => {
+    // A decisão mora em lib/notifications/destinoDaNotificacao; o shell passa o
+    // `detail` inteiro (type + link) para ela.
+    expect(destinoDaNotificacao({ type: 'muscle_weekly_insights', link: '/dashboard/report/weekly?week=2026-09-27' }))
+      .toEqual({ tipo: 'rota', rota: '/dashboard/report/weekly?week=2026-09-27' })
     const block = shell.slice(shell.indexOf('const onPushNavigate'), shell.indexOf("removeEventListener('irontracks:push:navigate'"))
-    expect(block).toMatch(/detail\?\.link/)
-    expect(block).toMatch(/router\.push\(link\)/)
+    expect(block).toMatch(/destinoDaNotificacao\(detail \?\? \{\}\)/)
   })
 
   it('só navega pra caminho INTERNO (push forjada não vira open-redirect)', () => {
-    const block = shell.slice(shell.indexOf('const onPushNavigate'), shell.indexOf("removeEventListener('irontracks:push:navigate'"))
-    expect(block).toMatch(/link\.startsWith\('\/'\)/)
-    expect(block).toMatch(/!link\.startsWith\('\/\/'\)/)
+    expect(rotaInternaDoApp('//evil.com/x')).toBe('')
+    expect(rotaInternaDoApp('https://evil.com')).toBe('')
+    expect(rotaInternaDoApp('/dashboard/report/weekly?week=1')).toBe('/dashboard/report/weekly?week=1')
   })
 })
 
@@ -86,12 +90,10 @@ describe('deep-link do push de admin → painel na aba certa', () => {
   })
 
   it('o tap resolve a aba pelo TYPE, não por rota inexistente', () => {
-    // Pelo tipo funciona mesmo com o app já aberto em outra view — é o mesmo
-    // motivo pelo qual 'workout_assigned' tem branch próprio logo acima.
-    expect(IMPL).toMatch(/admin_new_signup: 'requests'/)
-    expect(IMPL).toMatch(/admin_access_request: 'requests'/)
-    expect(IMPL).toMatch(/openAdminPanel\(adminTab\)/)
-    expect(IMPL).toMatch(/setView\('admin'\)/)
+    // Pelo tipo funciona mesmo com o app já aberto em outra view.
+    expect(destinoDaNotificacao({ type: 'admin_new_signup' })).toEqual({ tipo: 'painelAdmin', aba: 'requests' })
+    expect(destinoDaNotificacao({ type: 'admin_access_request' })).toEqual({ tipo: 'painelAdmin', aba: 'requests' })
+    expect(IMPL).toMatch(/abrirPainelAdmin:\s*\(aba\)\s*=>\s*\{\s*openAdminPanel\(aba\);\s*setView\('admin'\);/)
   })
 
   it('nenhum aviso de admin aponta para /admin — essa rota não existe', () => {
@@ -104,15 +106,12 @@ describe('deep-link do push de admin → painel na aba certa', () => {
     expect(ADMIN).toContain('notifyAdminNewSignup')
   })
 
-  it('a resolução por tipo vem ANTES do fallback genérico de link', () => {
-    // Senão o `router.push(link)` genérico venceria e levaria pro lugar errado.
-    // Fonte CRU aqui: `stripComments` estraga esta comparação, porque a linha do
-    // fallback contém '//' dentro de uma string e o regex a trata como comentário.
-    const raw = readFileSync('src/app/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
-    const porTipo = raw.indexOf('openAdminPanel(adminTab)')
-    const fallback = raw.indexOf('router.push(link)')
-    expect(porTipo).toBeGreaterThan(0)
-    expect(fallback).toBeGreaterThan(porTipo)
+  it('a resolução por tipo vem ANTES do link do payload', () => {
+    // Senão o link venceria e levaria pro lugar errado (o `/admin` que já foi
+    // mandado por push não existe; o `/dashboard` cairia na tela inicial).
+    for (const link of ['/admin', '/dashboard', '/dashboard/community']) {
+      expect(destinoDaNotificacao({ type: 'admin_new_signup', link }), link).toEqual({ tipo: 'painelAdmin', aba: 'requests' })
+    }
   })
 })
 
