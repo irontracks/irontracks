@@ -191,7 +191,9 @@ describe('fiação: o shell e o sino usam ESTA decisão', () => {
     expect(handler).toMatch(/executarDestino\(destinoDaNotificacao\(detail \?\? \{\}\)/)
     expect(handler).toMatch(/abrirNutricao:\s*openNutrition/)
     expect(handler).toMatch(/abrirMedicamentos:\s*\(\)\s*=>\s*setMedicationsOpen\(true\)/)
-    expect(handler).toMatch(/abrirRota:\s*\(rota\)\s*=>\s*router\.push\(rota\)/)
+    // Fecha a janela da Nutrição antes: destino `/dashboard` com ela aberta
+    // não mudava nada na tela (visto no simulador, 07/10/2026).
+    expect(handler).toMatch(/abrirRota:\s*\(rota\)\s*=>\s*\{\s*setNutritionOpen\(false\);\s*router\.push\(rota\);/)
     // O fallback cru de link (que aceitava qualquer `/x`) não volta.
     expect(handler).not.toMatch(/router\.push\(link\)/)
   })
