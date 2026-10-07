@@ -59,8 +59,11 @@ function useInputField(
     selectOnFocus?: boolean
     /** Retrato do log no instante em que o valor some — só entra no aviso. */
     contexto?: () => Record<string, unknown>
+    /** O campo está desenhado. Invisível nunca restaura (ver `decideExternalSync`). */
+    visivel?: boolean
   },
 ) {
+  const visivel = opts?.visivel !== false;
   const selectOnFocus = opts?.selectOnFocus !== false;
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
@@ -93,6 +96,7 @@ function useInputField(
       now: agora,
       graceMs: TYPED_VALUE_GRACE_MS,
       alreadyRestored: restoredRef.current,
+      visivel,
     });
 
     if (decisao === 'keep') return;
@@ -377,13 +381,13 @@ const NormalSetInner = ({
       weightSource: 'user',
       advanced_config: cfg ?? log.advanced_config ?? null,
     }),
-  );
+  undefined, { visivel: !isUnilateral });
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  'reps');
+  'reps', { visivel: !isUnilateral });
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  'rpe');
+  'rpe', { visivel: !isUnilateral });
   // Notas é o ÚNICO campo de texto livre aqui: selecionar tudo ao focar
   // apagaria o que o usuário já escreveu na primeira tecla. Exceção explícita.
   const notesField = useInputField(extNotes, (v) =>
@@ -391,12 +395,16 @@ const NormalSetInner = ({
   undefined, { selectOnFocus: false });
 
   // ── Input fields — unilateral ─────────────────────────────────────────
+  // Os campos dos DOIS modos são montados sempre (regra dos hooks), mas só um
+  // modo é desenhado. `visivel` impede o modo escondido de "restaurar" valor no
+  // log — os de lado espelham o compartilhado (`L_rpe ?? rpe`) e gravavam
+  // L_/R_ em série bilateral quando o usuário apagava o RPE.
   // Marca a fonte como 'user' ao editar um lado — sem isto a re-sincronização do
   // autoload sobrescreveria o peso que o usuário digitou no lado.
   const lWeightField = useInputField(extLWeight, (v) =>
-    updateLog(key, { L_weight: noNegWeight(v), weightSource: 'user' }));
+    updateLog(key, { L_weight: noNegWeight(v), weightSource: 'user' }), undefined, { visivel: isUnilateral });
   const rWeightField = useInputField(extRWeight, (v) =>
-    updateLog(key, { R_weight: noNegWeight(v), weightSource: 'user' }));
+    updateLog(key, { R_weight: noNegWeight(v), weightSource: 'user' }), undefined, { visivel: isUnilateral });
   // Retrato do log para o aviso de valor que sumiu (lido só quando ele dispara).
   const logRef = useRef(log);
   useEffect(() => { logRef.current = log; });
@@ -409,10 +417,10 @@ const NormalSetInner = ({
       done: l.done === true, L_done: l.L_done === true, R_done: l.R_done === true,
     };
   }, []);
-  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps', { contexto: retratoDoLog });
-  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps', { contexto: retratoDoLog });
-  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe', { contexto: retratoDoLog });
-  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe', { contexto: retratoDoLog });
+  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps', { contexto: retratoDoLog, visivel: isUnilateral });
+  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps', { contexto: retratoDoLog, visivel: isUnilateral });
+  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe', { contexto: retratoDoLog, visivel: isUnilateral });
+  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe', { contexto: retratoDoLog, visivel: isUnilateral });
 
   // Shared input style — weight column (3fr, roomy)
   // O VALOR digitado é `font-black` branco; o PLACEHOLDER (meta do plano ou

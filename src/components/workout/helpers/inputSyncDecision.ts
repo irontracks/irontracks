@@ -36,11 +36,24 @@ export type InputSyncInput = {
   graceMs: number
   /** Já restauramos uma vez neste campo (trava anti-loop). */
   alreadyRestored: boolean
+  /**
+   * O campo está NA TELA. Padrão true. A série normal monta os campos dos dois
+   * modos (bilateral e L_/R_) e só desenha um deles; o invisível nunca pode
+   * restaurar — ele não tem dono, só espelha o compartilhado.
+   */
+  visivel?: boolean
 }
 
 export type InputSyncDecision = 'keep' | 'restore' | 'accept'
 
 export function decideExternalSync(input: InputSyncInput): InputSyncDecision {
+  // Campo invisível só acompanha. Em 06/10/2026 os avisos "L_rpe sumiu do log"
+  // eram TODOS de série BILATERAL: o L_rpe escondido espelha `log.rpe`
+  // (`L_rpe ?? rpe`), o usuário apagava o RPE e o campo escondido "restaurava"
+  // L_rpe/R_rpe na série bilateral. Medido em produção: 465 séries bilaterais
+  // com campos de lado, e `setTotalReps` somando L+R no lugar de `reps`.
+  if (input.visivel === false) return 'accept'
+
   // Cursor no campo: o usuário manda, sempre. Nem o autoload interrompe digitação.
   if (input.isFocused) return 'keep'
 

@@ -30,6 +30,12 @@ const base = {
 }
 
 describe('decideExternalSync', () => {
+  it('campo invisível só acompanha — nunca restaura (série bilateral, 06/10/2026)', () => {
+    const sumindo = { ...base, localValue: '8', externalValue: '' }
+    expect(decideExternalSync(sumindo)).toBe('restore')
+    expect(decideExternalSync({ ...sumindo, visivel: false })).toBe('accept')
+  })
+
   it('cursor no campo: nada sobrescreve o usuário digitando', () => {
     expect(decideExternalSync({ ...base, localValue: '10', externalValue: '', isFocused: true })).toBe('keep')
     // vale mesmo quando o externo traz OUTRO valor (autoload chegando no meio da tecla)
