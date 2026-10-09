@@ -1,5 +1,8 @@
 // Tipos para o sistema de avaliação física
 
+/** Valores aceitos por `assessments.assessment_type` (CHECK `assessments_type_chk`). */
+export type AssessmentType = 'full' | 'bia' | 'dexa';
+
 export interface Assessment {
   id: string;
   student_id: string;
@@ -83,8 +86,25 @@ export interface Assessment {
   // calcula a média. Veja src/utils/calculations/assessmentPairing.ts.
   // 'full' = avaliação completa do personal (default; retrocompatível).
   // 'bia'  = registro standalone só de bioimpedância.
-  assessment_type?: 'full' | 'bia';
+  // 'dexa' = laudo de DEXA (exame de imagem): método próprio, nunca pareia
+  //          nem se compara com dobras/BIA. Ver utils/assessment/assessmentMethod.
+  assessment_type?: AssessmentType;
   paired_assessment_id?: string | null;
+
+  // DEXA — só preenchidos quando assessment_type = 'dexa' (o banco trava).
+  // Valores EXATAMENTE como o laudo publica; não recalcular (o FMI do laudo,
+  // 5,4, não bate com 16,163 ÷ 1,72² = 5,46).
+  dexa_asmi?: number; // índice de massa magra apendicular, kg/m²
+  dexa_fmi?: number; // índice de massa gorda, kg/m²
+  dexa_appendicular_lean_kg?: number; // massa magra dos braços + pernas
+  dexa_bone_mass_kg?: number; // conteúdo mineral ósseo (BMC)
+  dexa_bone_density?: number; // densidade mineral óssea total, g/cm²
+  dexa_android_fat_pct?: number; // gordura andróide, %
+  dexa_gynoid_fat_pct?: number; // gordura ginóide, %
+  dexa_arms_fat_pct?: number; // gordura dos braços, %
+  dexa_legs_fat_pct?: number; // gordura das pernas, %
+  dexa_trunk_fat_pct?: number; // gordura do tronco, %
+  dexa_device?: string | null; // aparelho/clínica — DEXAs de máquinas diferentes não são iguais
 
   // Metadados
   observations?: string;

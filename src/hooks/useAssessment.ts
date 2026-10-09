@@ -32,6 +32,7 @@ import {
   combinedBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { tryAutoPair } from '@/utils/calculations/assessmentPairing';
+import { normalizeAssessmentType } from '@/utils/assessment/assessmentMethod';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError } from '@/lib/logger'
 import { safePg, safeEmailLike } from '@/utils/safePgFilter'
@@ -276,10 +277,24 @@ export const useAssessment = (): UseAssessmentReturn => {
       bia_metabolic_age: toNumberOrUndefined(row.bia_metabolic_age),
 
       // Pareamento — strings/null vão direto
-      assessment_type: (row.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+      assessment_type: normalizeAssessmentType(row.assessment_type),
       paired_assessment_id: row.paired_assessment_id ? String(row.paired_assessment_id) : null,
       // Anexo (PDF/foto) — pode ser string vazia, null ou URL completa
       bia_attachment_url: row.bia_attachment_url ? String(row.bia_attachment_url) : null,
+
+      // DEXA — postgres numeric chega como string. Sem converter aqui o spread
+      // `...row` deixaria "12.8" (texto) passar adiante como se fosse número.
+      dexa_asmi: toNumberOrUndefined(row.dexa_asmi),
+      dexa_fmi: toNumberOrUndefined(row.dexa_fmi),
+      dexa_appendicular_lean_kg: toNumberOrUndefined(row.dexa_appendicular_lean_kg),
+      dexa_bone_mass_kg: toNumberOrUndefined(row.dexa_bone_mass_kg),
+      dexa_bone_density: toNumberOrUndefined(row.dexa_bone_density),
+      dexa_android_fat_pct: toNumberOrUndefined(row.dexa_android_fat_pct),
+      dexa_gynoid_fat_pct: toNumberOrUndefined(row.dexa_gynoid_fat_pct),
+      dexa_arms_fat_pct: toNumberOrUndefined(row.dexa_arms_fat_pct),
+      dexa_legs_fat_pct: toNumberOrUndefined(row.dexa_legs_fat_pct),
+      dexa_trunk_fat_pct: toNumberOrUndefined(row.dexa_trunk_fat_pct),
+      dexa_device: row.dexa_device ? String(row.dexa_device) : null,
     } as Assessment;
   }, []);
 

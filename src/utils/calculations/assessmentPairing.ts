@@ -22,7 +22,8 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Assessment } from '@/types/assessment'
+import type { Assessment, AssessmentType } from '@/types/assessment'
+import { normalizeAssessmentType } from '@/utils/assessment/assessmentMethod'
 
 export const PAIRING_WINDOW_DAYS = 14
 
@@ -49,11 +50,16 @@ export async function findPairCandidate(
   source: {
     id: string
     student_id: string
-    assessment_type: 'full' | 'bia'
+    assessment_type: AssessmentType
     assessment_date: string
   },
 ): Promise<string | null> {
-  const targetType: 'full' | 'bia' = source.assessment_type === 'bia' ? 'full' : 'bia'
+  // DEXA nunca pareia: é exame de imagem, outro método. Sem este retorno o
+  // `: 'bia'` abaixo trataria qualquer tipo que não é 'bia' como 'full' e
+  // procuraria uma BIA para casar com o DEXA.
+  const sourceType = normalizeAssessmentType(source.assessment_type)
+  if (sourceType === 'dexa') return null
+  const targetType: Exclude<AssessmentType, 'dexa'> = sourceType === 'bia' ? 'full' : 'bia'
 
   const sourceDateMs = new Date(source.assessment_date).getTime()
   if (!Number.isFinite(sourceDateMs)) return null
@@ -145,7 +151,7 @@ export async function tryAutoPair(
   source: {
     id: string
     student_id: string
-    assessment_type: 'full' | 'bia'
+    assessment_type: AssessmentType
     assessment_date: string
   },
 ): Promise<string | null> {

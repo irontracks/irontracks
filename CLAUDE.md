@@ -3701,6 +3701,30 @@ profundidade). Guard: `assessment/__tests__/avaliacaoDiaEMetodo.test.tsx`,
 função na linha do `import` passava por "o hook ordena pelo dia", e sem duas
 avaliações no MESMO dia o desempate nunca era exercitado.
 
+### DEXA é um terceiro tipo (`assessment_type = 'dexa'`, 09/10/2026)
+
+Laudo de exame de imagem (CEMED, Lunar Prodigy Primo, 06/10/2026: 17,0% contra 5,83%
+das dobras e 17,4% do InBody). Método próprio — fora das séries de dobras e de BIA,
+sem pareamento, sem Editar/PDF/Plano IA (o "Editar" não faz UPDATE: grava uma linha
+`'full'` NOVA).
+
+⚠️ **O defeito que isto evita:** o código só conhecia 'full' e 'bia', e qualquer outro
+valor caía em 'full' em silêncio (`=== 'bia' ? 'bia' : 'full'`, em 6 arquivos). Hoje a
+única comparação com literal mora em `utils/assessment/assessmentMethod.ts`
+(`normalizeAssessmentType`, `assessmentMethod`, `isExternalReport`); valor desconhecido
+cai em 'full' MAS avisa no Sentry (código atrás do banco). Guard de classe em
+`utils/assessment/__tests__/assessmentTypeClasse.test.ts`, em três ângulos: o símbolo,
+a forma do defeito (quem lê %gordura de `assessments` sem pedir o tipo — as rotas de
+IA nunca citam `assessment_type`) e o tipo (`Record<AssessmentMethod, …>`). Consumidor
+novo de `assessment_type` reprova até declarar o que o 'dexa' faz nele.
+
+Dados: 11 colunas `dexa_*` nulas (unidade no COMMENT) e três CHECKs que impedem um
+DEXA de se passar por outro método pelos dados. Valores do laudo NÃO se recalculam (o
+FMI do laudo é 5,4; 16,163 ÷ 1,72² dá 5,46). A `lean_mass` do DEXA exclui o osso, então
+peso + magra + gorda + osso não soma o peso informado (98,2 kg do aparelho contra 94,0).
+**Antes de a migration entrar, nenhum select explícito pode citar `dexa_*`**
+(PostgREST devolve 42703): a tela lê pelo `select('*')`.
+
 ## Histórico de REFEIÇÕES — o irmão do de treinos
 
 Registro completo: `docs/historico/2026-08-historico-refeicoes.md`.
