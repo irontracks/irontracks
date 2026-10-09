@@ -21,6 +21,44 @@
  */
 
 import { JP7_SKINFOLD_FIELDS } from '@/utils/calculations/bodyComposition'
+import { logWarnRemote } from '@/lib/logger'
+import type { AssessmentType } from '@/types/assessment'
+
+/**
+ * Os valores de `assessments.assessment_type` (CHECK `assessments_type_chk`).
+ *
+ * ⚠️ ÚNICO lugar que pode comparar `assessment_type` com literal. Qualquer outro
+ * arquivo que escreva `=== 'bia' ? 'bia' : 'full'` colapsa o 'dexa' em 'full'
+ * em silêncio — o laudo de DEXA (17,0%) entraria na curva das dobras (5,8%).
+ * Guard de classe: `utils/assessment/__tests__/assessmentTypeClasse.test.ts`.
+ */
+export const ASSESSMENT_TYPES = ['full', 'bia', 'dexa'] as const satisfies readonly AssessmentType[]
+
+/**
+ * Tipo normalizado de uma linha. Valor DESCONHECIDO cai em 'full' (o default do
+ * banco) mas AVISA: o CHECK do banco só deixa passar tipos que o código conhece,
+ * então um tipo que o código não conhece significa código ATRÁS do banco.
+ */
+const avisados = new Set<string>()
+export function normalizeAssessmentType(raw: unknown): AssessmentType {
+    if (raw === 'bia' || raw === 'dexa' || raw === 'full') return raw
+    const chave = String(raw ?? '')
+    if (chave !== '' && !avisados.has(chave)) {
+        avisados.add(chave)
+        logWarnRemote('assessment.type.desconhecido', `assessment_type "${chave}" não é conhecido; tratado como 'full'`)
+    }
+    return 'full'
+}
+
+/**
+ * Laudo EXTERNO (BIA, DEXA): o número vem pronto do aparelho. Não tem formulário
+ * de dobras para editar (o "Editar" cria uma linha 'full' nova), nem PDF no molde
+ * de dobras, nem Plano IA, nem pareamento.
+ */
+export function isExternalReport(type: unknown): boolean {
+    const t = normalizeAssessmentType(type)
+    return t === 'bia' || t === 'dexa'
+}
 
 /**
  * - `dobras`: avaliação completa sem leitura de bioimpedância.
@@ -28,8 +66,10 @@ import { JP7_SKINFOLD_FIELDS } from '@/utils/calculations/bodyComposition'
  *   só a BIA deu o %).
  * - `misto`: completa com dobras E bioimpedância — o app grava a MÉDIA das duas
  *   em `body_fat_percentage` (`combinedBodyFat`), que não é nenhum dos dois.
+ * - `dexa`: laudo de DEXA (`assessment_type = 'dexa'`). Método próprio: a massa
+ *   magra exclui o osso e o % de gordura não conversa com dobras nem com BIA.
  */
-export type AssessmentMethod = 'dobras' | 'bia' | 'misto'
+export type AssessmentMethod = 'dobras' | 'bia' | 'misto' | 'dexa'
 
 type RowLike = Record<string, unknown> | null | undefined
 
@@ -39,7 +79,9 @@ const positive = (v: unknown): boolean => {
 }
 
 export function assessmentMethod(row: RowLike): AssessmentMethod {
-    if (String(row?.assessment_type ?? '') === 'bia') return 'bia'
+    const tipo = normalizeAssessmentType(row?.assessment_type)
+    if (tipo === 'dexa') return 'dexa'
+    if (tipo === 'bia') return 'bia'
     if (!positive(row?.bia_body_fat_percentage)) return 'dobras'
     const temDobras =
         positive(row?.body_fat_percentage_skinfold) ||
@@ -51,6 +93,7 @@ export const ASSESSMENT_METHOD_LABEL: Record<AssessmentMethod, string> = {
     dobras: 'dobras cutâneas',
     bia: 'bioimpedância',
     misto: 'dobras + bioimpedância',
+    dexa: 'DEXA',
 }
 
 /** Rótulo curto, para legenda de gráfico. */
@@ -58,6 +101,7 @@ export const ASSESSMENT_METHOD_SHORT: Record<AssessmentMethod, string> = {
     dobras: 'dobras',
     bia: 'bioimpedância',
     misto: 'dobras + BIA',
+    dexa: 'DEXA',
 }
 
 /**

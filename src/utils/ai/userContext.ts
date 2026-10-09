@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { NUTRITION_PHASES } from '@/lib/nutrition/phase'
+import { assessmentMethod, ASSESSMENT_METHOD_SHORT } from '@/utils/assessment/assessmentMethod'
 import {
   buildUserSnapshot,
   type NutritionFacts,
@@ -148,7 +149,7 @@ async function assessmentSection(supabase: SupabaseClient, userId: string): Prom
   try {
     const { data } = await supabase
       .from('assessments')
-      .select('assessment_date, weight, body_fat_percentage, lean_mass, fat_mass, waist_circ, age, height, gender, bmr, tdee')
+      .select('assessment_date, assessment_type, weight, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage, lean_mass, fat_mass, waist_circ, age, height, gender, bmr, tdee')
       .eq('user_id', userId)
       .order('assessment_date', { ascending: false })
       .limit(1)
@@ -159,7 +160,9 @@ async function assessmentSection(supabase: SupabaseClient, userId: string): Prom
       a.height != null && `altura ${num(a.height)}cm`,
       a.age != null && `${num(a.age)} anos`,
       a.gender && `sexo ${a.gender}`,
-      a.body_fat_percentage != null && `BF ${num(a.body_fat_percentage)}%`,
+      // O método vai junto: 17% de DEXA e 5,8% de dobras não são a mesma régua, e o
+      // coach não deve comparar um com o outro.
+      a.body_fat_percentage != null && `BF ${num(a.body_fat_percentage)}% (${ASSESSMENT_METHOD_SHORT[assessmentMethod(a)]})`,
       a.lean_mass != null && `massa magra ${num(a.lean_mass)}kg`,
       a.waist_circ != null && `cintura ${num(a.waist_circ)}cm`,
       a.bmr != null && `BMR ${num(a.bmr)}`,

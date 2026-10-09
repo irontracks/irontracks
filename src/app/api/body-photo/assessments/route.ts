@@ -68,7 +68,7 @@ export async function GET(request: Request) {
             // estimar — ver utils/bodyPhoto/bodyFatCrossCheck.ts.
             const { data: measuredRows } = await admin
                 .from('assessments')
-                .select('assessment_date, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage')
+                .select('assessment_date, assessment_type, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage')
                 .eq('user_id', a.user_id)
                 .order('assessment_date', { ascending: false })
                 .limit(20)

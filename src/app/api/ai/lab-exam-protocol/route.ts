@@ -25,6 +25,7 @@ import { getGeminiModel } from '@/utils/ai/gemini'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
+import { assessmentMethod, ASSESSMENT_METHOD_LABEL } from '@/utils/assessment/assessmentMethod'
 import { aggregateTrainingWindow, computeSessionStats } from '@/utils/bodyPhoto/trainingWindow'
 import { LabProtocolSchema } from '@/schemas/labExam'
 import { labProtocolGenerationConfig } from '@/utils/labExam/protocolContract'
@@ -420,7 +421,7 @@ export async function POST(req: Request) {
     // ── Fonte 2: última avaliação física ────────────────────────────────────
     const { data: lastAssessment } = await admin
       .from('assessments')
-      .select('assessment_date, weight, height, age, gender, body_fat_percentage, lean_mass, bmr, bia_body_fat_percentage, bia_lean_mass, bia_visceral_fat, bia_metabolic_age')
+      .select('assessment_date, assessment_type, weight, height, age, gender, body_fat_percentage, body_fat_percentage_skinfold, lean_mass, bmr, bia_body_fat_percentage, bia_lean_mass, bia_visceral_fat, bia_metabolic_age')
       .eq('user_id', assessedUserId)
       .order('assessment_date', { ascending: false })
       .limit(1)
@@ -484,7 +485,11 @@ export async function POST(req: Request) {
       // Sinais temporais: proximidade treino↔coleta, tendência de carga, volume por grupo.
       treinoTemporal: temporalSignals,
       exame: markers,
-      avaliacaoFisica: lastAssessment || null,
+      // O método do % de gordura vai escrito: DEXA, bioimpedância e dobras medem
+      // coisas diferentes e a IA não deve tratar um como evolução do outro.
+      avaliacaoFisica: lastAssessment
+        ? { ...lastAssessment, metodoDoPercentualDeGordura: ASSESSMENT_METHOD_LABEL[assessmentMethod(lastAssessment as Record<string, unknown>)] }
+        : null,
       laudoFoto: lastPhoto
         ? {
             analysis: (lastPhoto as { analysis?: unknown }).analysis,

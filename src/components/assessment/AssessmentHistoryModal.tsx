@@ -12,6 +12,8 @@ import {
     getSkinfoldMm,
 } from './assessmentUtils';
 import { assessmentDayKey } from '@/utils/assessment/assessmentDay';
+import { assessmentMethod, isExternalReport, normalizeAssessmentType, ASSESSMENT_METHOD_SHORT } from '@/utils/assessment/assessmentMethod';
+import { AssessmentDexaDetails } from './AssessmentDexaDetails';
 
 const AssessmentPDFGenerator = dynamic(
     () => import('@/components/assessment/AssessmentPDFGenerator'),
@@ -112,7 +114,11 @@ export function AssessmentHistoryModal({
                                                 const bf = getBodyFatPercent(a);
                                                 const weightLabel = w ? `${w.toFixed(1)} kg` : '-';
                                                 const bfLabel = bf ? `${bf.toFixed(1)}%` : '-';
-                                                return `Peso ${weightLabel} • % Gordura ${bfLabel}`;
+                                                // Sem o método, 17% (DEXA) e 5,8% (dobras) parecem a mesma régua.
+                                                const metodoLabel = normalizeAssessmentType(a?.assessment_type) === 'dexa'
+                                                    ? ` (${ASSESSMENT_METHOD_SHORT[assessmentMethod(a)]})`
+                                                    : '';
+                                                return `Peso ${weightLabel} • % Gordura ${bfLabel}${metodoLabel}`;
                                             })()}
                                         </div>
                                     </div>
@@ -127,7 +133,8 @@ export function AssessmentHistoryModal({
                                         >
                                             {isOpen ? 'Ocultar' : 'Detalhes'}
                                         </button>
-                                        <AssessmentPDFGenerator
+                                        {!isExternalReport(a.assessment_type) && (
+<AssessmentPDFGenerator
                                             formData={{
                                                 assessment_date: String(a.assessment_date || ''),
                                                 weight: String(a.weight || ''),
@@ -162,12 +169,14 @@ export function AssessmentHistoryModal({
                                                     : String(a.assessment_date ?? Date.now()),
                                             )}
                                         />
+                                        )}
                                     </div>
                                 </div>
 
                                 {/* Expanded details */}
                                 {isOpen && (
                                     <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                        {normalizeAssessmentType(a?.assessment_type) === 'dexa' ? <AssessmentDexaDetails assessment={a} /> : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                             <div>
                                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-yellow-500/60 mb-2">Dobras Cutâneas (mm)</h4>
@@ -202,6 +211,7 @@ export function AssessmentHistoryModal({
                                                 </div>
                                             </div>
                                         </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
