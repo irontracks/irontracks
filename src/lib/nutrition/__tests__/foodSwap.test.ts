@@ -303,8 +303,20 @@ describe('mealHasLiquid — proteína rápida antes de carne/peixe de prato', ()
     expect(['whey protein concentrado', 'queijo cottage']).toContain(opcoes[0].food)
   })
 
-  it('COM líquido mas SEM opção rápida disponível: ainda oferece o prato — não filtra, só desempata', () => {
+  it('COM líquido mas prato que NÃO é de copo: sem opção rápida, ainda oferece o prato — só desempata', () => {
     const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO], { mealHasLiquid: true })
+    expect(opcoes.length).toBeGreaterThan(0)
+  })
+
+  it('o caso de 22/09 com os itens da refeição: prato DE COPO (leite + clara) FILTRA a carne', () => {
+    // Desde 26/10/2026 o desempate virou filtro quando o resto da refeição é o
+    // copo de leite — o ↻ da Ceia girava entre carnes assim que as opções rápidas
+    // acabavam. Ver trocaCopoOuTalher.test.ts.
+    const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO, WHEY, COTTAGE], {
+      mealItems: ['Leite desnatado', CLARA_DE_OVO.food],
+    })
+    expect(opcoes.map((o) => o.food)).not.toContain('atum solido ao natural')
+    expect(opcoes.map((o) => o.food)).not.toContain('peito de frango')
     expect(opcoes.length).toBeGreaterThan(0)
   })
 
@@ -314,18 +326,12 @@ describe('mealHasLiquid — proteína rápida antes de carne/peixe de prato', ()
     expect(comLiquido.map((o) => o.food)).toEqual(semLiquido.map((o) => o.food))
   })
 
-  it('a rota de swap calcula mealHasLiquid a partir do resto da refeição', () => {
-    const swapRoute = readFileSync('src/app/api/nutrition/diet-plan/swap/route.ts', 'utf8')
-    expect(swapRoute).toMatch(/mealHasLiquid:\s*meal\.items\.some/)
-  })
-
-  it('a rota de alternativas calcula mealHasLiquid por refeição', () => {
-    const altRoute = readFileSync('src/app/api/nutrition/diet-plan/alternatives/route.ts', 'utf8')
-    expect(altRoute).toMatch(/mealHasLiquid\s*=\s*meal\.items\.some/)
-  })
-
-  it('a variação da semana (buildWeekFromDay) também respeita a regra', () => {
-    const weekPlan = readFileSync('src/lib/nutrition/weekPlan.ts', 'utf8')
-    expect(weekPlan).toMatch(/mealHasLiquid:\s*meal\.items\.some/)
+  // Desde 26/10/2026 os chamadores passam `mealItems` e o motor deriva o
+  // `mealHasLiquid` sozinho — a fiação dos três está em trocaCopoOuTalher.test.ts.
+  it('sem mealHasLiquid explícito, os itens da refeição decidem o desempate', () => {
+    const opcoes = rankSwapOptions(CLARA_DE_OVO, [ATUM_SOLIDO, PEITO_DE_FRANGO, WHEY, COTTAGE], {
+      mealItems: ['Suco de laranja', CLARA_DE_OVO.food, 'Pão francês'],
+    })
+    expect(['whey protein concentrado', 'queijo cottage']).toContain(opcoes[0].food)
   })
 })

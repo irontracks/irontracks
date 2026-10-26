@@ -11,6 +11,7 @@ import { refeicaoParaLancamento, reescalarPlanItem, type AjustesDoLancamento } f
 import { resolveFoodForEditor } from '@/lib/nutrition/resolveFoodForEditor'
 import { useCustomFoods } from './useCustomFoods'
 import { MACRO_SURFACES } from '@/lib/nutrition/macroColors'
+import { opcaoNaEscalaDoItem } from '@/lib/nutrition/alternativaDeProteina'
 import { normalizeFoodKey } from '@/lib/nutrition/learned-foods'
 import { ajustarDia, type MacroAjustavel } from '@/lib/nutrition/ajusteAutomaticoDoDia'
 import { MACHINE_ACCENT } from '@/lib/design/machineAccent'
@@ -240,17 +241,81 @@ export default function MyDietPlan({
     return () => { alive = false }
   }, [row, dayIndex])
 
+  const day: PlanDay | undefined = days[dayIndex] ?? days[0]
+
+  /**
+   * O que já foi lançado HOJE, por nome de refeição normalizado — a fonte é
+   * `entries` (o diário de verdade), nunca `appliedIdx` (que é só o "✓" desta
+   * sessão da tela e reseta ao trocar de dia).
+   */
+  const lancamentosPorNome = useMemo(() => {
+    const mapa = new Map<string, MacroTotals>()
+    for (const e of entries ?? []) {
+      const chave = normalizeFoodKey(String(e?.food_name ?? ''))
+      if (!chave) continue
+      const atual = mapa.get(chave) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      mapa.set(chave, {
+        calories: atual.calories + num(e.calories),
+        protein: atual.protein + num(e.protein),
+        carbs: atual.carbs + num(e.carbs),
+        fat: atual.fat + num(e.fat),
+      })
+    }
+    return mapa
+  }, [entries])
+
+  // Só ajusta o dia ATUAL (canApply = hoje): dia passado já aconteceu por
+  // inteiro, dia futuro ainda não tem lançamento nenhum para comparar.
+  // Minuto atual em BRT, atualizado a cada minuto: refeição cujo horário já
+  // passou sem ser lançada não recebe mais o saldo do reajuste.
+  const [minutoAtual, setMinutoAtual] = useState(minutoBrtAgora)
+  useEffect(() => {
+    const iv = setInterval(() => setMinutoAtual(minutoBrtAgora()), 60_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const resultadoAjuste = useMemo(() => {
+    if (!autoAjusteLigado || !canApply || !day) return null
+    return ajustarDia(day.meals, lancamentosPorNome, { minutoAtual })
+  }, [autoAjusteLigado, canApply, day, lancamentosPorNome, minutoAtual])
+
+  const mealsParaExibir = useMemo(
+    () => (resultadoAjuste ? resultadoAjuste.refeicoes : (day?.meals ?? [])),
+    [resultadoAjuste, day],
+  )
+
+  /**
+   * As opções na escala do item que está NA TELA (reajuste 🧠 + quantidade
+   * digitada). O servidor as dimensiona contra o item do PLANO — ver
+   * `opcaoNaEscalaDoItem`. Display e lançamento leem DAQUI, nunca de
+   * `alternativas` cru: senão o card mostra uma porção e o diário grava outra.
+   */
+  const alternativasNaTela = useMemo(() => {
+    const mapa: Record<string, PlanItem> = {}
+    for (const [chave, opcao] of Object.entries(alternativas)) {
+      const [m, i] = chave.split('-').map((n) => Number(n))
+      const itemDoPlano = day?.meals?.[m as number]?.items?.[i as number]
+      const itemAjustado = mealsParaExibir[m as number]?.items?.[i as number]
+      if (!itemDoPlano || !itemAjustado) continue
+      const digitada = quantidadesEditadas[chave]
+      const itemNaTela = digitada !== undefined ? reescalarPlanItem(itemAjustado, digitada) : itemAjustado
+      const escalada = opcaoNaEscalaDoItem(opcao, itemDoPlano, itemNaTela)
+      if (escalada) mapa[chave] = escalada
+    }
+    return mapa
+  }, [alternativas, day, mealsParaExibir, quantidadesEditadas])
+
   /** Os substitutos marcados nesta refeição, por índice do item. */
   const escolhasDaRefeicao = useCallback((mealIdx: number): Map<number, PlanItem> => {
     const mapa = new Map<number, PlanItem>()
     for (const chave of escolhidos) {
       const [m, i] = chave.split('-').map((n) => Number(n))
       if (m !== mealIdx) continue
-      const alt = alternativas[chave]
+      const alt = alternativasNaTela[chave]
       if (alt && Number.isFinite(i)) mapa.set(i as number, alt)
     }
     return mapa
-  }, [escolhidos, alternativas])
+  }, [escolhidos, alternativasNaTela])
 
   /** Remoção/reescala/adição marcadas nesta refeição, para ESTE lançamento. */
   const ajustesDaRefeicao = useCallback((mealIdx: number): AjustesDoLancamento => {
@@ -262,10 +327,14 @@ export default function MyDietPlan({
     const quantidades = new Map<number, number>()
     for (const [chave, valor] of Object.entries(quantidadesEditadas)) {
       const [m, i] = chave.split('-').map((n) => Number(n))
+      // Item trocado pela Opção: a quantidade digitada já está DENTRO da opção
+      // (`alternativasNaTela`). Reaplicá-la aqui daria ao leite as gramas que
+      // foram digitadas para a carne.
+      if (escolhidos.has(chave) && alternativasNaTela[chave]) continue
       if (m === mealIdx && Number.isFinite(i)) quantidades.set(i, valor)
     }
     return { removidos, quantidades, adicionados: adicionadosPorRefeicao[mealIdx] ?? [] }
-  }, [itensRemovidos, quantidadesEditadas, adicionadosPorRefeicao])
+  }, [itensRemovidos, quantidadesEditadas, adicionadosPorRefeicao, escolhidos, alternativasNaTela])
 
   const alternarRemocaoDoItem = useCallback((mealIdx: number, itemIdx: number) => {
     const chave = `${mealIdx}-${itemIdx}`
@@ -439,45 +508,6 @@ export default function MyDietPlan({
     }
   }, [removing, confirm])
 
-  const day: PlanDay | undefined = days[dayIndex] ?? days[0]
-
-  /**
-   * O que já foi lançado HOJE, por nome de refeição normalizado — a fonte é
-   * `entries` (o diário de verdade), nunca `appliedIdx` (que é só o "✓" desta
-   * sessão da tela e reseta ao trocar de dia).
-   */
-  const lancamentosPorNome = useMemo(() => {
-    const mapa = new Map<string, MacroTotals>()
-    for (const e of entries ?? []) {
-      const chave = normalizeFoodKey(String(e?.food_name ?? ''))
-      if (!chave) continue
-      const atual = mapa.get(chave) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
-      mapa.set(chave, {
-        calories: atual.calories + num(e.calories),
-        protein: atual.protein + num(e.protein),
-        carbs: atual.carbs + num(e.carbs),
-        fat: atual.fat + num(e.fat),
-      })
-    }
-    return mapa
-  }, [entries])
-
-  // Só ajusta o dia ATUAL (canApply = hoje): dia passado já aconteceu por
-  // inteiro, dia futuro ainda não tem lançamento nenhum para comparar.
-  // Minuto atual em BRT, atualizado a cada minuto: refeição cujo horário já
-  // passou sem ser lançada não recebe mais o saldo do reajuste.
-  const [minutoAtual, setMinutoAtual] = useState(minutoBrtAgora)
-  useEffect(() => {
-    const iv = setInterval(() => setMinutoAtual(minutoBrtAgora()), 60_000)
-    return () => clearInterval(iv)
-  }, [])
-
-  const resultadoAjuste = useMemo(() => {
-    if (!autoAjusteLigado || !canApply || !day) return null
-    return ajustarDia(day.meals, lancamentosPorNome, { minutoAtual })
-  }, [autoAjusteLigado, canApply, day, lancamentosPorNome, minutoAtual])
-
-  const mealsParaExibir = resultadoAjuste ? resultadoAjuste.refeicoes : (day?.meals ?? [])
 
   /** Nomes (normalizados) das refeições que o reajuste automático tocou —
    *  pedido do dono, 22/09/2026: sem isso, só o aviso do topo dizia o que
@@ -647,7 +677,7 @@ export default function MyDietPlan({
                   <div className="overflow-hidden rounded-lg bg-black/20 divide-y divide-white/[0.04]">
                     {meal.items.map((it, j) => {
                       const chaveOpcao = `${idx}-${j}`
-                      const opcao = alternativas[chaveOpcao]
+                      const opcao = alternativasNaTela[chaveOpcao]
                       const trocado = escolhidos.has(chaveOpcao)
                       const chaveAjuste = `${idx}-${j}`
                       const removido = itensRemovidosDesta.has(j)

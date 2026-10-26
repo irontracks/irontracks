@@ -115,7 +115,7 @@ export interface AlternativaDeProteina extends SwapResult {
  * 20 g fica ENTRE o coadjuvante e a fonte principal: 150 g de ovos (19,5 g) ficam
  * de fora, 180 g de frango (56 g) e 40 g de whey (32 g) entram.
  */
-const MIN_PROTEINA_DO_PRATO = 20
+export const MIN_PROTEINA_DO_PRATO = 20
 
 export function alternativaDeProteina(
     item: SwappableItem,
@@ -140,4 +140,43 @@ export function alternativaDeProteina(
         if (familia && familia !== daCasa) return { ...opcao, familia }
     }
     return null
+}
+
+/**
+ * A opção, na escala do item que está NA TELA.
+ *
+ * O servidor dimensiona a opção contra o item do PLANO. Só que a tela mostra o
+ * item depois do reajuste automático (🧠) e da quantidade que o usuário digitou —
+ * e a opção ficava presa ao tamanho antigo. Caso real (26/10/2026): a Ceia
+ * mostrava "Picadinho de boi 20 g · 10 g de proteína" e logo abaixo "Opção: Leite
+ * 295 g · 21 g de proteína", dimensionada para os 40 g do plano. E escolher a
+ * opção lançaria os 295 g.
+ *
+ * A proporção é a das GRAMAS (item na tela ÷ item do plano), a mesma do
+ * `reescalarPlanItem`. Abaixo do piso de proteína a opção some, pela mesma regra
+ * do servidor: item que encolheu para coadjuvante não ganha alternativa.
+ */
+export function opcaoNaEscalaDoItem<T extends SwappableItem>(
+    opcao: T,
+    itemDoPlano: SwappableItem,
+    itemNaTela: SwappableItem,
+): T | null {
+    if (!(Number(itemNaTela.protein) >= MIN_PROTEINA_DO_PRATO)) return null
+    const base = Number(itemDoPlano.grams)
+    const agora = Number(itemNaTela.grams)
+    if (!(base > 0) || !(agora > 0)) return opcao
+    const fator = agora / base
+    if (Math.abs(fator - 1) < 1e-9) return opcao
+    // Mesmo arredondamento de 5 g da porção do motor (`portionFor`).
+    const gramas = Math.max(5, Math.round((Number(opcao.grams) * fator) / 5) * 5)
+    const f = gramas / Number(opcao.grams)
+    const um = (n: number) => Math.round(n * 10) / 10
+    return {
+        ...opcao,
+        grams: gramas,
+        calories: Math.round(Number(opcao.calories) * f),
+        protein: um(Number(opcao.protein) * f),
+        carbs: um(Number(opcao.carbs) * f),
+        fat: um(Number(opcao.fat) * f),
+    }
 }

@@ -109,6 +109,30 @@ export function isPreparedPlate(name: string): boolean {
   return PLATE_PATTERNS.some((re) => re.test(n))
 }
 
+/**
+ * Teto de proteína por 100 g para comida que NÃO é pó. Carne cozida fica em
+ * 25–35 g, parmesão em 36, carne seca e beef jerky em torno de 33; acima de 40
+ * só existe em pó (whey, albumina, proteína texturizada de soja).
+ *
+ * Por que existe (26/10/2026): `nutrition_learned_foods` guarda no campo "por
+ * 100 g" o TOTAL de uma porção lançada. "Músculo cozido" chegou como 446 kcal e
+ * 71 g de proteína por 100 g (são os ~200 g que o dono lançou de uma vez), e
+ * "picadinho de boi" como 425 kcal e 52 g — números que passam no teto de 900
+ * kcal e de 100 g por macro, mas que não existem em carne nenhuma. O card
+ * passava a sugerir "15 g de músculo" para fechar 11 g de proteína.
+ */
+export const MAX_PROTEIN_G_100G_NOT_POWDER = 40
+
+const POWDER_HINT = /\bem po\b|\bwhey\b|albumina|caseina|isolad|texturizad|\bpts\b|proteina de soja|proteina de ervilha|gelatina|colageno|leite em po/
+
+/** Proteína por 100 g possível para um alimento com ESTE nome? */
+export function hasPlausibleProteinDensity(name: string, macros: { protein: number }): boolean {
+  const protein = Number(macros?.protein)
+  if (!Number.isFinite(protein)) return false
+  if (protein <= MAX_PROTEIN_G_100G_NOT_POWDER) return true
+  return POWDER_HINT.test(normalize(name))
+}
+
 /** Macros por 100 g fisicamente possíveis? */
 export function hasPlausibleDensity(macros: { kcal: number; protein: number; carbs: number; fat: number }): boolean {
   const kcal = Number(macros?.kcal)
@@ -142,6 +166,7 @@ export function isUsableAsSwapCandidate(candidate: {
   if (isCondiment(name)) return false
   if (isPreparedPlate(name)) return false
   if (!hasPlausibleDensity(candidate)) return false
+  if (!hasPlausibleProteinDensity(name, candidate)) return false
   // Sem nenhum macro não dá pra dimensionar porção.
   return Number(candidate.kcal) > 0 || Number(candidate.protein) > 0 || Number(candidate.carbs) > 0 || Number(candidate.fat) > 0
 }

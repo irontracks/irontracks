@@ -15,7 +15,7 @@
 
 import { swapFood, type SwapCandidate } from './foodSwap'
 import { mealGroupOf, type FoodMealMap } from './mealContext'
-import { isVehicleLoadBearing, repairMissingVehicles, isLiquidVehicle } from './mealCoherence'
+import { isVehicleLoadBearing, repairMissingVehicles } from './mealCoherence'
 import type { PlanDay, PlanItem, PlanMeal } from './dietPlanShape'
 import { sumTotals } from './dietPlanShape'
 
@@ -69,9 +69,9 @@ export function buildWeekFromDay(
           exclude: [...meal.items.map((i) => i.food), ...already],
           mealGroup: mealGroupOf(meal.name),
           foodMealMap,
-          // Mesma regra da troca manual: refeição com líquido não sorteia carne/
-          // peixe de prato pra virar a variação da semana.
-          mealHasLiquid: meal.items.some((i) => isLiquidVehicle(i.food)),
+          // Mesma regra da troca manual: ao lado do copo de leite não sorteia
+          // carne/peixe de prato pra virar a variação da semana.
+          mealItems: meal.items.map((i) => i.food),
         })
         if (!swapped) return item
 

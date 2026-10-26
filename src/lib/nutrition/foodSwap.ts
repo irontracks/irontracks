@@ -17,7 +17,7 @@
 
 import { normalizeFoodKey } from './learned-foods'
 import { fitsMealGroup, isPreferredForMealGroup, type FoodMealMap, type MealGroup } from './mealContext'
-import { isRoleCompatible, isPlatedProtein } from './mealCoherence'
+import { cabeNoCopo, ehRefeicaoDeCopo, isLiquidVehicle, isRoleCompatible, isPlatedProtein } from './mealCoherence'
 
 /** Macros por 100 g — denominador comum das três fontes. */
 export interface FoodMacros {
@@ -211,6 +211,12 @@ export interface SwapOptions {
    * `isPlatedProtein` em `mealCoherence.ts`.
    */
   mealHasLiquid?: boolean
+  /**
+   * Nomes de TODOS os itens da refeição (o trocado incluso). Com eles o motor sabe
+   * se o prato é "de copo" (leite + proteína) ou de talher — ver
+   * `ehRefeicaoDeCopo`. Também deriva `mealHasLiquid` quando ele não vem.
+   */
+  mealItems?: readonly string[]
 }
 
 /**
@@ -261,6 +267,9 @@ export function rankSwapOptions(
   )
 
   const mealGroup: MealGroup = options.mealGroup ?? 'unknown'
+  const mealItems = options.mealItems ?? []
+  const deCopo = ehRefeicaoDeCopo(item.food, mealItems)
+  const mealHasLiquid = options.mealHasLiquid ?? mealItems.some((f) => isLiquidVehicle(f))
   const mealMap = options.foodMealMap
   const blockedList = [...blocked]
   const pool = (Array.isArray(candidates) ? candidates : [])
@@ -279,7 +288,20 @@ export function rankSwapOptions(
     // A classe de macro autoriza a troca; o PAPEL no prato é outra pergunta. Ver
     // `isRoleCompatible`: doce de leite não vira a base do café, whey não vira o
     // prato do jantar — mesmo com o macro batendo.
-    .filter((c) => isRoleCompatible(item.food, c.name, mealGroup === 'main'))
+    // Refeição de copo não é "principal" para a regra do pó: leite + whey é o
+    // prato inteiro dela, mesmo que o nome seja "Ceia".
+    .filter((c) => isRoleCompatible(item.food, c.name, mealGroup === 'main' && !deCopo))
+    // Copo × talher (26/10/2026). Ao lado de um copo de leite, a proteína que
+    // entra é a que cabe no copo (ovo, queijo, iogurte, pó) — nunca carne nem
+    // peixe de prato. É FILTRO, não desempate: o desempate de 22/09 deixava a carne
+    // voltar assim que as opções rápidas acabavam, e o ↻ da Ceia girava entre
+    // músculo, contrafilé e estrogonofe. Sem opção, a troca diz que não há
+    // substituto; é melhor que sugerir o que ninguém come.
+    .filter((c) => !(deCopo && cls === 'protein' && !cabeNoCopo(c.name)))
+    // E o contrário, no prato de talher do almoço/jantar: líquido não substitui
+    // comida (820 g de leite no lugar de 180 g de alcatra bate a proteína e não é
+    // um jantar). Líquido por líquido segue livre.
+    .filter((c) => !(mealGroup === 'main' && !deCopo && isLiquidVehicle(c.name) && !isLiquidVehicle(item.food)))
 
   if (!pool.length) return []
 
@@ -319,7 +341,7 @@ export function rankSwapOptions(
       // Refeição com líquido + proteína: opção rápida (whey, clara, cottage) antes
       // de carne/peixe de prato. Vem ANTES até do histórico — é coerência do prato,
       // não preferência aprendida.
-      if (options.mealHasLiquid && cls === 'protein') {
+      if (mealHasLiquid && cls === 'protein') {
         const platedA = isPlatedProtein(a.c.name) ? 1 : 0
         const platedB = isPlatedProtein(b.c.name) ? 1 : 0
         if (platedA !== platedB) return platedA - platedB
