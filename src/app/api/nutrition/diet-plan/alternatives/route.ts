@@ -10,7 +10,6 @@ import { buildUserFoodMealMap } from '@/lib/nutrition/mealItemFoods'
 import { mealGroupOf } from '@/lib/nutrition/mealContext'
 import { alternativaDeProteina } from '@/lib/nutrition/alternativaDeProteina'
 import { planDays } from '@/lib/nutrition/dietPlanShape'
-import { isLiquidVehicle } from '@/lib/nutrition/mealCoherence'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +76,7 @@ export async function POST(req: Request) {
 
     const alternatives = day.meals.flatMap((meal, mealIndex) => {
       const mealGroup = mealGroupOf(meal.name)
-      const mealHasLiquid = meal.items.some((i) => isLiquidVehicle(i.food))
+      const mealItems = meal.items.map((i) => i.food)
       return meal.items.flatMap((item, itemIndex) => {
         const alt = alternativaDeProteina(item, candidates, {
           // O resto do prato entra no exclude pelo mesmo motivo da troca: oferecer
@@ -85,9 +84,9 @@ export async function POST(req: Request) {
           exclude: meal.items.map((i) => i.food),
           mealGroup,
           foodMealMap,
-          // Mesma regra da troca (route.ts de swap): com líquido na refeição, a
-          // opção sugerida prioriza proteína rápida, não carne/peixe de prato.
-          mealHasLiquid,
+          // Mesma regra da troca (route.ts de swap): o motor decide sozinho, a
+          // partir dos itens, se o prato é de copo ou de talher.
+          mealItems,
         })
         return alt ? [{ mealIndex, itemIndex, alternative: alt }] : []
       })

@@ -120,11 +120,65 @@ export function isConcentratedSweet(foodName: unknown): boolean {
  * bane (o usuário pode não ter nada mais cadastrado) — só desempata DEPOIS de
  * `swapFood`, ver `mealHasLiquid` em `foodSwap.ts`.
  */
-const PLATED_PROTEIN = /\bfrango\b|\bfil[ée]\b|\bpeixe\b|\batum\b|\btil[áa]pia\b|\bsalm[ãa]o\b|\bcarne\b|\bpatinho\b|\bcoxa\b|\bsobrecoxa\b|\bpicanha\b|\balcatra\b|\bl[oô]mbo\b|\bpernil\b|\bbife\b|\bpeito de peru\b|\bcami?ar[aã]o\b|\bsardinha\b|\bacem\b|\bpaleta\b|\bcupim\b|\bmaminha\b/
+// O nome é normalizado (sem acento) antes do teste, então as classes [ée] etc.
+// são redundantes — ficaram por legibilidade. "musculo", "contrafile", "boi",
+// "picadinho" e "estrogonofe" entraram em 26/10/2026: a Ceia do dono (leite +
+// carne) girava pelo ↻ entre músculo, contrafilé e estrogonofe sem que nenhum
+// deles fosse reconhecido como carne de prato.
+const PLATED_PROTEIN = /\bfrango\b|\bfil[ée]\b|\bpeixe\b|\batum\b|\btil[áa]pia\b|\bsalm[ãa]o\b|\bcarne\b|\bpatinho\b|\bcoxa\b|\bsobrecoxa\b|\bpicanha\b|\balcatra\b|\bl[oô]mbo\b|\bpernil\b|\bbife\b|\bpeito de peru\b|\bcami?ar[aã]o\b|\bsardinha\b|\bacem\b|\bpaleta\b|\bcupim\b|\bmaminha\b|\bmusculo\b|\bcontrafile\b|\bboi\b|\bbovin[ao]\b|\bmignon\b|\bfraldinha\b|\bcostela\b|\bcoxao\b|\bpicadinho\b|\bestrogonof+e?\b|\bstrogonof+e?\b|\balmondega|\bhamburguer\b|\bporco\b|\blinguica\b|\bmerluza\b|\bpescada\b|\bbacalhau\b/
 
 export function isPlatedProtein(foodName: unknown): boolean {
   const n = normalize(foodName)
   return Boolean(n) && PLATED_PROTEIN.test(n)
+}
+
+/**
+ * A refeição é "de copo"? Todo o RESTO dela (tirando o item que está sendo
+ * trocado) é leite/iogurte ou pó que se mistura neles — e há pelo menos um
+ * líquido cremoso. É a Ceia do dono: "Leite desnatado" + uma proteína.
+ *
+ * Por que importa (26/10/2026): "Ceia" conta como refeição principal no
+ * `mealContext` (janta tardia), então a troca liberava carne de prato ao lado do
+ * copo de leite — 15 g de músculo, 43 g de contrafilé, 60 g de estrogonofe. E o
+ * contrário: no JANTAR de verdade o motor oferecia 820 g de leite no lugar da
+ * carne. As duas regras precisam saber a mesma coisa — se o prato é de copo ou de
+ * talher — e por isso a decisão mora aqui, uma vez só.
+ *
+ * Refeição só com o próprio item (nada mais) NÃO é de copo: sem resto, não há
+ * prato para descrever.
+ */
+export function ehRefeicaoDeCopo(itemFood: unknown, mealFoods: readonly unknown[]): boolean {
+  const alvo = normalize(itemFood)
+  let pulou = false
+  const resto: unknown[] = []
+  for (const f of Array.isArray(mealFoods) ? mealFoods : []) {
+    // Tira UMA ocorrência do item trocado (pode haver dois itens com o mesmo nome).
+    if (!pulou && normalize(f) === alvo) { pulou = true; continue }
+    resto.push(f)
+  }
+  if (!resto.length) return false
+  const temCremoso = resto.some((f) => liquidKindOf(f) === 'creamy')
+  if (!temCremoso) return false
+  return resto.every((f) => liquidKindOf(f) === 'creamy' || requiredVehicle(f) !== null)
+}
+
+/**
+ * Proteína que acompanha um copo de leite sem pedir panela nem talher: ovo,
+ * queijo, iogurte e afins. Lista de quem PODE, não de quem não pode: a primeira
+ * versão (26/10/2026) barrava carne de prato por nome, e a medição com o
+ * repertório real do dono devolveu cação, corvina, abadejo e pintado — peixe que
+ * nenhuma lista negra vai cobrir inteiro.
+ */
+const PROTEINA_DE_COPO = /\bovos?\b|\bclaras?\b|\bomelete\b|\bqueijo\b|\bcottage\b|\bricota\b|\brequeijao\b|\biogurte\b|\byopro\b|\bskyr\b|\bcoalhada\b|\bkefir\b/
+
+/**
+ * O candidato cabe ao lado do copo? Leite/iogurte, pó que se mistura neles, ou
+ * proteína de `PROTEINA_DE_COPO`.
+ */
+export function cabeNoCopo(foodName: unknown): boolean {
+  const n = normalize(foodName)
+  if (!n) return false
+  return liquidKindOf(n) === 'creamy' || requiredVehicle(n) !== null || PROTEINA_DE_COPO.test(n)
 }
 
 /** Máximo de doces concentrados no dia inteiro. Um é tempero; dois viram a dieta. */
