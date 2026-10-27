@@ -49,7 +49,7 @@ describe('só a troca INDIVIDUAL chama a IA', () => {
     })
 
     it('o Adaptar ambiente NÃO pede', () => {
-        const chamada = header.match(/aoTrocar=\{[^}]*swapExerciseName\([^)]*\)/)?.[0] ?? ''
+        const chamada = header.match(/aoAplicar=\{[^}]*swapExerciseNames\([^)]*\)/)?.[0] ?? ''
         expect(chamada, 'a chamada do lote precisa existir').not.toBe('')
         expect(chamada, 'lote com gerarNota = N chamadas pagas num toque').not.toMatch(/gerarNota/)
     })
