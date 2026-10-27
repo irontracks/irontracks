@@ -16,7 +16,10 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
-import { isSetCompleted } from '@/utils/report/setCompletion'
+import {
+  seriesPorExercicio, totaisDeSeries, volumePorExercicio, comparacaoDeVolume,
+  type SeriesDoExercicio, type VolumeDoExercicio, type ComparacaoDoExercicio,
+} from '@/utils/report/highlightDetails'
 import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { sessionKcalInputs, type KcalProfileLike, type SessionKcalInputs } from '@/utils/calories/sessionKcalInputs'
@@ -99,8 +102,14 @@ export interface UseReportDataReturn {
   setsCompleted: number
   setsPlanned: number
   setCompletionPct: number
+  /** Detalhe dos cards de destaque — ver utils/report/highlightDetails. */
+  seriesDetalhe: SeriesDoExercicio[]
+  volumeDetalhe: VolumeDoExercicio[]
+  /** Vazio quando não há sessão anterior para comparar. */
+  comparacaoVolume: ComparacaoDoExercicio[]
   // PR detection — vs last session AND vs all-time
-  detectedPrs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean }>
+  /** `recordeAnterior`: melhor 1RM estimado ANTES desta sessão (0 = sem histórico). */
+  detectedPrs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean; recordeAnterior: number }>
   prCount: number
   allTimePrCount: number
   // Historical best e1RM per exercise (all-time)
@@ -188,14 +197,16 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return found ? String(found) : null
   }, [session, user?.id, user?.uid])
 
-  // ── Effect: Sync AI from session prop ───────────────────────────────────
-  useEffect(() => {
+  // ── Sync AI from session prop ───────────────────────────────────────────
+  // Ajuste de estado DURANTE o render (padrão documentado do React), não em
+  // efeito: setState síncrono dentro de useEffect renderiza em cascata. A
+  // semântica é a mesma de antes — reage quando a identidade de `session` muda.
+  const [aiSincronizadoDe, setAiSincronizadoDe] = useState<unknown>(null)
+  if (aiSincronizadoDe !== session) {
+    setAiSincronizadoDe(session)
     const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null
-    setAiState((prev) => {
-      if (existing && typeof existing === 'object') return { ...prev, loading: false, error: null, result: existing as AnyObj, cached: true }
-      return prev
-    })
-  }, [session])
+    if (existing) setAiState((prev) => ({ ...prev, loading: false, error: null, result: existing as AnyObj, cached: true }))
+  }
 
   // ── Effect: afterprint listener ──────────────────────────────────────────
   useEffect(() => {
@@ -398,30 +409,32 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   }, [prevByExercise?.baseMsByExercise])
 
   // ── Set completion rate ──────────────────────────────────────────────────
-  const { setsCompleted, setsPlanned, setCompletionPct } = useMemo(() => {
+  // A janela do card "Séries completas" lista exercício a exercício; o total do
+  // card sai da MESMA lista (utils/report/highlightDetails), senão os dois podiam
+  // divergir e a janela explicaria um número que não está no card.
+  const seriesDetalhe = useMemo(() => {
     try {
-      const exercises = Array.isArray(safeSession?.exercises) ? safeSession.exercises as unknown[] : []
-      let planned = 0
-      let completed = 0
-      exercises.forEach((ex, exIdx) => {
-        const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
-        const setCount = Number(exObj?.sets ?? 0) || 0
-        planned += setCount
-        for (let sIdx = 0; sIdx < setCount; sIdx++) {
-          const key = `${exIdx}-${sIdx}`
-          const log = sessionLogs[key]
-          if (isSetCompleted(log)) completed++
-        }
-      })
-      return {
-        setsCompleted: completed,
-        setsPlanned: planned,
-        setCompletionPct: planned > 0 ? Math.round((completed / planned) * 100) : 0,
-      }
+      return seriesPorExercicio(safeSession?.exercises, sessionLogs)
     } catch {
-      return { setsCompleted: 0, setsPlanned: 0, setCompletionPct: 0 }
+      return []
     }
   }, [safeSession?.exercises, sessionLogs])
+  const { setsCompleted, setsPlanned, setCompletionPct } = useMemo(() => totaisDeSeries(seriesDetalhe), [seriesDetalhe])
+
+  // Detalhe dos cards de volume: por exercício hoje, e hoje × sessão anterior.
+  const volumeDetalhe = useMemo(
+    () => volumePorExercicio(safeSession?.exercises, sessionLogs),
+    [safeSession?.exercises, sessionLogs]
+  )
+  const comparacaoVolume = useMemo(
+    () => effectivePreviousSession
+      ? comparacaoDeVolume(
+        { exercises: safeSession?.exercises, logs: sessionLogs },
+        { exercises: effectivePreviousSession?.exercises, logs: prevSessionLogs },
+      )
+      : [],
+    [effectivePreviousSession, safeSession?.exercises, sessionLogs, prevSessionLogs]
+  )
 
   // ── Detect PRs (Epley 1RM — client-side, real-time display) ────────────────
   //
@@ -439,7 +452,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const { detectedPrs, prCount, allTimePrCount } = useMemo(() => {
     try {
       const exercises = Array.isArray(safeSession?.exercises) ? safeSession.exercises as unknown[] : []
-      const prs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean }> = []
+      const prs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean; recordeAnterior: number }> = []
 
       exercises.forEach((ex, exIdx) => {
         const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
@@ -482,7 +495,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
           // historicalBestE1rm vem arredondado a 1 casa (getHistoricalBestE1rm) —
           // arredonda o do dia igual pra não disparar PR all-time por ruído.
           const isAllTimePr = Math.round(bestCurE1rm * 10) / 10 > allTimeBest
-          prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm, isAllTimePr })
+          prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm, isAllTimePr, recordeAnterior: allTimeBest })
         }
       })
 
@@ -509,7 +522,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     aiState, setAiState,
     applyState, setApplyState,
     sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, kcalInputs, outdoorBike, cardioGps,
-    setsCompleted, setsPlanned, setCompletionPct,
+    setsCompleted, setsPlanned, setCompletionPct, seriesDetalhe, volumeDetalhe, comparacaoVolume,
     reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
     prevLogsMap, prevBaseMsMap,
     detectedPrs, prCount, allTimePrCount, historicalBestE1rm,

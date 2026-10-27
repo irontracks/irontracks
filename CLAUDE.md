@@ -484,6 +484,22 @@ Duas armadilhas medidas ao construir, as duas fora do alcance de teste unitário
 
 **Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
 
+**Os cards de "Destaques da sessão" abrem o DETALHE (27/10/2026).** PRs, variação
+contra a anterior, volume total e séries completas viraram botões; cada um abre
+`ReportHighlightDetailModal` com o número quebrado por exercício. **A regra é a
+soma do detalhe bater com o card**: as contas moram em
+`utils/report/highlightDetails.ts` sobre as MESMAS fontes do card (`setVolume`/
+`isWorkingSet`, `isSetCompleted`), e o hook deriva o total de séries de
+`seriesPorExercicio` — sem isso a janela explicaria um número com outro. Guards
+em `highlightDetails.test.ts` (somas) e `destaquesAbremDetalhe.test.tsx` (fiação).
+
+⚠️ **Mexer em `useReportData` acordou o lint do React Compiler sobre código
+ANTIGO**: o `setState` dentro de efeito (sync do `session.ai`) estava lá desde
+sempre e passava porque o compilador desistia de analisar o hook; trocar um
+`useMemo` fez ele analisar, e o erro apareceu. Corrigido com ajuste de estado
+durante o render. Erro de lint "novo" num arquivo que você mal tocou pode ser
+esse — não silencie com `eslint-disable`.
+
 **Check-in/check-out no PDF (02/09/2026) — antes só a tela mostrava.** O
 check-in (pré-treino: energia, dor, tempo disponível, observações) e o
 check-out (pós-treino: RPE, satisfação, dor, observações) sempre foram

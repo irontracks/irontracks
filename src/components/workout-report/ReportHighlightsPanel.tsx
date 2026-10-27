@@ -1,14 +1,17 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import NextImage from 'next/image'
+import { ChevronRight } from 'lucide-react'
+import { ReportHighlightDetailModal, type DestaqueAberto, type PrDetalhado } from '@/components/workout-report/ReportHighlightDetailModal'
+import type { ComparacaoDoExercicio, SeriesDoExercicio, VolumeDoExercicio } from '@/utils/report/highlightDetails'
 import { classificarVariacaoVolume, rotuloVariacaoVolume } from '@/utils/report/volumeVariation'
 
 
 interface ReportHighlightsPanelProps {
   prCount: number
   allTimePrCount: number
-  detectedPrs: { exerciseName?: string; e1rm: number; isAllTimePr?: boolean }[]
+  detectedPrs: PrDetalhado[]
   volumeDeltaAbs: number
   volumeDelta: number
   currentVolume: number
@@ -17,7 +20,21 @@ interface ReportHighlightsPanelProps {
   setsPlanned: number
   /** A sessão aplicou descarga? Muda o julgamento da queda de volume. */
   emDeload?: boolean
+  /** Detalhe de cada card, aberto ao tocar nele (utils/report/highlightDetails). */
+  seriesDetalhe?: SeriesDoExercicio[]
+  volumeDetalhe?: VolumeDoExercicio[]
+  comparacaoVolume?: ComparacaoDoExercicio[]
 }
+
+/**
+ * Sinal de que o card abre alguma coisa. Sem ele, o toque é capacidade
+ * escondida — e capacidade escondida é capacidade ausente.
+ */
+function AbreDetalhe() {
+  return <ChevronRight size={14} aria-hidden className="absolute top-2.5 right-2.5 z-10 text-neutral-400" />
+}
+
+const CARD_BOTAO = 'relative w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400'
 
 export function ReportHighlightsPanel({
   prCount,
@@ -30,7 +47,11 @@ export function ReportHighlightsPanel({
   setsCompleted,
   setsPlanned,
   emDeload = false,
+  seriesDetalhe = [],
+  volumeDetalhe = [],
+  comparacaoVolume = [],
 }: ReportHighlightsPanelProps) {
+  const [aberto, setAberto] = useState<DestaqueAberto | null>(null)
   if (!(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0) || setCompletionPct > 0)) return null
 
   return (
@@ -50,8 +71,14 @@ export function ReportHighlightsPanel({
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {prCount > 0 && (
-          <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
-            style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.14), rgba(180,83,9,0.10))', boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
+          <button type="button" onClick={() => setAberto('prs')} aria-label={`Ver detalhes: ${prCount} ${prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}`}
+            className={`${CARD_BOTAO} overflow-hidden border border-yellow-500/40 flex flex-col`}
+            style={{ boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
+            {/* O fundo dourado é uma CAMADA, não o fundo do botão: gradiente
+                inline em <button> é o padrão de CTA improvisado que o guard
+                ctaDouradoFormas proíbe — e isto não é CTA, é o card do PR, que
+                virou tocável para abrir o detalhe. */}
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/15 to-amber-700/10" />
             {/* A arte comemorativa fica, mas atrás de um SCRIM. Sem ele, o
                 contraste do texto dependia de onde a explosão dourada calhava
                 de estar clara ou escura — ou seja, era imprevisível, e no
@@ -78,11 +105,12 @@ export function ReportHighlightsPanel({
               )}
               {detectedPrs[0] && (
                 <div className="text-[10px] text-yellow-100 line-clamp-2 leading-tight">
-                  {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
+                  {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg 1RM
                 </div>
               )}
             </div>
-          </div>
+            <AbreDetalhe />
+          </button>
         )}
         {/* Variação com ZONA NEUTRA. Antes qualquer negativo virava vermelho de
             alarme, sem piso: uma sessão com 2 PRs exibia ao lado um bloco
@@ -107,7 +135,9 @@ export function ReportHighlightsPanel({
               : classe === 'queda' ? 'text-red-300'
                 : 'text-neutral-400'
           return (
-            <div className={`border rounded-xl p-3 flex flex-col gap-1 ${caixa}`}>
+            <button type="button" onClick={() => setAberto('variacao')} aria-label={`Ver detalhes: ${rotuloVariacaoVolume(classe)}`}
+              className={`${CARD_BOTAO} border p-3 flex flex-col gap-1 ${caixa}`}>
+              <AbreDetalhe />
               <div className={`text-2xl font-black ${numero}`}>
                 {volumeDeltaAbs > 0 ? '+' : ''}{Math.round(volumeDeltaAbs).toLocaleString('pt-BR')} kg
               </div>
@@ -116,31 +146,51 @@ export function ReportHighlightsPanel({
               </div>
               {Math.abs(volumeDelta) > 0 && (
                 <div className={`text-[10px] font-mono ${pct}`}>
-                  {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+                  {volumeDelta > 0 ? '+' : ''}{volumeDelta.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 </div>
               )}
-            </div>
+            </button>
           )
         })()}
         {currentVolume > 0 && (
-          <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
+          <button type="button" onClick={() => setAberto('volume')} aria-label="Ver detalhes: volume total"
+            className={`${CARD_BOTAO} bg-neutral-800/60 border border-neutral-700/60 p-3 flex flex-col gap-1`}>
+            <AbreDetalhe />
             <div className="text-2xl font-black text-white">{Math.round(currentVolume).toLocaleString('pt-BR')} kg</div>
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume total</div>
-          </div>
+          </button>
         )}
         {setCompletionPct > 0 && (
-          <div className={`border rounded-xl p-3 flex flex-col gap-1 ${setCompletionPct >= 90 ? 'bg-green-500/10 border-green-500/30' :
+          <button type="button" onClick={() => setAberto('series')} aria-label="Ver detalhes: séries completas"
+            className={`${CARD_BOTAO} border p-3 flex flex-col gap-1 ${setCompletionPct >= 90 ? 'bg-green-500/10 border-green-500/30' :
             setCompletionPct >= 70 ? 'bg-yellow-500/10 border-yellow-500/30' :
               'bg-red-500/10 border-red-500/30'
             }`}>
+            <AbreDetalhe />
             <div className={`text-2xl font-black ${setCompletionPct >= 90 ? 'text-green-400' :
               setCompletionPct >= 70 ? 'text-yellow-400' : 'text-red-400'
               }`}>{setCompletionPct}%</div>
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Séries completas</div>
             <div className="text-[10px] text-neutral-400 font-mono">{setsCompleted}/{setsPlanned}</div>
-          </div>
+          </button>
         )}
       </div>
+      {aberto && (
+        <ReportHighlightDetailModal
+          aberto={aberto}
+          onClose={() => setAberto(null)}
+          detectedPrs={detectedPrs}
+          volumeDetalhe={volumeDetalhe}
+          comparacaoVolume={comparacaoVolume}
+          seriesDetalhe={seriesDetalhe}
+          currentVolume={currentVolume}
+          volumeDeltaAbs={volumeDeltaAbs}
+          volumeDelta={volumeDelta}
+          setsCompleted={setsCompleted}
+          setsPlanned={setsPlanned}
+          emDeload={emDeload}
+        />
+      )}
     </div>
   )
 }
