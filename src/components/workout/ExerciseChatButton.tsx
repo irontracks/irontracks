@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/utils/ui/portalRoot'
 import { MessageCircleQuestion } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
 import { enderecoDaConversa } from '@/lib/workout/exerciseChatThread'
@@ -88,7 +89,7 @@ export default function ExerciseChatButton({
               exerciseName={exerciseName}
               onFechar={fechar}
             />,
-            document.body,
+            portalRoot(),
           )
         : null}
     </>

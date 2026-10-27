@@ -54,11 +54,11 @@ describe('modais do treino ativo × barra do descanso', () => {
         expect(total).toBeGreaterThanOrEqual(15)
     })
 
-    it('o <Modals /> é portalado para o document.body no ActiveWorkout', () => {
+    it('o <Modals /> é portalado para o contêiner raiz do app no ActiveWorkout', () => {
         const src = read('src/components/ActiveWorkout.tsx')
         // Sem o portal, todo z daqui de baixo é irrelevante: o contexto z-50
         // do ActiveWorkout perde para a barra (2100) na raiz.
-        expect(src).toMatch(/createPortal\(\s*<Modals\s*\/>\s*,\s*document\.body\s*\)/)
+        expect(src).toMatch(/createPortal\(\s*<Modals\s*\/>\s*,\s*portalRoot\(\)\s*\)/)
     })
 
     it.each(MODAL_FILES)('%s — todo overlay fica ACIMA da barra do descanso', (file) => {
@@ -96,6 +96,6 @@ describe('a família de modais é montada UMA vez', () => {
     })
 
     it('e ela é a do portal', () => {
-        expect(src).toMatch(/createPortal\(\s*<Modals\s*\/>\s*,\s*document\.body\s*\)/)
+        expect(src).toMatch(/createPortal\(\s*<Modals\s*\/>\s*,\s*portalRoot\(\)\s*\)/)
     })
 })

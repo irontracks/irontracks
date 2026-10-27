@@ -135,9 +135,9 @@ describe('o editor de story escapa do stacking context', () => {
     }
   })
 
-  it('o portal vai para o document.body, não para um container qualquer', () => {
+  it('o portal vai para o contêiner raiz do app (sem contexto de empilhamento), não para um container qualquer', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/stories/FullscreenPortal.tsx'), 'utf8')
-    expect(src).toMatch(/createPortal\(children, document\.body\)/)
+    expect(src).toMatch(/createPortal\(children, portalRoot\(\)\)/)
   })
 
   it('cada composer mantém um botão de sair com nome acessível', () => {

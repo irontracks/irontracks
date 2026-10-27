@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/utils/ui/portalRoot'
 import { RefreshCw, Loader2, X, Check, Dumbbell } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
 import { EVENTOS_TREINO, rastrearTreino } from '@/lib/workout/telemetriaTreino'
@@ -225,7 +226,7 @@ export default function AIExerciseSwap({
       </button>
 
       {/* Portal modal — rendered at document.body to escape ExerciseCard event handling */}
-      {modalContent && typeof document !== 'undefined' && createPortal(modalContent, document.body)}
+      {modalContent && typeof document !== 'undefined' && createPortal(modalContent, portalRoot())}
     </>
   )
 }

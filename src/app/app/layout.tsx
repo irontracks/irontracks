@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { headers } from 'next/headers'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { Inter } from 'next/font/google'
+import { APP_ROOT_ID } from '@/utils/ui/portalRoot'
 import Script from 'next/script'
 
 /**
@@ -77,7 +78,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const headersList = await headers()
   const nonce = headersList?.get ? (headersList.get('x-nonce') || '') : ''
   return (
-    <div className={`${inter.variable} font-sans antialiased bg-neutral-950 text-white`}>
+    // `id`: alvo dos portais (utils/ui/portalRoot) — a fonte e a cor do app
+    // moram AQUI, não no <body>, que é compartilhado com a landing.
+    <div id={APP_ROOT_ID} className={`${inter.variable} font-sans antialiased bg-neutral-950 text-white`}>
       {process.env.NODE_ENV === 'production' && (
         <Script src="/recovery.js" strategy="afterInteractive" nonce={nonce || undefined} />
       )}

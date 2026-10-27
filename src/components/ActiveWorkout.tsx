@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { portalRoot } from '@/utils/ui/portalRoot';
 import { motion } from 'framer-motion';
 import { Pause, Pencil, Gamepad2, Brain } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
@@ -520,7 +521,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             conseguir salvar. O portal tira a família inteira de modais do
             contexto; os z de cada um (2250–2350) vencem a barra NA RAIZ. Os
             alerts do GlobalDialog (z-10000, raiz) continuam acima de tudo. */}
-        {typeof document !== 'undefined' && createPortal(<Modals />, document.body)}
+        {typeof document !== 'undefined' && createPortal(<Modals />, portalRoot())}
 
         {inTeamSession && (
           <TeamChatDrawer
