@@ -122,7 +122,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         aiState, setAiState,
         applyState, setApplyState,
         sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, kcalInputs, outdoorBike, cardioGps,
-        setsCompleted, setsPlanned, setCompletionPct,
+        setsCompleted, setsPlanned, setCompletionPct, seriesDetalhe, volumeDetalhe, comparacaoVolume,
         reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
         detectedPrs, prCount, allTimePrCount, historicalBestE1rm,
@@ -683,6 +683,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     setsCompleted={setsCompleted}
                     setsPlanned={setsPlanned}
                     emDeload={emDeload}
+                    seriesDetalhe={seriesDetalhe}
+                    volumeDetalhe={volumeDetalhe}
+                    comparacaoVolume={comparacaoVolume}
                 />
 
                 {reportMeta && (
