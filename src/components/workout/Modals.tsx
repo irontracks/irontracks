@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { portalRoot } from '@/utils/ui/portalRoot';
 import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
@@ -289,7 +290,7 @@ export default function Modals() {
             </div>
           </div>
         </div>,
-        document.body,
+        portalRoot(),
       )}
 
       {deloadModal && (

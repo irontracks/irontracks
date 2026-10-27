@@ -24,6 +24,7 @@
  */
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/utils/ui/portalRoot'
 
 /** Nada para assinar: o valor só difere entre servidor (false) e cliente (true). */
 const semInscricao = () => () => {}
@@ -35,7 +36,7 @@ export function FullscreenPortal({ children }: { children: ReactNode }) {
   const noCliente = useSyncExternalStore(semInscricao, () => true, () => false)
 
   if (!noCliente || typeof document === 'undefined') return null
-  return createPortal(children, document.body)
+  return createPortal(children, portalRoot())
 }
 
 export default FullscreenPortal

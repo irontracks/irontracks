@@ -35,7 +35,7 @@ const maxZ = (src: string): number => {
 const checkinIdx = modals.indexOf('{postCheckinOpen &&')
 /** Janela justa: a abertura do bloco (onde ficam o createPortal e o z-index). */
 const checkinOpening = modals.slice(checkinIdx, checkinIdx + 900)
-/** Janela larga: o modal inteiro, até o `document.body` que fecha o portal. */
+/** Janela larga: o modal inteiro, até o `portalRoot()` que fecha o portal. */
 const checkinBlock = modals.slice(checkinIdx, checkinIdx + 6000)
 
 describe('Check-out pós-treino — acima da barra de descanso', () => {
@@ -43,10 +43,10 @@ describe('Check-out pós-treino — acima da barra de descanso', () => {
     expect(checkinIdx).toBeGreaterThan(-1)
   })
 
-  it('é renderizado via portal no document.body (escapa o contexto do ActiveWorkout)', () => {
+  it('é renderizado via portal no contêiner raiz do app (escapa o contexto do ActiveWorkout)', () => {
     expect(modals).toContain("import { createPortal } from 'react-dom'")
     expect(checkinOpening).toContain('createPortal(')
-    expect(checkinBlock).toContain('document.body')
+    expect(checkinBlock).toContain('portalRoot()')
   })
 
   it('o pai que justifica o portal continua criando contexto de empilhamento', () => {

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/utils/ui/portalRoot'
 import Image from 'next/image'
 import {
   Apple,
@@ -554,7 +555,7 @@ export default function HeaderActionsMenu({
             <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
           </div>
         </>,
-        document.body
+        portalRoot()
       )}
     </div>
   )

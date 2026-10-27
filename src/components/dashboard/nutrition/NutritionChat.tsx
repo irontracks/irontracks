@@ -10,6 +10,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/utils/ui/portalRoot'
 import { Loader2, Plus, Send, Sparkles, X } from 'lucide-react'
 import { applyChatSimulationAction } from '@/app/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -301,6 +302,6 @@ export default function NutritionChat({
         </form>
       </div>
     </div>,
-    document.body,
+    portalRoot(),
   )
 }
