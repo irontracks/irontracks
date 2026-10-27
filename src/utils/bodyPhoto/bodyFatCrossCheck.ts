@@ -18,10 +18,12 @@
  */
 
 /** Fonte do número medido, para a UI não chamar bioimpedância de dobra. */
-export type MeasuredBodyFatSource = 'skinfold' | 'bia' | 'assessment'
+export type MeasuredBodyFatSource = 'skinfold' | 'bia' | 'dexa' | 'assessment'
 
 export interface AssessmentBodyFatRow {
     assessment_date: string
+    /** 'dexa' é lido pelo tipo: o % do laudo está em `body_fat_percentage`. */
+    assessment_type?: string | null
     body_fat_percentage?: number | string | null
     body_fat_percentage_skinfold?: number | string | null
     bia_body_fat_percentage?: number | string | null
@@ -73,7 +75,8 @@ export function pickBodyFatReference(
         const bia = toNum(row.bia_body_fat_percentage)
         const generic = toNum(row.body_fat_percentage)
         const picked: [number, MeasuredBodyFatSource] | null =
-            skin !== null ? [skin, 'skinfold']
+            row.assessment_type === 'dexa' && generic !== null ? [generic, 'dexa']
+            : skin !== null ? [skin, 'skinfold']
                 : bia !== null ? [bia, 'bia']
                     : generic !== null ? [generic, 'assessment']
                         : null

@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/utils/escapeHtml'
+import { assessmentMethod, ASSESSMENT_METHOD_SHORT } from '@/utils/assessment/assessmentMethod'
 import {
   avisoForaDoPeriodo, formatarDataBr, SEM_REGISTRO,
   type DossierInput, type Registro, type RegistroResolvido,
@@ -126,7 +127,7 @@ function secaoAvaliacaoFisica(input: DossierInput): string {
   return `${head}
     <div class="cards">
       ${card('Peso', fmt(a.weight, 1, ' kg'))}
-      ${card('Gordura', fmt(bf, 1, '%'))}
+      ${card(`Gordura (${ASSESSMENT_METHOD_SHORT[assessmentMethod(a)]})`, fmt(bf, 1, '%'))}
       ${card('Massa magra', fmt(a.lean_mass ?? a.bia_lean_mass, 1, ' kg'))}
       ${card('IMC', fmt(a.bmi, 1))}
     </div>

@@ -237,7 +237,11 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
     const labels = sortedAssessments.map(makeLabel);
 
     // Barras: apenas as N mais recentes para não sobrecarregar o eixo X
-    const barAssessments = sortedAssessments.slice(-CHART_BAR_LIMIT);
+    // O laudo de DEXA não traz circunferência: uma coluna vazia gastaria um dos
+    // seis lugares das barras de tronco/membros.
+    const barAssessments = sortedAssessments
+        .filter((a) => assessmentMethod(a) !== 'dexa')
+        .slice(-CHART_BAR_LIMIT);
     const barLabels = barAssessments.map(makeLabel);
 
     /*
@@ -251,13 +255,24 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
     const metodos = methodsPresent(sortedAssessments);
     const variosMetodos = metodos.length > 1;
     const BIA_TRACO = [6, 4];
+    // Cada método tem um traço próprio — com o mesmo pontilhado para BIA e DEXA a
+    // legenda era a única pista de qual curva era qual.
+    const estiloDoMetodo = (m: AssessmentMethod): Record<string, unknown> => {
+        switch (m) {
+            case 'dobras': return {};
+            case 'bia':
+            case 'misto': return { borderDash: BIA_TRACO, fill: false };
+            case 'dexa': return { borderDash: [2, 4], fill: false, pointStyle: 'rectRot', pointRadius: 5 };
+            default: { const _exaustivo: never = m; return _exaustivo; }
+        }
+    };
     const porMetodo = <S extends Record<string, unknown>>(
         rotulo: string,
         valor: (a: AssessmentRow) => number | null,
         estilo: S,
     ) => metodos.map((m: AssessmentMethod) => ({
         ...estilo,
-        ...(m === 'dobras' ? {} : { borderDash: BIA_TRACO, fill: false }),
+        ...estiloDoMetodo(m),
         label: variosMetodos ? `${rotulo} · ${ASSESSMENT_METHOD_SHORT[m]}` : rotulo,
         data: sortedAssessments.map((a) => (assessmentMethod(a) === m ? valor(a) : null)),
     }));

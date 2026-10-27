@@ -5,6 +5,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 import type { DossierState } from '@/hooks/useDossier'
 import type { DossierTipo, RegistroResolvido } from '@/lib/dossier/buildDossier'
+import { assessmentMethod, ASSESSMENT_METHOD_SHORT } from '@/utils/assessment/assessmentMethod'
 import { avisoForaDoPeriodo, formatarDataBr, SEM_REGISTRO } from '@/lib/dossier/buildDossier'
 
 interface Props {
@@ -124,7 +125,7 @@ export function DossierModal({ state, exporting, onTrocarTipo, onClose, onExport
                     {av && (
                       <>
                         <Linha label="Peso" valor={num(avReg.weight, 1, ' kg')} />
-                        <Linha label="Gordura" valor={num(avReg.body_fat_percentage ?? avReg.body_fat_percentage_skinfold ?? avReg.bia_body_fat_percentage, 1, '%')} />
+                        <Linha label={`Gordura (${ASSESSMENT_METHOD_SHORT[assessmentMethod(avReg)]})`} valor={num(avReg.body_fat_percentage ?? avReg.body_fat_percentage_skinfold ?? avReg.bia_body_fat_percentage, 1, '%')} />
                       </>
                     )}
                   </section>

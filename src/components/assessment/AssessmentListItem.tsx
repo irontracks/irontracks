@@ -4,7 +4,8 @@ import React from 'react'
 import { ChevronDown, ChevronUp, Sparkles, Edit3, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { computeDelta, type MetricDelta } from './assessmentDelta'
 import { assessmentDayKey, daysBetweenDayKeys } from '@/utils/assessment/assessmentDay'
-import { assessmentMethod, ASSESSMENT_METHOD_LABEL } from '@/utils/assessment/assessmentMethod'
+import { assessmentMethod, ASSESSMENT_METHOD_LABEL, normalizeAssessmentType, isExternalReport } from '@/utils/assessment/assessmentMethod'
+import { AssessmentDexaDetails } from './AssessmentDexaDetails'
 import dynamic from 'next/dynamic'
 
 import type { AssessmentRow } from './assessmentUtils'
@@ -230,7 +231,12 @@ export function AssessmentListItem({
   const ageLabel = String(assessment?.age ?? '-')
   // Discriminação BIA-only vs full + sinal de pareamento. O hook
   // normalizeAssessmentRow garante esses 2 campos sempre presentes.
-  const isBiaOnly = String(assessment?.assessment_type ?? 'full') === 'bia'
+  const tipo = normalizeAssessmentType(assessment?.assessment_type)
+  const isBiaOnly = tipo === 'bia'
+  const isDexa = tipo === 'dexa'
+  // Laudo externo (BIA, DEXA): número pronto do aparelho. Sem Editar (o form
+  // grava uma linha 'full' NOVA), sem PDF no molde de dobras, sem Plano IA.
+  const isLaudoExterno = isExternalReport(tipo)
   const isPaired = !!assessment?.paired_assessment_id
   // Anexo do PDF/foto da bioimpedância — pode estar nesse registro ou no
   // par linkado (a UI considera os dois pra decidir se mostra o badge).
@@ -309,6 +315,11 @@ export function AssessmentListItem({
                   Bioimpedância
                 </span>
               )}
+              {isDexa && (
+                <span className="px-2.5 py-1 bg-sky-500/15 text-sky-300 text-xs rounded-full border border-sky-500/30 font-bold">
+                  DEXA
+                </span>
+              )}
               {isPaired && (
                 <span
                   className="px-2.5 py-1 bg-emerald-500/15 text-emerald-300 text-xs rounded-full border border-emerald-500/30 font-bold inline-flex items-center gap-1"
@@ -325,7 +336,7 @@ export function AssessmentListItem({
                   📎 Comprovante
                 </span>
               )}
-              {!isBiaOnly && (
+              {!isLaudoExterno && (
                 <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
                   {ageLabel} anos
                 </span>
@@ -440,7 +451,7 @@ export function AssessmentListItem({
             {isSelected ? 'Ocultar' : 'Detalhes'}
           </button>
 
-          {!isBiaOnly && (
+          {!isLaudoExterno && (
             <button
               type="button"
               onClick={() => onOpenPlanModal(assessment)}
@@ -453,7 +464,7 @@ export function AssessmentListItem({
           )}
 
           {/* Secundárias: ícone só, com rótulo acessível. */}
-          {!isBiaOnly && (
+          {!isLaudoExterno && (
             <AssessmentPDFGenerator
               variant="icon"
               formData={pdfFormData}
@@ -464,7 +475,7 @@ export function AssessmentListItem({
             />
           )}
 
-          {!isBiaOnly && (
+          {!isLaudoExterno && (
             <button
               type="button"
               onClick={() => onEdit(assessmentId)}
@@ -509,6 +520,7 @@ export function AssessmentListItem({
       </div>
       {isSelected && (
         <div className="mt-4 pt-4 border-t border-neutral-700">
+          {isDexa ? <AssessmentDexaDetails assessment={assessment} /> : (<>
           {/* ── Anexo do PDF/foto da bioimpedância ── */}
           {(() => {
             // Anexo pode estar tanto no registro principal (bia standalone
@@ -569,14 +581,14 @@ export function AssessmentListItem({
             // atual só tem um dos dois (caso típico de pareamento).
             const breakdown = resolveBodyFatFromPair(
               {
-                assessment_type: (assessment.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+                assessment_type: normalizeAssessmentType(assessment.assessment_type),
                 body_fat_percentage_skinfold: typeof assessment.body_fat_percentage_skinfold === 'number'
                   ? assessment.body_fat_percentage_skinfold : undefined,
                 bia_body_fat_percentage: typeof assessment.bia_body_fat_percentage === 'number'
                   ? assessment.bia_body_fat_percentage : undefined,
               },
               pairedAssessment ? {
-                assessment_type: (pairedAssessment.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+                assessment_type: normalizeAssessmentType(pairedAssessment.assessment_type),
                 body_fat_percentage_skinfold: typeof pairedAssessment.body_fat_percentage_skinfold === 'number'
                   ? pairedAssessment.body_fat_percentage_skinfold : undefined,
                 bia_body_fat_percentage: typeof pairedAssessment.bia_body_fat_percentage === 'number'
@@ -688,6 +700,7 @@ export function AssessmentListItem({
             planState={aiPlanState}
             planAnchorRef={(el) => setPlanAnchorRef(String(assessment.id), el)}
           />
+          </>)}
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import { env } from '@/utils/env'
 import { getGeminiModel, type GeminiModelShim } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { assessmentMethod, ASSESSMENT_METHOD_SHORT } from '@/utils/assessment/assessmentMethod'
 import { encodeSseEvent } from '@/utils/ai/sse'
 
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,9 @@ function summariseAssessment(row: AnyObj): string {
   }
   add('Peso', 'weight', 'kg')
   add('Altura', 'height', 'cm')
-  add('BF%', 'body_fat_percentage', '%')
+  // Método junto do número: BF de DEXA, bioimpedância e dobras não se comparam.
+  const bf = Number(row.body_fat_percentage || 0)
+  if (bf > 0) parts.push(`BF%: ${bf}% (${ASSESSMENT_METHOD_SHORT[assessmentMethod(row)]})`)
   add('IMC', 'bmi')
   add('TMB', 'bmr', 'kcal')
   add('Massa magra', 'lean_mass', 'kg')
@@ -191,7 +194,7 @@ export async function POST(req: Request) {
         .limit(5),
       supabase
         .from('assessments')
-        .select('assessment_date, created_at, weight, height, age, gender, body_fat_percentage, bmi, bmr, lean_mass, fat_mass, waist_circ, hip_circ, arm_circ, thigh_circ')
+        .select('assessment_date, assessment_type, created_at, weight, height, age, gender, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage, bmi, bmr, lean_mass, fat_mass, waist_circ, hip_circ, arm_circ, thigh_circ')
         .or(`student_id.eq.${safePg(userId)},user_id.eq.${safePg(userId)}`)
         .order('assessment_date', { ascending: false })
         .limit(1),

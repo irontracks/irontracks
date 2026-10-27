@@ -24,6 +24,7 @@ import {
 const SOURCE_LABEL: Record<BodyFatReference['source'], string> = {
     skinfold: 'dobras cutâneas',
     bia: 'bioimpedância',
+    dexa: 'DEXA',
     assessment: 'avaliação física',
 }
 
