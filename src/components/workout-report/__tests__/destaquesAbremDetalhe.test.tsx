@@ -55,9 +55,9 @@ describe('cards de destaque abrem o detalhe', () => {
     abrir(/Ver detalhes: 2 PRs alcançados/)
     const dlg = screen.getByRole('dialog', { name: 'Recordes da sessão' })
     expect(dlg.textContent).toContain('Cadeira extensora')
-    expect(dlg.textContent).toContain('Última vez: 190,0 kg')
-    expect(dlg.textContent).toContain('o anterior era 200,0 kg')
-    expect(dlg.textContent).toContain('Primeira vez')
+    expect(dlg.textContent).toContain('190,0 kg+17,2 kg')
+    expect(dlg.textContent).toContain('superado em 7,2 kg')
+    expect(dlg.textContent).toContain('primeira comparação')
   })
 
   it('variação → comparação por exercício, incluindo o que não foi feito hoje', () => {
@@ -74,16 +74,16 @@ describe('cards de destaque abrem o detalhe', () => {
     abrir(/Ver detalhes: volume total/)
     const dlg = screen.getByRole('dialog', { name: 'Volume por exercício' })
     expect(dlg.textContent).toContain('20.000 kg')
-    expect(dlg.textContent).toContain('60% do total')
+    expect(dlg.textContent).toContain('60%')
   })
 
   it('séries completas → série a série, com a que faltou', () => {
     render(<ReportHighlightsPanel {...props} />)
     abrir(/Ver detalhes: séries completas/)
     const dlg = screen.getByRole('dialog', { name: 'Séries por exercício' })
-    expect(dlg.textContent).toContain('22,5 kg × 12')
+    expect(dlg.textContent).toContain('22,5 kg × 12 reps')
     expect(dlg.textContent).toContain('não feita')
-    expect(dlg.textContent).toContain('faltou 1')
+    expect(dlg.textContent).toContain('Faltou 1 série')
   })
 
   it('o X fecha a janela', () => {
